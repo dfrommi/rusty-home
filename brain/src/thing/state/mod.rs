@@ -23,18 +23,18 @@ use crate::prelude::*;
 use crate::support::timeseries::TimeSeries;
 
 pub trait DataPointAccess<T> {
-    fn current_data_point(&self) -> Result<DataPoint<T>>;
+    async fn current_data_point(&self) -> Result<DataPoint<T>>;
 
-    fn current(&self) -> Result<T> {
-        self.current_data_point().map(|dp| dp.value)
+    async fn current(&self) -> Result<T> {
+        self.current_data_point().await.map(|dp| dp.value)
     }
 }
 
 pub trait TimeSeriesAccess<T> {
-    fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<T>>;
+    async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<T>>;
 
-    fn series_of_last(&self, duration: ::chrono::Duration) -> Result<TimeSeries<T>> {
-        self.series_since(chrono::Utc::now() - duration)
+    async fn series_of_last(&self, duration: ::chrono::Duration) -> Result<TimeSeries<T>> {
+        self.series_since(chrono::Utc::now() - duration).await
     }
 }
 
@@ -84,9 +84,9 @@ impl<
         F: Fn(&S, &T) -> R,
     > TimeSeriesAccess<R> for MultiTimeSeriesAccess<S, T, R, U, V, F>
 {
-    fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<R>> {
-        let first_series = self.first.series_since(since)?;
-        let second_series = self.second.series_since(since)?;
+    async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<R>> {
+        let first_series = self.first.series_since(since).await?;
+        let second_series = self.second.series_since(since).await?;
 
         println!("First {:?}", first_series);
         println!("Second {:?}", second_series);

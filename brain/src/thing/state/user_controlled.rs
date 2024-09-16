@@ -13,10 +13,11 @@ pub enum UserControlled {
 }
 
 impl DataPointAccess<bool> for UserControlled {
-    fn current_data_point(&self) -> crate::error::Result<DataPoint<bool>> {
-        let state = super::Powered::Dehumidifier.current_data_point()?;
-        let maybe_command =
-            home_api().get_latest_command(&CommandTarget::SetPower(PowerToggle::Dehumidifier))?;
+    async fn current_data_point(&self) -> crate::error::Result<DataPoint<bool>> {
+        let state = super::Powered::Dehumidifier.current_data_point().await?;
+        let maybe_command = home_api()
+            .get_latest_command(&CommandTarget::SetPower(PowerToggle::Dehumidifier))
+            .await?;
 
         tracing::debug!("command = {:?}", maybe_command);
 

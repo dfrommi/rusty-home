@@ -46,16 +46,16 @@ impl DewPoint {
 }
 
 impl DataPointAccess<DegreeCelsius> for DewPoint {
-    fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
-        let t_value = self.temperature().current_data_point()?;
-        let h_value = self.relative_humidity().current_data_point()?;
+    async fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
+        let t_value = self.temperature().current_data_point().await?;
+        let h_value = self.relative_humidity().current_data_point().await?;
 
         Ok(self.dewpoint(&t_value, &h_value))
     }
 }
 
 impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
-    fn series_since(
+    async fn series_since(
         &self,
         since: chrono::DateTime<chrono::Utc>,
     ) -> Result<TimeSeries<DegreeCelsius>> {
@@ -66,7 +66,7 @@ impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
                 calculate_dew_point(t, h)
             });
 
-        series.series_since(since)
+        series.series_since(since).await
     }
 }
 

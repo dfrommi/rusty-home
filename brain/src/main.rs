@@ -5,6 +5,7 @@ use core::time;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::sync::{Arc, OnceLock};
+use tokio::task::JoinSet;
 
 mod error;
 mod planning;
@@ -24,28 +25,22 @@ pub fn home_api() -> &'static HomeApi {
         .expect("Global home-api instance accessed before initialization")
 }
 
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
 
     unsafe { std::env::set_var("RUST_LOG", "warn,brain=debug") };
     tracing_subscriber::fmt::init();
 
-    let rt = Arc::new(
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
+    let mut tasks = JoinSet::new();
 
-    let db_pool = rt
-        .block_on(
-            sqlx::postgres::PgPoolOptions::new()
-                .max_connections(4)
-                .connect(&settings.database.url),
-        )
-        .unwrap();
+    let db_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&settings.database.url)
+        .await
+        .expect("Error initializing database");
 
-    rt.spawn(async move {
+    tasks.spawn(async move {
         let mut listener = PgListener::connect(&settings.database.url).await.unwrap();
         listener.listen("thing_values_insert").await.unwrap();
 
@@ -55,13 +50,19 @@ pub fn main() {
     });
 
     HOME_API_INSTANCE
-        .set(HomeApi::new(db_pool, rt.clone()))
+        .set(HomeApi::new(db_pool))
         .expect("Error setting global event bus instance");
 
-    loop {
-        tracing::info!("Start planning");
-        do_plan();
-        tracing::info!("Planning done");
-        std::thread::sleep(time::Duration::from_secs_f64(30.0));
+    tasks.spawn(async {
+        loop {
+            tracing::info!("Start planning");
+            do_plan().await;
+            tracing::info!("Planning done");
+            std::thread::sleep(time::Duration::from_secs_f64(30.0));
+        }
+    });
+
+    while let Some(task) = tasks.join_next().await {
+        let () = task.unwrap();
     }
 }

@@ -8,16 +8,19 @@ pub use api::state::Temperature;
 use support::unit::DegreeCelsius;
 
 impl DataPointAccess<DegreeCelsius> for Temperature {
-    fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
-        Ok(home_api().get_latest(self)?)
+    async fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
+        Ok(home_api().get_latest(self).await?)
     }
 }
 
 impl TimeSeriesAccess<DegreeCelsius> for Temperature {
-    fn series_since(
+    async fn series_since(
         &self,
         since: chrono::DateTime<chrono::Utc>,
     ) -> Result<TimeSeries<DegreeCelsius>> {
-        home_api().get_covering(self, since).map(TimeSeries::new)?
+        home_api()
+            .get_covering(self, since)
+            .await
+            .map(TimeSeries::new)?
     }
 }

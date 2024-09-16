@@ -13,29 +13,35 @@ use crate::prelude::*;
 pub struct Dehumidify {}
 
 impl Action for Dehumidify {
-    fn start(&self) -> Result<()> {
+    async fn start(&self) -> Result<()> {
         Command::SetPower {
             item: PowerToggle::Dehumidifier,
             power_on: true,
         }
         .execute()
+        .await
     }
 
-    fn stop(&self) -> Result<()> {
+    async fn stop(&self) -> Result<()> {
         Command::SetPower {
             item: PowerToggle::Dehumidifier,
             power_on: false,
         }
         .execute()
+        .await
     }
 
-    fn is_running(&self) -> bool {
-        Powered::Dehumidifier.current().map_or(false, |v| v.is_on())
+    async fn is_running(&self) -> bool {
+        Powered::Dehumidifier
+            .current()
+            .await
+            .map_or(false, |v| v.is_on())
     }
 
-    fn is_enabled(&self) -> bool {
+    async fn is_enabled(&self) -> bool {
         UserControlled::Dehumidifier
             .current()
+            .await
             .unwrap_or_else(|e| {
                 tracing::warn!(
                     "Error getting user-controlled state, falling back to enabled: {:?}",

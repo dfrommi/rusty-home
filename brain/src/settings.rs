@@ -16,7 +16,7 @@ pub struct Database {
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let s = Config::builder()
-            .add_source(File::with_name("kraken.toml"))
+            .add_source(File::with_name("brain.toml"))
             .build()?;
 
         s.try_deserialize()

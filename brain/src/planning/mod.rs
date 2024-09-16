@@ -19,15 +19,15 @@ struct HomeState {
 }
 
 impl HomeState {
-    pub fn new() -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         Ok(Self {
-            risk_of_mould_in_bathroom: RiskOfMould::Bathroom.current()?,
+            risk_of_mould_in_bathroom: RiskOfMould::Bathroom.current().await?,
         })
     }
 }
 
-pub fn do_plan() {
-    let initial_state = HomeState::new().expect("Error initialzing state");
+pub async fn do_plan() {
+    let initial_state = HomeState::new().await.expect("Error initialzing state");
     let all_actions: Vec<Dehumidify> = vec![Dehumidify {}];
 
     tracing::debug!("Planning with initial state {:?}", initial_state);
@@ -41,30 +41,32 @@ pub fn do_plan() {
     tracing::debug!("Planning result next actions {:?}", result.next_actions);
 
     for action in &all_actions {
-        tracing::debug!("Enabled = {:?}", action.is_enabled());
+        let is_enabled = action.is_enabled().await;
+        let is_running = action.is_running().await;
+        tracing::debug!("Enabled = {:?}", is_enabled);
 
-        if result.next_actions.contains(&action) || !action.is_running() {
+        if result.next_actions.contains(&action) || !is_running {
             continue;
         }
 
-        if !action.is_enabled() {
+        if !is_enabled {
             tracing::debug!("Not stopping action {:?} because it's disabled", action);
             continue;
         }
 
-        match action.stop() {
+        match action.stop().await {
             Ok(_) => tracing::info!("Stopped action {:?}", action),
             Err(err) => tracing::error!("Error stopping action {:?}: {}", action, err),
         };
     }
 
     for action in result.next_actions {
-        if !action.is_enabled() {
+        if !action.is_enabled().await {
             tracing::debug!("Skipping action {:?} because it's disabled", action);
             continue;
         }
 
-        match action.start() {
+        match action.start().await {
             Ok(_) => tracing::info!("Action {:?} started", action),
             Err(err) => tracing::error!("Error starting action {:?}: {}", action, err),
         };

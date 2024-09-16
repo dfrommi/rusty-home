@@ -7,7 +7,7 @@ pub use api::state::Powered;
 use support::unit::PowerState;
 
 impl DataPointAccess<PowerState> for Powered {
-    fn current_data_point(&self) -> Result<DataPoint<PowerState>> {
-        Ok(home_api().get_latest(self)?)
+    async fn current_data_point(&self) -> Result<DataPoint<PowerState>> {
+        Ok(home_api().get_latest(self).await?)
     }
 }

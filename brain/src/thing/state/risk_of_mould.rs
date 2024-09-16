@@ -12,11 +12,12 @@ pub enum RiskOfMould {
 }
 
 impl DataPointAccess<bool> for RiskOfMould {
-    fn current_data_point(&self) -> Result<DataPoint<bool>> {
+    async fn current_data_point(&self) -> Result<DataPoint<bool>> {
         let humidity = match self {
             RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
         }
-        .current_data_point()?;
+        .current_data_point()
+        .await?;
 
         if humidity.value < Percent(60.0) {
             return Ok(DataPoint {
@@ -28,9 +29,10 @@ impl DataPointAccess<bool> for RiskOfMould {
         let this_dp = match self {
             RiskOfMould::Bathroom => DewPoint::BathroomShower,
         }
-        .current_data_point()?;
+        .current_data_point()
+        .await?;
 
-        let ref_dp = self.get_reference_dewpoint()?;
+        let ref_dp = self.get_reference_dewpoint().await?;
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
@@ -43,7 +45,7 @@ impl DataPointAccess<bool> for RiskOfMould {
 }
 
 impl RiskOfMould {
-    fn get_reference_dewpoint(&self) -> Result<DegreeCelsius> {
+    async fn get_reference_dewpoint(&self) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
                 DewPoint::LivingRoomDoor,
@@ -54,7 +56,7 @@ impl RiskOfMould {
 
         let mut ref_sum: f64 = 0.0;
         for ref_dp in &ref_dewpoints {
-            let ts = ref_dp.series_of_last(Duration::hours(3))?;
+            let ts = ref_dp.series_of_last(Duration::hours(3)).await?;
             ref_sum += ts.mean().0;
         }
 

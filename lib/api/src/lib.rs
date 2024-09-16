@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use state::*;
@@ -15,7 +13,6 @@ pub use crate::error::{Error, Result};
 #[derive(Debug)]
 pub struct HomeApi {
     db_pool: PgPool,
-    rt: Arc<tokio::runtime::Runtime>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,20 +21,19 @@ pub struct BackendApi {
 }
 
 impl HomeApi {
-    pub fn new(db_pool: PgPool, rt: Arc<tokio::runtime::Runtime>) -> Self {
-        Self { db_pool, rt }
+    pub fn new(db_pool: PgPool) -> Self {
+        Self { db_pool }
     }
 
-    pub fn get_latest<'a, C: ChannelId>(&self, id: &'a C) -> Result<DataPoint<C::ValueType>>
+    pub async fn get_latest<'a, C: ChannelId>(&self, id: &'a C) -> Result<DataPoint<C::ValueType>>
     where
         &'a C: Into<DbChannelId>,
         C::ValueType: From<f64>,
     {
-        self.rt
-            .block_on(crate::state::db::get_latest(&(self.db_pool), id))
+        crate::state::db::get_latest(&(self.db_pool), id).await
     }
 
-    pub fn get_covering<'a, C: ChannelId>(
+    pub async fn get_covering<'a, C: ChannelId>(
         &self,
         id: &'a C,
         start: DateTime<Utc>,
@@ -46,18 +42,18 @@ impl HomeApi {
         &'a C: Into<DbChannelId>,
         C::ValueType: From<f64>,
     {
-        self.rt
-            .block_on(crate::state::db::get_covering(&(self.db_pool), id, start))
+        crate::state::db::get_covering(&(self.db_pool), id, start).await
     }
 
-    pub fn execute_command(&self, command: &Command) -> Result<()> {
-        self.rt
-            .block_on(crate::command::db::add_command(&(self.db_pool), command))
+    pub async fn execute_command(&self, command: &Command) -> Result<()> {
+        crate::command::db::add_command(&(self.db_pool), command).await
     }
 
-    pub fn get_latest_command(&self, target: &CommandTarget) -> Result<Option<CommandExecution>> {
-        self.rt
-            .block_on(command::db::get_latest_for_target(&self.db_pool, target))
+    pub async fn get_latest_command(
+        &self,
+        target: &CommandTarget,
+    ) -> Result<Option<CommandExecution>> {
+        command::db::get_latest_for_target(&self.db_pool, target).await
     }
 }
 

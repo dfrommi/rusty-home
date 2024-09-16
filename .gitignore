@@ -1,0 +1,12 @@
+.idea/
+target/
+.sqlx/
+
+.*
+!.gitignore
+
+Cargo.lock
+
+/*.toml
+!Cargo.toml
+

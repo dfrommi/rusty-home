@@ -1,0 +1,43 @@
+use config::{Config, ConfigError, File};
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct Settings {
+    pub database: Database,
+    pub mqtt: Mqtt,
+    pub homeassistant: HomeAssitant,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct Database {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct Mqtt {
+    pub host: String,
+    pub port: u16,
+    pub client_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct HomeAssitant {
+    pub topic_event: String,
+    pub topic_command: String,
+    pub url: String,
+    pub token: String,
+}
+
+impl Settings {
+    pub fn new() -> Result<Self, ConfigError> {
+        let s = Config::builder()
+            .add_source(File::with_name("pinky.toml"))
+            .build()?;
+
+        s.try_deserialize()
+    }
+}

@@ -1,0 +1,31 @@
+[package]
+name = "kraken"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4.38", features = ["serde", "std"] }
+rumqttc = "*"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+lazy_static = "*"
+thiserror = "1"
+tracing = "*"
+tracing-subscriber = "*"
+reqwest = { version = "*", features = ["json"] }
+
+config = { version = "0.14.0", features = ["toml"] }
+
+sqlx = { version = "0.7", features = [
+  "postgres",
+  "runtime-tokio",
+  "macros",
+  "chrono",
+] }
+
+api = { path = "../lib/api" }
+support = { path = "../lib/support" }
+
+[dev-dependencies]
+assert-json-diff = "2.0.2"

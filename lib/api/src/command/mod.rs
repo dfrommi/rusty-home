@@ -2,12 +2,12 @@ use chrono::{DateTime, Utc};
 
 pub(super) mod db;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PowerToggle {
     Dehumidifier,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     SetPower { item: PowerToggle, power_on: bool },
 }

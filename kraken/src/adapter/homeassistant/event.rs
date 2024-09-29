@@ -1,27 +1,55 @@
-use std::env;
-
+use api::BackendApi;
 use parse::{HaEvent, StateValue};
-use serde_json::json;
-use tokio::sync::mpsc::Sender;
-use tracing::{debug, error, info, warn};
+use support::mqtt::MqttInMessage;
+use tracing::{debug, info, warn};
 
-use crate::adapter::{
-    homeassistant::event::parse::StateChangedEvent, IncomingMessage, PersistentDataPoint,
-};
+use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
+use crate::error::Result;
 use api::state::ChannelValue;
 use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
 use super::{config::ha_incoming_event_config, HaChannel};
 
-pub fn to_smart_home_event(json_payload: &str) -> Option<PersistentDataPoint> {
-    let v = serde_json::from_str(json_payload);
+pub async fn persist_current_ha_state(api: &BackendApi, url: &str, token: &str) -> Result<()> {
+    info!("Persisting current HA states");
+    for event in get_current_states(url, token).await? {
+        if let Some(dp) = to_smart_home_event(&event) {
+            info!("Persisting {:?}", dp);
+            api.add_thing_value(&dp.value, &dp.timestamp).await?;
+        }
+    }
 
-    match v {
-        Ok(HaEvent::StateChanged {
+    Ok(())
+}
+
+pub async fn on_ha_event_received(api: &BackendApi, msg: MqttInMessage) {
+    match serde_json::from_str(&msg.payload) {
+        Ok(event) => match to_smart_home_event(&event) {
+            Some(dp) => {
+                tracing::debug!(
+                    "Received supported event {:?} as data-point {:?}",
+                    event,
+                    dp
+                );
+                api.add_thing_value(&dp.value, &dp.timestamp)
+                    .await
+                    .inspect_err(|e| tracing::error!("Error persisting data-point: {}", e));
+            }
+            None => {
+                tracing::trace!("Unsupported event {:?} received", event);
+            }
+        },
+        Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
+    }
+}
+
+fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
+    match event {
+        HaEvent::StateChanged {
             entity_id,
             new_state,
             ..
-        }) => {
+        } => {
             let ha_config = match ha_incoming_event_config(&entity_id as &str) {
                 Some(entity_config) => entity_config,
                 None => {
@@ -30,7 +58,7 @@ pub fn to_smart_home_event(json_payload: &str) -> Option<PersistentDataPoint> {
                 }
             };
 
-            match new_state.state {
+            match &new_state.state {
                 StateValue::Available(state_value) => {
                     info!("Received supported event {}", entity_id);
 
@@ -58,22 +86,14 @@ pub fn to_smart_home_event(json_payload: &str) -> Option<PersistentDataPoint> {
                 }
             }
         }
-        Ok(HaEvent::Unknown(_)) => {
+        HaEvent::Unknown(_) => {
             debug!("Received unsupported event");
-            None
-        }
-        Err(err) => {
-            error!("Error parsing json {:?}", err);
             None
         }
     }
 }
 
-pub async fn init(
-    evt_tx: &Sender<IncomingMessage>,
-    url: &str,
-    token: &str,
-) -> crate::error::Result<()> {
+async fn get_current_states(url: &str, token: &str) -> Result<Vec<HaEvent>> {
     let client = reqwest::Client::new();
     let response = client
         .get(format!("{}/api/states", url))
@@ -85,27 +105,15 @@ pub async fn init(
 
     tracing::info!("{} init-events ready to send", events.len());
 
-    for event in events.into_iter() {
-        let entity_id = event.entity_id.clone();
-
-        let msg = HaEvent::StateChanged {
-            entity_id: entity_id.clone(),
+    let result: Vec<HaEvent> = events
+        .into_iter()
+        .map(|event| HaEvent::StateChanged {
+            entity_id: event.entity_id.clone(),
             new_state: event,
-        };
+        })
+        .collect();
 
-        let send_res = evt_tx
-            .send(IncomingMessage::HomeAssistant {
-                payload: json!(msg).to_string(),
-            })
-            .await;
-
-        match send_res {
-            Ok(_) => tracing::trace!("Sending init event for {}", entity_id),
-            Err(e) => tracing::error!("Error sending init event for {}: {:?}", entity_id, e),
-        }
-    }
-
-    Ok(())
+    Ok(result)
 }
 
 fn to_persistent_data_point(

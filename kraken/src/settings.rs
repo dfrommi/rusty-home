@@ -1,7 +1,7 @@
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct Settings {
     pub database: Database,
@@ -9,13 +9,13 @@ pub struct Settings {
     pub homeassistant: HomeAssitant,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct Database {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct Mqtt {
     pub host: String,
@@ -23,7 +23,7 @@ pub struct Mqtt {
     pub client_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct HomeAssitant {
     pub topic_event: String,

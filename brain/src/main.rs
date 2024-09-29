@@ -4,7 +4,7 @@ use api::HomeApi;
 use core::time;
 use settings::Settings;
 use sqlx::postgres::PgListener;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use tokio::task::JoinSet;
 
 mod error;
@@ -15,10 +15,8 @@ mod support;
 mod thing;
 
 pub use crate::error::{Error, Result};
-use support::*;
 
 static HOME_API_INSTANCE: OnceLock<HomeApi> = OnceLock::new();
-
 pub fn home_api() -> &'static HomeApi {
     HOME_API_INSTANCE
         .get()

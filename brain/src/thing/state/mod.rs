@@ -10,13 +10,8 @@ mod total_energy_consumption;
 mod user_controlled;
 
 use api::state::DataPoint;
-pub use current_power_usage::CurrentPowerUsage;
-pub use dewpoint::DewPoint;
 pub use powered::Powered;
-pub use relative_humidity::RelativeHumidity;
 pub use risk_of_mould::RiskOfMould;
-pub use temperature::Temperature;
-pub use total_energy_consumption::TotalEnergyConsumption;
 pub use user_controlled::UserControlled;
 
 use crate::prelude::*;

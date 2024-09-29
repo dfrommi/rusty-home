@@ -16,11 +16,6 @@ use api::{
 };
 use support::mqtt::{MqttInMessage, MqttOutMessage};
 
-struct HaSensorEntity<'a> {
-    pub id: &'a str,
-    pub channel: HaChannel,
-}
-
 #[derive(Debug, Clone)]
 enum HaChannel {
     Temperature(Temperature),
@@ -46,7 +41,7 @@ pub async fn process_ha_events(
     mut event_rx: Receiver<MqttInMessage>,
     settings: &settings::HomeAssitant,
 ) -> Result<()> {
-    persist_current_ha_state(api, &settings.url, &settings.token).await;
+    persist_current_ha_state(api, &settings.url, &settings.token).await?;
 
     let rx_api = api.clone();
     tokio::spawn(async move {
@@ -71,7 +66,10 @@ pub async fn process_ha_commands(
                     payload,
                     retain: false,
                 };
-                mqtt_sender.send(mqtt_msg).await;
+                if let Err(e) = mqtt_sender.send(mqtt_msg).await {
+                    //TODO persist error in database
+                    tracing::error!("Error sending command to MQTT: {}", e);
+                }
             }
             None => {
                 tracing::trace!("Command not supported by Home Assistant: {:?}", command);

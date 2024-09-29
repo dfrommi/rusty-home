@@ -8,6 +8,7 @@ use support::unit::{DegreeCelsius, Percent};
 pub enum DewPoint {
     BathroomShower,
     LivingRoomDoor,
+    #[allow(dead_code)]
     KitchenOuterWall,
     RoomOfRequirementDoor,
 }
@@ -70,6 +71,7 @@ impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
     }
 }
 
+#[allow(dead_code)] //more parameters than currently needed are calculated
 pub fn calculate_dew_point(
     temperature: &DegreeCelsius,
     relative_humidity: &Percent,

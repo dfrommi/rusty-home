@@ -3,7 +3,6 @@ use api::state::DataPoint;
 pub use api::state::TotalEnergyConsumption;
 use support::unit::KiloWattHours;
 
-use super::*;
 use crate::prelude::*;
 
 use super::DataPointAccess;

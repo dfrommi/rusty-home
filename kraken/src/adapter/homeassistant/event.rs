@@ -8,7 +8,7 @@ use crate::error::Result;
 use api::state::ChannelValue;
 use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
-use super::{config::ha_incoming_event_config, HaChannel};
+use super::{config::ha_incoming_event_channel, HaChannel};
 
 pub async fn persist_current_ha_state(api: &BackendApi, url: &str, token: &str) -> Result<()> {
     info!("Persisting current HA states");
@@ -31,9 +31,9 @@ pub async fn on_ha_event_received(api: &BackendApi, msg: MqttInMessage) {
                     event,
                     dp
                 );
-                api.add_thing_value(&dp.value, &dp.timestamp)
-                    .await
-                    .inspect_err(|e| tracing::error!("Error persisting data-point: {}", e));
+                if let Err(e) = api.add_thing_value(&dp.value, &dp.timestamp).await {
+                    tracing::error!("Error persisting data-point: {}", e);
+                }
             }
             None => {
                 tracing::trace!("Unsupported event {:?} received", event);
@@ -50,8 +50,8 @@ fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
             new_state,
             ..
         } => {
-            let ha_config = match ha_incoming_event_config(&entity_id as &str) {
-                Some(entity_config) => entity_config,
+            let ha_channel = match ha_incoming_event_channel(entity_id as &str) {
+                Some(c) => c,
                 None => {
                     debug!("Skipped {}", entity_id);
                     return None;
@@ -62,11 +62,8 @@ fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
                 StateValue::Available(state_value) => {
                     info!("Received supported event {}", entity_id);
 
-                    let dp_result = to_persistent_data_point(
-                        ha_config.channel,
-                        &state_value,
-                        new_state.last_changed,
-                    );
+                    let dp_result =
+                        to_persistent_data_point(ha_channel, state_value, new_state.last_changed);
 
                     match dp_result {
                         Ok(dp) => Some(dp),

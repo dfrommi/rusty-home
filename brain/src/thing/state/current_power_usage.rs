@@ -3,7 +3,6 @@ pub use api::state::CurrentPowerUsage;
 use api::state::DataPoint;
 use support::unit::Watt;
 
-use super::*;
 use crate::prelude::*;
 
 use super::DataPointAccess;

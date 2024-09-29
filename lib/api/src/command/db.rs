@@ -194,6 +194,7 @@ mod mapper {
                 DbCommandType::SetPower => Command::SetPower {
                     item: match self.position {
                         DbDevice::Dehumidifier => PowerToggle::Dehumidifier,
+                        #[allow(unreachable_patterns)] //will be needed with more items
                         _ => return Err(Error::LocationDataInconsistent),
                     },
                     power_on: serde_json::from_value::<SetPowerPayload>(self.payload)?.power_on,

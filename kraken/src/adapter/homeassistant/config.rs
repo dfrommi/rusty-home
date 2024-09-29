@@ -9,14 +9,11 @@ use api::{
     state::Temperature,
 };
 
+use super::HaCommandEntity;
 use super::HomeAssistantService;
-use super::{HaCommandEntity, HaSensorEntity};
 
-pub fn ha_incoming_event_config(entity_id: &str) -> Option<HaSensorEntity> {
-    HA_ENTITIES.get(&entity_id).map(|channel| HaSensorEntity {
-        id: entity_id,
-        channel: channel.clone(),
-    })
+pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
+    HA_ENTITIES.get(&entity_id).cloned()
 }
 
 pub fn ha_command_entity(command: &Command) -> Option<HaCommandEntity> {
@@ -28,6 +25,7 @@ pub fn ha_command_entity(command: &Command) -> Option<HaCommandEntity> {
             id: "switch.mytest",
             service: turn_on_off(*power_on),
         }),
+        #[allow(unreachable_patterns)]
         _ => None,
     }
 }

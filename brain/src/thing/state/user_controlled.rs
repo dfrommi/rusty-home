@@ -39,6 +39,7 @@ impl DataPointAccess<bool> for UserControlled {
                     && diff_since_state_change < Duration::minutes(15))
                     || power_on != state.value.is_on()
             }
+            #[allow(unreachable_patterns)] //will be relavant when more commands are added
             Some(c) => {
                 tracing::error!("Returned command not matching query: {:?}", c);
                 false

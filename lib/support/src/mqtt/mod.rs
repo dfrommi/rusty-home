@@ -62,19 +62,19 @@ impl Mqtt {
         &mut self,
         topic: impl Into<String>,
     ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
+        let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
+        self.subsciptions.push(tx);
+
         self.client
             .subscribe_with_properties(
                 topic,
                 QoS::AtLeastOnce,
                 SubscribeProperties {
-                    id: Some(self.subsciptions.len()),
+                    id: Some(self.subsciptions.len()), //must be > 0
                     user_properties: vec![],
                 },
             )
             .await?;
-
-        let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
-        self.subsciptions.push(tx);
 
         Ok(rx)
     }
@@ -110,7 +110,7 @@ impl Mqtt {
                         };
 
                         for id in subscription_ids {
-                            match self.subsciptions.get(id) {
+                            match self.subsciptions.get(id - 1) {
                                 Some(tx) => {
                                     if let Err(e) = tx.send(mqtt_in_message.clone()).await {
                                         tracing::error!(

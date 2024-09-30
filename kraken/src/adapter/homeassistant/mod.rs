@@ -43,12 +43,10 @@ pub async fn process_ha_events(
 ) -> Result<()> {
     persist_current_ha_state(api, &settings.url, &settings.token).await?;
 
-    let rx_api = api.clone();
-    tokio::spawn(async move {
-        while let Some(msg) = event_rx.recv().await {
-            on_ha_event_received(&rx_api, msg).await;
-        }
-    });
+    tracing::info!("Start processing HA events");
+    while let Some(msg) = event_rx.recv().await {
+        on_ha_event_received(api, msg).await;
+    }
 
     Ok(())
 }

@@ -7,6 +7,7 @@ use sqlx::postgres::PgListener;
 use std::sync::OnceLock;
 use tokio::task::JoinSet;
 
+mod adapter;
 mod error;
 mod planning;
 mod prelude;
@@ -38,6 +39,12 @@ pub async fn main() {
         .await
         .expect("Error initializing database");
 
+    let mqtt_client = ::support::mqtt::Mqtt::connect(
+        &settings.mqtt.host,
+        settings.mqtt.port,
+        &settings.mqtt.client_id,
+    );
+
     tasks.spawn(async move {
         let mut listener = PgListener::connect(&settings.database.url).await.unwrap();
         listener.listen("thing_values_insert").await.unwrap();
@@ -59,6 +66,13 @@ pub async fn main() {
             std::thread::sleep(time::Duration::from_secs_f64(30.0));
         }
     });
+
+    let mqtt_sender = mqtt_client.new_publisher();
+    tasks.spawn(async move {
+        adapter::mqtt::process(&settings.mqtt.topic_state_export, mqtt_sender).await
+    });
+
+    tasks.spawn(async move { mqtt_client.process().await });
 
     while let Some(task) = tasks.join_next().await {
         let () = task.unwrap();

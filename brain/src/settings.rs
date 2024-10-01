@@ -20,7 +20,8 @@ pub struct Mqtt {
     pub host: String,
     pub port: u16,
     pub client_id: String,
-    pub topic_state_export: String,
+    pub base_topic_status: String,
+    pub base_topic_set: String,
 }
 
 impl Settings {

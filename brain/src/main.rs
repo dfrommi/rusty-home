@@ -28,7 +28,7 @@ pub fn home_api() -> &'static HomeApi {
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
 
-    unsafe { std::env::set_var("RUST_LOG", "warn,brain=debug") };
+    unsafe { std::env::set_var("RUST_LOG", "warn,brain=debug,support=debug") };
     tracing_subscriber::fmt::init();
 
     let mut tasks = JoinSet::new();
@@ -39,7 +39,7 @@ pub async fn main() {
         .await
         .expect("Error initializing database");
 
-    let mqtt_client = ::support::mqtt::Mqtt::connect(
+    let mut mqtt_client = ::support::mqtt::Mqtt::connect(
         &settings.mqtt.host,
         settings.mqtt.port,
         &settings.mqtt.client_id,
@@ -63,13 +63,21 @@ pub async fn main() {
             tracing::info!("Start planning");
             do_plan().await;
             tracing::info!("Planning done");
-            std::thread::sleep(time::Duration::from_secs_f64(30.0));
+            tokio::time::sleep(time::Duration::from_secs_f64(30.0)).await;
         }
     });
 
     let mqtt_sender = mqtt_client.new_publisher();
+    let state_topic = settings.mqtt.base_topic_status.clone();
+    tasks.spawn(async move { adapter::mqtt::export_state(&state_topic, mqtt_sender).await });
+
+    tracing::info!("Starting command processing from mqtt");
+    let mqtt_command_receiver = mqtt_client
+        .subscribe(format!("{}/#", &settings.mqtt.base_topic_set))
+        .await
+        .unwrap();
     tasks.spawn(async move {
-        adapter::mqtt::process(&settings.mqtt.topic_state_export, mqtt_sender).await
+        adapter::mqtt::process_commands(&settings.mqtt.base_topic_set, mqtt_command_receiver).await
     });
 
     tasks.spawn(async move { mqtt_client.process().await });

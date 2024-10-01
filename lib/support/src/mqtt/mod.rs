@@ -62,6 +62,10 @@ impl Mqtt {
         &mut self,
         topic: impl Into<String>,
     ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
+        let topic = topic.into();
+
+        tracing::info!("Subscribing to topic: {:?}", &topic);
+
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
         self.subsciptions.push(tx);
 

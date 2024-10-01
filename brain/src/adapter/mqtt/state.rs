@@ -7,7 +7,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::prelude::DataPointAccess;
 
-pub async fn process(base_topic: &str, tx: Sender<MqttOutMessage>) {
+pub async fn export_state(base_topic: &str, tx: Sender<MqttOutMessage>) {
     let mut sender = MqttStateSender::new(base_topic.to_string(), tx);
 
     loop {
@@ -35,7 +35,7 @@ impl MqttStateSender {
     async fn send(&mut self, state: impl IntoMqttState) {
         let state = state.into_mqtt_state().await.unwrap();
         let msg = MqttOutMessage {
-            topic: format!("{}/{}/{}/get", self.base_topic, state.name, state.channel),
+            topic: format!("{}/{}/{}", self.base_topic, state.name, state.channel),
             payload: state.payload,
             retain: true,
         };

@@ -1,5 +1,4 @@
-use crate::home_api;
-use api::state::DataPoint;
+use crate::{adapter::persistence::DataPoint, home_api};
 pub use api::state::TotalEnergyConsumption;
 use support::unit::KiloWattHours;
 

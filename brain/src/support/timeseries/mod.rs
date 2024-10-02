@@ -2,8 +2,7 @@ use polars::frame::DataFrame;
 use polars::prelude::*;
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::prelude::*;
-use api::state::DataPoint;
+use crate::{adapter::persistence::DataPoint, prelude::*};
 
 const TIME: &str = "time";
 const VALUE: &str = "value";

@@ -1,6 +1,6 @@
 use crate::planning::do_plan;
 
-use api::HomeApi;
+use adapter::persistence::HomeApi;
 use core::time;
 use settings::Settings;
 use sqlx::postgres::PgListener;

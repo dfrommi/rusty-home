@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-pub(super) mod db;
+pub mod db;
 
 #[derive(Debug, Clone)]
 pub enum PowerToggle {

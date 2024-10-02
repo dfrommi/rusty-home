@@ -1,8 +1,8 @@
-use api::state::{DataPoint, RelativeHumidity};
+use api::state::RelativeHumidity;
 use chrono::Duration;
 use support::unit::{DegreeCelsius, Percent};
 
-use crate::error::Result;
+use crate::{adapter::persistence::DataPoint, error::Result};
 
 use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};
 

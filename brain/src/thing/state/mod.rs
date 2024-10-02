@@ -9,11 +9,11 @@ mod temperature;
 mod total_energy_consumption;
 mod user_controlled;
 
-use api::state::DataPoint;
 pub use powered::Powered;
 pub use risk_of_mould::RiskOfMould;
 pub use user_controlled::UserControlled;
 
+use crate::adapter::persistence::DataPoint;
 use crate::prelude::*;
 use crate::support::timeseries::TimeSeries;
 

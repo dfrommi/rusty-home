@@ -8,4 +8,6 @@ pub enum Error {
     ApiError(#[from] api::Error),
     #[error("Error in timeseries processing")]
     TimeSeriesError(#[from] polars::error::PolarsError),
+    #[error("error in database query")]
+    Persistence(#[from] sqlx::Error),
 }

@@ -1,6 +1,5 @@
-use crate::home_api;
+use crate::{adapter::persistence::DataPoint, home_api};
 pub use api::state::CurrentPowerUsage;
-use api::state::DataPoint;
 use support::unit::Watt;
 
 use crate::prelude::*;

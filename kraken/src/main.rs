@@ -1,3 +1,4 @@
+use adapter::persistence::BackendApi;
 use api::command::Command;
 use settings::Settings;
 use std::env;
@@ -8,7 +9,6 @@ use tokio::{
     task::JoinSet,
 };
 
-use api::BackendApi;
 mod adapter;
 mod error;
 mod settings;

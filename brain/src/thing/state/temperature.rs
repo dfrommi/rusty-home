@@ -3,7 +3,6 @@ use crate::error::Result;
 use super::*;
 use crate::prelude::*;
 
-use api::state::DataPoint;
 pub use api::state::Temperature;
 use support::unit::DegreeCelsius;
 

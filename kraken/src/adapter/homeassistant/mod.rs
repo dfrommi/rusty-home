@@ -12,9 +12,10 @@ use api::{
     state::{
         CurrentPowerUsage, Opened, Powered, RelativeHumidity, Temperature, TotalEnergyConsumption,
     },
-    BackendApi,
 };
 use support::mqtt::{MqttInMessage, MqttOutMessage};
+
+use super::persistence::BackendApi;
 
 #[derive(Debug, Clone)]
 enum HaChannel {

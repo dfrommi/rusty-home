@@ -1,115 +1,92 @@
-use std::f64;
-
 use cached::proc_macro::cached;
-use chrono::{DateTime, Utc};
-use sqlx::{postgres::PgRow, PgPool, Row};
+use sqlx::PgPool;
 
-use crate::error::{Error, Result};
+use super::*;
 
-use super::{ChannelId, ChannelValue, DataPoint, DbChannelId};
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct DbChannelId {
+    pub channel_name: &'static str,
+    pub item_name: &'static str,
+}
 
-pub async fn get_latest<'a, C: ChannelId>(
-    db_pool: &PgPool,
-    id: &'a C,
-) -> Result<DataPoint<C::ValueType>>
-where
-    &'a C: Into<DbChannelId>,
-    C::ValueType: From<f64>,
-{
-    let tag_id = get_tag_id(db_pool, id.into(), false).await?;
-
-    //TODO rewrite to max query
-    let rec: Option<PgRow> = sqlx::query(
-        "SELECT value, timestamp
-            FROM THING_VALUES
-            WHERE TAG_ID = $1
-            ORDER BY timestamp DESC
-            LIMIT 1",
-    )
-    .bind(tag_id)
-    .fetch_optional(db_pool)
-    .await?;
-
-    match rec {
-        Some(r) => Ok(DataPoint {
-            value: r.get::<f64, _>("value").into(),
-            timestamp: r.get("timestamp"),
-        }),
-        None => Err(Error::NotFound),
+impl From<&ChannelValue> for DbChannelId {
+    fn from(value: &ChannelValue) -> Self {
+        match value {
+            ChannelValue::Temperature(id, _) => id.into(),
+            ChannelValue::RelativeHumidity(id, _) => id.into(),
+            ChannelValue::Opened(id, _) => id.into(),
+            ChannelValue::Powered(id, _) => id.into(),
+            ChannelValue::CurrentPowerUsage(id, _) => id.into(),
+            ChannelValue::TotalEnergyConsumption(id, _) => id.into(),
+        }
     }
 }
 
-pub async fn get_covering<'a, C: ChannelId>(
-    db_pool: &PgPool,
-    id: &'a C,
-    start: DateTime<Utc>,
-) -> Result<Vec<DataPoint<C::ValueType>>>
-where
-    &'a C: Into<DbChannelId>,
-    C::ValueType: From<f64>,
-{
-    let tags_id = get_tag_id(db_pool, id.into(), false).await?;
-
-    //TODO rewrite to max query
-    let rec = sqlx::query(
-        "(SELECT value, timestamp
-              FROM THING_VALUES
-              WHERE TAG_ID = $1
-              AND timestamp > $2)
-            UNION ALL
-            (SELECT value, timestamp
-              FROM THING_VALUES
-              WHERE TAG_ID = $1
-              AND timestamp <= $2
-              ORDER BY timestamp DESC
-              LIMIT 1)",
-    )
-    .bind(tags_id)
-    .bind(start)
-    .fetch_all(db_pool)
-    .await?;
-
-    let dps: Vec<DataPoint<C::ValueType>> = rec
-        .into_iter()
-        .map(|row| DataPoint {
-            value: C::ValueType::from(row.get("value")),
-            timestamp: row.get("timestamp"),
-        })
-        .collect();
-
-    Ok(dps)
+impl From<&ChannelValue> for f64 {
+    fn from(val: &ChannelValue) -> Self {
+        match val {
+            ChannelValue::Temperature(_, v) => v.into(),
+            ChannelValue::RelativeHumidity(_, v) => v.into(),
+            ChannelValue::Opened(_, v) => v.into(),
+            ChannelValue::Powered(_, v) => v.into(),
+            ChannelValue::CurrentPowerUsage(_, v) => v.into(),
+            ChannelValue::TotalEnergyConsumption(_, v) => v.into(),
+        }
+    }
 }
 
-pub async fn add_thing_value(
-    db_pool: &PgPool,
-    value: &ChannelValue,
-    timestamp: &DateTime<Utc>,
-) -> Result<()> {
-    let tags_id = get_tag_id(db_pool, value.into(), true).await?;
+impl From<&Temperature> for DbChannelId {
+    fn from(val: &Temperature) -> Self {
+        DbChannelId {
+            channel_name: "temperature",
+            item_name: val.into(),
+        }
+    }
+}
 
-    let fvalue: f64 = value.into();
+impl From<&RelativeHumidity> for DbChannelId {
+    fn from(val: &RelativeHumidity) -> Self {
+        DbChannelId {
+            channel_name: "relative_humidity",
+            item_name: val.into(),
+        }
+    }
+}
 
-    sqlx::query(
-        "WITH latest_value AS (
-                SELECT value
-                FROM thing_values
-                WHERE tag_id = $1
-                ORDER BY timestamp DESC
-                LIMIT 1
-            )
-            INSERT INTO thing_values (tag_id, value, timestamp)
-            SELECT $1, $2, $3
-            WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)",
-    )
-    .bind(tags_id)
-    .bind(fvalue)
-    .bind(timestamp)
-    .execute(db_pool)
-    .await?;
+impl From<&Opened> for DbChannelId {
+    fn from(val: &Opened) -> Self {
+        DbChannelId {
+            channel_name: "opened",
+            item_name: val.into(),
+        }
+    }
+}
 
-    //info!("Inserted new value: {:?}", event);
+impl From<&Powered> for DbChannelId {
+    fn from(val: &Powered) -> Self {
+        DbChannelId {
+            channel_name: "powered",
+            item_name: val.into(),
+        }
+    }
+}
 
-    Ok(())
+impl From<&CurrentPowerUsage> for DbChannelId {
+    fn from(value: &CurrentPowerUsage) -> Self {
+        DbChannelId {
+            channel_name: "current_power_usage",
+            item_name: value.into(),
+        }
+    }
+}
+
+impl From<&TotalEnergyConsumption> for DbChannelId {
+    fn from(value: &TotalEnergyConsumption) -> Self {
+        DbChannelId {
+            channel_name: "total_energy_consumption",
+            item_name: value.into(),
+        }
+    }
 }
 
 #[cached(
@@ -117,7 +94,7 @@ pub async fn add_thing_value(
     key = "DbChannelId",
     convert = r#"{ channel_id.clone() }"#
 )]
-async fn get_tag_id(
+pub async fn get_tag_id(
     db_pool: &PgPool,
     channel_id: DbChannelId,
     create_if_missing: bool,

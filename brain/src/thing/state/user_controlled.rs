@@ -1,10 +1,7 @@
 use chrono::{Duration, Utc};
 
-use crate::home_api;
-use api::{
-    command::{Command, CommandExecution, CommandTarget, PowerToggle},
-    state::DataPoint,
-};
+use crate::{adapter::persistence::DataPoint, home_api};
+use api::command::{Command, CommandExecution, CommandTarget, PowerToggle};
 
 use super::DataPointAccess;
 

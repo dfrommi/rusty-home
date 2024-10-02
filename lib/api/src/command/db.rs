@@ -1,122 +1,8 @@
-use sqlx::PgPool;
-
-use crate::error::{Error, Result};
-
 use self::schema::*;
 
-use super::{Command, CommandExecution, CommandTarget};
-
-pub async fn add_command(db_pool: &PgPool, command: &Command) -> Result<()> {
-    let data: DbThingCommand = command.into();
-
-    sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, POSITION, PAYLOAD, TIMESTAMP, STATUS) VALUES ($1, $2, $3, $4, $5)")
-            .bind(data.command_type)
-            .bind(data.position)
-            .bind(data.payload)
-            .bind(chrono::Utc::now())
-            .bind(DbCommandState::Pending)
-            .execute(db_pool)
-            .await?;
-
-    Ok(())
-}
-
-pub async fn get_latest_for_target(
-    db_pool: &PgPool,
-    target: &CommandTarget,
-) -> Result<Option<CommandExecution>> {
-    let (command_type, device): (DbCommandType, DbDevice) = target.into();
-
-    let row: Option<DbThingCommandRow> = sqlx::query_as(
-        "SELECT *
-            from THING_COMMANDS
-            where type = $1
-              and position = $2
-           order by timestamp desc
-           limit 1",
-    )
-    .bind(command_type)
-    .bind(device)
-    .fetch_optional(db_pool)
-    .await?;
-
-    Ok(match row {
-        Some(row) => Option::Some(row.try_into()?),
-        None => Option::None,
-    })
-}
-
-//TODO handle too old commands -> expect TTL with command, store in DB and return error with message
-pub async fn get_command_for_processing(db_pool: &PgPool) -> Result<Option<Command>> {
-    let mut tx = db_pool.begin().await?;
-
-    let maybe_rec: Option<DbThingCommandRow> = sqlx::query_as(
-        "SELECT * 
-                from THING_COMMANDS 
-                where status = $1
-                order by TIMESTAMP ASC
-                limit 1
-                for update skip locked",
-    )
-    .bind(DbCommandState::Pending)
-    .fetch_optional(&mut *tx)
-    .await?;
-
-    match maybe_rec {
-        None => Ok(None),
-        Some(rec) => {
-            let maybe_command: Result<Command> = rec.data.try_into();
-
-            let result = match maybe_command {
-                Ok(command) => {
-                    set_command_status_in_tx(
-                        &mut *tx,
-                        rec.id,
-                        DbCommandState::InProgress,
-                        Option::None,
-                    )
-                    .await?;
-                    Some(command)
-                }
-                Err(Error::LocationDataInconsistent) | Err(Error::Deserialisation(_)) => {
-                    //TODO error message
-                    set_command_status_in_tx(
-                        &mut *tx,
-                        rec.id,
-                        DbCommandState::Error,
-                        Option::Some("Error in format of stored command"),
-                    )
-                    .await?;
-                    None
-                }
-                Err(error) => return Err(error),
-            };
-
-            tx.commit().await?;
-            Ok(result)
-        }
-    }
-}
-
-//TODO error message
-async fn set_command_status_in_tx(
-    executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
-    command_id: i64,
-    status: DbCommandState,
-    error_message: Option<&str>,
-) -> std::result::Result<(), sqlx::Error> {
-    sqlx::query("UPDATE THING_COMMANDS SET status = $2, error = $3 WHERE id = $1")
-        .bind(command_id)
-        .bind(status)
-        .bind(error_message)
-        .execute(executor)
-        .await
-        .map(|_| ())
-}
-
-mod schema {
+pub mod schema {
     #[derive(serde::Serialize, serde::Deserialize)]
-    pub struct SetPowerPayload {
+    pub struct DbSetPowerPayload {
         pub power_on: bool,
     }
 
@@ -160,7 +46,7 @@ mod schema {
     }
 }
 
-mod mapper {
+pub mod mapper {
     use serde_json::json;
 
     use crate::{
@@ -178,7 +64,7 @@ mod mapper {
                     position: match item {
                         PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
                     },
-                    payload: json!(SetPowerPayload {
+                    payload: json!(DbSetPowerPayload {
                         power_on: *power_on,
                     }),
                 },
@@ -197,7 +83,7 @@ mod mapper {
                         #[allow(unreachable_patterns)] //will be needed with more items
                         _ => return Err(Error::LocationDataInconsistent),
                     },
-                    power_on: serde_json::from_value::<SetPowerPayload>(self.payload)?.power_on,
+                    power_on: serde_json::from_value::<DbSetPowerPayload>(self.payload)?.power_on,
                 },
             };
 

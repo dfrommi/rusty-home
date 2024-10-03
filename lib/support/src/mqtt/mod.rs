@@ -1,4 +1,8 @@
-use std::str::{from_utf8, Utf8Error};
+use std::{
+    collections::HashMap,
+    str::{from_utf8, Utf8Error},
+    time::{Duration, Instant},
+};
 
 use rumqttc::v5::{
     mqttbytes::{
@@ -94,6 +98,8 @@ impl Mqtt {
         let mut event_loop = self.event_loop;
 
         tasks.spawn(async move {
+            let mut last_seen: HashMap<String, (Instant, String)> = HashMap::new();
+
             loop {
                 match event_loop.poll().await {
                     Ok(Incoming(rumqttc::v5::mqttbytes::v5::Packet::Publish(msg))) => {
@@ -112,6 +118,20 @@ impl Mqtt {
                                 continue;
                             }
                         };
+
+                        //deduplicate as some senders publish multiple times (homekit)
+                        if let Some((t, p)) = last_seen.get(&mqtt_in_message.topic) {
+                            if t.elapsed() < Duration::from_millis(250)
+                                && p == &mqtt_in_message.payload
+                            {
+                                continue;
+                            }
+                        }
+
+                        last_seen.insert(
+                            mqtt_in_message.topic.clone(),
+                            (Instant::now(), mqtt_in_message.payload.clone()),
+                        );
 
                         for id in subscription_ids {
                             match self.subsciptions.get(id - 1) {

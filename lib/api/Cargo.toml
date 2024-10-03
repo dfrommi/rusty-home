@@ -17,5 +17,6 @@ serde_json = "1.0"
 thiserror = "1"
 cached = { version = "*", features = ["default", "async"] }
 strum = { version = "0.26", features = ["derive"] }
+tracing = "*"
 
 support = { path = "../support" }

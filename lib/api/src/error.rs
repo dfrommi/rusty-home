@@ -12,4 +12,6 @@ pub enum Error {
     Deserialisation(#[from] serde_json::error::Error),
     #[error("error parsing value to float")]
     NumberFormat(#[from] std::num::ParseFloatError),
+    #[error("Invaild parameter")]
+    InvalidParameter,
 }

@@ -8,13 +8,14 @@ use api::{
     },
     get_tag_id,
     state::{db::DbChannelId, ChannelId},
+    EventListener,
 };
 use chrono::{DateTime, Utc};
 use sqlx::{
     postgres::{PgListener, PgRow},
     PgPool, Row,
 };
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::broadcast::Receiver;
 
 pub use crate::error::{Error, Result};
 
@@ -31,47 +32,27 @@ pub struct HomeApi {
 
 #[derive(Debug)]
 pub struct HomeEventListener {
-    db_listener: PgListener,
-    thing_value_added_sender: Sender<()>,
+    delegate: EventListener,
 }
 
 impl HomeEventListener {
     pub fn new(db_listener: PgListener) -> Self {
-        let (tx, _) = tokio::sync::broadcast::channel(1);
-
         Self {
-            db_listener,
-            thing_value_added_sender: tx,
+            delegate: EventListener::new(db_listener, vec![api::THING_VALUE_ADDED_EVENT]),
         }
     }
 
     pub fn new_thing_value_added_listener(&self) -> Receiver<()> {
-        self.thing_value_added_sender.subscribe()
+        self.delegate
+            .new_listener(api::THING_VALUE_ADDED_EVENT)
+            .unwrap()
     }
 
-    pub async fn dispatch_events(mut self) -> Result<()> {
-        self.db_listener
-            .listen(api::THING_VALUE_ADDED_EVENT)
-            .await?;
-
-        loop {
-            match self.db_listener.recv().await {
-                Ok(notification) => match notification.channel() {
-                    api::THING_VALUE_ADDED_EVENT => {
-                        if let Err(e) = self.thing_value_added_sender.send(()) {
-                            tracing::error!("Error dispatching event: {}", e);
-                        }
-                    }
-                    _ => {
-                        tracing::warn!(
-                            "Received notification on unknown channel: {}",
-                            notification.channel()
-                        );
-                    }
-                },
-                Err(e) => tracing::error!("Error receiving notification: {}", e),
-            }
-        }
+    pub async fn dispatch_events(self) -> Result<()> {
+        self.delegate
+            .dispatch_events()
+            .await
+            .map_err(Error::ApiError)
     }
 }
 

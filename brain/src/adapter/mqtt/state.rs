@@ -3,17 +3,25 @@ use std::collections::HashMap;
 use crate::error::Result;
 use api::state::Powered;
 use support::{mqtt::MqttOutMessage, unit::PowerState};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::prelude::DataPointAccess;
 
-pub async fn export_state(base_topic: &str, tx: Sender<MqttOutMessage>) {
+pub async fn export_state(
+    base_topic: &str,
+    tx: Sender<MqttOutMessage>,
+    mut state_changed: Receiver<()>,
+) {
     let mut sender = MqttStateSender::new(base_topic.to_string(), tx);
+    let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
 
     loop {
-        sender.send(Powered::Dehumidifier).await;
+        tokio::select! {
+            _ = state_changed.recv() => {},
+            _ = timer.tick() => {},
+        }
 
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        sender.send(Powered::Dehumidifier).await;
     }
 }
 

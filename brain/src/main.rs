@@ -1,6 +1,6 @@
 use crate::planning::do_plan;
 
-use adapter::persistence::HomeApi;
+use adapter::persistence::{HomeApi, HomeEventListener};
 use core::time;
 use settings::Settings;
 use sqlx::postgres::PgListener;
@@ -39,24 +39,21 @@ pub async fn main() {
         .await
         .expect("Error initializing database");
 
+    let db_listener = PgListener::connect(&settings.database.url)
+        .await
+        .expect("Error initializing database listener");
+
     let mut mqtt_client = ::support::mqtt::Mqtt::connect(
         &settings.mqtt.host,
         settings.mqtt.port,
         &settings.mqtt.client_id,
     );
 
-    tasks.spawn(async move {
-        let mut listener = PgListener::connect(&settings.database.url).await.unwrap();
-        listener.listen("thing_values_insert").await.unwrap();
-
-        while let Ok(notification) = listener.recv().await {
-            tracing::info!("PG Received notification: {}", notification.payload());
-        }
-    });
-
     HOME_API_INSTANCE
         .set(HomeApi::new(db_pool))
         .expect("Error setting global event bus instance");
+
+    let event_listener = HomeEventListener::new(db_listener);
 
     tasks.spawn(async {
         loop {
@@ -69,7 +66,10 @@ pub async fn main() {
 
     let mqtt_sender = mqtt_client.new_publisher();
     let state_topic = settings.mqtt.base_topic_status.clone();
-    tasks.spawn(async move { adapter::mqtt::export_state(&state_topic, mqtt_sender).await });
+    let mqtt_trigger = event_listener.new_thing_value_added_listener();
+    tasks.spawn(async move {
+        adapter::mqtt::export_state(&state_topic, mqtt_sender, mqtt_trigger).await
+    });
 
     tracing::info!("Starting command processing from mqtt");
     let mqtt_command_receiver = mqtt_client
@@ -78,6 +78,13 @@ pub async fn main() {
         .unwrap();
     tasks.spawn(async move {
         adapter::mqtt::process_commands(&settings.mqtt.base_topic_set, mqtt_command_receiver).await
+    });
+
+    tasks.spawn(async move {
+        event_listener
+            .dispatch_events()
+            .await
+            .expect("Error processing home-events")
     });
 
     tasks.spawn(async move { mqtt_client.process().await });

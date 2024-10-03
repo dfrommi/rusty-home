@@ -83,9 +83,6 @@ impl<
         let first_series = self.first.series_since(since).await?;
         let second_series = self.second.series_since(since).await?;
 
-        println!("First {:?}", first_series);
-        println!("Second {:?}", second_series);
-
         let mut dps: Vec<DataPoint<R>> = Vec::new();
 
         for first_dp in first_series.iter() {

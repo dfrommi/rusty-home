@@ -134,7 +134,7 @@ impl HomeApi {
         let data: DbThingCommand = command.into();
         let db_source: DbCommandSource = source.into();
 
-        sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, POSITION, PAYLOAD, TIMESTAMP, STATUS) VALUES ($1, $2, $3, $4, $5, $6)")
+        sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, DEVICE, PAYLOAD, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4, $5, $6)")
             .bind(data.command_type)
             .bind(data.device)
             .bind(data.payload)
@@ -157,7 +157,7 @@ impl HomeApi {
             "SELECT *
             from THING_COMMANDS
             where type = $1
-              and position = $2
+              and device = $2
            order by timestamp desc
            limit 1",
         )

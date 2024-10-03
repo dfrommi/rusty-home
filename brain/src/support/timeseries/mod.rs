@@ -46,10 +46,7 @@ where
         let r = self.at_or_latest_before_int(at);
         match r {
             Ok(v) => Some(v),
-            Err(e) => {
-                println!("ERROR {:?}", e);
-                None
-            }
+            Err(e) => None,
         }
     }
 

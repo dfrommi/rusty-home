@@ -60,8 +60,6 @@ impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
         &self,
         since: chrono::DateTime<chrono::Utc>,
     ) -> Result<TimeSeries<DegreeCelsius>> {
-        println!("Getting TS of {:?}", self);
-
         let series =
             MultiTimeSeriesAccess::new(self.temperature(), self.relative_humidity(), |t, h| {
                 calculate_dew_point(t, h)

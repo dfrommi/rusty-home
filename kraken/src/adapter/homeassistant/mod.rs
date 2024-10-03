@@ -58,6 +58,8 @@ pub async fn process_ha_commands(
     command_mqtt_topic: &str,
 ) {
     while let Some(command) = cmd_rx.recv().await {
+        tracing::info!("Processing command: {:?}", command);
+
         match to_command_payload(&command) {
             Some(payload) => {
                 let mqtt_msg = MqttOutMessage {

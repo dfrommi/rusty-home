@@ -11,14 +11,14 @@ pub trait Executable {
 
 impl Executable for Command {
     async fn execute(&self) -> Result<()> {
-        Ok(home_api()
+        home_api()
             .execute_command(self, &CommandSource::System)
-            .await?)
+            .await
     }
 
     async fn execute_on_behalf_of_user(&self) -> Result<()> {
-        Ok(home_api()
+        home_api()
             .execute_command(self, &CommandSource::User)
-            .await?)
+            .await
     }
 }

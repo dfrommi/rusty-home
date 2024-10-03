@@ -8,6 +8,6 @@ use super::DataPointAccess;
 
 impl DataPointAccess<KiloWattHours> for TotalEnergyConsumption {
     async fn current_data_point(&self) -> Result<DataPoint<KiloWattHours>> {
-        Ok(home_api().get_latest(self).await?)
+        home_api().get_latest(self).await
     }
 }

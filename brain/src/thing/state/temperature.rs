@@ -8,7 +8,7 @@ use support::unit::DegreeCelsius;
 
 impl DataPointAccess<DegreeCelsius> for Temperature {
     async fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
-        Ok(home_api().get_latest(self).await?)
+        home_api().get_latest(self).await
     }
 }
 

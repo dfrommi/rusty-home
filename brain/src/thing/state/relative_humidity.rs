@@ -8,7 +8,7 @@ use support::unit::Percent;
 
 impl DataPointAccess<Percent> for RelativeHumidity {
     async fn current_data_point(&self) -> Result<DataPoint<Percent>> {
-        Ok(home_api().get_latest(self).await?)
+        home_api().get_latest(self).await
     }
 }
 

@@ -7,6 +7,6 @@ use support::unit::PowerState;
 
 impl DataPointAccess<PowerState> for Powered {
     async fn current_data_point(&self) -> Result<DataPoint<PowerState>> {
-        Ok(home_api().get_latest(self).await?)
+        home_api().get_latest(self).await
     }
 }

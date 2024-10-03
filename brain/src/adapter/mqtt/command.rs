@@ -24,7 +24,7 @@ pub async fn process_commands(base_topic: &str, mut rx: Receiver<MqttInMessage>)
         match to_command(name, channel, &msg.payload) {
             Ok(command) => {
                 tracing::info!("Executing command received via Mqtt: {:?}", command);
-                if let Err(e) = command.execute().await {
+                if let Err(e) = command.execute_on_behalf_of_user().await {
                     tracing::error!("Error executing command: {:?}", e)
                 }
             }

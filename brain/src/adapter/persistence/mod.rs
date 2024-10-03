@@ -1,7 +1,10 @@
 use api::{
     command::{
-        db::schema::{DbCommandState, DbCommandType, DbDevice, DbThingCommand, DbThingCommandRow},
-        Command, CommandExecution, CommandTarget,
+        db::schema::{
+            DbCommandSource, DbCommandState, DbCommandType, DbDevice, DbThingCommand,
+            DbThingCommandRow,
+        },
+        Command, CommandExecution, CommandSource, CommandTarget,
     },
     get_tag_id,
     state::{db::DbChannelId, ChannelId},
@@ -146,15 +149,17 @@ impl HomeApi {
         Ok(dps)
     }
 
-    pub async fn execute_command(&self, command: &Command) -> Result<()> {
+    pub async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()> {
         let data: DbThingCommand = command.into();
+        let db_source: DbCommandSource = source.into();
 
-        sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, POSITION, PAYLOAD, TIMESTAMP, STATUS) VALUES ($1, $2, $3, $4, $5)")
+        sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, POSITION, PAYLOAD, TIMESTAMP, STATUS) VALUES ($1, $2, $3, $4, $5, $6)")
             .bind(data.command_type)
-            .bind(data.position)
+            .bind(data.device)
             .bind(data.payload)
             .bind(chrono::Utc::now())
             .bind(DbCommandState::Pending)
+            .bind(db_source)
             .execute(&self.db_pool)
             .await?;
 

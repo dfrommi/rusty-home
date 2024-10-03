@@ -27,11 +27,18 @@ pub mod schema {
         Dehumidifier,
     }
 
+    #[derive(Debug, sqlx::Type)]
+    #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum DbCommandSource {
+        System,
+        User,
+    }
+
     #[derive(Debug, sqlx::FromRow)]
     pub struct DbThingCommand {
         #[sqlx(rename = "type")]
         pub command_type: DbCommandType,
-        pub position: DbDevice,
+        pub device: DbDevice,
         pub payload: serde_json::Value,
     }
 
@@ -43,6 +50,7 @@ pub mod schema {
         pub timestamp: chrono::DateTime<chrono::Utc>,
         pub status: DbCommandState,
         pub error: Option<String>,
+        pub source: DbCommandSource,
     }
 }
 
@@ -50,7 +58,9 @@ pub mod mapper {
     use serde_json::json;
 
     use crate::{
-        command::{Command, CommandExecution, CommandState, CommandTarget, PowerToggle},
+        command::{
+            Command, CommandExecution, CommandSource, CommandState, CommandTarget, PowerToggle,
+        },
         error::Error,
     };
 
@@ -61,7 +71,7 @@ pub mod mapper {
             match val {
                 Command::SetPower { item, power_on } => DbThingCommand {
                     command_type: DbCommandType::SetPower,
-                    position: match item {
+                    device: match item {
                         PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
                     },
                     payload: json!(DbSetPowerPayload {
@@ -78,7 +88,7 @@ pub mod mapper {
         fn try_into(self) -> std::result::Result<Command, Self::Error> {
             let command = match self.command_type {
                 DbCommandType::SetPower => Command::SetPower {
-                    item: match self.position {
+                    item: match self.device {
                         DbDevice::Dehumidifier => PowerToggle::Dehumidifier,
                         #[allow(unreachable_patterns)] //will be needed with more items
                         _ => return Err(Error::LocationDataInconsistent),
@@ -107,6 +117,10 @@ pub mod mapper {
                     }
                 },
                 created: self.timestamp,
+                source: match self.source {
+                    DbCommandSource::System => CommandSource::System,
+                    DbCommandSource::User => CommandSource::User,
+                },
             })
         }
     }
@@ -120,6 +134,15 @@ pub mod mapper {
                         PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
                     },
                 ),
+            }
+        }
+    }
+
+    impl From<&CommandSource> for DbCommandSource {
+        fn from(val: &CommandSource) -> Self {
+            match val {
+                CommandSource::System => DbCommandSource::System,
+                CommandSource::User => DbCommandSource::User,
             }
         }
     }

@@ -22,6 +22,7 @@ pub struct CommandExecution {
     pub command: Command,
     pub state: CommandState,
     pub created: DateTime<Utc>,
+    pub source: CommandSource,
 }
 
 #[derive(Debug)]
@@ -30,4 +31,10 @@ pub enum CommandState {
     InProgress,
     Success,
     Error(String),
+}
+
+#[derive(Debug)]
+pub enum CommandSource {
+    System,
+    User,
 }

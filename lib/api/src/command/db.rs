@@ -1,18 +1,18 @@
 use self::schema::*;
 
 pub mod schema {
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     pub struct DbSetPowerPayload {
         pub power_on: bool,
     }
 
-    #[derive(Debug, sqlx::Type)]
+    #[derive(Debug, Clone, sqlx::Type)]
     #[sqlx(type_name = "TEXT", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbCommandType {
         SetPower,
     }
 
-    #[derive(Debug, sqlx::Type)]
+    #[derive(Debug, Clone, sqlx::Type)]
     #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbCommandState {
         Pending,
@@ -27,14 +27,14 @@ pub mod schema {
         Dehumidifier,
     }
 
-    #[derive(Debug, sqlx::Type)]
+    #[derive(Debug, Clone, sqlx::Type)]
     #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbCommandSource {
         System,
         User,
     }
 
-    #[derive(Debug, sqlx::FromRow)]
+    #[derive(Debug, Clone, sqlx::FromRow)]
     pub struct DbThingCommand {
         #[sqlx(rename = "type")]
         pub command_type: DbCommandType,
@@ -42,7 +42,7 @@ pub mod schema {
         pub payload: serde_json::Value,
     }
 
-    #[derive(Debug, sqlx::FromRow)]
+    #[derive(Debug, Clone, sqlx::FromRow)]
     pub struct DbThingCommandRow {
         pub id: i64,
         #[sqlx(flatten)]

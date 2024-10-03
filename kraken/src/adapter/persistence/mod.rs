@@ -1,6 +1,6 @@
 use api::{
     command::{
-        db::schema::{DbCommandState, DbThingCommandRow},
+        db::schema::{DbCommandState, DbCommandType, DbDevice, DbThingCommandRow},
         Command,
     },
     get_tag_id,
@@ -55,7 +55,7 @@ impl BackendApi {
             "SELECT * 
                 from THING_COMMANDS 
                 where status = $1
-                order by TIMESTAMP ASC
+                order by TIMESTAMP DESC
                 limit 1
                 for update skip locked",
         )
@@ -66,6 +66,14 @@ impl BackendApi {
         match maybe_rec {
             None => Ok(None),
             Some(rec) => {
+                mark_other_commands_superseeded(
+                    &mut *tx,
+                    rec.id,
+                    &rec.data.command_type,
+                    &rec.data.device,
+                )
+                .await?;
+
                 let result = match rec.data.try_into() {
                     Ok(command) => {
                         set_command_status_in_tx(
@@ -131,7 +139,6 @@ impl BackendApi {
     }
 }
 
-//TODO error message
 async fn set_command_status_in_tx(
     executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     command_id: i64,
@@ -142,6 +149,24 @@ async fn set_command_status_in_tx(
         .bind(command_id)
         .bind(status)
         .bind(error_message)
+        .execute(executor)
+        .await
+        .map(|_| ())
+}
+
+async fn mark_other_commands_superseeded(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
+    excluded_command_id: i64,
+    command_type: &DbCommandType,
+    device: &DbDevice,
+) -> std::result::Result<(), sqlx::Error> {
+    sqlx::query("UPDATE THING_COMMANDS SET status = $1, error = $2 WHERE NOT id = $3 AND status = $4 AND type = $5 AND device = $6")
+        .bind(DbCommandState::Error)
+        .bind(format!("Command was superseeded by {}", excluded_command_id))
+        .bind(excluded_command_id)
+        .bind(DbCommandState::Pending)
+        .bind(command_type)
+        .bind(device)
         .execute(executor)
         .await
         .map(|_| ())

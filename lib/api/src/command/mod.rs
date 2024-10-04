@@ -33,7 +33,7 @@ pub enum CommandState {
     Error(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CommandSource {
     System,
     User,

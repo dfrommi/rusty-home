@@ -2,6 +2,8 @@ use api::command::{Command, CommandSource};
 
 use crate::prelude::*;
 
+use anyhow::Result;
+
 pub mod state;
 
 pub trait Executable {
@@ -17,8 +19,6 @@ impl Executable for Command {
     }
 
     async fn execute_on_behalf_of_user(&self) -> Result<()> {
-        home_api()
-            .execute_command(self, &CommandSource::User)
-            .await
+        home_api().execute_command(self, &CommandSource::User).await
     }
 }

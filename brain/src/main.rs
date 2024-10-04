@@ -8,14 +8,11 @@ use std::sync::OnceLock;
 use tokio::task::JoinSet;
 
 mod adapter;
-mod error;
 mod planning;
 mod prelude;
 mod settings;
 mod support;
 mod thing;
-
-pub use crate::error::{Error, Result};
 
 static HOME_API_INSTANCE: OnceLock<HomeApi> = OnceLock::new();
 pub fn home_api() -> &'static HomeApi {

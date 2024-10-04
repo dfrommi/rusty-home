@@ -2,7 +2,7 @@ use crate::{adapter::persistence::DataPoint, home_api};
 pub use api::state::CurrentPowerUsage;
 use support::unit::Watt;
 
-use crate::prelude::*;
+use anyhow::Result;
 
 use super::DataPointAccess;
 

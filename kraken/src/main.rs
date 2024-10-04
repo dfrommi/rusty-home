@@ -1,5 +1,5 @@
 use adapter::persistence::{BackendApi, BackendEventListener};
-use api::command::Command;
+use api::command::CommandExecution;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::env;
@@ -14,7 +14,6 @@ use tokio::{
 };
 
 mod adapter;
-mod error;
 mod settings;
 
 #[tokio::main]
@@ -47,7 +46,7 @@ pub async fn main() {
     let event_listener = BackendEventListener::new(db_listener);
 
     //Migrate to broadcast when needed
-    let (cmd_tx, cmd_rx) = mpsc::channel::<Command>(32);
+    let (cmd_tx, cmd_rx) = mpsc::channel::<CommandExecution>(32);
 
     info!("Start processing messages");
 
@@ -66,8 +65,15 @@ pub async fn main() {
 
     info!("Starting HA-command processing");
     let ha_cmd_tx = mqtt_client.new_publisher();
+    let ha_cmd_api = api.clone();
     tasks.spawn(async move {
-        adapter::process_ha_commands(cmd_rx, ha_cmd_tx, &settings.homeassistant.topic_command).await
+        adapter::process_ha_commands(
+            cmd_rx,
+            ha_cmd_tx,
+            &settings.homeassistant.topic_command,
+            &ha_cmd_api,
+        )
+        .await
     });
 
     tasks.spawn(async move { mqtt_client.process().await });
@@ -91,7 +97,7 @@ pub async fn main() {
 pub async fn dispatch_pending_commands(
     api: &BackendApi,
     mut new_cmd_rx: Receiver<()>,
-    tx: Sender<Command>,
+    tx: Sender<CommandExecution>,
 ) {
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(5));
     let mut got_cmd = false;

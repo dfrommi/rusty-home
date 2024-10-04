@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4.38", features = ["serde", "std"] }
-thiserror = "1"
 tracing = "*"
 tracing-subscriber = "*"
-polars = { version = "0.42.0", features = ["lazy"] }
+polars = { version = "0.43", features = ["lazy"] }
 
 sqlx = { version = "0.8", features = [
   "postgres",

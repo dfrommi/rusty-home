@@ -14,8 +14,8 @@ pub use risk_of_mould::RiskOfMould;
 pub use user_controlled::UserControlled;
 
 use crate::adapter::persistence::DataPoint;
-use crate::prelude::*;
 use crate::support::timeseries::TimeSeries;
+use anyhow::Result;
 
 pub trait DataPointAccess<T> {
     async fn current_data_point(&self) -> Result<DataPoint<T>>;

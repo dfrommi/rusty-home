@@ -4,13 +4,14 @@ use crate::{adapter::persistence::DataPoint, home_api};
 use api::command::{Command, CommandExecution, CommandTarget, PowerToggle};
 
 use super::DataPointAccess;
+use anyhow::Result;
 
 pub enum UserControlled {
     Dehumidifier,
 }
 
 impl DataPointAccess<bool> for UserControlled {
-    async fn current_data_point(&self) -> crate::error::Result<DataPoint<bool>> {
+    async fn current_data_point(&self) -> Result<DataPoint<bool>> {
         let state = super::Powered::Dehumidifier.current_data_point().await?;
         let maybe_command = home_api()
             .get_latest_command(&CommandTarget::SetPower(PowerToggle::Dehumidifier))

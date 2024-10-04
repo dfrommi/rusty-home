@@ -6,9 +6,10 @@ pub use command::to_command_payload;
 use event::{on_ha_event_received, persist_current_ha_state};
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{error::Result, settings};
+use crate::settings;
+use anyhow::Result;
 use api::{
-    command::Command,
+    command::CommandExecution,
     state::{
         CurrentPowerUsage, Opened, Powered, RelativeHumidity, Temperature, TotalEnergyConsumption,
     },
@@ -53,27 +54,45 @@ pub async fn process_ha_events(
 }
 
 pub async fn process_ha_commands(
-    mut cmd_rx: Receiver<Command>,
+    mut cmd_rx: Receiver<CommandExecution>,
     mqtt_sender: Sender<MqttOutMessage>,
     command_mqtt_topic: &str,
+    api: &BackendApi,
 ) {
-    while let Some(command) = cmd_rx.recv().await {
-        tracing::info!("Processing command: {:?}", command);
+    while let Some(command_execution) = cmd_rx.recv().await {
+        tracing::info!("Processing command: {:?}", command_execution);
 
-        match to_command_payload(&command) {
+        match to_command_payload(&command_execution.command) {
             Some(payload) => {
                 let mqtt_msg = MqttOutMessage {
                     topic: command_mqtt_topic.to_string(),
                     payload,
                     retain: false,
                 };
-                if let Err(e) = mqtt_sender.send(mqtt_msg).await {
-                    //TODO persist error in database
-                    tracing::error!("Error sending command to MQTT: {}", e);
+                match mqtt_sender.send(mqtt_msg).await {
+                    Ok(_) => {
+                        if let Err(e) = api.set_command_state_success(command_execution.id).await {
+                            tracing::error!("Error setting command state to SUCESS in DB: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        if let Err(e) = api
+                            .set_command_state_error(
+                                command_execution.id,
+                                format!("Error sending command to MQTT: {}", e).as_str(),
+                            )
+                            .await
+                        {
+                            tracing::error!("Error setting command state to ERROR in DB: {}", e);
+                        }
+                    }
                 }
             }
             None => {
-                tracing::trace!("Command not supported by Home Assistant: {:?}", command);
+                tracing::trace!(
+                    "Command not supported by Home Assistant: {:?}",
+                    command_execution
+                );
             }
         }
     }

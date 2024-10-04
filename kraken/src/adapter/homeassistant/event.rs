@@ -4,7 +4,7 @@ use tracing::{debug, info, warn};
 
 use crate::adapter::persistence::BackendApi;
 use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
-use crate::error::Result;
+use anyhow::Result;
 use api::state::ChannelValue;
 use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
@@ -117,7 +117,7 @@ fn to_persistent_data_point(
     channel: HaChannel,
     ha_value: &str,
     timestamp: chrono::DateTime<chrono::Utc>,
-) -> crate::error::Result<PersistentDataPoint> {
+) -> Result<PersistentDataPoint> {
     let dp = match channel {
         HaChannel::Temperature(channel) => PersistentDataPoint {
             value: ChannelValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),

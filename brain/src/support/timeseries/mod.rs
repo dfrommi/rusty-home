@@ -2,7 +2,8 @@ use polars::frame::DataFrame;
 use polars::prelude::*;
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{adapter::persistence::DataPoint, prelude::*};
+use crate::adapter::persistence::DataPoint;
+use anyhow::{ensure, Result};
 
 const TIME: &str = "time";
 const VALUE: &str = "value";
@@ -26,9 +27,7 @@ where
             values.push(dp.value.into());
         }
 
-        if timestamps.is_empty() {
-            return Err(Error::NotFound);
-        }
+        ensure!(!timestamps.is_empty(), "data points are empty");
 
         let df = df![
             TIME => timestamps,
@@ -46,7 +45,7 @@ where
         let r = self.at_or_latest_before_int(at);
         match r {
             Ok(v) => Some(v),
-            Err(e) => None,
+            Err(_) => None,
         }
     }
 
@@ -59,9 +58,7 @@ where
             .tail(1)
             .collect()?;
 
-        if row.is_empty() {
-            return Err(Error::NotFound);
-        }
+        ensure!(!row.is_empty(), "No data point found before {}", at);
 
         Ok(Self::to_datapoints(&row)?.remove(0))
     }
@@ -116,38 +113,44 @@ mod tests {
         assert_eq!(ts.mean(), 20.0);
     }
 
-    #[test]
-    fn test_at__point_before() {
-        let ts = test_series();
+    mod at {
+        use super::*;
 
-        let dp_opt = ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap());
+        #[test]
+        fn test_point_before() {
+            let ts = test_series();
 
-        let dp = assert_some(dp_opt);
-        assert_eq!(
-            dp.timestamp,
-            Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap()
-        );
-        assert_eq!(dp.value, 20.0);
-    }
+            let dp_opt =
+                ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap());
 
-    #[test]
-    fn test_at__point_exact_match() {
-        let ts = test_series();
-        let dt = Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap();
+            let dp = assert_some(dp_opt);
+            assert_eq!(
+                dp.timestamp,
+                Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap()
+            );
+            assert_eq!(dp.value, 20.0);
+        }
 
-        let dp_opt = ts.at_or_latest_before(dt);
+        #[test]
+        fn test_point_exact_match() {
+            let ts = test_series();
+            let dt = Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap();
 
-        let dp = assert_some(dp_opt);
-        assert_eq!(dp.timestamp, dt);
-        assert_eq!(dp.value, 20.0);
-    }
+            let dp_opt = ts.at_or_latest_before(dt);
 
-    #[test]
-    fn test_at__no_point_before() {
-        let ts = test_series();
-        let dp_opt = ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 12, 0, 0).unwrap());
+            let dp = assert_some(dp_opt);
+            assert_eq!(dp.timestamp, dt);
+            assert_eq!(dp.value, 20.0);
+        }
 
-        assert!(dp_opt.is_none());
+        #[test]
+        fn test_no_point_before() {
+            let ts = test_series();
+            let dp_opt =
+                ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 12, 0, 0).unwrap());
+
+            assert!(dp_opt.is_none());
+        }
     }
 
     #[test]

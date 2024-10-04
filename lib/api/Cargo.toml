@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1"
 sqlx = { version = "0.8", features = [
   "postgres",
   "runtime-tokio",
@@ -14,7 +15,6 @@ tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4.38", features = ["serde", "std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-thiserror = "1"
 cached = { version = "*", features = ["default", "async"] }
 strum = { version = "0.26", features = ["derive"] }
 tracing = "*"

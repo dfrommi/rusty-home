@@ -1,10 +1,9 @@
 pub mod command;
-mod error;
 pub mod state;
 
 use std::collections::HashMap;
 
-pub use crate::error::{Error, Result};
+use anyhow::{bail, Result};
 
 use sqlx::postgres::PgListener;
 pub use state::db::get_tag_id;
@@ -37,7 +36,7 @@ impl EventListener {
     pub fn new_listener(&self, topic: &str) -> Result<Receiver<()>> {
         match self.sender_by_topic.get(topic) {
             Some(tx) => Ok(tx.subscribe()),
-            None => Err(Error::InvalidParameter),
+            None => bail!("Unknown topic {}", topic),
         }
     }
 

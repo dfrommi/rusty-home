@@ -55,13 +55,11 @@ pub mod schema {
 }
 
 pub mod mapper {
+    use anyhow::bail;
     use serde_json::json;
 
-    use crate::{
-        command::{
-            Command, CommandExecution, CommandSource, CommandState, CommandTarget, PowerToggle,
-        },
-        error::Error,
+    use crate::command::{
+        Command, CommandExecution, CommandSource, CommandState, CommandTarget, PowerToggle,
     };
 
     use super::*;
@@ -83,7 +81,7 @@ pub mod mapper {
     }
 
     impl TryInto<Command> for DbThingCommand {
-        type Error = Error;
+        type Error = anyhow::Error;
 
         fn try_into(self) -> std::result::Result<Command, Self::Error> {
             let command = match self.command_type {
@@ -91,7 +89,11 @@ pub mod mapper {
                     item: match self.device {
                         DbDevice::Dehumidifier => PowerToggle::Dehumidifier,
                         #[allow(unreachable_patterns)] //will be needed with more items
-                        _ => return Err(Error::LocationDataInconsistent),
+                        _ => bail!(
+                            "Combination of command type {:?} and device {:?} not supported",
+                            self.command_type,
+                            self.device
+                        ),
                     },
                     power_on: serde_json::from_value::<DbSetPowerPayload>(self.payload)?.power_on,
                 },
@@ -102,7 +104,7 @@ pub mod mapper {
     }
 
     impl TryInto<CommandExecution> for DbThingCommandRow {
-        type Error = Error;
+        type Error = anyhow::Error;
 
         fn try_into(self) -> std::result::Result<CommandExecution, Self::Error> {
             Ok(CommandExecution {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::error::Result;
+use anyhow::Result;
 use api::state::Powered;
 use support::{mqtt::MqttOutMessage, unit::PowerState};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};

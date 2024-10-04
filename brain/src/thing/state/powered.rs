@@ -1,6 +1,7 @@
-use crate::{adapter::persistence::DataPoint, error::Result, home_api};
+use crate::{adapter::persistence::DataPoint, home_api};
 
 use super::DataPointAccess;
+use anyhow::Result;
 
 pub use api::state::Powered;
 use support::unit::PowerState;

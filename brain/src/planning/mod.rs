@@ -3,7 +3,7 @@ extern crate goap;
 use goap::PlanningResult;
 use goap::{eval::MissedGoalsError, plan};
 
-use crate::error::Result;
+use anyhow::Result;
 
 use self::action::Action;
 use self::{action::dehumidify::Dehumidify, goal::prevent_mould::PreventMouldGoal};

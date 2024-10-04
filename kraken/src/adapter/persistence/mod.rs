@@ -1,7 +1,7 @@
 use api::{
     command::{
         db::schema::{DbCommandState, DbCommandType, DbDevice, DbThingCommandRow},
-        Command,
+        CommandExecution,
     },
     get_tag_id,
     state::ChannelValue,
@@ -11,8 +11,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::sync::broadcast::Receiver;
 
-use crate::error::Error;
-pub use crate::error::Result;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct BackendEventListener {
@@ -33,7 +32,7 @@ impl BackendEventListener {
     }
 
     pub async fn dispatch_events(self) -> Result<()> {
-        self.delegate.dispatch_events().await.map_err(Error::Api)
+        self.delegate.dispatch_events().await
     }
 }
 
@@ -48,7 +47,7 @@ impl BackendApi {
     }
 
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
-    pub async fn get_command_for_processing(&self) -> Result<Option<Command>> {
+    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.db_pool.begin().await?;
 
         let maybe_rec: Option<DbThingCommandRow> = sqlx::query_as(
@@ -66,39 +65,42 @@ impl BackendApi {
         match maybe_rec {
             None => Ok(None),
             Some(rec) => {
+                let id = rec.id;
+
                 mark_other_commands_superseeded(
                     &mut *tx,
-                    rec.id,
+                    id,
                     &rec.data.command_type,
                     &rec.data.device,
                 )
                 .await?;
 
-                let result = match rec.data.try_into() {
-                    Ok(command) => {
-                        set_command_status_in_tx(
-                            &mut *tx,
-                            rec.id,
-                            DbCommandState::InProgress,
-                            Option::None,
-                        )
-                        .await?;
-                        Some(command)
-                    }
-                    Err(api::Error::LocationDataInconsistent)
-                    | Err(api::Error::Deserialisation(_)) => {
-                        //TODO error message
-                        set_command_status_in_tx(
-                            &mut *tx,
-                            rec.id,
-                            DbCommandState::Error,
-                            Option::Some("Error in format of stored command"),
-                        )
-                        .await?;
-                        None
-                    }
-                    Err(error) => return Err(error.into()),
-                };
+                let result: Option<CommandExecution> =
+                    match TryInto::<CommandExecution>::try_into(rec) {
+                        Ok(command) => {
+                            set_command_status_in_tx(
+                                &mut *tx,
+                                id,
+                                DbCommandState::InProgress,
+                                Option::None,
+                            )
+                            .await?;
+
+                            Some(command)
+                        }
+                        Err(e) => {
+                            set_command_status_in_tx(
+                                &mut *tx,
+                                id,
+                                DbCommandState::Error,
+                                Option::Some(
+                                    format!("Error reading stored command: {}", e).as_str(),
+                                ),
+                            )
+                            .await?;
+                            None
+                        }
+                    };
 
                 tx.commit().await?;
                 Ok(result)
@@ -137,6 +139,24 @@ impl BackendApi {
 
         Ok(())
     }
+
+    pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
+        set_command_status_in_tx(&self.db_pool, command_id, DbCommandState::Success, None).await
+    }
+
+    pub async fn set_command_state_error(
+        &self,
+        command_id: i64,
+        error_message: &str,
+    ) -> Result<()> {
+        set_command_status_in_tx(
+            &self.db_pool,
+            command_id,
+            DbCommandState::Error,
+            Some(error_message),
+        )
+        .await
+    }
 }
 
 async fn set_command_status_in_tx(
@@ -144,7 +164,7 @@ async fn set_command_status_in_tx(
     command_id: i64,
     status: DbCommandState,
     error_message: Option<&str>,
-) -> std::result::Result<(), sqlx::Error> {
+) -> Result<()> {
     sqlx::query("UPDATE THING_COMMANDS SET status = $2, error = $3 WHERE id = $1")
         .bind(command_id)
         .bind(status)
@@ -152,6 +172,7 @@ async fn set_command_status_in_tx(
         .execute(executor)
         .await
         .map(|_| ())
+        .map_err(Into::into)
 }
 
 async fn mark_other_commands_superseeded(
@@ -159,7 +180,7 @@ async fn mark_other_commands_superseeded(
     excluded_command_id: i64,
     command_type: &DbCommandType,
     device: &DbDevice,
-) -> std::result::Result<(), sqlx::Error> {
+) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE THING_COMMANDS SET status = $1, error = $2 WHERE NOT id = $3 AND status = $4 AND type = $5 AND device = $6")
         .bind(DbCommandState::Error)
         .bind(format!("Command was superseeded by {}", excluded_command_id))
@@ -170,4 +191,5 @@ async fn mark_other_commands_superseeded(
         .execute(executor)
         .await
         .map(|_| ())
+        .map_err(Into::into)
 }

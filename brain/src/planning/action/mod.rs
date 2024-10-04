@@ -1,6 +1,6 @@
 use goap::{Effects, Preconditions};
 
-use crate::error::Result;
+use anyhow::Result;
 
 use super::HomeState;
 

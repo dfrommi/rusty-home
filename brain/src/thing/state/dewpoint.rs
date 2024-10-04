@@ -1,5 +1,5 @@
 use super::*;
-use crate::error::Result;
+use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};
 
 use support::unit::{DegreeCelsius, Percent};

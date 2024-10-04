@@ -1,3 +1,4 @@
+use anyhow::Result;
 use api::{
     command::{
         db::schema::{
@@ -16,8 +17,6 @@ use sqlx::{
     PgPool, Row,
 };
 use tokio::sync::broadcast::Receiver;
-
-pub use crate::error::{Error, Result};
 
 #[derive(Debug, Clone)]
 pub struct DataPoint<V> {
@@ -49,10 +48,7 @@ impl HomeEventListener {
     }
 
     pub async fn dispatch_events(self) -> Result<()> {
-        self.delegate
-            .dispatch_events()
-            .await
-            .map_err(Error::ApiError)
+        self.delegate.dispatch_events().await
     }
 }
 
@@ -85,7 +81,7 @@ impl HomeApi {
                 value: r.get::<f64, _>("value").into(),
                 timestamp: r.get("timestamp"),
             }),
-            None => Err(Error::NotFound),
+            None => anyhow::bail!("No data found"),
         }
     }
 

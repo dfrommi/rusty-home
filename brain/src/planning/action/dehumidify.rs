@@ -8,6 +8,7 @@ use api::{command::Command, command::PowerToggle, state::Powered};
 use super::Action;
 
 use crate::prelude::*;
+use anyhow::Result;
 
 #[derive(Debug, PartialEq)]
 pub struct Dehumidify {}

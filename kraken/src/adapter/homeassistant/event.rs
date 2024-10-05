@@ -1,8 +1,9 @@
 use parse::{HaEvent, StateValue};
 use support::mqtt::MqttInMessage;
+use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-use crate::adapter::persistence::BackendApi;
+use crate::adapter::StateCollector;
 use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
 use anyhow::Result;
 use api::state::ChannelValue;
@@ -10,36 +11,68 @@ use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerSta
 
 use super::{config::ha_incoming_event_channel, HaChannel};
 
-pub async fn persist_current_ha_state(api: &BackendApi, url: &str, token: &str) -> Result<()> {
-    info!("Persisting current HA states");
-    for event in get_current_states(url, token).await? {
-        if let Some(dp) = to_smart_home_event(&event) {
-            info!("Persisting {:?}", dp);
-            api.add_thing_value(&dp.value, &dp.timestamp).await?;
-        }
-    }
-
-    Ok(())
+pub struct HaStateCollector {
+    api_url: String,
+    api_token: String,
+    event_rx: mpsc::Receiver<MqttInMessage>,
 }
 
-pub async fn on_ha_event_received(api: &BackendApi, msg: MqttInMessage) {
-    match serde_json::from_str(&msg.payload) {
-        Ok(event) => match to_smart_home_event(&event) {
-            Some(dp) => {
-                tracing::debug!(
-                    "Received supported event {:?} as data-point {:?}",
-                    event,
-                    dp
-                );
-                if let Err(e) = api.add_thing_value(&dp.value, &dp.timestamp).await {
-                    tracing::error!("Error persisting data-point: {}", e);
-                }
+impl HaStateCollector {
+    pub fn new(api_url: &str, api_token: &str, event_rx: mpsc::Receiver<MqttInMessage>) -> Self {
+        Self {
+            api_url: api_url.to_owned(),
+            api_token: api_token.to_owned(),
+            event_rx,
+        }
+    }
+}
+
+impl StateCollector for HaStateCollector {
+    async fn process(mut self, dp_tx: &mpsc::Sender<PersistentDataPoint>) -> Result<()> {
+        self.persist_current_state(dp_tx).await?;
+
+        tracing::info!("Start processing HA events");
+
+        while let Some(msg) = self.event_rx.recv().await {
+            match serde_json::from_str(&msg.payload) {
+                Ok(event) => match to_smart_home_event(&event) {
+                    Some(dp) => {
+                        if let Err(e) = dp_tx.send(dp).await {
+                            tracing::error!(
+                                "Error sending data-point to channel for processing: {}",
+                                e
+                            );
+                        }
+                    }
+
+                    //unsupported entity
+                    None => {
+                        tracing::trace!("Unsupported event {:?} received", event);
+                    }
+                },
+
+                //json parsing error
+                Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
             }
-            None => {
-                tracing::trace!("Unsupported event {:?} received", event);
+        }
+
+        Ok(())
+    }
+}
+
+impl HaStateCollector {
+    pub async fn persist_current_state(
+        &self,
+        dp_tx: &mpsc::Sender<PersistentDataPoint>,
+    ) -> Result<()> {
+        info!("Persisting current HA states");
+        for event in get_current_states(&self.api_url, &self.api_token).await? {
+            if let Some(dp) = to_smart_home_event(&event) {
+                dp_tx.send(dp).await?;
             }
-        },
-        Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
+        }
+
+        Ok(())
     }
 }
 

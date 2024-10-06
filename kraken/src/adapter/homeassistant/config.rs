@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 
 use crate::adapter::homeassistant::HaChannel;
-use api::state::{CurrentPowerUsage, HeatingDemand, SetPoint, TotalEnergyConsumption};
+use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::{
     command::Command, command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
@@ -345,6 +345,38 @@ lazy_static! {
             (
                 "climate.bad",
                 HaChannel::SetPoint(SetPoint::Bathroom)
+            ),
+
+            //
+            // PRESENCE
+            //
+            (
+                "binary_sensor.bedroom_bed_dennis_occupancy_water_leak",
+                HaChannel::PresenceFromLeakSensor(Presence::BedDennis)
+            ),
+            (
+                "binary_sensor.bedroom_bed_sabine_occupancy_water_leak",
+                HaChannel::PresenceFromLeakSensor(Presence::BedSabine)
+            ),
+            (
+                "binary_sensor.esphome_couch_couch_left",
+                HaChannel::PresenceFromEsp(Presence::CouchLeft)
+            ),
+            (
+                "binary_sensor.esphome_couch_couch_center",
+                HaChannel::PresenceFromEsp(Presence::CouchCenter)
+            ),
+            (
+                "binary_sensor.esphome_couch_couch_right",
+                HaChannel::PresenceFromEsp(Presence::CouchRight)
+            ),
+            (
+                "device_tracker.jarvis",
+                HaChannel::PresenceFromDeviceTracker(Presence::AtHomeDennis)
+            ),
+            (
+                "device_tracker.simi_2",
+                HaChannel::PresenceFromDeviceTracker(Presence::AtHomeSabine)
             ),
         ];
 

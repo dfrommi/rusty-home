@@ -1,11 +1,14 @@
-use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
+use support::unit::{
+    present_state::PresentState, DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState,
+    Watt,
+};
 
 pub mod db;
 
 /**
 * TODO:
 * [X] valve open state: "sensor.${room}_heating" (heating demand in percent)
-* - target temperature: climate.${room}
+* [X] target temperature: climate.${room}
 * - (optional): manual control on/off: binary_sensor.${room}_overlay
 *
 * [X] ir heater energy consumption
@@ -13,8 +16,8 @@ pub mod db;
 * - water usage
 * - heating consumption
 *
-* - presence bed dennis, sabine
-* - presence couch
+* [X] presence bed dennis, sabine
+* [X] presence couch
 *
 * - notification light (off, info, warn, alert)
 * - home state: dennis, sabine
@@ -32,6 +35,7 @@ pub enum ChannelValue {
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
     SetPoint(SetPoint, DegreeCelsius),
     HeatingDemand(HeatingDemand, Percent),
+    Presence(Presence, PresentState),
 }
 
 pub trait ChannelId {
@@ -176,4 +180,20 @@ pub enum HeatingDemand {
 
 impl ChannelId for HeatingDemand {
     type ValueType = Percent;
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum Presence {
+    AtHomeDennis,
+    AtHomeSabine,
+    BedDennis,
+    BedSabine,
+    CouchLeft,
+    CouchCenter,
+    CouchRight,
+}
+
+impl ChannelId for Presence {
+    type ValueType = PresentState;
 }

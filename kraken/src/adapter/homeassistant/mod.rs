@@ -3,8 +3,8 @@ mod config;
 mod event;
 
 use api::state::{
-    CurrentPowerUsage, HeatingDemand, Opened, Powered, RelativeHumidity, SetPoint, Temperature,
-    TotalEnergyConsumption,
+    CurrentPowerUsage, HeatingDemand, Opened, Powered, Presence, RelativeHumidity, SetPoint,
+    Temperature, TotalEnergyConsumption,
 };
 
 pub use command::HaCommandExecutor;
@@ -20,6 +20,9 @@ enum HaChannel {
     TotalEnergyConsumption(TotalEnergyConsumption),
     SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
+    PresenceFromLeakSensor(Presence),
+    PresenceFromEsp(Presence),
+    PresenceFromDeviceTracker(Presence),
 }
 
 enum HomeAssistantService {

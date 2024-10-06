@@ -3,6 +3,7 @@ mod kwh;
 mod opened_state;
 mod percent;
 mod power_state;
+pub mod present_state;
 mod watt;
 
 pub use degree_celsius::DegreeCelsius;

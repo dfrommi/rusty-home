@@ -20,6 +20,7 @@ impl From<&ChannelValue> for DbChannelId {
             ChannelValue::TotalEnergyConsumption(id, _) => id.into(),
             ChannelValue::SetPoint(id, _) => id.into(),
             ChannelValue::HeatingDemand(id, _) => id.into(),
+            ChannelValue::Presence(id, _) => id.into(),
         }
     }
 }
@@ -35,6 +36,7 @@ impl From<&ChannelValue> for f64 {
             ChannelValue::TotalEnergyConsumption(_, v) => v.into(),
             ChannelValue::SetPoint(_, v) => v.into(),
             ChannelValue::HeatingDemand(_, v) => v.into(),
+            ChannelValue::Presence(_, v) => v.into(),
         }
     }
 }
@@ -101,10 +103,20 @@ impl From<&SetPoint> for DbChannelId {
         }
     }
 }
+
 impl From<&HeatingDemand> for DbChannelId {
     fn from(value: &HeatingDemand) -> Self {
         DbChannelId {
             channel_name: "heating_demand",
+            item_name: value.into(),
+        }
+    }
+}
+
+impl From<&Presence> for DbChannelId {
+    fn from(value: &Presence) -> Self {
+        DbChannelId {
+            channel_name: "presence",
             item_name: value.into(),
         }
     }

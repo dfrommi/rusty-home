@@ -190,6 +190,10 @@ fn to_persistent_data_point(
             value: ChannelValue::TotalEnergyConsumption(channel, KiloWattHours(ha_value.parse()?)),
             timestamp,
         },
+        HaChannel::HeatingDemand(channel) => PersistentDataPoint {
+            value: ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
+            timestamp,
+        },
     };
 
     Ok(dp)

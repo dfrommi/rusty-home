@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 
 use crate::adapter::homeassistant::HaChannel;
-use api::state::{CurrentPowerUsage, TotalEnergyConsumption};
+use api::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
 use api::{
     command::Command, command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
@@ -210,6 +210,10 @@ lazy_static! {
                 HaChannel::CurrentPowerUsage(CurrentPowerUsage::NetworkSwitch)
             ),
             (
+                "sensor.irheater_energy_power",
+                HaChannel::CurrentPowerUsage(CurrentPowerUsage::InfraredHeater)
+            ),
+            (
                 "sensor.kitchen_multiplug_power",
                 HaChannel::CurrentPowerUsage(CurrentPowerUsage::KitchenMultiPlug)
             ),
@@ -279,6 +283,10 @@ lazy_static! {
                 HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::NetworkSwitch)
             ),
             (
+                "sensor.irheater_energy_total",
+                HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::InfraredHeater)
+            ),
+            (
                 "sensor.kitchen_multiplug_energy",
                 HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::KitchenMultiPlug)
             ),
@@ -289,6 +297,30 @@ lazy_static! {
             (
                 "sensor.room_of_requirements_makerspace_energy",
                 HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::RoomOfRequirementsDesk)
+            ),
+
+            //
+            // HEATING DEMAND
+            //
+            (
+                "sensor.wohnzimmer_heating",
+                HaChannel::HeatingDemand(HeatingDemand::LivingRoom)
+            ),
+            (
+                "sensor.schlafzimmer_heating",
+                HaChannel::HeatingDemand(HeatingDemand::Bedroom)
+            ),
+            (
+                "sensor.arbeitsimmer_heating",
+                HaChannel::HeatingDemand(HeatingDemand::RoomOfRequirements)
+            ),
+            (
+                "sensor.kuche_heating",
+                HaChannel::HeatingDemand(HeatingDemand::Kitchen)
+            ),
+            (
+                "sensor.bad_heating",
+                HaChannel::HeatingDemand(HeatingDemand::Bathroom)
             ),
         ];
 

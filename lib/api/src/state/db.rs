@@ -18,6 +18,7 @@ impl From<&ChannelValue> for DbChannelId {
             ChannelValue::Powered(id, _) => id.into(),
             ChannelValue::CurrentPowerUsage(id, _) => id.into(),
             ChannelValue::TotalEnergyConsumption(id, _) => id.into(),
+            ChannelValue::HeatingDemand(id, _) => id.into(),
         }
     }
 }
@@ -31,6 +32,7 @@ impl From<&ChannelValue> for f64 {
             ChannelValue::Powered(_, v) => v.into(),
             ChannelValue::CurrentPowerUsage(_, v) => v.into(),
             ChannelValue::TotalEnergyConsumption(_, v) => v.into(),
+            ChannelValue::HeatingDemand(_, v) => v.into(),
         }
     }
 }
@@ -89,6 +91,14 @@ impl From<&TotalEnergyConsumption> for DbChannelId {
     }
 }
 
+impl From<&HeatingDemand> for DbChannelId {
+    fn from(value: &HeatingDemand) -> Self {
+        DbChannelId {
+            channel_name: "heating_demand",
+            item_name: value.into(),
+        }
+    }
+}
 #[cached(
     result = true,
     key = "DbChannelId",

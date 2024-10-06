@@ -4,7 +4,7 @@ pub mod db;
 
 /**
 * TODO:
-* - valve open state: "sensor.${room}_heating" (heating demand in percent)
+* [X] valve open state: "sensor.${room}_heating" (heating demand in percent)
 * - target temperature: climate.${room}
 * - (optional): manual control on/off: binary_sensor.${room}_overlay
 *
@@ -30,6 +30,7 @@ pub enum ChannelValue {
     Powered(Powered, PowerState),
     CurrentPowerUsage(CurrentPowerUsage, Watt),
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
+    SetPoint(SetPoint, DegreeCelsius),
     HeatingDemand(HeatingDemand, Percent),
 }
 
@@ -147,6 +148,20 @@ pub enum TotalEnergyConsumption {
 
 impl ChannelId for TotalEnergyConsumption {
     type ValueType = KiloWattHours;
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum SetPoint {
+    LivingRoom,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
+}
+
+impl ChannelId for SetPoint {
+    type ValueType = DegreeCelsius;
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::IntoStaticStr)]

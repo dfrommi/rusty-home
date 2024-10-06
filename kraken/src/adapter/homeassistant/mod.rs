@@ -3,7 +3,7 @@ mod config;
 mod event;
 
 use api::state::{
-    CurrentPowerUsage, HeatingDemand, Opened, Powered, RelativeHumidity, Temperature,
+    CurrentPowerUsage, HeatingDemand, Opened, Powered, RelativeHumidity, SetPoint, Temperature,
     TotalEnergyConsumption,
 };
 
@@ -18,6 +18,7 @@ enum HaChannel {
     Powered(Powered),
     CurrentPowerUsage(CurrentPowerUsage),
     TotalEnergyConsumption(TotalEnergyConsumption),
+    SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
 }
 

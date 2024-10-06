@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 
 use crate::adapter::homeassistant::HaChannel;
-use api::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use api::state::{CurrentPowerUsage, HeatingDemand, SetPoint, TotalEnergyConsumption};
 use api::{
     command::Command, command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
@@ -321,6 +321,30 @@ lazy_static! {
             (
                 "sensor.bad_heating",
                 HaChannel::HeatingDemand(HeatingDemand::Bathroom)
+            ),
+
+            //
+            // SET POINT
+            //
+            (
+                "climate.wohnzimmer",
+                HaChannel::SetPoint(SetPoint::LivingRoom)
+            ),
+            (
+                "climate.schlafzimmer",
+                HaChannel::SetPoint(SetPoint::Bedroom)
+            ),
+            (
+                "climate.arbeitsimmer",
+                HaChannel::SetPoint(SetPoint::RoomOfRequirements)
+            ),
+            (
+                "climate.kuche",
+                HaChannel::SetPoint(SetPoint::Kitchen)
+            ),
+            (
+                "climate.bad",
+                HaChannel::SetPoint(SetPoint::Bathroom)
             ),
         ];
 

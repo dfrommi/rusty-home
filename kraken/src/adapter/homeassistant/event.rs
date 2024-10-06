@@ -1,11 +1,14 @@
+use std::collections::HashMap;
+
 use parse::{HaEvent, StateValue};
+use serde_json::Value;
 use support::mqtt::MqttInMessage;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 use crate::adapter::StateCollector;
 use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use api::state::ChannelValue;
 use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
@@ -95,8 +98,12 @@ fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
                 StateValue::Available(state_value) => {
                     info!("Received supported event {}", entity_id);
 
-                    let dp_result =
-                        to_persistent_data_point(ha_channel, state_value, new_state.last_changed);
+                    let dp_result = to_persistent_data_point(
+                        ha_channel,
+                        state_value,
+                        &new_state.attributes,
+                        new_state.last_changed,
+                    );
 
                     match dp_result {
                         Ok(dp) => Some(dp),
@@ -149,6 +156,7 @@ async fn get_current_states(url: &str, token: &str) -> Result<Vec<HaEvent>> {
 fn to_persistent_data_point(
     channel: HaChannel,
     ha_value: &str,
+    attributes: &HashMap<String, Value>,
     timestamp: chrono::DateTime<chrono::Utc>,
 ) -> Result<PersistentDataPoint> {
     let dp = match channel {
@@ -190,6 +198,17 @@ fn to_persistent_data_point(
             value: ChannelValue::TotalEnergyConsumption(channel, KiloWattHours(ha_value.parse()?)),
             timestamp,
         },
+        HaChannel::SetPoint(channel) => {
+            let v = match attributes.get("temperature").and_then(|v| v.as_f64()) {
+                Some(f_value) => f_value,
+                None => bail!("No temperature found in attributes or not a number"),
+            };
+
+            PersistentDataPoint {
+                value: ChannelValue::SetPoint(channel, DegreeCelsius(v)),
+                timestamp,
+            }
+        }
         HaChannel::HeatingDemand(channel) => PersistentDataPoint {
             value: ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
             timestamp,

@@ -1,6 +1,6 @@
 use std::{f64, fmt::Display};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd)]
 pub struct DegreeCelsius(pub f64);
 
 impl From<&DegreeCelsius> for f64 {

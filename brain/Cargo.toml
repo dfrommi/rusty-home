@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
+enum_dispatch = "0.3"
 chrono = { version = "0.4.38", features = ["serde", "std"] }
 tracing = "*"
 tracing-subscriber = "*"

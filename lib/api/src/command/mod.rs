@@ -5,6 +5,7 @@ pub mod db;
 #[derive(Debug, Clone)]
 pub enum PowerToggle {
     Dehumidifier,
+    LivingRoomNotificationLight,
 }
 
 #[derive(Debug, Clone)]

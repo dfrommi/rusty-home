@@ -6,6 +6,20 @@ pub enum OpenedState {
     Closed,
 }
 
+impl OpenedState {
+    pub fn any(values: &[Self]) -> Self {
+        if values.iter().any(|&state| state == OpenedState::Opened) {
+            OpenedState::Opened
+        } else {
+            OpenedState::Closed
+        }
+    }
+
+    pub fn is_opened(&self) -> bool {
+        self == &Self::Opened
+    }
+}
+
 impl From<&OpenedState> for f64 {
     fn from(value: &OpenedState) -> Self {
         match value {

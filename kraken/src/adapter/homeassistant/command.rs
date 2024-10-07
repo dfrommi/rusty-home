@@ -59,6 +59,20 @@ mod serialize {
                     ids: vec![id.to_owned()],
                 },
             },
+            HaService::LightTurnOn { id } => HaMessage::CallService {
+                domain: "light",
+                service: "turn_on",
+                service_data: HaServiceData::ForEntities {
+                    ids: vec![id.to_owned()],
+                },
+            },
+            HaService::LightTurnOff { id } => HaMessage::CallService {
+                domain: "light",
+                service: "turn_off",
+                service_data: HaServiceData::ForEntities {
+                    ids: vec![id.to_owned()],
+                },
+            },
         };
 
         serde_json::to_string(&message)

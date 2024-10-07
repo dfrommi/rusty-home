@@ -10,7 +10,7 @@ use super::Action;
 use crate::prelude::*;
 use anyhow::Result;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Dehumidify {}
 
 impl Action for Dehumidify {
@@ -62,7 +62,6 @@ impl Preconditions<HomeState> for Dehumidify {
 
 impl Effects<HomeState> for Dehumidify {
     fn apply_to(&self, state: &HomeState) -> HomeState {
-        #[allow(clippy::needless_update)] //will become relevant with bigger home state
         HomeState {
             risk_of_mould_in_bathroom: false,
             ..state.clone()

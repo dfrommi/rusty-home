@@ -34,6 +34,16 @@ pub struct HomeEventListener {
     delegate: EventListener,
 }
 
+impl<T> DataPoint<T> {
+    pub fn map_value<U>(&self, f: impl FnOnce(&T) -> U) -> DataPoint<U> {
+        let value = f(&self.value);
+        DataPoint {
+            value,
+            timestamp: self.timestamp,
+        }
+    }
+}
+
 impl HomeEventListener {
     pub fn new(db_listener: PgListener) -> Self {
         Self {

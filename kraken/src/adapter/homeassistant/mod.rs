@@ -28,4 +28,6 @@ pub enum HaChannel {
 pub enum HaService {
     SwitchTurnOn { id: String },
     SwitchTurnOff { id: String },
+    LightTurnOn { id: String },
+    LightTurnOff { id: String },
 }

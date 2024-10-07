@@ -25,6 +25,7 @@ pub mod schema {
     #[sqlx(type_name = "TEXT", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbDevice {
         Dehumidifier,
+        LivingRoomNotificationLight,
     }
 
     #[derive(Debug, Clone, sqlx::Type)]
@@ -71,6 +72,9 @@ pub mod mapper {
                     command_type: DbCommandType::SetPower,
                     device: match item {
                         PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
+                        PowerToggle::LivingRoomNotificationLight => {
+                            DbDevice::LivingRoomNotificationLight
+                        }
                     },
                     payload: json!(DbSetPowerPayload {
                         power_on: *power_on,
@@ -88,6 +92,9 @@ pub mod mapper {
                 DbCommandType::SetPower => Command::SetPower {
                     item: match self.device {
                         DbDevice::Dehumidifier => PowerToggle::Dehumidifier,
+                        DbDevice::LivingRoomNotificationLight => {
+                            PowerToggle::LivingRoomNotificationLight
+                        }
                         #[allow(unreachable_patterns)] //will be needed with more items
                         _ => bail!(
                             "Combination of command type {:?} and device {:?} not supported",
@@ -134,6 +141,9 @@ pub mod mapper {
                     DbCommandType::SetPower,
                     match toggle {
                         PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
+                        PowerToggle::LivingRoomNotificationLight => {
+                            DbDevice::LivingRoomNotificationLight
+                        }
                     },
                 ),
             }

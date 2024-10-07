@@ -30,6 +30,18 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
                 id: "switch.dehumidifier".to_owned(),
             }
         }),
+        Command::SetPower {
+            item: PowerToggle::LivingRoomNotificationLight,
+            power_on,
+        } => CommandBackendService::HomeAssistant(if *power_on {
+            HaService::LightTurnOn {
+                id: "light.hue_go".to_owned(),
+            }
+        } else {
+            HaService::LightTurnOff {
+                id: "light.hue_go".to_owned(),
+            }
+        }),
     }
 }
 

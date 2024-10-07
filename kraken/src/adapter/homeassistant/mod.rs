@@ -1,5 +1,4 @@
 mod command;
-mod config;
 mod event;
 
 use api::state::{
@@ -11,7 +10,7 @@ pub use command::HaCommandExecutor;
 pub use event::HaStateCollector;
 
 #[derive(Debug, Clone)]
-enum HaChannel {
+pub enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Opened(Opened),
@@ -25,12 +24,8 @@ enum HaChannel {
     PresenceFromDeviceTracker(Presence),
 }
 
-enum HomeAssistantService {
-    SwitchTurnOn,
-    SwitchTurnOff,
-}
-
-struct HaCommandEntity<'a> {
-    pub id: &'a str,
-    pub service: HomeAssistantService,
+#[derive(Debug, Clone)]
+pub enum HaService {
+    SwitchTurnOn { id: String },
+    SwitchTurnOff { id: String },
 }

@@ -1,12 +1,10 @@
-use api::command::Command;
-
 use serialize::to_message;
 use support::mqtt::MqttOutMessage;
 use tokio::sync::mpsc::Sender;
 
 use crate::adapter::CommandExecutor;
 
-use super::config::ha_command_entity;
+use super::HaService;
 
 pub struct HaCommandExecutor {
     mqtt_sender: Sender<MqttOutMessage>,
@@ -22,62 +20,43 @@ impl HaCommandExecutor {
     }
 }
 
-impl CommandExecutor for HaCommandExecutor {
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        match to_command_payload(command) {
-            Some(payload) => {
-                let mqtt_msg = MqttOutMessage {
-                    topic: self.command_mqtt_topic.to_owned(),
-                    payload,
-                    retain: false,
-                };
-                self.mqtt_sender
-                    .send(mqtt_msg)
-                    .await
-                    .map(|_| true)
-                    .map_err(Into::into)
-            }
-            None => Ok(false),
-        }
-    }
-}
+impl CommandExecutor<HaService> for HaCommandExecutor {
+    async fn execute_command(&self, command: &HaService) -> anyhow::Result<bool> {
+        let payload = to_message(command)?;
 
-pub fn to_command_payload(command: &Command) -> Option<String> {
-    let ha_command = ha_command_entity(command);
+        let mqtt_msg = MqttOutMessage {
+            topic: self.command_mqtt_topic.to_owned(),
+            payload,
+            retain: false,
+        };
 
-    match ha_command {
-        None => {
-            tracing::error!("Command not supported by HA: {:?}", command);
-            None
-        }
-        Some(cmd) => to_message(&cmd)
-            .map_err(|e| {
-                tracing::error!("Internal error processing JSON: {:?}", e);
-                e
-            })
-            .ok(),
+        self.mqtt_sender
+            .send(mqtt_msg)
+            .await
+            .map(|_| true)
+            .map_err(Into::into)
     }
 }
 
 mod serialize {
     use serde::Serialize;
 
-    use crate::adapter::homeassistant::{HaCommandEntity, HomeAssistantService};
+    use crate::adapter::homeassistant::HaService;
 
-    pub fn to_message(ha_command_entity: &HaCommandEntity) -> Result<String, serde_json::Error> {
-        let message = match ha_command_entity.service {
-            HomeAssistantService::SwitchTurnOn => HaMessage::CallService {
+    pub fn to_message(service: &HaService) -> Result<String, serde_json::Error> {
+        let message = match service {
+            HaService::SwitchTurnOn { id } => HaMessage::CallService {
                 domain: "switch",
                 service: "turn_on",
                 service_data: HaServiceData::ForEntities {
-                    ids: vec![ha_command_entity.id.to_string()],
+                    ids: vec![id.to_owned()],
                 },
             },
-            HomeAssistantService::SwitchTurnOff => HaMessage::CallService {
+            HaService::SwitchTurnOff { id } => HaMessage::CallService {
                 domain: "switch",
                 service: "turn_off",
                 service_data: HaServiceData::ForEntities {
-                    ids: vec![ha_command_entity.id.to_string()],
+                    ids: vec![id.to_owned()],
                 },
             },
         };

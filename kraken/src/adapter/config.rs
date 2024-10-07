@@ -2,39 +2,34 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 
-use crate::adapter::homeassistant::HaChannel;
+use crate::adapter::CommandBackendService;
 use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::{
     command::Command, command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
 };
 
-use super::HaCommandEntity;
-use super::HomeAssistantService;
+use super::homeassistant::HaChannel;
+use super::HaService;
 
 pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
     HA_ENTITIES.get(&entity_id).cloned()
 }
 
-pub fn ha_command_entity(command: &Command) -> Option<HaCommandEntity> {
+pub fn to_backend_command(command: &Command) -> CommandBackendService {
     match command {
         Command::SetPower {
             item: PowerToggle::Dehumidifier,
             power_on,
-        } => Some(HaCommandEntity {
-            id: "switch.mytest",
-            service: turn_on_off(*power_on),
+        } => CommandBackendService::HomeAssistant(if *power_on {
+            HaService::SwitchTurnOn {
+                id: "switch.dehumidifier".to_owned(),
+            }
+        } else {
+            HaService::SwitchTurnOff {
+                id: "switch.dehumidifier".to_owned(),
+            }
         }),
-        #[allow(unreachable_patterns)]
-        _ => None,
-    }
-}
-
-fn turn_on_off(power_on: bool) -> HomeAssistantService {
-    if power_on {
-        HomeAssistantService::SwitchTurnOn
-    } else {
-        HomeAssistantService::SwitchTurnOff
     }
 }
 

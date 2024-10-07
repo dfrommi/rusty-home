@@ -1,13 +1,15 @@
-use api::command::Command;
 use chrono::{DateTime, Utc};
 
 use api::state::ChannelValue;
 
+mod config;
 mod homeassistant;
 pub mod persistence;
 
 use anyhow::Result;
+use config::to_backend_command;
 pub use homeassistant::HaCommandExecutor;
+use homeassistant::HaService;
 pub use homeassistant::HaStateCollector;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -19,9 +21,14 @@ pub struct PersistentDataPoint {
     timestamp: DateTime<Utc>,
 }
 
-trait CommandExecutor {
+#[derive(Debug, Clone)]
+enum CommandBackendService {
+    HomeAssistant(HaService),
+}
+
+trait CommandExecutor<T> {
     //Returns true if command was executed
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
+    async fn execute_command(&self, command: &T) -> anyhow::Result<bool>;
 }
 
 trait StateCollector {
@@ -76,10 +83,13 @@ pub async fn execute_commands(
             Ok(Some(cmd)) => {
                 got_cmd = true;
 
-                //TODO find a way to handle executors in a generic way. How to iterate over traits
-                //with async fn?
-                let ha_res = ha_executor.execute_command(&cmd.command).await;
-                handle_execution_result(cmd.id, ha_res, api).await;
+                let res = match to_backend_command(&cmd.command) {
+                    CommandBackendService::HomeAssistant(ha_service) => {
+                        ha_executor.execute_command(&ha_service).await
+                    }
+                };
+
+                handle_execution_result(cmd.id, res, api).await;
             }
             Ok(None) => {
                 got_cmd = false;

@@ -7,13 +7,14 @@ use support::unit::present_state::PresentState;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
+use crate::adapter::config::ha_incoming_event_channel;
 use crate::adapter::StateCollector;
 use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
 use anyhow::{bail, Result};
 use api::state::ChannelValue;
 use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
-use super::{config::ha_incoming_event_channel, HaChannel};
+use super::HaChannel;
 
 pub struct HaStateCollector {
     api_url: String,

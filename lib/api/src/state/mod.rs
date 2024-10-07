@@ -20,7 +20,7 @@ pub mod db;
 * [X] presence couch
 *
 * - notification light (off, info, warn, alert)
-* - home state: dennis, sabine
+* [X] home state: dennis, sabine
 *
 * - tv energy saving mode
 */

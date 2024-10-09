@@ -1,6 +1,6 @@
 use support::unit::{
-    present_state::PresentState, DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState,
-    Watt,
+    DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, PresentState,
+    UserControlledState, Watt,
 };
 
 pub mod db;
@@ -35,6 +35,7 @@ pub enum ChannelValue {
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
     SetPoint(SetPoint, DegreeCelsius),
     HeatingDemand(HeatingDemand, Percent),
+    UserControlled(UserControlled, UserControlledState),
     Presence(Presence, PresentState),
 }
 
@@ -180,6 +181,20 @@ pub enum HeatingDemand {
 
 impl ChannelId for HeatingDemand {
     type ValueType = Percent;
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum UserControlled {
+    LivingRoomThermostat,
+    BedroomThermostat,
+    KitchenThermostat,
+    RoomOfRequirementsThermostat,
+    BathroomThermostat,
+}
+
+impl ChannelId for UserControlled {
+    type ValueType = UserControlledState;
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::IntoStaticStr)]

@@ -3,7 +3,7 @@ mod event;
 
 use api::state::{
     CurrentPowerUsage, HeatingDemand, Opened, Powered, Presence, RelativeHumidity, SetPoint,
-    Temperature, TotalEnergyConsumption,
+    Temperature, TotalEnergyConsumption, UserControlled,
 };
 
 pub use command::HaCommandExecutor;
@@ -19,6 +19,7 @@ pub enum HaChannel {
     TotalEnergyConsumption(TotalEnergyConsumption),
     SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
+    UserControlledOverlay(UserControlled),
     PresenceFromLeakSensor(Presence),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),

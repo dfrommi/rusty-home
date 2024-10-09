@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use parse::{HaEvent, StateValue};
 use serde_json::Value;
 use support::mqtt::MqttInMessage;
-use support::unit::present_state::PresentState;
+use support::unit::{PresentState, UserControlledState};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -213,6 +213,19 @@ fn to_persistent_data_point(
         }
         HaChannel::HeatingDemand(channel) => PersistentDataPoint {
             value: ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
+            timestamp,
+        },
+        HaChannel::UserControlledOverlay(channel) => PersistentDataPoint {
+            value: ChannelValue::UserControlled(
+                channel,
+                if ha_value == "on"
+                    && attributes.get("termination") == Some(&Value::String("TIMER".to_string()))
+                {
+                    UserControlledState::User
+                } else {
+                    UserControlledState::System
+                },
+            ),
             timestamp,
         },
         HaChannel::PresenceFromLeakSensor(channel) => PersistentDataPoint {

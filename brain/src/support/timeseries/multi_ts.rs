@@ -59,7 +59,7 @@ impl<
         let mut dps: Vec<DataPoint<R>> = Vec::new();
 
         for first_dp in first_series.iter() {
-            if let Some(second_dp) = second_series.at_or_latest_before(first_dp.timestamp) {
+            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
                 let value = (self.merge)(&first_dp.value, &second_dp.value);
                 let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
                 dps.push(DataPoint { value, timestamp });
@@ -67,14 +67,14 @@ impl<
         }
 
         for second_dp in second_series.iter() {
-            if let Some(first_dp) = first_series.at_or_latest_before(second_dp.timestamp) {
+            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
                 let value = (self.merge)(&first_dp.value, &second_dp.value);
                 let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
                 dps.push(DataPoint { value, timestamp });
             }
         }
 
-        let ts = TimeSeries::new(dps);
+        let ts = TimeSeries::new(dps, since);
         println!("Final {:?}", ts);
         ts
     }

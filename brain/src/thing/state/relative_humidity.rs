@@ -20,6 +20,6 @@ impl TimeSeriesAccess<Percent> for RelativeHumidity {
         home_api()
             .get_covering(self, since)
             .await
-            .map(TimeSeries::new)?
+            .map(|v| TimeSeries::new(v, since))?
     }
 }

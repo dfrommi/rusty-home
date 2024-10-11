@@ -18,7 +18,10 @@ impl<T> TimeSeries<T>
 where
     T: From<f64> + Into<f64> + Clone + Debug,
 {
-    pub fn new(data_points: impl IntoIterator<Item = DataPoint<T>>) -> Result<Self> {
+    pub fn new(
+        data_points: impl IntoIterator<Item = DataPoint<T>>,
+        start_at: DateTime<Utc>,
+    ) -> Result<Self> {
         let mut values: BTreeMap<DateTime<Utc>, DataPoint<T>> = BTreeMap::new();
         for dp in data_points.into_iter() {
             values.insert(dp.timestamp, dp);
@@ -26,18 +29,19 @@ where
 
         ensure!(!values.is_empty(), "data points are empty");
 
+        if let Some(interpolated) = interpolate(&values, start_at) {
+            values.insert(start_at, interpolated);
+        }
+
         Ok(Self {
-            values,
+            values: values.split_off(&start_at), //remove all values before start
             _marker: PhantomData,
         })
     }
 
-    pub fn at_or_latest_before(&self, at: chrono::DateTime<chrono::Utc>) -> Option<DataPoint<T>> {
-        self.values
-            .range(..=at)
-            .next_back()
-            .map(|(_, v)| v)
-            .cloned()
+    //linear interpolation or last seen
+    pub fn at(&self, at: chrono::DateTime<chrono::Utc>) -> Option<DataPoint<T>> {
+        interpolate(&self.values, at)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
@@ -45,9 +49,64 @@ where
     }
 
     pub fn mean(&self) -> T {
-        let sum: f64 = self.values.values().map(|dp| dp.value.clone().into()).sum();
-        let count = self.values.len() as f64;
-        (sum / count).into()
+        let mut weighted_sum = 0.0;
+        let mut total_duration = 0.0;
+
+        let mut iter = self.values.values().peekable();
+        while let Some(current) = iter.next() {
+            if let Some(next) = iter.peek() {
+                let duration = (next.timestamp - current.timestamp).num_seconds() as f64;
+                //linear interpolated
+                weighted_sum +=
+                    ((current.value.clone().into() + next.value.clone().into()) / 2.0) * duration;
+                total_duration += duration;
+            }
+        }
+
+        if total_duration == 0.0 {
+            return self.values.values().next().unwrap().value.clone();
+        }
+
+        (weighted_sum / total_duration).into()
+    }
+}
+
+//linear interpolation or last seen
+fn interpolate<T>(
+    values: &BTreeMap<DateTime<Utc>, DataPoint<T>>,
+    at: chrono::DateTime<chrono::Utc>,
+) -> Option<DataPoint<T>>
+where
+    T: From<f64> + Into<f64> + Clone,
+{
+    if let Some(dp) = values.get(&at) {
+        return Some(dp.clone());
+    }
+
+    let prev = values.range(..=at).next_back().map(|(_, dp)| dp);
+    let next = values.range(at..).next().map(|(_, dp)| dp);
+
+    match (prev, next) {
+        (Some(prev_dp), Some(next_dp)) => {
+            let prev_time = prev_dp.timestamp.timestamp() as f64;
+            let next_time = next_dp.timestamp.timestamp() as f64;
+            let at_time = at.timestamp() as f64;
+
+            let prev_value: f64 = prev_dp.value.clone().into();
+            let next_value: f64 = next_dp.value.clone().into();
+
+            let interpolated_value = prev_value
+                + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
+
+            Some(DataPoint {
+                timestamp: at,
+                value: interpolated_value.into(),
+            })
+        }
+
+        (Some(prev_dp), None) => Some(prev_dp.clone()),
+
+        _ => None,
     }
 }
 
@@ -66,18 +125,17 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_point_before() {
+        fn test_points_around() {
             let ts = test_series();
 
-            let dp_opt =
-                ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap());
+            let dp_opt = ts.at(Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap());
 
             let dp = assert_some(dp_opt);
             assert_eq!(
                 dp.timestamp,
-                Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap()
+                Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap()
             );
-            assert_eq!(dp.value, 20.0);
+            assert_eq!(dp.value, 22.5);
         }
 
         #[test]
@@ -85,7 +143,7 @@ mod tests {
             let ts = test_series();
             let dt = Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap();
 
-            let dp_opt = ts.at_or_latest_before(dt);
+            let dp_opt = ts.at(dt);
 
             let dp = assert_some(dp_opt);
             assert_eq!(dp.timestamp, dt);
@@ -95,8 +153,7 @@ mod tests {
         #[test]
         fn test_no_point_before() {
             let ts = test_series();
-            let dp_opt =
-                ts.at_or_latest_before(Utc.with_ymd_and_hms(2024, 9, 10, 12, 0, 0).unwrap());
+            let dp_opt = ts.at(Utc.with_ymd_and_hms(2024, 9, 10, 12, 0, 0).unwrap());
 
             assert!(dp_opt.is_none());
         }
@@ -133,20 +190,23 @@ mod tests {
     }
 
     fn test_series() -> TimeSeries<f64> {
-        TimeSeries::new(vec![
-            DataPoint {
-                timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap(),
-                value: 10.0,
-            },
-            DataPoint {
-                timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap(),
-                value: 30.0,
-            },
-            DataPoint {
-                timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap(),
-                value: 20.0,
-            },
-        ])
+        TimeSeries::new(
+            vec![
+                DataPoint {
+                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap(),
+                    value: 10.0,
+                },
+                DataPoint {
+                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap(),
+                    value: 30.0,
+                },
+                DataPoint {
+                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap(),
+                    value: 20.0,
+                },
+            ],
+            Utc.with_ymd_and_hms(2024, 9, 10, 13, 0, 0).unwrap(),
+        )
         .unwrap()
     }
 }

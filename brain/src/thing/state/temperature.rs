@@ -18,6 +18,6 @@ impl TimeSeriesAccess<DegreeCelsius> for Temperature {
         home_api()
             .get_covering(self, since)
             .await
-            .map(TimeSeries::new)?
+            .map(|v| TimeSeries::new(v, since))?
     }
 }

@@ -1,104 +1,53 @@
-use polars::frame::DataFrame;
-use polars::prelude::*;
-use std::{fmt::Debug, marker::PhantomData};
+mod multi_ts;
+
+use chrono::{DateTime, Utc};
+use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
 
 use crate::adapter::persistence::DataPoint;
 use anyhow::{ensure, Result};
 
-const TIME: &str = "time";
-const VALUE: &str = "value";
+pub use multi_ts::MultiTimeSeriesAccess;
 
 #[derive(Debug)]
 pub struct TimeSeries<T> {
-    df: DataFrame,
+    values: BTreeMap<DateTime<Utc>, DataPoint<T>>,
     _marker: PhantomData<T>,
 }
 
 impl<T> TimeSeries<T>
 where
-    T: From<f64> + Into<f64> + Debug,
+    T: From<f64> + Into<f64> + Clone + Debug,
 {
     pub fn new(data_points: impl IntoIterator<Item = DataPoint<T>>) -> Result<Self> {
-        let mut timestamps: Vec<chrono::NaiveDateTime> = Vec::new();
-        let mut values: Vec<f64> = Vec::new();
-
-        for dp in data_points {
-            timestamps.push(dp.timestamp.naive_utc());
-            values.push(dp.value.into());
+        let mut values: BTreeMap<DateTime<Utc>, DataPoint<T>> = BTreeMap::new();
+        for dp in data_points.into_iter() {
+            values.insert(dp.timestamp, dp);
         }
 
-        ensure!(!timestamps.is_empty(), "data points are empty");
-
-        let df = df![
-            TIME => timestamps,
-            VALUE => values
-        ]?
-        .sort([TIME], SortMultipleOptions::default())?;
+        ensure!(!values.is_empty(), "data points are empty");
 
         Ok(Self {
-            df,
+            values,
             _marker: PhantomData,
         })
     }
 
     pub fn at_or_latest_before(&self, at: chrono::DateTime<chrono::Utc>) -> Option<DataPoint<T>> {
-        let r = self.at_or_latest_before_int(at);
-        match r {
-            Ok(v) => Some(v),
-            Err(_) => None,
-        }
+        self.values
+            .range(..=at)
+            .next_back()
+            .map(|(_, v)| v)
+            .cloned()
     }
 
-    fn at_or_latest_before_int(&self, at: chrono::DateTime<chrono::Utc>) -> Result<DataPoint<T>> {
-        let row = self
-            .df
-            .clone()
-            .lazy()
-            .filter(col(TIME).lt_eq(lit(at.naive_utc())))
-            .tail(1)
-            .collect()?;
-
-        ensure!(!row.is_empty(), "No data point found before {}", at);
-
-        Ok(Self::to_datapoints(&row)?.remove(0))
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = DataPoint<T>> {
-        Self::to_datapoints(&self.df).unwrap().into_iter()
+    pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
+        self.values.values()
     }
 
     pub fn mean(&self) -> T {
-        self.df
-            .column(VALUE)
-            .expect("Internal error: value column not found")
-            .mean()
-            .expect("Internal error: mean can't be calculated, but dataframe should not be empty")
-            .into()
-    }
-
-    fn to_datapoints(df: &DataFrame) -> Result<Vec<DataPoint<T>>> {
-        let timestamps = df.column(TIME)?.datetime()?;
-        let values = df.column(VALUE)?.f64()?;
-
-        let mut dps: Vec<DataPoint<T>> = vec![];
-
-        for i in 0..df.height() {
-            let timestamp_i64 = timestamps.get(i).unwrap();
-            let timestamp = chrono::DateTime::from_timestamp(
-                timestamp_i64 / 1000,
-                ((timestamp_i64 % 1000) * 1_000_000) as u32,
-            )
-            .unwrap();
-
-            let value: f64 = values.get(i).unwrap_or(f64::NAN);
-
-            dps.push(DataPoint {
-                timestamp,
-                value: value.into(),
-            });
-        }
-
-        Ok(dps)
+        let sum: f64 = self.values.values().map(|dp| dp.value.clone().into()).sum();
+        let count = self.values.len() as f64;
+        (sum / count).into()
     }
 }
 
@@ -157,7 +106,7 @@ mod tests {
     fn test_iter() {
         let ts = test_series();
 
-        let dps: Vec<DataPoint<f64>> = ts.iter().collect();
+        let dps: Vec<&DataPoint<f64>> = ts.iter().collect();
 
         assert_eq!(
             dps[0].timestamp,

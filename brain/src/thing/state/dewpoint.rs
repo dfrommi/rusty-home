@@ -1,3 +1,5 @@
+use crate::support::timeseries::MultiTimeSeriesAccess;
+
 use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};

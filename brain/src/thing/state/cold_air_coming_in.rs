@@ -22,17 +22,10 @@ impl DataPointAccess<bool> for ColdAirComingIn {
         }
 
         let result = match self {
-            ColdAirComingIn::LivingRoom => {
-                let (window, door) = tokio::try_join!(
-                    Opened::LivingRoomWindow.current_data_point(),
-                    Opened::BalconyDoor.current_data_point()
-                )?;
-
-                DataPoint {
-                    value: door.value.is_opened() || window.value.is_opened(),
-                    timestamp: std::cmp::max(window.timestamp, door.timestamp),
-                }
-            }
+            ColdAirComingIn::LivingRoom => Opened::LivingRoomWindowOrDoor
+                .current_data_point()
+                .await?
+                .map_value(|v| v.is_opened()),
             ColdAirComingIn::Bedroom => Opened::BedroomWindow
                 .current_data_point()
                 .await?

@@ -26,3 +26,11 @@ impl Display for DegreeCelsius {
         write!(f, "{} °C", self.0)
     }
 }
+
+impl std::ops::Sub for &DegreeCelsius {
+    type Output = DegreeCelsius;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        DegreeCelsius(self.0 - rhs.0)
+    }
+}

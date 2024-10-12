@@ -1,3 +1,4 @@
+mod automatic_temp_inc;
 mod cold_air_coming_in;
 mod current_power_usage;
 mod dewpoint;
@@ -9,6 +10,7 @@ mod temperature;
 mod total_energy_consumption;
 mod user_controlled;
 
+pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use powered::Powered;
 pub use risk_of_mould::RiskOfMould;

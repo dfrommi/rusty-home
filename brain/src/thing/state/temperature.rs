@@ -1,8 +1,9 @@
 use super::*;
 use crate::prelude::*;
 use anyhow::Result;
-pub use api::state::Temperature;
 use support::unit::DegreeCelsius;
+
+pub use api::state::Temperature;
 
 impl DataPointAccess<DegreeCelsius> for Temperature {
     async fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {

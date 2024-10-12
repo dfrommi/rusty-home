@@ -6,8 +6,7 @@ use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
 pub enum Opened {
-    LivingRoomWindow,
-    BalconyDoor,
+    LivingRoomWindowOrDoor,
     BedroomWindow,
     KitchenWindow,
     RoomOfRequirementsWindow,
@@ -17,49 +16,38 @@ impl DataPointAccess<OpenedState> for Opened {
     async fn current_data_point(&self) -> anyhow::Result<DataPoint<OpenedState>> {
         let api = home_api();
         match self {
-            Opened::BalconyDoor => {
-                api.get_latest(&api::state::Opened::LivingRoomBalconyDoor)
-                    .await
-            }
-            Opened::LivingRoomWindow => {
-                any_of(
+            Opened::LivingRoomWindowOrDoor => {
+                any_of(vec![
                     api::state::Opened::LivingRoomWindowLeft,
                     api::state::Opened::LivingRoomWindowRight,
                     api::state::Opened::LivingRoomWindowSide,
-                )
+                    api::state::Opened::LivingRoomBalconyDoor,
+                ])
                 .await
             }
             Opened::BedroomWindow => api.get_latest(&api::state::Opened::BedroomWindow).await,
             Opened::KitchenWindow => api.get_latest(&api::state::Opened::KitchenWindow).await,
             Opened::RoomOfRequirementsWindow => {
-                any_of(
+                any_of(vec![
                     api::state::Opened::RoomOfRequirementsWindowLeft,
                     api::state::Opened::RoomOfRequirementsWindowRight,
                     api::state::Opened::RoomOfRequirementsWindowSide,
-                )
+                ])
                 .await
             }
         }
     }
 }
 
-async fn any_of(
-    o1: api::state::Opened,
-    o2: api::state::Opened,
-    o3: api::state::Opened,
-) -> anyhow::Result<DataPoint<OpenedState>> {
+async fn any_of(opened_states: Vec<api::state::Opened>) -> anyhow::Result<DataPoint<OpenedState>> {
     let api = home_api();
-    let res = tokio::try_join! {
-        api.get_latest(&o1),
-        api.get_latest(&o2),
-        api.get_latest(&o3)
-    };
+    let futures: Vec<_> = opened_states.iter().map(|o| api.get_latest(o)).collect();
+    let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
     match res {
-        Ok((v1, v2, v3)) => {
-            //min of timestamp of l, r, s
-            let timestamp = std::cmp::max(v1.timestamp, std::cmp::max(v2.timestamp, v3.timestamp));
-            let value = OpenedState::any(&[v1.value, v2.value, v3.value]);
+        Ok(values) => {
+            let timestamp = values.iter().map(|v| v.timestamp).max().unwrap_or_default();
+            let value = OpenedState::any(&values.iter().map(|v| v.value).collect::<Vec<_>>());
 
             Ok(DataPoint { value, timestamp })
         }

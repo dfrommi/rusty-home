@@ -1,10 +1,9 @@
-use crate::support::timeseries::MultiTimeSeriesAccess;
-
 use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};
 
 use support::unit::{DegreeCelsius, Percent};
+use tokio::try_join;
 
 #[derive(Debug, Clone)]
 pub enum DewPoint {
@@ -62,12 +61,13 @@ impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
         &self,
         since: chrono::DateTime<chrono::Utc>,
     ) -> Result<TimeSeries<DegreeCelsius>> {
-        let series =
-            MultiTimeSeriesAccess::new(self.temperature(), self.relative_humidity(), |t, h| {
-                calculate_dew_point(t, h)
-            });
+        let (t_series, h_series) = {
+            let temp = self.temperature();
+            let humidity = self.relative_humidity();
+            try_join!(temp.series_since(since), humidity.series_since(since))?
+        };
 
-        series.series_since(since).await
+        TimeSeries::combined(&t_series, &h_series, calculate_dew_point)
     }
 }
 

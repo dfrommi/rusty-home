@@ -1,19 +1,15 @@
-mod multi_ts;
-
 use chrono::{DateTime, Utc};
-use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
+use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::adapter::persistence::DataPoint;
 use anyhow::{ensure, Result};
 
-pub use multi_ts::MultiTimeSeriesAccess;
-
 #[derive(Debug)]
 pub struct TimeSeries<T> {
     values: BTreeMap<DateTime<Utc>, DataPoint<T>>,
-    _marker: PhantomData<T>,
 }
 
+//TODO less clone, better usage of references, maybe not always via f64
 impl<T> TimeSeries<T>
 where
     T: From<f64> + Into<f64> + Clone + Debug,
@@ -35,8 +31,55 @@ where
 
         Ok(Self {
             values: values.split_off(&start_at), //remove all values before start
-            _marker: PhantomData,
         })
+    }
+
+    pub fn combined<U, V, F>(
+        first_series: &TimeSeries<U>,
+        second_series: &TimeSeries<V>,
+        merge: F,
+    ) -> Result<Self>
+    where
+        U: From<f64> + Into<f64> + Clone + Debug,
+        V: From<f64> + Into<f64> + Clone + Debug,
+        F: Fn(&U, &V) -> T,
+    {
+        let mut dps: Vec<DataPoint<T>> = Vec::new();
+
+        for first_dp in first_series.iter() {
+            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+                dps.push(DataPoint { value, timestamp });
+            }
+        }
+
+        for second_dp in second_series.iter() {
+            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+                dps.push(DataPoint { value, timestamp });
+            }
+        }
+
+        let since = std::cmp::max(first_series.starting_at(), second_series.starting_at());
+        Self::new(dps, since)
+    }
+
+    pub fn first(&self) -> DataPoint<T> {
+        self.values
+            .values()
+            .next()
+            .expect("Internal error: map should not be empty")
+            .clone()
+    }
+
+    pub fn last(&self) -> DataPoint<T> {
+        self.values
+            .values()
+            .last()
+            .expect("Internal error: map should not be empty")
+            .clone()
     }
 
     //linear interpolation or last seen
@@ -44,7 +87,27 @@ where
         interpolate(&self.values, at)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
+    pub fn min(&self) -> DataPoint<T> {
+        self.values
+            .values()
+            .min_by(|dp_a, dp_b| {
+                let a: f64 = dp_a.value.clone().into();
+                let b: f64 = dp_b.value.clone().into();
+                a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .expect("Internal error: map should not be empty")
+            .clone()
+    }
+
+    fn starting_at(&self) -> DateTime<Utc> {
+        *self
+            .values
+            .keys()
+            .next()
+            .expect("Internal error: map should not be empty")
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
         self.values.values()
     }
 

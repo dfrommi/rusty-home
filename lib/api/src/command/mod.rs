@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
+use r#macro::CommandTarget;
 use serde::{Deserialize, Serialize};
 use support::unit::DegreeCelsius;
 
 pub mod db;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, CommandTarget, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
     SetPower {
@@ -16,13 +17,6 @@ pub enum Command {
         #[serde(flatten)]
         target_state: HeatingTargetState,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "device", rename_all = "snake_case")]
-pub enum CommandTarget {
-    SetPower(PowerToggle),
-    SetHeating(Thermostat),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

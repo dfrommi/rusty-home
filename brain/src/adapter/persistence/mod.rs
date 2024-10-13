@@ -5,7 +5,7 @@ use api::{
         Command, CommandExecution, CommandSource, CommandTarget,
     },
     get_tag_id,
-    state::{db::DbChannelId, ChannelId},
+    state::{Channel, ChannelTypeInfo},
     EventListener,
 };
 use chrono::{DateTime, Utc};
@@ -64,9 +64,12 @@ impl HomeApi {
         Self { db_pool }
     }
 
-    pub async fn get_latest<'a, C: ChannelId>(&self, id: &'a C) -> Result<DataPoint<C::ValueType>>
+    pub async fn get_latest<'a, C: ChannelTypeInfo>(
+        &self,
+        id: &'a C,
+    ) -> Result<DataPoint<C::ValueType>>
     where
-        &'a C: Into<DbChannelId>,
+        &'a C: Into<Channel>,
         C::ValueType: From<f64>,
     {
         let tag_id = get_tag_id(&self.db_pool, id.into(), false).await?;
@@ -92,13 +95,13 @@ impl HomeApi {
         }
     }
 
-    pub async fn get_covering<'a, C: ChannelId>(
+    pub async fn get_covering<'a, C: ChannelTypeInfo>(
         &self,
         id: &'a C,
         start: DateTime<Utc>,
     ) -> Result<Vec<DataPoint<C::ValueType>>>
     where
-        &'a C: Into<DbChannelId>,
+        &'a C: Into<Channel>,
         C::ValueType: From<f64>,
     {
         let tags_id = get_tag_id(&self.db_pool, id.into(), false).await?;

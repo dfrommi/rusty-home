@@ -5,7 +5,7 @@ use api::{
         Command, CommandExecution, CommandSource, CommandTarget,
     },
     get_tag_id,
-    state::{Channel, ChannelTypeInfo},
+    state::{db::DbValue, Channel, ChannelTypeInfo},
     EventListener,
 };
 use chrono::{DateTime, Utc};
@@ -70,7 +70,7 @@ impl HomeApi {
     ) -> Result<DataPoint<C::ValueType>>
     where
         &'a C: Into<Channel>,
-        C::ValueType: From<f64>,
+        C::ValueType: From<DbValue>,
     {
         let tag_id = get_tag_id(&self.db_pool, id.into(), false).await?;
 
@@ -88,7 +88,7 @@ impl HomeApi {
 
         match rec {
             Some(r) => Ok(DataPoint {
-                value: r.get::<f64, _>("value").into(),
+                value: r.get::<DbValue, _>("value").into(),
                 timestamp: r.get("timestamp"),
             }),
             None => anyhow::bail!("No data found"),
@@ -102,7 +102,7 @@ impl HomeApi {
     ) -> Result<Vec<DataPoint<C::ValueType>>>
     where
         &'a C: Into<Channel>,
-        C::ValueType: From<f64>,
+        C::ValueType: From<DbValue>,
     {
         let tags_id = get_tag_id(&self.db_pool, id.into(), false).await?;
 

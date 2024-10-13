@@ -4,7 +4,7 @@ use api::{
         CommandExecution,
     },
     get_tag_id,
-    state::ChannelValue,
+    state::{db::DbValue, ChannelValue},
     EventListener,
 };
 use chrono::{DateTime, Utc};
@@ -109,7 +109,7 @@ impl BackendApi {
     ) -> Result<()> {
         let tags_id = get_tag_id(&self.db_pool, value.into(), true).await?;
 
-        let fvalue: f64 = value.into();
+        let fvalue: DbValue = value.into();
 
         sqlx::query(
             "WITH latest_value AS (

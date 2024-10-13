@@ -9,12 +9,6 @@ impl From<&Percent> for f64 {
     }
 }
 
-impl From<Percent> for f64 {
-    fn from(value: Percent) -> Self {
-        value.0
-    }
-}
-
 impl From<f64> for Percent {
     fn from(value: f64) -> Self {
         Self(value)

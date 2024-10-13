@@ -20,7 +20,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut type_info_impls = Vec::new();
     let mut from_impls = Vec::new();
     let mut from_channel_value_impl = Vec::new();
-    let mut into_f64_impls = Vec::new();
+    let mut into_dbvalue_impls = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
@@ -57,7 +57,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             });
 
             // Generate the Into<f64> implementation
-            into_f64_impls.push(quote! {
+            into_dbvalue_impls.push(quote! {
                 ChannelValue::#variant_name(_, v) => v.into()
             });
         }
@@ -89,10 +89,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl From<&#name> for f64 {
+        impl From<&#name> for crate::state::db::DbValue {
             fn from(val: &#name) -> Self {
                 match val {
-                    #(#into_f64_impls),*
+                    #(#into_dbvalue_impls),*
                 }
             }
         }

@@ -3,6 +3,10 @@ use sqlx::PgPool;
 
 use super::*;
 
+#[derive(Debug, Clone, PartialEq, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct DbValue(f64);
+
 #[cached(result = true, key = "Channel", convert = r#"{ channel.clone() }"#)]
 pub async fn get_tag_id(
     db_pool: &PgPool,
@@ -49,4 +53,133 @@ pub async fn get_tag_id(
         .await?;
 
     Ok(rec.0)
+}
+
+mod mapper {
+    use super::DbValue;
+    use support::unit::*;
+
+    impl From<&DegreeCelsius> for DbValue {
+        fn from(value: &DegreeCelsius) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for DegreeCelsius {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
+    impl From<&Percent> for DbValue {
+        fn from(value: &Percent) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for Percent {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
+    impl From<&Watt> for DbValue {
+        fn from(value: &Watt) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for Watt {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
+    impl From<&KiloWattHours> for DbValue {
+        fn from(value: &KiloWattHours) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for KiloWattHours {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
+    impl From<&OpenedState> for DbValue {
+        fn from(value: &OpenedState) -> Self {
+            match value {
+                OpenedState::Opened => DbValue(1.0),
+                OpenedState::Closed => DbValue(0.0),
+            }
+        }
+    }
+
+    impl From<DbValue> for OpenedState {
+        fn from(value: DbValue) -> Self {
+            if value.0 > 0.0 {
+                Self::Opened
+            } else {
+                Self::Closed
+            }
+        }
+    }
+
+    impl From<&PowerState> for DbValue {
+        fn from(value: &PowerState) -> Self {
+            match value {
+                PowerState::On => DbValue(1.0),
+                PowerState::Off => DbValue(0.0),
+            }
+        }
+    }
+
+    impl From<DbValue> for PowerState {
+        fn from(value: DbValue) -> Self {
+            if value.0 > 0.0 {
+                Self::On
+            } else {
+                Self::Off
+            }
+        }
+    }
+
+    impl From<&PresentState> for DbValue {
+        fn from(value: &PresentState) -> Self {
+            match value {
+                PresentState::Present => DbValue(1.0),
+                PresentState::Absent => DbValue(0.0),
+            }
+        }
+    }
+
+    impl From<DbValue> for PresentState {
+        fn from(value: DbValue) -> Self {
+            if value.0 > 0.0 {
+                Self::Present
+            } else {
+                Self::Absent
+            }
+        }
+    }
+
+    impl From<&UserControlledState> for DbValue {
+        fn from(value: &UserControlledState) -> Self {
+            match value {
+                UserControlledState::User => DbValue(1.0),
+                UserControlledState::System => DbValue(0.0),
+            }
+        }
+    }
+
+    impl From<DbValue> for UserControlledState {
+        fn from(value: DbValue) -> Self {
+            if value.0 > 0.0 {
+                Self::System
+            } else {
+                Self::User
+            }
+        }
+    }
 }

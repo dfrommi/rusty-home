@@ -12,7 +12,8 @@ pub struct TimeSeries<T> {
 //TODO less clone, better usage of references, maybe not always via f64
 impl<T> TimeSeries<T>
 where
-    T: From<f64> + Into<f64> + Clone + Debug,
+    T: From<f64> + Clone + Debug,
+    for<'a> &'a T: Into<f64>,
 {
     pub fn new(
         data_points: impl IntoIterator<Item = DataPoint<T>>,
@@ -40,8 +41,10 @@ where
         merge: F,
     ) -> Result<Self>
     where
-        U: From<f64> + Into<f64> + Clone + Debug,
-        V: From<f64> + Into<f64> + Clone + Debug,
+        U: From<f64> + Clone + Debug,
+        for<'a> &'a U: Into<f64>,
+        V: From<f64> + Clone + Debug,
+        for<'b> &'b V: Into<f64>,
         F: Fn(&U, &V) -> T,
     {
         let mut dps: Vec<DataPoint<T>> = Vec::new();
@@ -90,9 +93,9 @@ where
     pub fn min(&self) -> DataPoint<T> {
         self.values
             .values()
-            .min_by(|dp_a, dp_b| {
-                let a: f64 = dp_a.value.clone().into();
-                let b: f64 = dp_b.value.clone().into();
+            .min_by(|&dp_a, &dp_b| {
+                let a: f64 = (&dp_a.value).into();
+                let b: f64 = (&dp_b.value).into();
                 a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
             })
             .expect("Internal error: map should not be empty")
@@ -119,9 +122,11 @@ where
         while let Some(current) = iter.next() {
             if let Some(next) = iter.peek() {
                 let duration = (next.timestamp - current.timestamp).num_seconds() as f64;
+                let current_f64 = (&current.value).into();
+                let next_f64 = (&next.value).into();
+
                 //linear interpolated
-                weighted_sum +=
-                    ((current.value.clone().into() + next.value.clone().into()) / 2.0) * duration;
+                weighted_sum += ((current_f64 + next_f64) / 2.0) * duration;
                 total_duration += duration;
             }
         }
@@ -140,7 +145,8 @@ fn interpolate<T>(
     at: chrono::DateTime<chrono::Utc>,
 ) -> Option<DataPoint<T>>
 where
-    T: From<f64> + Into<f64> + Clone,
+    T: From<f64> + Clone,
+    for<'a> &'a T: Into<f64>,
 {
     if let Some(dp) = values.get(&at) {
         return Some(dp.clone());
@@ -155,8 +161,8 @@ where
             let next_time = next_dp.timestamp.timestamp() as f64;
             let at_time = at.timestamp() as f64;
 
-            let prev_value: f64 = prev_dp.value.clone().into();
-            let next_value: f64 = next_dp.value.clone().into();
+            let prev_value: f64 = (&prev_dp.value).into();
+            let next_value: f64 = (&next_dp.value).into();
 
             let interpolated_value = prev_value
                 + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
@@ -177,11 +183,12 @@ where
 mod tests {
     use super::*;
     use ::chrono::{TimeZone, Utc};
+    use support::unit::DegreeCelsius;
 
     #[test]
     fn test_mean() {
         let ts = test_series();
-        assert_eq!(ts.mean(), 20.0);
+        assert_eq!(ts.mean().0, 20.0);
     }
 
     mod at {
@@ -198,7 +205,7 @@ mod tests {
                 dp.timestamp,
                 Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap()
             );
-            assert_eq!(dp.value, 22.5);
+            assert_eq!(dp.value.0, 22.5);
         }
 
         #[test]
@@ -210,7 +217,7 @@ mod tests {
 
             let dp = assert_some(dp_opt);
             assert_eq!(dp.timestamp, dt);
-            assert_eq!(dp.value, 20.0);
+            assert_eq!(dp.value.0, 20.0);
         }
 
         #[test]
@@ -226,25 +233,25 @@ mod tests {
     fn test_iter() {
         let ts = test_series();
 
-        let dps: Vec<&DataPoint<f64>> = ts.iter().collect();
+        let dps: Vec<&DataPoint<DegreeCelsius>> = ts.iter().collect();
 
         assert_eq!(
             dps[0].timestamp,
             Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap()
         );
-        assert_eq!(dps[0].value, 10.0);
+        assert_eq!(dps[0].value.0, 10.0);
 
         assert_eq!(
             dps[1].timestamp,
             Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap()
         );
-        assert_eq!(dps[1].value, 20.0);
+        assert_eq!(dps[1].value.0, 20.0);
 
         assert_eq!(
             dps[2].timestamp,
             Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap()
         );
-        assert_eq!(dps[2].value, 30.0);
+        assert_eq!(dps[2].value.0, 30.0);
     }
 
     fn assert_some<T>(val: Option<T>) -> T {
@@ -252,20 +259,20 @@ mod tests {
         val.unwrap()
     }
 
-    fn test_series() -> TimeSeries<f64> {
+    fn test_series() -> TimeSeries<DegreeCelsius> {
         TimeSeries::new(
             vec![
                 DataPoint {
                     timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap(),
-                    value: 10.0,
+                    value: DegreeCelsius(10.0),
                 },
                 DataPoint {
                     timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap(),
-                    value: 30.0,
+                    value: DegreeCelsius(30.0),
                 },
                 DataPoint {
                     timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap(),
-                    value: 20.0,
+                    value: DegreeCelsius(20.0),
                 },
             ],
             Utc.with_ymd_and_hms(2024, 9, 10, 13, 0, 0).unwrap(),

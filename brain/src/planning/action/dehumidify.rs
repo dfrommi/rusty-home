@@ -16,7 +16,7 @@ pub struct Dehumidify {}
 impl Action for Dehumidify {
     async fn start(&self) -> Result<()> {
         Command::SetPower {
-            item: PowerToggle::Dehumidifier,
+            device: PowerToggle::Dehumidifier,
             power_on: true,
         }
         .execute()
@@ -25,7 +25,7 @@ impl Action for Dehumidify {
 
     async fn stop(&self) -> Result<()> {
         Command::SetPower {
-            item: PowerToggle::Dehumidifier,
+            device: PowerToggle::Dehumidifier,
             power_on: false,
         }
         .execute()

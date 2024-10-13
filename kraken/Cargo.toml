@@ -28,4 +28,4 @@ api = { path = "../lib/api" }
 support = { path = "../lib/support" }
 
 [dev-dependencies]
-assert-json-diff = "2.0.2"
+assert-json-diff = "2"

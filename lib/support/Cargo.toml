@@ -7,3 +7,5 @@ edition = "2021"
 rumqttc = "*"
 tokio = { version = "1", features = ["full"] }
 tracing = "*"
+serde = "1"
+serde_json = "1"

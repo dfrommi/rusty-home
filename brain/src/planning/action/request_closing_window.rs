@@ -16,7 +16,7 @@ impl Action for RequestClosingWindow {
         }
 
         Command::SetPower {
-            item: PowerToggle::LivingRoomNotificationLight,
+            device: PowerToggle::LivingRoomNotificationLight,
             power_on: true,
         }
         .execute()
@@ -25,7 +25,7 @@ impl Action for RequestClosingWindow {
 
     async fn stop(&self) -> anyhow::Result<()> {
         Command::SetPower {
-            item: PowerToggle::LivingRoomNotificationLight,
+            device: PowerToggle::LivingRoomNotificationLight,
             power_on: false,
         }
         .execute()
@@ -33,11 +33,11 @@ impl Action for RequestClosingWindow {
     }
 
     async fn is_running(&self) -> bool {
+        let target = CommandTarget::SetPower(PowerToggle::LivingRoomNotificationLight);
+
         //TODO hide behind Command interface
         let maybe_command = home_api()
-            .get_latest_command(&CommandTarget::SetPower(
-                PowerToggle::LivingRoomNotificationLight,
-            ))
+            .get_latest_command(&target)
             .await
             .unwrap_or_else(|e| {
                 tracing::error!(
@@ -54,6 +54,14 @@ impl Action for RequestClosingWindow {
                 command: Command::SetPower { power_on, .. },
                 ..
             }) => power_on,
+            Some(cmd) => {
+                tracing::error!(
+                    "Unexpected command type received for target {:?}: {:?}",
+                    target,
+                    cmd
+                );
+                false
+            }
             None => false,
         }
     }

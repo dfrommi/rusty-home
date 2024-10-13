@@ -1,10 +1,7 @@
 use anyhow::Result;
 use api::{
     command::{
-        db::schema::{
-            DbCommandSource, DbCommandState, DbCommandType, DbDevice, DbThingCommand,
-            DbThingCommandRow,
-        },
+        db::schema::{DbCommandSource, DbCommandState, DbThingCommandRow},
         Command, CommandExecution, CommandSource, CommandTarget,
     },
     get_tag_id,
@@ -137,13 +134,11 @@ impl HomeApi {
     }
 
     pub async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()> {
-        let data: DbThingCommand = command.into();
+        let db_command = serde_json::json!(command);
         let db_source: DbCommandSource = source.into();
 
-        sqlx::query( "INSERT INTO THING_COMMANDS (TYPE, DEVICE, PAYLOAD, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4, $5, $6)")
-            .bind(data.command_type)
-            .bind(data.device)
-            .bind(data.payload)
+        sqlx::query( "INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)")
+            .bind(db_command)
             .bind(chrono::Utc::now())
             .bind(DbCommandState::Pending)
             .bind(db_source)
@@ -157,18 +152,16 @@ impl HomeApi {
         &self,
         target: &CommandTarget,
     ) -> Result<Option<CommandExecution>> {
-        let (command_type, device): (DbCommandType, DbDevice) = target.into();
+        let db_target = serde_json::json!(target);
 
         let row: Option<DbThingCommandRow> = sqlx::query_as(
             "SELECT *
             from THING_COMMANDS
-            where type = $1
-              and device = $2
+            where command @> $1
            order by timestamp desc
            limit 1",
         )
-        .bind(command_type)
-        .bind(device)
+        .bind(db_target)
         .fetch_optional(&self.db_pool)
         .await?;
 

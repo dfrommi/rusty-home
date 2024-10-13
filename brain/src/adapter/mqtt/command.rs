@@ -36,7 +36,7 @@ pub async fn process_commands(base_topic: &str, mut rx: Receiver<MqttInMessage>)
 fn to_command(name: &str, channel: &str, payload: &str) -> Result<Command, String> {
     match (name, channel) {
         ("dehumidifier", "power") => Ok(Command::SetPower {
-            item: PowerToggle::Dehumidifier,
+            device: PowerToggle::Dehumidifier,
             power_on: try_bool(payload)?,
         }),
         _ => Err(format!("Device {} channel {} not supported", name, channel)),

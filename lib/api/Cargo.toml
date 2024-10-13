@@ -20,3 +20,7 @@ strum = { version = "0.26", features = ["derive"] }
 tracing = "*"
 
 support = { path = "../support" }
+
+
+[dev-dependencies]
+assert-json-diff = "2"

@@ -22,7 +22,7 @@ pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
 pub fn to_backend_command(command: &Command) -> CommandBackendService {
     match command {
         Command::SetPower {
-            item: PowerToggle::Dehumidifier,
+            device: PowerToggle::Dehumidifier,
             power_on,
         } => CommandBackendService::HomeAssistant(if *power_on {
             HaService::SwitchTurnOn {
@@ -34,7 +34,7 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
             }
         }),
         Command::SetPower {
-            item: PowerToggle::LivingRoomNotificationLight,
+            device: PowerToggle::LivingRoomNotificationLight,
             power_on,
         } => CommandBackendService::HomeAssistant(if *power_on {
             HaService::LightTurnOn {
@@ -45,7 +45,10 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
                 id: "light.hue_go".to_owned(),
             }
         }),
-        Command::SetHeating { item, target_state } => {
+        Command::SetHeating {
+            device: item,
+            target_state,
+        } => {
             let thermostat = match item {
                 Thermostat::LivingRoom => "climate.wohnzimmer",
                 Thermostat::Bedroom => "climate.schlafzimmer",
@@ -60,9 +63,9 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
                     id: thermostat,
                     mode: "off".to_string(),
                 },
-                HeatingTargetState::Heat(degree_celsius) => HaService::ClimateSetTemperature {
+                HeatingTargetState::Heat { temperature } => HaService::ClimateSetTemperature {
                     id: thermostat,
-                    temperature: degree_celsius.0,
+                    temperature: temperature.0,
                 },
             })
         }

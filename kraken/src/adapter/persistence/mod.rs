@@ -1,6 +1,6 @@
 use api::{
     command::{
-        db::schema::{DbCommandState, DbCommandType, DbDevice, DbThingCommandRow},
+        db::schema::{DbCommandState, DbThingCommandRow},
         CommandExecution,
     },
     get_tag_id,
@@ -67,13 +67,7 @@ impl BackendApi {
             Some(rec) => {
                 let id = rec.id;
 
-                mark_other_commands_superseeded(
-                    &mut *tx,
-                    id,
-                    &rec.data.command_type,
-                    &rec.data.device,
-                )
-                .await?;
+                mark_other_commands_superseeded(&mut *tx, id).await?;
 
                 let result: Option<CommandExecution> =
                     match TryInto::<CommandExecution>::try_into(rec) {
@@ -178,18 +172,23 @@ async fn set_command_status_in_tx(
 async fn mark_other_commands_superseeded(
     executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     excluded_command_id: i64,
-    command_type: &DbCommandType,
-    device: &DbDevice,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE THING_COMMANDS SET status = $1, error = $2 WHERE NOT id = $3 AND status = $4 AND type = $5 AND device = $6")
-        .bind(DbCommandState::Error)
-        .bind(format!("Command was superseeded by {}", excluded_command_id))
-        .bind(excluded_command_id)
-        .bind(DbCommandState::Pending)
-        .bind(command_type)
-        .bind(device)
-        .execute(executor)
-        .await
-        .map(|_| ())
-        .map_err(Into::into)
+    sqlx::query("
+        WITH excluded_command AS (
+            SELECT command->'type' as type, command->'device' as device FROM THING_COMMANDS WHERE id = $1
+        )
+        UPDATE THING_COMMANDS
+        SET status = $2, error = $3
+        WHERE id != $1
+        AND status = $4
+        AND command->'type' = (SELECT type FROM excluded_command)
+        AND command->'device' = (SELECT device FROM excluded_command)")
+    .bind(excluded_command_id)
+    .bind(DbCommandState::Error)
+    .bind(format!("Command was superseded by {}", excluded_command_id))
+    .bind(DbCommandState::Pending)
+    .execute(executor)
+    .await?;
+
+    Ok(())
 }

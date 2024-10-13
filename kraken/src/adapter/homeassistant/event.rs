@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use api::state::value_type::*;
 use parse::{HaEvent, StateValue};
 use serde_json::Value;
 use support::mqtt::MqttInMessage;
-use support::unit::{PresentState, UserControlledState};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -12,7 +12,6 @@ use crate::adapter::StateCollector;
 use crate::adapter::{homeassistant::event::parse::StateChangedEvent, PersistentDataPoint};
 use anyhow::{bail, Result};
 use api::state::ChannelValue;
-use support::unit::{DegreeCelsius, KiloWattHours, OpenedState, Percent, PowerState, Watt};
 
 use super::HaChannel;
 

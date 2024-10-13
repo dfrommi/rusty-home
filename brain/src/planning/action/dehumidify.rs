@@ -33,10 +33,7 @@ impl Action for Dehumidify {
     }
 
     async fn is_running(&self) -> bool {
-        Powered::Dehumidifier
-            .current()
-            .await
-            .map_or(false, |v| v.is_on())
+        Powered::Dehumidifier.current().await.unwrap_or(false)
     }
 
     async fn is_enabled(&self) -> bool {

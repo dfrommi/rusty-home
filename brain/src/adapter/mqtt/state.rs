@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use api::state::Powered;
-use support::{mqtt::MqttOutMessage, unit::PowerState};
+use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::prelude::DataPointAccess;
@@ -85,9 +85,9 @@ impl IntoMqttState for Powered {
     }
 }
 
-impl From<PowerState> for MqttStateValue {
-    fn from(val: PowerState) -> Self {
-        MqttStateValue(if val.is_on() {
+impl From<bool> for MqttStateValue {
+    fn from(val: bool) -> Self {
+        MqttStateValue(if val {
             "1".to_string()
         } else {
             "0".to_string()

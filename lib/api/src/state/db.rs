@@ -56,8 +56,8 @@ pub async fn get_tag_id(
 }
 
 mod mapper {
+    use super::value_type::*;
     use super::DbValue;
-    use support::unit::*;
 
     impl From<&DegreeCelsius> for DbValue {
         fn from(value: &DegreeCelsius) -> Self {

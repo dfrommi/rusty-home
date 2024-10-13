@@ -1,4 +1,4 @@
-use support::unit::OpenedState;
+use api::state::value_type::OpenedState;
 
 use crate::{adapter::persistence::DataPoint, home_api};
 

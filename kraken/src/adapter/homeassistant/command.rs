@@ -39,7 +39,10 @@ impl CommandExecutor<HaService> for HaCommandExecutor {
 }
 
 mod serialize {
+    use std::collections::HashMap;
+
     use serde::Serialize;
+    use serde_json::{json, Value};
 
     use crate::adapter::homeassistant::HaService;
 
@@ -50,6 +53,7 @@ mod serialize {
                 service: "turn_on",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
+                    extra: HashMap::new(),
                 },
             },
             HaService::SwitchTurnOff { id } => HaMessage::CallService {
@@ -57,6 +61,7 @@ mod serialize {
                 service: "turn_off",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
+                    extra: HashMap::new(),
                 },
             },
             HaService::LightTurnOn { id } => HaMessage::CallService {
@@ -64,6 +69,7 @@ mod serialize {
                 service: "turn_on",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
+                    extra: HashMap::new(),
                 },
             },
             HaService::LightTurnOff { id } => HaMessage::CallService {
@@ -71,6 +77,23 @@ mod serialize {
                 service: "turn_off",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
+                    extra: HashMap::new(),
+                },
+            },
+            HaService::ClimateSetHvacMode { id, mode } => HaMessage::CallService {
+                domain: "climate",
+                service: "set_hvac_mode",
+                service_data: HaServiceData::ForEntities {
+                    ids: vec![id.to_owned()],
+                    extra: HashMap::from([("mode".to_string(), json!(mode))]),
+                },
+            },
+            HaService::ClimateSetTemperature { id, temperature } => HaMessage::CallService {
+                domain: "climate",
+                service: "set_temperature",
+                service_data: HaServiceData::ForEntities {
+                    ids: vec![id.to_owned()],
+                    extra: HashMap::from([("temperature".to_string(), json!(temperature))]),
                 },
             },
         };
@@ -95,6 +118,9 @@ mod serialize {
         ForEntities {
             #[serde(rename = "entity_id")]
             ids: Vec<String>,
+
+            #[serde(flatten)]
+            extra: HashMap<String, Value>,
         },
     }
 
@@ -113,6 +139,7 @@ mod serialize {
                 service: "testservice",
                 service_data: HaServiceData::ForEntities {
                     ids: vec!["my_switch".to_string()],
+                    extra: HashMap::new(),
                 },
             };
 

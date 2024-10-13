@@ -1,6 +1,24 @@
 use chrono::{DateTime, Utc};
+use support::unit::DegreeCelsius;
 
 pub mod db;
+
+#[derive(Debug, Clone)]
+pub enum Command {
+    SetPower {
+        item: PowerToggle,
+        power_on: bool,
+    },
+    SetHeating {
+        item: Thermostat,
+        target_state: HeatingTargetState,
+    },
+}
+
+pub enum CommandTarget {
+    SetPower(PowerToggle),
+    SetHeating(Thermostat),
+}
 
 #[derive(Debug, Clone)]
 pub enum PowerToggle {
@@ -9,12 +27,18 @@ pub enum PowerToggle {
 }
 
 #[derive(Debug, Clone)]
-pub enum Command {
-    SetPower { item: PowerToggle, power_on: bool },
+pub enum Thermostat {
+    LivingRoom,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
 }
 
-pub enum CommandTarget {
-    SetPower(PowerToggle),
+#[derive(Debug, Clone)]
+pub enum HeatingTargetState {
+    Off,
+    Heat(DegreeCelsius),
 }
 
 #[derive(Debug)]

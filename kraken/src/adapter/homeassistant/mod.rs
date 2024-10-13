@@ -31,4 +31,6 @@ pub enum HaService {
     SwitchTurnOff { id: String },
     LightTurnOn { id: String },
     LightTurnOff { id: String },
+    ClimateSetHvacMode { id: String, mode: String },
+    ClimateSetTemperature { id: String, temperature: f64 },
 }

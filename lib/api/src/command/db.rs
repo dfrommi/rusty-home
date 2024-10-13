@@ -6,10 +6,16 @@ pub mod schema {
         pub power_on: bool,
     }
 
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    pub struct DbSetHeatingPayload {
+        pub target_temperature: f64,
+    }
+
     #[derive(Debug, Clone, sqlx::Type)]
     #[sqlx(type_name = "TEXT", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbCommandType {
         SetPower,
+        SetHeating,
     }
 
     #[derive(Debug, Clone, sqlx::Type)]
@@ -26,6 +32,11 @@ pub mod schema {
     pub enum DbDevice {
         Dehumidifier,
         LivingRoomNotificationLight,
+        LivingRoomThermostat,
+        BedroomThermostat,
+        KitchenThermostat,
+        RoomOfRequirementsThermostat,
+        BathroomThermostat,
     }
 
     #[derive(Debug, Clone, sqlx::Type)]
@@ -58,9 +69,11 @@ pub mod schema {
 pub mod mapper {
     use anyhow::bail;
     use serde_json::json;
+    use support::unit::DegreeCelsius;
 
     use crate::command::{
-        Command, CommandExecution, CommandSource, CommandState, CommandTarget, PowerToggle,
+        Command, CommandExecution, CommandSource, CommandState, CommandTarget, HeatingTargetState,
+        PowerToggle, Thermostat,
     };
 
     use super::*;
@@ -80,6 +93,22 @@ pub mod mapper {
                         power_on: *power_on,
                     }),
                 },
+                Command::SetHeating { item, target_state } => DbThingCommand {
+                    command_type: DbCommandType::SetHeating,
+                    device: match item {
+                        Thermostat::LivingRoom => DbDevice::LivingRoomThermostat,
+                        Thermostat::Bedroom => DbDevice::BedroomThermostat,
+                        Thermostat::Kitchen => DbDevice::KitchenThermostat,
+                        Thermostat::RoomOfRequirements => DbDevice::RoomOfRequirementsThermostat,
+                        Thermostat::Bathroom => DbDevice::BathroomThermostat,
+                    },
+                    payload: json!(DbSetHeatingPayload {
+                        target_temperature: match target_state {
+                            HeatingTargetState::Off => 0.0,
+                            HeatingTargetState::Heat(degree_celsius) => degree_celsius.into(),
+                        }
+                    }),
+                },
             }
         }
     }
@@ -95,7 +124,7 @@ pub mod mapper {
                         DbDevice::LivingRoomNotificationLight => {
                             PowerToggle::LivingRoomNotificationLight
                         }
-                        #[allow(unreachable_patterns)] //will be needed with more items
+
                         _ => bail!(
                             "Combination of command type {:?} and device {:?} not supported",
                             self.command_type,
@@ -104,9 +133,59 @@ pub mod mapper {
                     },
                     power_on: serde_json::from_value::<DbSetPowerPayload>(self.payload)?.power_on,
                 },
+                DbCommandType::SetHeating => Command::SetHeating {
+                    item: match self.device {
+                        DbDevice::LivingRoomThermostat => Thermostat::LivingRoom,
+                        DbDevice::BedroomThermostat => Thermostat::Bedroom,
+                        DbDevice::KitchenThermostat => Thermostat::Kitchen,
+                        DbDevice::RoomOfRequirementsThermostat => Thermostat::RoomOfRequirements,
+                        DbDevice::BathroomThermostat => Thermostat::Bathroom,
+
+                        _ => bail!(
+                            "Combination of command type {:?} and device {:?} not supported",
+                            self.command_type,
+                            self.device
+                        ),
+                    },
+
+                    target_state: {
+                        let payload: DbSetHeatingPayload = serde_json::from_value(self.payload)?;
+                        if payload.target_temperature == 0.0 {
+                            HeatingTargetState::Off
+                        } else {
+                            HeatingTargetState::Heat(DegreeCelsius(payload.target_temperature))
+                        }
+                    },
+                },
             };
 
             Ok(command)
+        }
+    }
+
+    impl From<&CommandTarget> for (DbCommandType, DbDevice) {
+        fn from(val: &CommandTarget) -> Self {
+            match val {
+                CommandTarget::SetPower(toggle) => (
+                    DbCommandType::SetPower,
+                    match toggle {
+                        PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
+                        PowerToggle::LivingRoomNotificationLight => {
+                            DbDevice::LivingRoomNotificationLight
+                        }
+                    },
+                ),
+                CommandTarget::SetHeating(thermostat) => (
+                    DbCommandType::SetHeating,
+                    match thermostat {
+                        Thermostat::LivingRoom => DbDevice::LivingRoomThermostat,
+                        Thermostat::Bedroom => DbDevice::BedroomThermostat,
+                        Thermostat::Kitchen => DbDevice::KitchenThermostat,
+                        Thermostat::RoomOfRequirements => DbDevice::RoomOfRequirementsThermostat,
+                        Thermostat::Bathroom => DbDevice::BathroomThermostat,
+                    },
+                ),
+            }
         }
     }
 
@@ -131,22 +210,6 @@ pub mod mapper {
                     DbCommandSource::User => CommandSource::User,
                 },
             })
-        }
-    }
-
-    impl From<&CommandTarget> for (DbCommandType, DbDevice) {
-        fn from(val: &CommandTarget) -> Self {
-            match val {
-                CommandTarget::SetPower(toggle) => (
-                    DbCommandType::SetPower,
-                    match toggle {
-                        PowerToggle::Dehumidifier => DbDevice::Dehumidifier,
-                        PowerToggle::LivingRoomNotificationLight => {
-                            DbDevice::LivingRoomNotificationLight
-                        }
-                    },
-                ),
-            }
         }
     }
 

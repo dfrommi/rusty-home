@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use api::command::{HeatingTargetState, Thermostat};
 use lazy_static::lazy_static;
 
 use crate::adapter::CommandBackendService;
@@ -44,6 +45,27 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
                 id: "light.hue_go".to_owned(),
             }
         }),
+        Command::SetHeating { item, target_state } => {
+            let thermostat = match item {
+                Thermostat::LivingRoom => "climate.wohnzimmer",
+                Thermostat::Bedroom => "climate.schlafzimmer",
+                Thermostat::Kitchen => "climate.kuche",
+                Thermostat::RoomOfRequirements => "climate.arbeitszimmer",
+                Thermostat::Bathroom => "climate.bad",
+            }
+            .to_string();
+
+            CommandBackendService::HomeAssistant(match target_state {
+                HeatingTargetState::Off => HaService::ClimateSetHvacMode {
+                    id: thermostat,
+                    mode: "off".to_string(),
+                },
+                HeatingTargetState::Heat(degree_celsius) => HaService::ClimateSetTemperature {
+                    id: thermostat,
+                    temperature: degree_celsius.0,
+                },
+            })
+        }
     }
 }
 

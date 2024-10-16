@@ -8,6 +8,7 @@ use api::state::{
 
 pub use command::HaCommandExecutor;
 pub use event::HaStateCollector;
+use support::unit::DegreeCelsius;
 
 #[derive(Debug, Clone)]
 pub enum HaChannel {
@@ -27,10 +28,16 @@ pub enum HaChannel {
 
 #[derive(Debug, Clone)]
 pub enum HaService {
-    SwitchTurnOn { id: String },
-    SwitchTurnOff { id: String },
-    LightTurnOn { id: String },
-    LightTurnOff { id: String },
-    ClimateSetHvacMode { id: String, mode: String },
-    ClimateSetTemperature { id: String, temperature: f64 },
+    SwitchTurnOnOff {
+        id: String,
+        power_on: bool,
+    },
+    LightTurnOnOff {
+        id: String,
+        power_on: bool,
+    },
+    ClimateSetTemperature {
+        id: String,
+        temperature: Option<DegreeCelsius>,
+    },
 }

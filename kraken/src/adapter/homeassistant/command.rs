@@ -48,47 +48,37 @@ mod serialize {
 
     pub fn to_message(service: &HaService) -> Result<String, serde_json::Error> {
         let message = match service {
-            HaService::SwitchTurnOn { id } => HaMessage::CallService {
+            HaService::SwitchTurnOnOff { id, power_on } => HaMessage::CallService {
                 domain: "switch",
-                service: "turn_on",
+                service: if *power_on { "turn_on" } else { "turn_off" },
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
                     extra: HashMap::new(),
                 },
             },
-            HaService::SwitchTurnOff { id } => HaMessage::CallService {
-                domain: "switch",
-                service: "turn_off",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::new(),
-                },
-            },
-            HaService::LightTurnOn { id } => HaMessage::CallService {
+            HaService::LightTurnOnOff { id, power_on } => HaMessage::CallService {
                 domain: "light",
-                service: "turn_on",
+                service: if *power_on { "turn_on" } else { "turn_off" },
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
                     extra: HashMap::new(),
                 },
             },
-            HaService::LightTurnOff { id } => HaMessage::CallService {
-                domain: "light",
-                service: "turn_off",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::new(),
-                },
-            },
-            HaService::ClimateSetHvacMode { id, mode } => HaMessage::CallService {
+            HaService::ClimateSetTemperature {
+                id,
+                temperature: None,
+            } => HaMessage::CallService {
                 domain: "climate",
                 service: "set_hvac_mode",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
-                    extra: HashMap::from([("mode".to_string(), json!(mode))]),
+                    extra: HashMap::from([("mode".to_string(), json!("off"))]),
                 },
             },
-            HaService::ClimateSetTemperature { id, temperature } => HaMessage::CallService {
+            HaService::ClimateSetTemperature {
+                id,
+                temperature: Some(temperature),
+            } => HaMessage::CallService {
                 domain: "climate",
                 service: "set_temperature",
                 service_data: HaServiceData::ForEntities {

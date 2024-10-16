@@ -24,26 +24,16 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
         Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on,
-        } => CommandBackendService::HomeAssistant(if *power_on {
-            HaService::SwitchTurnOn {
-                id: "switch.dehumidifier".to_owned(),
-            }
-        } else {
-            HaService::SwitchTurnOff {
-                id: "switch.dehumidifier".to_owned(),
-            }
+        } => CommandBackendService::HomeAssistant(HaService::SwitchTurnOnOff {
+            id: "switch.dehumidifier".to_owned(),
+            power_on: *power_on,
         }),
         Command::SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
             power_on,
-        } => CommandBackendService::HomeAssistant(if *power_on {
-            HaService::LightTurnOn {
-                id: "light.hue_go".to_owned(),
-            }
-        } else {
-            HaService::LightTurnOff {
-                id: "light.hue_go".to_owned(),
-            }
+        } => CommandBackendService::HomeAssistant(HaService::LightTurnOnOff {
+            id: "light.hue_go".to_owned(),
+            power_on: *power_on,
         }),
         Command::SetHeating {
             device: item,
@@ -59,13 +49,13 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
             .to_string();
 
             CommandBackendService::HomeAssistant(match target_state {
-                HeatingTargetState::Off => HaService::ClimateSetHvacMode {
+                HeatingTargetState::Off => HaService::ClimateSetTemperature {
                     id: thermostat,
-                    mode: "off".to_string(),
+                    temperature: None,
                 },
                 HeatingTargetState::Heat { temperature } => HaService::ClimateSetTemperature {
                     id: thermostat,
-                    temperature: temperature.0,
+                    temperature: Some(*temperature),
                 },
             })
         }

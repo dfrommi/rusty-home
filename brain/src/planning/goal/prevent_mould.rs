@@ -7,6 +7,6 @@ pub struct PreventMould;
 
 impl Preconditions<HomeState> for PreventMould {
     fn is_fulfilled(&self, state: &HomeState) -> bool {
-        !state.risk_of_mould_in_bathroom
+        !state.bathroom.risk_of_mould
     }
 }

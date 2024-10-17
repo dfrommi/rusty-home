@@ -1,7 +1,11 @@
 use api::command::{Command, CommandExecution, CommandTarget, PowerToggle};
 use goap::{Effects, Preconditions};
 
-use crate::{home_api, planning::HomeState, thing::Executable};
+use crate::{
+    home_api,
+    planning::{BedroomState, HomeState, KitchenState, LivingRoomState, RoomOfRequirementsState},
+    thing::Executable,
+};
 
 use super::Action;
 
@@ -73,9 +77,9 @@ impl Action for RequestClosingWindow {
 
 impl Preconditions<HomeState> for RequestClosingWindow {
     fn is_fulfilled(&self, state: &HomeState) -> bool {
-        let r = !state.heating_output_remains_in_bedroom
-            || !state.heating_output_remains_in_kitchen
-            || !state.heating_output_remains_in_room_of_requirements;
+        let r = !state.bedroom.heating_output_remains
+            || !state.kitchen.heating_output_remains
+            || !state.room_of_requirements.heating_output_remains;
         tracing::debug!("request closing window: {:?} -- {:?}", r, state);
         r
     }
@@ -84,10 +88,22 @@ impl Preconditions<HomeState> for RequestClosingWindow {
 impl Effects<HomeState> for RequestClosingWindow {
     fn apply_to(&self, state: &HomeState) -> HomeState {
         HomeState {
-            heating_output_remains_in_living_room: true,
-            heating_output_remains_in_bedroom: true,
-            heating_output_remains_in_kitchen: true,
-            heating_output_remains_in_room_of_requirements: true,
+            living_room: LivingRoomState {
+                heating_output_remains: true,
+                ..state.living_room.clone()
+            },
+            bedroom: BedroomState {
+                heating_output_remains: true,
+                ..state.bedroom.clone()
+            },
+            kitchen: KitchenState {
+                heating_output_remains: true,
+                ..state.kitchen.clone()
+            },
+            room_of_requirements: RoomOfRequirementsState {
+                heating_output_remains: true,
+                ..state.room_of_requirements.clone()
+            },
 
             ..state.clone()
         }

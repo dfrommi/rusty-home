@@ -2,7 +2,10 @@ use std::ops::Not;
 
 use goap::{Effects, Preconditions};
 
-use crate::{planning::HomeState, thing::Executable};
+use crate::{
+    planning::{BathroomState, HomeState},
+    thing::Executable,
+};
 use api::{command::Command, command::PowerToggle, state::Powered};
 
 use super::Action;
@@ -53,14 +56,16 @@ impl Action for Dehumidify {
 
 impl Preconditions<HomeState> for Dehumidify {
     fn is_fulfilled(&self, state: &HomeState) -> bool {
-        state.risk_of_mould_in_bathroom
+        state.bathroom.risk_of_mould
     }
 }
 
 impl Effects<HomeState> for Dehumidify {
     fn apply_to(&self, state: &HomeState) -> HomeState {
         HomeState {
-            risk_of_mould_in_bathroom: false,
+            bathroom: BathroomState {
+                risk_of_mould: false,
+            },
             ..state.clone()
         }
     }

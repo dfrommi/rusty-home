@@ -2,6 +2,7 @@ extern crate goap;
 
 use std::ops::Not;
 
+use action::heat::Heat;
 use action::request_closing_window::RequestClosingWindow;
 use action::HomeAction;
 use goal::room_comfort::{RoomComfort, RoomComfortLevel};
@@ -10,6 +11,7 @@ use goap::PlanningResult;
 use goap::{eval::MissedGoalsError, plan};
 
 use anyhow::Result;
+use support::unit::DegreeCelsius;
 
 use self::action::Action;
 use self::{action::dehumidify::Dehumidify, goal::prevent_mould::PreventMould};
@@ -21,27 +23,64 @@ mod goal;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 struct HomeState {
-    risk_of_mould_in_bathroom: bool,
-    heating_output_remains_in_living_room: bool,
-    heating_output_remains_in_bedroom: bool,
-    heating_output_remains_in_kitchen: bool,
-    heating_output_remains_in_room_of_requirements: bool,
+    living_room: LivingRoomState,
+    bedroom: BedroomState,
+    kitchen: KitchenState,
+    room_of_requirements: RoomOfRequirementsState,
+    bathroom: BathroomState,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct LivingRoomState {
+    heating_output_remains: bool,
+    temperature: DegreeCelsius,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct BedroomState {
+    heating_output_remains: bool,
+    temperature: DegreeCelsius,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct KitchenState {
+    heating_output_remains: bool,
+    temperature: DegreeCelsius,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct RoomOfRequirementsState {
+    heating_output_remains: bool,
+    temperature: DegreeCelsius,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct BathroomState {
+    risk_of_mould: bool,
 }
 
 impl HomeState {
     pub async fn new() -> Result<Self> {
         Ok(Self {
-            risk_of_mould_in_bathroom: RiskOfMould::Bathroom.current().await?,
-            heating_output_remains_in_living_room: ColdAirComingIn::LivingRoom
-                .current()
-                .await?
-                .not(),
-            heating_output_remains_in_bedroom: ColdAirComingIn::Bedroom.current().await?.not(),
-            heating_output_remains_in_kitchen: ColdAirComingIn::Kitchen.current().await?.not(),
-            heating_output_remains_in_room_of_requirements: ColdAirComingIn::RoomOfRequirements
-                .current()
-                .await?
-                .not(),
+            living_room: LivingRoomState {
+                heating_output_remains: ColdAirComingIn::LivingRoom.current().await?.not(),
+                temperature: Temperature::LivingRoomDoor.current().await?,
+            },
+            bedroom: BedroomState {
+                heating_output_remains: ColdAirComingIn::Bedroom.current().await?.not(),
+                temperature: Temperature::BedroomDoor.current().await?,
+            },
+            kitchen: KitchenState {
+                heating_output_remains: ColdAirComingIn::Kitchen.current().await?.not(),
+                temperature: Temperature::KitchenOuterWall.current().await?,
+            },
+            room_of_requirements: RoomOfRequirementsState {
+                heating_output_remains: ColdAirComingIn::RoomOfRequirements.current().await?.not(),
+                temperature: Temperature::RoomOfRequirementsDoor.current().await?,
+            },
+            bathroom: BathroomState {
+                risk_of_mould: RiskOfMould::Bathroom.current().await?,
+            },
         })
     }
 }
@@ -51,6 +90,18 @@ pub async fn do_plan() {
     let all_actions = vec![
         HomeAction::Dehumidify(Dehumidify {}),
         HomeAction::RequestClosingWindow(RequestClosingWindow {}),
+        HomeAction::Heat(Heat::LivingRoom(RoomComfortLevel::EnergySaving)),
+        HomeAction::Heat(Heat::LivingRoom(RoomComfortLevel::Normal)),
+        HomeAction::Heat(Heat::LivingRoom(RoomComfortLevel::Comfortable)),
+        HomeAction::Heat(Heat::Bedroom(RoomComfortLevel::EnergySaving)),
+        HomeAction::Heat(Heat::Bedroom(RoomComfortLevel::Normal)),
+        HomeAction::Heat(Heat::Bedroom(RoomComfortLevel::Comfortable)),
+        HomeAction::Heat(Heat::Kitchen(RoomComfortLevel::EnergySaving)),
+        HomeAction::Heat(Heat::Kitchen(RoomComfortLevel::Normal)),
+        HomeAction::Heat(Heat::Kitchen(RoomComfortLevel::Comfortable)),
+        HomeAction::Heat(Heat::RoomOfRequirements(RoomComfortLevel::EnergySaving)),
+        HomeAction::Heat(Heat::RoomOfRequirements(RoomComfortLevel::Normal)),
+        HomeAction::Heat(Heat::RoomOfRequirements(RoomComfortLevel::Comfortable)),
     ];
 
     tracing::debug!("Planning with initial state {:?}", initial_state);

@@ -1,4 +1,5 @@
 use goap::Preconditions;
+use support::unit::DegreeCelsius;
 
 use crate::planning::HomeState;
 
@@ -17,15 +18,29 @@ pub enum RoomComfort {
     RoomOfRequirements(RoomComfortLevel),
 }
 
+impl RoomComfortLevel {
+    pub fn from_temperature(temperature: DegreeCelsius) -> Self {
+        if temperature < DegreeCelsius(18.0) {
+            Self::EnergySaving
+        } else if temperature < DegreeCelsius(19.5) {
+            Self::Normal
+        } else {
+            Self::Comfortable
+        }
+    }
+}
+
 impl Preconditions<HomeState> for RoomComfort {
     fn is_fulfilled(&self, state: &HomeState) -> bool {
-        match self {
-            RoomComfort::LivingRoom(_) => state.heating_output_remains_in_living_room,
-            RoomComfort::Bedroom(_) => state.heating_output_remains_in_bedroom,
-            RoomComfort::Kitchen(_) => state.heating_output_remains_in_kitchen,
-            RoomComfort::RoomOfRequirements(_) => {
-                state.heating_output_remains_in_room_of_requirements
+        let (level, temperature) = match self {
+            RoomComfort::LivingRoom(level) => (level, state.living_room.temperature),
+            RoomComfort::Bedroom(level) => (level, state.bedroom.temperature),
+            RoomComfort::Kitchen(level) => (level, state.kitchen.temperature),
+            RoomComfort::RoomOfRequirements(level) => {
+                (level, state.room_of_requirements.temperature)
             }
-        }
+        };
+
+        RoomComfortLevel::from_temperature(temperature) == *level
     }
 }

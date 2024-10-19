@@ -1,7 +1,0 @@
-[package]
-name = "goap"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-pathfinding = "4.9.1"

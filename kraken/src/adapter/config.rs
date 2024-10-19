@@ -359,7 +359,7 @@ lazy_static! {
                 HaChannel::SetPoint(SetPoint::Bedroom)
             ),
             (
-                "climate.arbeitsimmer",
+                "climate.arbeitszimmer",
                 HaChannel::SetPoint(SetPoint::RoomOfRequirements)
             ),
             (

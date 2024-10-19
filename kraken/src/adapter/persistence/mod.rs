@@ -116,7 +116,7 @@ impl BackendApi {
                 SELECT value
                 FROM thing_values
                 WHERE tag_id = $1
-                ORDER BY timestamp DESC
+                ORDER BY timestamp DESC, id DESC
                 LIMIT 1
             )
             INSERT INTO thing_values (tag_id, value, timestamp)

@@ -90,7 +90,7 @@ fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
             let ha_channel = match ha_incoming_event_channel(entity_id as &str) {
                 Some(c) => c,
                 None => {
-                    debug!("Skipped {}", entity_id);
+                    tracing::trace!("Skipped {}", entity_id);
                     return None;
                 }
             };
@@ -200,9 +200,13 @@ fn to_persistent_data_point(
             timestamp,
         },
         HaChannel::SetPoint(channel) => {
-            let v = match attributes.get("temperature").and_then(|v| v.as_f64()) {
-                Some(f_value) => f_value,
-                None => bail!("No temperature found in attributes or not a number"),
+            let v = match (
+                ha_value,
+                attributes.get("temperature").and_then(|v| v.as_f64()),
+            ) {
+                ("off", _) => 0.0,
+                (_, Some(f_value)) => f_value,
+                _ => bail!("No temperature found in attributes or not a number"),
             };
 
             PersistentDataPoint {

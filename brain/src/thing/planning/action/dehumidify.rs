@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 use api::command::{Command, PowerToggle};
 
@@ -42,5 +44,11 @@ impl Action for Dehumidify {
 
     fn controls_resource(&self) -> Option<Resource> {
         Some(Resource::Dehumidifier)
+    }
+}
+
+impl Display for Dehumidify {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Dehumidify")
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::{bail, Result};
 use api::command::{Command, CommandExecution, CommandTarget, PowerToggle};
 
@@ -82,5 +84,11 @@ impl Action for RequestClosingWindow {
 
     fn controls_resource(&self) -> Option<Resource> {
         Some(Resource::LivingRoomNotificationLight)
+    }
+}
+
+impl Display for RequestClosingWindow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RequestClosingWindow")
     }
 }

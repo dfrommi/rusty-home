@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 use api::command::Command;
 use support::unit::DegreeCelsius;
@@ -45,7 +47,13 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
 
 impl Action for Heat {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
-        Ok(true)
+        let current_temperature = self
+            .heating_zone
+            .current_room_temperature()
+            .current()
+            .await?;
+
+        Ok(current_temperature <= self.target_temperature)
     }
 
     async fn is_running(&self) -> Result<bool> {
@@ -85,6 +93,16 @@ impl Action for Heat {
     }
 }
 
+impl Display for Heat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Heat[{} -> {}]",
+            self.heating_zone, self.target_temperature
+        )
+    }
+}
+
 impl Action for NoHeatingDuringVentilation {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
         match self.heating_zone {
@@ -120,11 +138,24 @@ impl Action for NoHeatingDuringVentilation {
     }
 
     async fn stop(&self) -> Result<()> {
-        anyhow::bail!("Unexpected stop. Should not be called and always be locked by another thermostat action")
+        Command::SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: DegreeCelsius(15.0),
+            },
+        }
+        .execute()
+        .await
     }
 
     fn controls_resource(&self) -> Option<Resource> {
         Some(self.heating_zone.resource())
+    }
+}
+
+impl Display for NoHeatingDuringVentilation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NoHeatingDuringVentilation[{}]", self.heating_zone)
     }
 }
 
@@ -165,10 +196,27 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 
     async fn stop(&self) -> Result<()> {
-        anyhow::bail!("Unexpected stop. Should not be called and always be locked by another thermostat action")
+        Command::SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: DegreeCelsius(15.0),
+            },
+        }
+        .execute()
+        .await
     }
 
     fn controls_resource(&self) -> Option<Resource> {
         Some(self.heating_zone.resource())
+    }
+}
+
+impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
+            self.heating_zone
+        )
     }
 }

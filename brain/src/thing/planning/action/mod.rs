@@ -3,8 +3,10 @@ mod heating;
 mod request_closing_window;
 
 use std::fmt::Debug;
+use std::fmt::Display;
 
 use anyhow::Result;
+use api::state::Temperature;
 use api::{command::Thermostat, state::SetPoint};
 use enum_dispatch::enum_dispatch;
 
@@ -17,7 +19,7 @@ pub use request_closing_window::RequestClosingWindow;
 use crate::thing::UserControlled;
 
 #[derive(Debug, Clone)]
-#[enum_dispatch(Action)]
+#[enum_dispatch(Action, Dislay)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     RequestClosingWindow(RequestClosingWindow),
@@ -47,7 +49,7 @@ pub enum HeatingZone {
 }
 
 #[enum_dispatch]
-pub trait Action: Debug {
+pub trait Action: Debug + Display {
     async fn preconditions_fulfilled(&self) -> Result<bool>;
     async fn is_running(&self) -> Result<bool>;
     async fn is_user_controlled(&self) -> Result<bool>;
@@ -96,6 +98,46 @@ impl HeatingZone {
             HeatingZone::Kitchen => UserControlled::KitchenThermostat,
             HeatingZone::RoomOfRequirements => UserControlled::RoomOfRequirementsThermostat,
             HeatingZone::Bathroom => UserControlled::BathroomThermostat,
+        }
+    }
+
+    pub fn current_room_temperature(&self) -> Temperature {
+        match self {
+            HeatingZone::LivingRoom => Temperature::LivingRoomDoor,
+            HeatingZone::Bedroom => Temperature::BedroomDoor,
+            HeatingZone::Kitchen => Temperature::KitchenOuterWall,
+            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirementsDoor,
+            HeatingZone::Bathroom => Temperature::BathroomShower,
+        }
+    }
+}
+
+impl Display for HomeAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HomeAction::Dehumidify(dehumidify) => write!(f, "{}", dehumidify),
+            HomeAction::RequestClosingWindow(request_closing_window) => {
+                write!(f, "{}", request_closing_window)
+            }
+            HomeAction::Heat(heat) => write!(f, "{}", heat),
+            HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
+                write!(f, "{}", no_heating_during_ventilation)
+            }
+            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
+                no_heating_during_automatic_temperature_increase,
+            ) => write!(f, "{}", no_heating_during_automatic_temperature_increase),
+        }
+    }
+}
+
+impl Display for HeatingZone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeatingZone::LivingRoom => write!(f, "LivingRoom"),
+            HeatingZone::Bedroom => write!(f, "Bedroom"),
+            HeatingZone::Kitchen => write!(f, "Kitchen"),
+            HeatingZone::RoomOfRequirements => write!(f, "RoomOfRequirements"),
+            HeatingZone::Bathroom => write!(f, "Bathroom"),
         }
     }
 }

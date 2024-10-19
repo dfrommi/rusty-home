@@ -4,7 +4,10 @@ use crate::prelude::*;
 
 use anyhow::Result;
 
+mod planning;
 pub mod state;
+
+pub use planning::do_plan;
 
 pub trait Executable {
     async fn execute(&self) -> Result<()>;

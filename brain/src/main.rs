@@ -1,14 +1,12 @@
-use crate::planning::do_plan;
-
 use adapter::persistence::{HomeApi, HomeEventListener};
 use core::time;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::sync::OnceLock;
+use thing::do_plan;
 use tokio::task::JoinSet;
 
 mod adapter;
-mod planning;
 mod prelude;
 mod settings;
 mod support;

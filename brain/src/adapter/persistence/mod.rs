@@ -79,7 +79,7 @@ impl HomeApi {
             "SELECT value, timestamp
             FROM THING_VALUES
             WHERE TAG_ID = $1
-            ORDER BY timestamp DESC
+            ORDER BY timestamp DESC, id DESC
             LIMIT 1",
         )
         .bind(tag_id)

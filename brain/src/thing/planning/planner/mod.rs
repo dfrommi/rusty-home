@@ -4,11 +4,6 @@ use tabled::Tabled;
 
 use super::Action;
 
-pub struct PlanningResult<'a, A> {
-    pub actions_to_be_started: Vec<&'a A>,
-    pub actions_to_be_stopped: Vec<&'a A>,
-}
-
 #[derive(Debug, Tabled)]
 pub struct ActionResult<'a, A: Action> {
     pub action: &'a A,
@@ -81,8 +76,6 @@ where
             result.locked = true;
         }
     }
-
-    //actions_to_be_stopped.retain(|a| !resource_lock.is_locked(&a.controls_resource()));
 
     action_results
 }

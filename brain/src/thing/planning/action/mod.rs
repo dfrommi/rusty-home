@@ -6,6 +6,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use anyhow::Result;
+use api::state::ExternalAutoControl;
 use api::state::Temperature;
 use api::{command::Thermostat, state::SetPoint};
 use enum_dispatch::enum_dispatch;
@@ -91,13 +92,13 @@ impl HeatingZone {
         }
     }
 
-    pub fn user_controlled(&self) -> UserControlled {
+    pub fn auto_mode(&self) -> ExternalAutoControl {
         match self {
-            HeatingZone::LivingRoom => UserControlled::LivingRoomThermostat,
-            HeatingZone::Bedroom => UserControlled::BedroomThermostat,
-            HeatingZone::Kitchen => UserControlled::KitchenThermostat,
-            HeatingZone::RoomOfRequirements => UserControlled::RoomOfRequirementsThermostat,
-            HeatingZone::Bathroom => UserControlled::BathroomThermostat,
+            HeatingZone::LivingRoom => ExternalAutoControl::LivingRoomThermostat,
+            HeatingZone::Bedroom => ExternalAutoControl::BedroomThermostat,
+            HeatingZone::Kitchen => ExternalAutoControl::KitchenThermostat,
+            HeatingZone::RoomOfRequirements => ExternalAutoControl::RoomOfRequirementsThermostat,
+            HeatingZone::Bathroom => ExternalAutoControl::BathroomThermostat,
         }
     }
 

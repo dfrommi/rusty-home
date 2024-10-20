@@ -4,9 +4,7 @@ use api::command::{HeatingTargetState, Thermostat};
 use lazy_static::lazy_static;
 
 use crate::adapter::CommandBackendService;
-use api::state::{
-    CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption, UserControlled,
-};
+use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::{
     command::Command, command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
@@ -376,23 +374,23 @@ lazy_static! {
             //
             (
                 "binary_sensor.arbeitszimmer_overlay",
-                HaChannel::UserControlledOverlay(UserControlled::RoomOfRequirementsThermostat)
+                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::RoomOfRequirementsThermostat)
             ),
             (
                 "binary_sensor.bad_overlay",
-                HaChannel::UserControlledOverlay(UserControlled::BathroomThermostat)
+                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::BathroomThermostat)
             ),
             (
                 "binary_sensor.kuche_overlay",
-                HaChannel::UserControlledOverlay(UserControlled::KitchenThermostat)
+                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::KitchenThermostat)
             ),
             (
                 "binary_sensor.schlafzimmer_overlay",
-                HaChannel::UserControlledOverlay(UserControlled::BedroomThermostat)
+                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::BedroomThermostat)
             ),
             (
                 "binary_sensor.wohnzimmer_overlay",
-                HaChannel::UserControlledOverlay(UserControlled::LivingRoomThermostat)
+                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::LivingRoomThermostat)
             ),
 
             //

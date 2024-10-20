@@ -204,12 +204,8 @@ fn to_persistent_data_point(
             value: ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
             timestamp,
         },
-        HaChannel::UserControlledOverlay(channel) => PersistentDataPoint {
-            value: ChannelValue::UserControlled(
-                channel,
-                ha_value == "on"
-                    && attributes.get("termination") == Some(&Value::String("TIMER".to_string())),
-            ),
+        HaChannel::ThermostatAutoControl(channel) => PersistentDataPoint {
+            value: ChannelValue::ExternalAutoControl(channel, ha_value == "auto"),
             timestamp,
         },
         HaChannel::PresenceFromLeakSensor(channel) => PersistentDataPoint {

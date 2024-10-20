@@ -14,7 +14,7 @@ pub enum ChannelValue {
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
     SetPoint(SetPoint, DegreeCelsius),
     HeatingDemand(HeatingDemand, Percent),
-    UserControlled(UserControlled, bool),
+    ExternalAutoControl(ExternalAutoControl, bool),
     Presence(Presence, bool),
 }
 
@@ -132,7 +132,7 @@ pub enum HeatingDemand {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum UserControlled {
+pub enum ExternalAutoControl {
     LivingRoomThermostat,
     BedroomThermostat,
     KitchenThermostat,

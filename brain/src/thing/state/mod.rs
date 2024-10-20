@@ -2,6 +2,7 @@ mod automatic_temp_inc;
 mod cold_air_coming_in;
 mod current_power_usage;
 mod dewpoint;
+mod external_auto_control;
 mod opened;
 mod powered;
 mod relative_humidity;

@@ -7,42 +7,12 @@ use super::DataPointAccess;
 
 pub enum UserControlled {
     Dehumidifier,
-    LivingRoomThermostat,
-    BedroomThermostat,
-    KitchenThermostat,
-    RoomOfRequirementsThermostat,
-    BathroomThermostat,
 }
 
 impl DataPointAccess<bool> for UserControlled {
     async fn current_data_point(&self) -> anyhow::Result<DataPoint<bool>> {
         match self {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier().await,
-            UserControlled::LivingRoomThermostat => {
-                home_api()
-                    .get_latest(&api::state::UserControlled::LivingRoomThermostat)
-                    .await
-            }
-            UserControlled::BedroomThermostat => {
-                home_api()
-                    .get_latest(&api::state::UserControlled::BedroomThermostat)
-                    .await
-            }
-            UserControlled::KitchenThermostat => {
-                home_api()
-                    .get_latest(&api::state::UserControlled::KitchenThermostat)
-                    .await
-            }
-            UserControlled::RoomOfRequirementsThermostat => {
-                home_api()
-                    .get_latest(&api::state::UserControlled::RoomOfRequirementsThermostat)
-                    .await
-            }
-            UserControlled::BathroomThermostat => {
-                home_api()
-                    .get_latest(&api::state::UserControlled::BathroomThermostat)
-                    .await
-            }
         }
     }
 }

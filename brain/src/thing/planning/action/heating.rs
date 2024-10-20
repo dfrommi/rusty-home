@@ -65,7 +65,8 @@ impl Action for Heat {
     }
 
     async fn is_user_controlled(&self) -> Result<bool> {
-        self.heating_zone.user_controlled().current().await
+        //TODO check also latest command sent
+        self.heating_zone.auto_mode().current().await.map(|v| !v)
     }
 
     async fn start(&self) -> Result<()> {
@@ -181,7 +182,8 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 
     async fn is_user_controlled(&self) -> Result<bool> {
-        self.heating_zone.user_controlled().current().await
+        //TODO check also latest command sent
+        self.heating_zone.auto_mode().current().await.map(|v| !v)
     }
 
     async fn start(&self) -> Result<()> {

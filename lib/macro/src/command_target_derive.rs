@@ -15,8 +15,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
         panic!("CommandTargetMacro can only be derived for enums");
     };
 
+    // The name of the new enum is CommandTarget
+    let target_enum_name = format_ident!("CommandTarget");
+
     // Collect the CommandTarget enum variants
     let mut target_variants = Vec::new();
+    let mut from_command_impls = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
@@ -34,11 +38,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     });
                 }
             }
+
+            // Generate the From<&Command> for Channel implementation
+            from_command_impls.push(quote! {
+                #name::#variant_name { device, .. } => #target_enum_name::#variant_name(device.clone())
+            });
         }
     }
-
-    // The name of the new enum is CommandTarget
-    let target_enum_name = format_ident!("CommandTarget");
 
     let expanded = quote! {
         // Define the CommandTarget enum
@@ -46,6 +52,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
         #[serde(tag = "type", content = "device", rename_all = "snake_case")]
         pub enum #target_enum_name {
             #(#target_variants),*
+        }
+
+        // Implement From<&Command> for CommandTarget
+        impl From<&#name> for #target_enum_name {
+            fn from(val: &#name) -> Self {
+                match val {
+                    #(#from_command_impls),*
+                }
+            }
         }
     };
 

@@ -13,6 +13,7 @@ use sqlx::{
     postgres::{PgListener, PgRow},
     PgPool, Row,
 };
+use support::ext::ToOk;
 use tokio::sync::broadcast::Receiver;
 
 #[derive(Debug, Clone)]
@@ -151,26 +152,37 @@ impl HomeApi {
         Ok(())
     }
 
-    pub async fn get_latest_command(
+    pub async fn is_latest_command_since(
         &self,
-        target: &CommandTarget,
-    ) -> Result<Option<CommandExecution>> {
+        command: &Command,
+        since: DateTime<Utc>,
+        source: Option<&CommandSource>,
+    ) -> Result<bool> {
+        let target: CommandTarget = command.into();
         let db_target = serde_json::json!(target);
 
         let row: Option<DbThingCommandRow> = sqlx::query_as(
             "SELECT *
             from THING_COMMANDS
             where command @> $1
+            and timestamp > $2
            order by timestamp desc
            limit 1",
         )
         .bind(db_target)
+        .bind(since)
         .fetch_optional(&self.db_pool)
         .await?;
 
-        Ok(match row {
-            Some(row) => Option::Some(row.try_into()?),
-            None => Option::None,
-        })
+        match row {
+            Some(row) => {
+                let returned_command: Command = serde_json::from_value(row.command)?;
+                let returned_source: CommandSource = row.source.into();
+                (source.is_none() || source == Some(&returned_source))
+                    && &returned_command == command
+            }
+            None => false,
+        }
+        .to_ok()
     }
 }

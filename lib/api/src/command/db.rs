@@ -10,7 +10,7 @@ pub mod schema {
         Error,
     }
 
-    #[derive(Debug, Clone, sqlx::Type)]
+    #[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
     #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
     pub enum DbCommandSource {
         System,
@@ -48,11 +48,17 @@ pub mod mapper {
                     }
                 },
                 created: self.timestamp,
-                source: match self.source {
-                    DbCommandSource::System => CommandSource::System,
-                    DbCommandSource::User => CommandSource::User,
-                },
+                source: self.source.into(),
             })
+        }
+    }
+
+    impl From<DbCommandSource> for CommandSource {
+        fn from(value: DbCommandSource) -> Self {
+            match value {
+                DbCommandSource::System => CommandSource::System,
+                DbCommandSource::User => CommandSource::User,
+            }
         }
     }
 

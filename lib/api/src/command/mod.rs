@@ -5,7 +5,7 @@ use support::unit::DegreeCelsius;
 
 pub mod db;
 
-#[derive(Debug, Clone, CommandTarget, Serialize, Deserialize)]
+#[derive(Debug, Clone, CommandTarget, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
     SetPower {
@@ -19,14 +19,14 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
     LivingRoomNotificationLight,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
     LivingRoom,
@@ -36,11 +36,15 @@ pub enum Thermostat {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum HeatingTargetState {
-    Off,
-    Heat { temperature: DegreeCelsius },
+    Auto,
+    Off, //TODO support off-timer (not supported via HA)
+    Heat {
+        temperature: DegreeCelsius,
+        until: DateTime<Utc>,
+    },
 }
 
 #[derive(Debug)]
@@ -69,6 +73,7 @@ pub enum CommandSource {
 #[cfg(test)]
 mod test {
     use assert_json_diff::assert_json_eq;
+    use chrono::TimeZone;
     use serde_json::json;
 
     use super::*;
@@ -96,16 +101,16 @@ mod test {
     }
 
     #[test]
-    fn set_heating_off() {
+    fn set_heating_auto() {
         assert_json_eq!(
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
-                target_state: HeatingTargetState::Off,
+                target_state: HeatingTargetState::Auto,
             },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
-                "mode": "off"
+                "mode": "auto"
             })
         );
         assert_json_eq!(
@@ -118,19 +123,36 @@ mod test {
     }
 
     #[test]
+    fn set_heating_off() {
+        assert_json_eq!(
+            Command::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+                target_state: HeatingTargetState::Off
+            },
+            json!({
+                "type": "set_heating",
+                "device": "room_of_requirements",
+                "mode": "off"
+            })
+        );
+    }
+
+    #[test]
     fn set_heating_temperature() {
         assert_json_eq!(
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
-                    temperature: DegreeCelsius(22.5)
+                    temperature: DegreeCelsius(22.5),
+                    until: Utc.with_ymd_and_hms(2024, 10, 14, 13, 37, 42).unwrap()
                 },
             },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
                 "mode": "heat",
-                "temperature": 22.5
+                "temperature": 22.5,
+                "until": "2024-10-14T13:37:42Z"
             })
         );
     }

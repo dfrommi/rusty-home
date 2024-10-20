@@ -1,12 +1,9 @@
 use std::fmt::Display;
 
-use anyhow::{bail, Result};
-use api::command::{Command, CommandExecution, CommandTarget, PowerToggle};
-
-use crate::{
-    home_api,
-    thing::{ColdAirComingIn, DataPointAccess, Executable},
-};
+use crate::thing::state::Powered;
+use crate::thing::{ColdAirComingIn, DataPointAccess, Executable};
+use anyhow::Result;
+use api::command::{Command, PowerToggle};
 
 use super::{Action, Resource};
 
@@ -28,36 +25,7 @@ impl Action for RequestClosingWindow {
     }
 
     async fn is_running(&self) -> Result<bool> {
-        let target = CommandTarget::SetPower(PowerToggle::LivingRoomNotificationLight);
-
-        //TODO hide behind Command interface
-        let maybe_command = home_api()
-            .get_latest_command(&target)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!(
-                    "Failed to get latest command, falling back to not running: {}",
-                    e
-                );
-                None
-            });
-
-        tracing::debug!("is_running: {:?}", maybe_command);
-
-        match maybe_command {
-            Some(CommandExecution {
-                command: Command::SetPower { power_on, .. },
-                ..
-            }) => Ok(power_on),
-            Some(cmd) => {
-                bail!(
-                    "Unexpected command type received for target {:?}: {:?}",
-                    target,
-                    cmd
-                );
-            }
-            None => Ok(false),
-        }
+        Powered::LivingRoomNotificationLight.current().await
     }
 
     async fn is_user_controlled(&self) -> Result<bool> {

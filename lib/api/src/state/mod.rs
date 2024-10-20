@@ -64,6 +64,7 @@ pub enum Opened {
 #[serde(rename_all = "snake_case")]
 pub enum Powered {
     Dehumidifier,
+    LivingRoomNotificationLight,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]

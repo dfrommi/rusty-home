@@ -10,7 +10,7 @@ use api::{
     state::Temperature,
 };
 
-use super::homeassistant::HaChannel;
+use super::homeassistant::{HaChannel, HaClimateHvacMode};
 use super::HaService;
 
 pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
@@ -47,13 +47,18 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
             .to_string();
 
             CommandBackendService::HomeAssistant(match target_state {
-                HeatingTargetState::Off => HaService::ClimateSetTemperature {
+                HeatingTargetState::Auto => HaService::ClimateSetHvacMode {
                     id: thermostat,
-                    temperature: None,
+                    mode: HaClimateHvacMode::Auto,
                 },
-                HeatingTargetState::Heat { temperature } => HaService::ClimateSetTemperature {
+                HeatingTargetState::Off => HaService::ClimateSetHvacMode {
                     id: thermostat,
-                    temperature: Some(*temperature),
+                    mode: HaClimateHvacMode::Off,
+                },
+                HeatingTargetState::Heat { temperature, until } => HaService::TadoSetClimateTimer {
+                    id: thermostat,
+                    temperature: *temperature,
+                    until: *until,
                 },
             })
         }
@@ -174,6 +179,10 @@ lazy_static! {
             (
                 "switch.dehumidifier",
                 HaChannel::Powered(Powered::Dehumidifier)
+            ),
+            (
+                "light.hue_go",
+                HaChannel::Powered(Powered::LivingRoomNotificationLight)
             ),
 
             //

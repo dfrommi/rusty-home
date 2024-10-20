@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::command::Command;
+use chrono::{Duration, Utc};
 use support::unit::DegreeCelsius;
 
 use crate::thing::{AutomaticTemperatureIncrease, ColdAirComingIn, DataPointAccess, Executable};
@@ -74,6 +75,7 @@ impl Action for Heat {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature,
+                until: Utc::now() + Duration::hours(6),
             },
         }
         .execute()
@@ -83,7 +85,7 @@ impl Action for Heat {
     async fn stop(&self) -> Result<()> {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Off,
+            target_state: api::command::HeatingTargetState::Auto,
         }
         .execute()
         .await
@@ -141,9 +143,7 @@ impl Action for NoHeatingDuringVentilation {
     async fn stop(&self) -> Result<()> {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
-                temperature: DegreeCelsius(15.0),
-            },
+            target_state: api::command::HeatingTargetState::Auto,
         }
         .execute()
         .await
@@ -191,6 +191,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: DegreeCelsius(7.0),
+                until: Utc::now() + Duration::hours(1),
             },
         }
         .execute()
@@ -200,9 +201,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     async fn stop(&self) -> Result<()> {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
-                temperature: DegreeCelsius(15.0),
-            },
+            target_state: api::command::HeatingTargetState::Auto,
         }
         .execute()
         .await

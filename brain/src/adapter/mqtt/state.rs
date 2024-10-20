@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use api::state::Powered;
 use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
@@ -73,6 +73,7 @@ impl IntoMqttState for Powered {
     async fn into_mqtt_state(self) -> Result<MqttState> {
         let (name, channel) = match self {
             Powered::Dehumidifier => ("dehumidifier", "power"),
+            _ => bail!("Unsupported state"),
         };
 
         let v: MqttStateValue = self.current().await?.into();

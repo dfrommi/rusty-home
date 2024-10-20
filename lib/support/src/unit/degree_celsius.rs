@@ -30,14 +30,3 @@ impl std::ops::Sub for &DegreeCelsius {
         DegreeCelsius(self.0 - rhs.0)
     }
 }
-
-//f64 doesn't impl Eq and Hash because it could be NaN, but we know it never is
-
-impl Eq for DegreeCelsius {}
-
-impl std::hash::Hash for DegreeCelsius {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Use the bitwise representation of the f64 for hashing
-        self.0.to_bits().hash(state);
-    }
-}

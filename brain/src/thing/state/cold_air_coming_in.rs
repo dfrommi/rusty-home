@@ -21,25 +21,15 @@ impl DataPointAccess<bool> for ColdAirComingIn {
             return Ok(outside_temp.map_value(|_| false));
         }
 
-        let result = match self {
-            ColdAirComingIn::LivingRoom => Opened::LivingRoomWindowOrDoor
-                .current_data_point()
-                .await?
-                .map_value(|v| v.is_opened()),
-            ColdAirComingIn::Bedroom => Opened::BedroomWindow
-                .current_data_point()
-                .await?
-                .map_value(|v| v.is_opened()),
-            ColdAirComingIn::Kitchen => Opened::KitchenWindow
-                .current_data_point()
-                .await?
-                .map_value(|v| v.is_opened()),
-            ColdAirComingIn::RoomOfRequirements => Opened::RoomOfRequirementsWindow
-                .current_data_point()
-                .await?
-                .map_value(|v| v.is_opened()),
-        };
-
-        Ok(result)
+        match self {
+            ColdAirComingIn::LivingRoom => {
+                Opened::LivingRoomWindowOrDoor.current_data_point().await
+            }
+            ColdAirComingIn::Bedroom => Opened::BedroomWindow.current_data_point().await,
+            ColdAirComingIn::Kitchen => Opened::KitchenWindow.current_data_point().await,
+            ColdAirComingIn::RoomOfRequirements => {
+                Opened::RoomOfRequirementsWindow.current_data_point().await
+            }
+        }
     }
 }

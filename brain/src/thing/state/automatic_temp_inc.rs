@@ -35,7 +35,7 @@ impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
         let window_opened = window.current_data_point().await?;
         let opened_elapsed = Utc::now() - window_opened.timestamp;
 
-        if window_opened.value.is_opened() || opened_elapsed > Duration::minutes(30) {
+        if window_opened.value || opened_elapsed > Duration::minutes(30) {
             return Ok(window_opened.map_value(|_| false));
         }
 

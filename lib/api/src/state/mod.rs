@@ -1,6 +1,6 @@
 use r#macro::StateChannel;
 use serde::{Deserialize, Serialize};
-use value_type::*;
+use support::unit::*;
 
 pub mod db;
 
@@ -8,14 +8,14 @@ pub mod db;
 pub enum ChannelValue {
     Temperature(Temperature, DegreeCelsius),
     RelativeHumidity(RelativeHumidity, Percent),
-    Opened(Opened, OpenedState),
-    Powered(Powered, PowerState),
+    Opened(Opened, bool),
+    Powered(Powered, bool),
     CurrentPowerUsage(CurrentPowerUsage, Watt),
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
     SetPoint(SetPoint, DegreeCelsius),
     HeatingDemand(HeatingDemand, Percent),
-    UserControlled(UserControlled, UserControlledState),
-    Presence(Presence, PresentState),
+    UserControlled(UserControlled, bool),
+    Presence(Presence, bool),
 }
 
 pub trait ChannelTypeInfo {
@@ -150,61 +150,4 @@ pub enum Presence {
     CouchLeft,
     CouchCenter,
     CouchRight,
-}
-
-pub mod value_type {
-    pub use support::unit::DegreeCelsius;
-    pub use support::unit::KiloWattHours;
-    pub use support::unit::Percent;
-    pub use support::unit::Watt;
-
-    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-    pub enum OpenedState {
-        Opened,
-        Closed,
-    }
-
-    impl OpenedState {
-        pub fn any(values: &[Self]) -> Self {
-            if values.iter().any(|&state| state == OpenedState::Opened) {
-                OpenedState::Opened
-            } else {
-                OpenedState::Closed
-            }
-        }
-
-        pub fn is_opened(&self) -> bool {
-            self == &Self::Opened
-        }
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-    pub enum PowerState {
-        On,
-        Off,
-    }
-
-    impl PowerState {
-        pub fn is_on(self) -> bool {
-            Self::On == self
-        }
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-    pub enum PresentState {
-        Present,
-        Absent,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-    pub enum UserControlledState {
-        System,
-        User,
-    }
-
-    impl UserControlledState {
-        pub fn is_user_controlled(self) -> bool {
-            Self::User == self
-        }
-    }
 }

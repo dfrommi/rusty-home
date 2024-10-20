@@ -1,10 +1,7 @@
 use chrono::{Duration, Utc};
 
 use crate::{adapter::persistence::DataPoint, home_api};
-use api::{
-    command::{CommandExecution, CommandSource, CommandTarget, PowerToggle},
-    state::value_type::UserControlledState,
-};
+use api::command::{CommandExecution, CommandSource, CommandTarget, PowerToggle};
 
 use super::DataPointAccess;
 
@@ -19,7 +16,7 @@ pub enum UserControlled {
 
 impl DataPointAccess<bool> for UserControlled {
     async fn current_data_point(&self) -> anyhow::Result<DataPoint<bool>> {
-        let result = match self {
+        match self {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier().await,
             UserControlled::LivingRoomThermostat => {
                 home_api()
@@ -46,16 +43,11 @@ impl DataPointAccess<bool> for UserControlled {
                     .get_latest(&api::state::UserControlled::BathroomThermostat)
                     .await
             }
-        };
-
-        match result {
-            Ok(dp) => Ok(dp.map_value(|v| v.is_user_controlled())),
-            Err(e) => Err(e),
         }
     }
 }
 
-async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<UserControlledState>> {
+async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>> {
     let state = super::Powered::Dehumidifier.current_data_point().await?;
     let maybe_command = home_api()
         .get_latest_command(&CommandTarget::SetPower(PowerToggle::Dehumidifier))
@@ -75,11 +67,7 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<UserC
     };
 
     Ok(DataPoint {
-        value: if user_controlled {
-            UserControlledState::User
-        } else {
-            UserControlledState::System
-        },
+        value: user_controlled,
         timestamp: state.timestamp,
     })
 }

@@ -56,8 +56,15 @@ pub async fn get_tag_id(
 }
 
 mod mapper {
-    use super::value_type::*;
+    use support::unit::*;
+
     use super::DbValue;
+
+    impl From<&bool> for DbValue {
+        fn from(value: &bool) -> Self {
+            DbValue(if *value { 1.0 } else { 0.0 })
+        }
+    }
 
     impl From<&DegreeCelsius> for DbValue {
         fn from(value: &DegreeCelsius) -> Self {
@@ -107,79 +114,9 @@ mod mapper {
         }
     }
 
-    impl From<&OpenedState> for DbValue {
-        fn from(value: &OpenedState) -> Self {
-            match value {
-                OpenedState::Opened => DbValue(1.0),
-                OpenedState::Closed => DbValue(0.0),
-            }
-        }
-    }
-
-    impl From<DbValue> for OpenedState {
+    impl From<DbValue> for bool {
         fn from(value: DbValue) -> Self {
-            if value.0 > 0.0 {
-                Self::Opened
-            } else {
-                Self::Closed
-            }
-        }
-    }
-
-    impl From<&PowerState> for DbValue {
-        fn from(value: &PowerState) -> Self {
-            match value {
-                PowerState::On => DbValue(1.0),
-                PowerState::Off => DbValue(0.0),
-            }
-        }
-    }
-
-    impl From<DbValue> for PowerState {
-        fn from(value: DbValue) -> Self {
-            if value.0 > 0.0 {
-                Self::On
-            } else {
-                Self::Off
-            }
-        }
-    }
-
-    impl From<&PresentState> for DbValue {
-        fn from(value: &PresentState) -> Self {
-            match value {
-                PresentState::Present => DbValue(1.0),
-                PresentState::Absent => DbValue(0.0),
-            }
-        }
-    }
-
-    impl From<DbValue> for PresentState {
-        fn from(value: DbValue) -> Self {
-            if value.0 > 0.0 {
-                Self::Present
-            } else {
-                Self::Absent
-            }
-        }
-    }
-
-    impl From<&UserControlledState> for DbValue {
-        fn from(value: &UserControlledState) -> Self {
-            match value {
-                UserControlledState::User => DbValue(1.0),
-                UserControlledState::System => DbValue(0.0),
-            }
-        }
-    }
-
-    impl From<DbValue> for UserControlledState {
-        fn from(value: DbValue) -> Self {
-            if value.0 > 0.0 {
-                Self::System
-            } else {
-                Self::User
-            }
+            value.0 > 0.0
         }
     }
 }

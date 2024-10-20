@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use api::state::value_type::*;
 use parse::{HaEvent, StateValue};
 use serde_json::Value;
 use support::mqtt::MqttInMessage;
+use support::unit::*;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
@@ -170,25 +170,11 @@ fn to_persistent_data_point(
             timestamp,
         },
         HaChannel::Opened(channel) => PersistentDataPoint {
-            value: ChannelValue::Opened(
-                channel,
-                if ha_value == "on" {
-                    OpenedState::Opened
-                } else {
-                    OpenedState::Closed
-                },
-            ),
+            value: ChannelValue::Opened(channel, ha_value == "on"),
             timestamp,
         },
         HaChannel::Powered(channel) => PersistentDataPoint {
-            value: ChannelValue::Powered(
-                channel,
-                if ha_value == "on" {
-                    PowerState::On
-                } else {
-                    PowerState::Off
-                },
-            ),
+            value: ChannelValue::Powered(channel, ha_value == "on"),
             timestamp,
         },
         HaChannel::CurrentPowerUsage(channel) => PersistentDataPoint {
@@ -221,47 +207,21 @@ fn to_persistent_data_point(
         HaChannel::UserControlledOverlay(channel) => PersistentDataPoint {
             value: ChannelValue::UserControlled(
                 channel,
-                if ha_value == "on"
-                    && attributes.get("termination") == Some(&Value::String("TIMER".to_string()))
-                {
-                    UserControlledState::User
-                } else {
-                    UserControlledState::System
-                },
+                ha_value == "on"
+                    && attributes.get("termination") == Some(&Value::String("TIMER".to_string())),
             ),
             timestamp,
         },
         HaChannel::PresenceFromLeakSensor(channel) => PersistentDataPoint {
-            value: ChannelValue::Presence(
-                channel,
-                if ha_value == "on" {
-                    PresentState::Present
-                } else {
-                    PresentState::Absent
-                },
-            ),
+            value: ChannelValue::Presence(channel, ha_value == "on"),
             timestamp,
         },
         HaChannel::PresenceFromEsp(channel) => PersistentDataPoint {
-            value: ChannelValue::Presence(
-                channel,
-                if ha_value == "on" {
-                    PresentState::Present
-                } else {
-                    PresentState::Absent
-                },
-            ),
+            value: ChannelValue::Presence(channel, ha_value == "on"),
             timestamp,
         },
         HaChannel::PresenceFromDeviceTracker(channel) => PersistentDataPoint {
-            value: ChannelValue::Presence(
-                channel,
-                if ha_value == "home" {
-                    PresentState::Present
-                } else {
-                    PresentState::Absent
-                },
-            ),
+            value: ChannelValue::Presence(channel, ha_value == "home"),
             timestamp,
         },
     };

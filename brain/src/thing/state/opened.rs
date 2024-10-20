@@ -1,5 +1,3 @@
-use api::state::value_type::OpenedState;
-
 use crate::{adapter::persistence::DataPoint, home_api};
 
 use super::DataPointAccess;
@@ -12,8 +10,8 @@ pub enum Opened {
     RoomOfRequirementsWindow,
 }
 
-impl DataPointAccess<OpenedState> for Opened {
-    async fn current_data_point(&self) -> anyhow::Result<DataPoint<OpenedState>> {
+impl DataPointAccess<bool> for Opened {
+    async fn current_data_point(&self) -> anyhow::Result<DataPoint<bool>> {
         let api = home_api();
         match self {
             Opened::LivingRoomWindowOrDoor => {
@@ -39,7 +37,7 @@ impl DataPointAccess<OpenedState> for Opened {
     }
 }
 
-async fn any_of(opened_states: Vec<api::state::Opened>) -> anyhow::Result<DataPoint<OpenedState>> {
+async fn any_of(opened_states: Vec<api::state::Opened>) -> anyhow::Result<DataPoint<bool>> {
     let api = home_api();
     let futures: Vec<_> = opened_states.iter().map(|o| api.get_latest(o)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
@@ -47,7 +45,7 @@ async fn any_of(opened_states: Vec<api::state::Opened>) -> anyhow::Result<DataPo
     match res {
         Ok(values) => {
             let timestamp = values.iter().map(|v| v.timestamp).max().unwrap_or_default();
-            let value = OpenedState::any(&values.iter().map(|v| v.value).collect::<Vec<_>>());
+            let value = values.iter().any(|v| v.value);
 
             Ok(DataPoint { value, timestamp })
         }

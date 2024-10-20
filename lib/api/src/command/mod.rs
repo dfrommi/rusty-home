@@ -113,7 +113,6 @@ mod test {
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
-                "mode": "off"
             })
         );
     }

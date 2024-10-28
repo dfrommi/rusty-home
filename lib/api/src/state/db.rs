@@ -68,13 +68,13 @@ mod mapper {
 
     impl From<&DegreeCelsius> for DbValue {
         fn from(value: &DegreeCelsius) -> Self {
-            DbValue(value.0)
+            DbValue(*value.as_ref())
         }
     }
 
     impl From<DbValue> for DegreeCelsius {
         fn from(value: DbValue) -> Self {
-            Self(value.0)
+            value.0.into()
         }
     }
 

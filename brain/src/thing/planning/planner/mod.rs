@@ -19,8 +19,6 @@ pub struct ActionResult<'a, A: Action> {
     pub is_fulfilled: Option<bool>,
     #[tabled(display_with = "display_option")]
     pub is_running: Option<bool>,
-    #[tabled(display_with = "display_option")]
-    pub is_user_controlled: Option<bool>,
 }
 
 //sorting order of config is important - first come, first serve
@@ -47,23 +45,17 @@ where
                 continue;
             }
 
-            let (is_fulfilled, is_user_controlled, is_running) = get_action_state(action).await;
+            let (is_fulfilled, is_running) = get_action_state(action).await;
             result.is_fulfilled = Some(is_fulfilled);
-            result.is_user_controlled = Some(is_user_controlled);
             result.is_running = Some(is_running);
 
             if is_goal_active && is_fulfilled {
                 resource_lock.lock(used_resource);
+                result.should_be_started = !is_running;
             }
 
-            if !is_user_controlled {
-                if is_goal_active && is_fulfilled && !is_running {
-                    result.should_be_started = true;
-                }
-
-                if (!is_goal_active || !is_fulfilled) && is_running {
-                    result.should_be_stopped = true;
-                }
+            if !is_goal_active || !is_fulfilled {
+                result.should_be_stopped = is_running;
             }
 
             action_results.push(result);
@@ -71,9 +63,13 @@ where
     }
 
     for result in action_results.iter_mut() {
-        if result.should_be_stopped && resource_lock.is_locked(&result.action.controls_resource()) {
-            result.should_be_stopped = false;
-            result.locked = true;
+        if result.should_be_stopped {
+            if resource_lock.is_locked(&result.action.controls_resource()) {
+                result.should_be_stopped = false;
+                result.locked = true;
+            } else {
+                resource_lock.lock(result.action.controls_resource());
+            }
         }
     }
 
@@ -89,7 +85,6 @@ impl<'a, A: Action> ActionResult<'a, A> {
             is_goal_active: false,
             locked: false,
             is_fulfilled: None,
-            is_user_controlled: None,
             is_running: None,
         }
     }
@@ -107,25 +102,13 @@ fn display_option(o: &Option<bool>) -> String {
     }
 }
 
-async fn get_action_state(action: &impl Action) -> (bool, bool, bool) {
-    let (is_fulfilled_res, is_user_controlled_res, is_running_res) = tokio::join!(
-        action.preconditions_fulfilled(),
-        action.is_user_controlled(),
-        action.is_running(),
-    );
+async fn get_action_state(action: &impl Action) -> (bool, bool) {
+    let (is_fulfilled_res, is_running_res) =
+        tokio::join!(action.preconditions_fulfilled(), action.is_running(),);
 
     let is_fulfilled = is_fulfilled_res.unwrap_or_else(|e| {
         tracing::warn!(
             "Error checking preconditions of action {:?}, assuming not fulfilled: {:?}",
-            action,
-            e
-        );
-        false
-    });
-
-    let is_user_controlled = is_user_controlled_res.unwrap_or_else(|e| {
-        tracing::warn!(
-            "Error checking user-controlled state of action {:?}, assuming not controlled: {:?}",
             action,
             e
         );
@@ -141,7 +124,7 @@ async fn get_action_state(action: &impl Action) -> (bool, bool, bool) {
         false
     });
 
-    (is_fulfilled, is_user_controlled, is_running)
+    (is_fulfilled, is_running)
 }
 
 struct ResourceLock<R> {

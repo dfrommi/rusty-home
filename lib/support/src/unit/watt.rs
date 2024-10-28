@@ -1,6 +1,7 @@
+use derive_more::derive::AsRef;
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef)]
 pub struct Watt(pub f64);
 
 impl Display for Watt {

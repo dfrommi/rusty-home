@@ -8,7 +8,7 @@ use api::command::{Command, PowerToggle};
 use super::{Action, Resource};
 
 #[derive(Debug, Clone)]
-pub struct RequestClosingWindow {}
+pub struct RequestClosingWindow;
 
 impl Action for RequestClosingWindow {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
@@ -26,10 +26,6 @@ impl Action for RequestClosingWindow {
 
     async fn is_running(&self) -> Result<bool> {
         Powered::LivingRoomNotificationLight.current().await
-    }
-
-    async fn is_user_controlled(&self) -> Result<bool> {
-        Ok(false)
     }
 
     async fn start(&self) -> Result<()> {

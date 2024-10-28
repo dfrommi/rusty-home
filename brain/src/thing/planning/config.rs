@@ -1,82 +1,75 @@
 use support::unit::DegreeCelsius;
 
 use crate::thing::planning::action::HeatingZone;
+use crate::thing::UserControlled;
 
 use super::action::{
-    Dehumidify, Heat, HomeAction, NoHeatingDuringAutomaticTemperatureIncrease,
-    NoHeatingDuringVentilation, RequestClosingWindow,
+    DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,
+    KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, NoHeatingDuringVentilation,
+    RequestClosingWindow, Resource,
 };
-use super::goal::{HomeGoal, Room, RoomComfortLevel};
+use super::goal::{HomeGoal, Room};
 
 #[rustfmt::skip]
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
-    let mut result = vec![
+    vec![
     (
-        HomeGoal::AvoidUselessHeating,
+        HomeGoal::SmarterHeating(Room::LivingRoom),
         vec![
-            HomeAction::NoHeatingDuringVentilation(NoHeatingDuringVentilation::new(HeatingZone::LivingRoom)),
-            HomeAction::NoHeatingDuringVentilation(NoHeatingDuringVentilation::new(HeatingZone::Bedroom)),
-            HomeAction::NoHeatingDuringVentilation(NoHeatingDuringVentilation::new(HeatingZone::Kitchen)),
-            HomeAction::NoHeatingDuringVentilation(NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements)),
-            HomeAction::NoHeatingDuringVentilation(NoHeatingDuringVentilation::new(HeatingZone::Bathroom)),
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom)),
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom)),
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen)),
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements)),
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom)),
+            NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
+            KeepUserOverride::new(UserControlled::LivingRoomThermostat, Resource::LivingRoomThermostat).into(),
+            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
+            ExtendHeatingUntilSleeping::new(HeatingZone::LivingRoom, DegreeCelsius(19.1), (22,30), (2,30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(17.6), (6,12), (12,30)).into(),
+        ]
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::Bedroom),
+        vec![
+            NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
+            KeepUserOverride::new(UserControlled::BedroomThermostat, Resource::BedroomThermostat).into(),
+            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
+            ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(18.6), (22,30), (2,30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::Bedroom, DegreeCelsius(15.1), (6,12), (12,30)).into(),
+        ]
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::Kitchen),
+        vec![
+            NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
+            KeepUserOverride::new(UserControlled::KitchenThermostat, Resource::KitchenThermostat).into(),
+            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.1), (6,12), (12,30)).into(),
+        ]
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
+        vec![
+            NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements).into(),
+            KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Resource::RoomOfRequirementsThermostat).into(),
+            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements).into(),
+        ]
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::Bathroom),
+        vec![
+            NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
+            KeepUserOverride::new(UserControlled::BathroomThermostat, Resource::BathroomThermostat).into(),
+            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
         ]
     ),
     (
         HomeGoal::StayInformed,
         vec![
-            HomeAction::RequestClosingWindow(RequestClosingWindow {})
+            RequestClosingWindow.into()
         ],
     ),
     (
         HomeGoal::PreventMouldInBathroom,
         vec![
-            HomeAction::Dehumidify(Dehumidify {})
+            KeepUserOverride::new(UserControlled::Dehumidifier, Resource::Dehumidifier).into(),
+            Dehumidify.into()
         ],
     ),
-    ];
-
-    for (room, level, temperature) in [
-        (Room::LivingRoom, RoomComfortLevel::EnergySaving, 19.0),
-        (Room::LivingRoom, RoomComfortLevel::Normal, 20.0),
-        (Room::LivingRoom, RoomComfortLevel::Comfortable, 21.0),
-        (Room::Bedroom, RoomComfortLevel::EnergySaving, 19.0),
-        (Room::Bedroom, RoomComfortLevel::Normal, 20.0),
-        (Room::Bedroom, RoomComfortLevel::Comfortable, 21.0),
-        (Room::Kitchen, RoomComfortLevel::EnergySaving, 19.0),
-        (Room::Kitchen, RoomComfortLevel::Normal, 20.0),
-        (Room::Kitchen, RoomComfortLevel::Comfortable, 21.0),
-        (Room::RoomOfRequirements, RoomComfortLevel::EnergySaving, 19.0),
-        (Room::RoomOfRequirements, RoomComfortLevel::Normal, 20.0),
-        (Room::RoomOfRequirements, RoomComfortLevel::Comfortable, 21.0),
-        (Room::Bathroom, RoomComfortLevel::EnergySaving, 19.0),
-        (Room::Bathroom, RoomComfortLevel::Normal, 20.0),
-        (Room::Bathroom, RoomComfortLevel::Comfortable, 21.0),
-    ] {
-        let heating_zone = HeatingZone::from(&room);
-        result.push((
-            HomeGoal::RoomComfort(room, level),
-            vec![
-                HomeAction::Heat(Heat::new(heating_zone, DegreeCelsius(temperature)))
-            ],
-        ));
-    }
-
-    result
-}
-
-impl From<&Room> for HeatingZone {
-    fn from(val: &Room) -> Self {
-        match val {
-            Room::LivingRoom => HeatingZone::LivingRoom,
-            Room::Bedroom => HeatingZone::Bedroom,
-            Room::Kitchen => HeatingZone::Kitchen,
-            Room::RoomOfRequirements => HeatingZone::RoomOfRequirements,
-            Room::Bathroom => HeatingZone::Bathroom,
-        }
-    }
+    ]
 }

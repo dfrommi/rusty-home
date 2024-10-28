@@ -1,8 +1,9 @@
-use std::{f64, fmt::Display, hash::Hasher};
+use std::fmt::Display;
 
+use derive_more::derive::AsRef;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, AsRef, Serialize, Deserialize)]
 pub struct DegreeCelsius(pub f64);
 
 impl From<&DegreeCelsius> for f64 {

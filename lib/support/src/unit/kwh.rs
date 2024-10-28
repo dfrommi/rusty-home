@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+use derive_more::derive::AsRef;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef)]
 pub struct KiloWattHours(pub f64);
 
 impl Display for KiloWattHours {

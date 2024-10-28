@@ -1,5 +1,6 @@
 mod dehumidify;
 mod heating;
+mod keep_user_override;
 mod request_closing_window;
 
 use std::fmt::Debug;
@@ -12,21 +13,20 @@ use api::{command::Thermostat, state::SetPoint};
 use enum_dispatch::enum_dispatch;
 
 pub use dehumidify::Dehumidify;
-pub use heating::Heat;
-pub use heating::NoHeatingDuringAutomaticTemperatureIncrease;
-pub use heating::NoHeatingDuringVentilation;
+pub use heating::*;
+pub use keep_user_override::KeepUserOverride;
 pub use request_closing_window::RequestClosingWindow;
-
-use crate::thing::UserControlled;
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(Action, Dislay)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     RequestClosingWindow(RequestClosingWindow),
-    Heat(Heat),
     NoHeatingDuringVentilation(NoHeatingDuringVentilation),
     NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease),
+    KeepUserOverride(KeepUserOverride),
+    ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
+    DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -51,9 +51,11 @@ pub enum HeatingZone {
 
 #[enum_dispatch]
 pub trait Action: Debug + Display {
+    //action should be started based on current state
     async fn preconditions_fulfilled(&self) -> Result<bool>;
+
+    //action was just triggered or effect of action is fulfilled based on current state
     async fn is_running(&self) -> Result<bool>;
-    async fn is_user_controlled(&self) -> Result<bool>;
 
     async fn start(&self) -> Result<()>;
     async fn stop(&self) -> Result<()>;
@@ -120,13 +122,21 @@ impl Display for HomeAction {
             HomeAction::RequestClosingWindow(request_closing_window) => {
                 write!(f, "{}", request_closing_window)
             }
-            HomeAction::Heat(heat) => write!(f, "{}", heat),
             HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
                 write!(f, "{}", no_heating_during_ventilation)
             }
             HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
                 no_heating_during_automatic_temperature_increase,
             ) => write!(f, "{}", no_heating_during_automatic_temperature_increase),
+            HomeAction::KeepUserOverride(keep_user_override) => {
+                write!(f, "{}", keep_user_override)
+            }
+            HomeAction::ExtendHeatingUntilSleeping(extend_heating_until_sleeping) => {
+                write!(f, "{}", extend_heating_until_sleeping)
+            }
+            HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
+                write!(f, "{}", defer_heating_until_ventilation_done)
+            }
         }
     }
 }

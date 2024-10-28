@@ -196,7 +196,7 @@ fn to_persistent_data_point(
             };
 
             PersistentDataPoint {
-                value: ChannelValue::SetPoint(channel, DegreeCelsius(v)),
+                value: ChannelValue::SetPoint(channel, DegreeCelsius::from(v)),
                 timestamp,
             }
         }
@@ -204,7 +204,7 @@ fn to_persistent_data_point(
             value: ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
             timestamp,
         },
-        HaChannel::ThermostatAutoControl(channel) => PersistentDataPoint {
+        HaChannel::ClimateAutoMode(channel) => PersistentDataPoint {
             value: ChannelValue::ExternalAutoControl(channel, ha_value == "auto"),
             timestamp,
         },

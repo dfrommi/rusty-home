@@ -21,7 +21,7 @@ pub enum HaChannel {
     TotalEnergyConsumption(TotalEnergyConsumption),
     SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
-    ThermostatAutoControl(ExternalAutoControl),
+    ClimateAutoMode(ExternalAutoControl),
     PresenceFromLeakSensor(Presence),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),

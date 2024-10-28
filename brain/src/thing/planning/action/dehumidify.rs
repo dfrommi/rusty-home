@@ -9,7 +9,7 @@ use super::{Action, Resource};
 use crate::prelude::*;
 
 #[derive(Debug, Clone)]
-pub struct Dehumidify {}
+pub struct Dehumidify;
 
 impl Action for Dehumidify {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
@@ -18,10 +18,6 @@ impl Action for Dehumidify {
 
     async fn is_running(&self) -> Result<bool> {
         Powered::Dehumidifier.current().await
-    }
-
-    async fn is_user_controlled(&self) -> Result<bool> {
-        UserControlled::Dehumidifier.current().await
     }
 
     async fn start(&self) -> Result<()> {

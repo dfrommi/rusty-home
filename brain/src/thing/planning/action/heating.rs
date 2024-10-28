@@ -1,28 +1,19 @@
 use std::fmt::Display;
 
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use api::command::Command;
 use chrono::{Duration, Utc};
-use support::unit::DegreeCelsius;
+use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
-use crate::thing::{AutomaticTemperatureIncrease, ColdAirComingIn, DataPointAccess, Executable};
+use crate::{
+    adapter::persistence::DataPoint,
+    thing::{
+        AutomaticTemperatureIncrease, ColdAirComingIn, DataPointAccess, Executable, Opened,
+        Resident, ResidentState,
+    },
+};
 
 use super::{Action, HeatingZone, Resource};
-
-#[derive(Debug, Clone)]
-pub struct Heat {
-    heating_zone: HeatingZone,
-    target_temperature: DegreeCelsius,
-}
-
-impl Heat {
-    pub fn new(heating_zone: HeatingZone, target_temperature: DegreeCelsius) -> Self {
-        Self {
-            heating_zone,
-            target_temperature,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringVentilation {
@@ -46,28 +37,106 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
     }
 }
 
-impl Action for Heat {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
-        let current_temperature = self
-            .heating_zone
-            .current_room_temperature()
-            .current()
-            .await?;
+#[derive(Debug, Clone)]
+pub struct ExtendHeatingUntilSleeping {
+    heating_zone: HeatingZone,
+    target_temperature: DegreeCelsius,
+    time_range: DailyTimeRange,
+}
 
-        Ok(current_temperature <= self.target_temperature)
+#[derive(Debug, Clone)]
+pub struct DeferHeatingUntilVentilationDone {
+    heating_zone: HeatingZone,
+    target_temperature: DegreeCelsius,
+    time_range: DailyTimeRange,
+}
+
+impl ExtendHeatingUntilSleeping {
+    pub fn new(
+        heating_zone: HeatingZone,
+        target_temperature: DegreeCelsius,
+        start_hm: (u32, u32),
+        latest_until_hm: (u32, u32),
+    ) -> Self {
+        Self {
+            heating_zone,
+            target_temperature,
+            time_range: DailyTimeRange::new(start_hm, latest_until_hm),
+        }
+    }
+
+    async fn is_matching_target(&self) -> Result<DataPoint<bool>> {
+        let (set_point, auto_mode) = (
+            self.heating_zone.current_set_point(),
+            self.heating_zone.auto_mode(),
+        );
+
+        let (set_point, auto_mode) = tokio::try_join!(
+            set_point.current_data_point(),
+            auto_mode.current_data_point()
+        )?;
+
+        Ok(DataPoint {
+            value: set_point.value == self.target_temperature && auto_mode.value,
+            timestamp: std::cmp::max(set_point.timestamp, auto_mode.timestamp),
+        })
+    }
+}
+
+impl Display for ExtendHeatingUntilSleeping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ExtendHeatingUntilSleeping[{} -> {} ({})]",
+            self.heating_zone, self.target_temperature, self.time_range
+        )
+    }
+}
+
+impl DeferHeatingUntilVentilationDone {
+    pub fn new(
+        heating_zone: HeatingZone,
+        target_temperature: DegreeCelsius,
+        start_hm: (u32, u32),
+        latest_until_hm: (u32, u32),
+    ) -> Self {
+        Self {
+            heating_zone,
+            target_temperature,
+            time_range: DailyTimeRange::new(start_hm, latest_until_hm),
+        }
+    }
+
+    fn window(&self) -> Opened {
+        match self.heating_zone {
+            HeatingZone::LivingRoom => Opened::LivingRoomWindowOrDoor,
+            HeatingZone::Bedroom => Opened::BedroomWindow,
+            HeatingZone::Kitchen => Opened::KitchenWindow,
+            HeatingZone::RoomOfRequirements => Opened::LivingRoomWindowOrDoor,
+            HeatingZone::Bathroom => Opened::BedroomWindow,
+        }
+    }
+}
+
+impl Action for ExtendHeatingUntilSleeping {
+    async fn preconditions_fulfilled(&self) -> Result<bool> {
+        if !self.time_range.contains(Utc::now()) {
+            return Ok(false);
+        }
+
+        let (dennis, sabine) =
+            tokio::try_join!(Resident::Dennis.current(), Resident::Sabine.current(),)?;
+
+        //TODO more granular (one still or already up)
+        //home = not away or sleeping
+        Ok(dennis == ResidentState::Home || sabine == ResidentState::Home)
     }
 
     async fn is_running(&self) -> Result<bool> {
-        self.heating_zone
-            .current_set_point()
-            .current()
-            .await
-            .map(|current| current == self.target_temperature)
-    }
+        let matches_target = self.is_matching_target().await?;
 
-    async fn is_user_controlled(&self) -> Result<bool> {
-        //TODO check also latest command sent
-        self.heating_zone.auto_mode().current().await.map(|v| !v)
+        //TODO check command already sent within last 2 minutes
+        Ok(matches_target.value && self.time_range.contains(matches_target.timestamp))
     }
 
     async fn start(&self) -> Result<()> {
@@ -75,7 +144,7 @@ impl Action for Heat {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature,
-                until: Utc::now() + Duration::hours(6),
+                until: self.time_range.for_today().1,
             },
         }
         .execute()
@@ -96,12 +165,58 @@ impl Action for Heat {
     }
 }
 
-impl Display for Heat {
+impl Action for DeferHeatingUntilVentilationDone {
+    async fn preconditions_fulfilled(&self) -> Result<bool> {
+        if !self.time_range.contains(Utc::now()) {
+            return Ok(false);
+        }
+
+        let window_opened = self.window().current_data_point().await?;
+        Ok(!self.time_range.contains(window_opened.timestamp))
+    }
+
+    async fn is_running(&self) -> Result<bool> {
+        let has_expected_manual_heating =
+            is_manual_heating_to(&self.heating_zone, self.target_temperature).await?;
+
+        Ok(has_expected_manual_heating.value
+            && self
+                .time_range
+                .contains(has_expected_manual_heating.timestamp))
+    }
+
+    async fn start(&self) -> Result<()> {
+        Command::SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: self.target_temperature,
+                until: self.time_range.for_today().1,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    async fn stop(&self) -> Result<()> {
+        Command::SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Auto,
+        }
+        .execute()
+        .await
+    }
+
+    fn controls_resource(&self) -> Option<Resource> {
+        Some(self.heating_zone.resource())
+    }
+}
+
+impl Display for DeferHeatingUntilVentilationDone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Heat[{} -> {}]",
-            self.heating_zone, self.target_temperature
+            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
+            self.heating_zone, self.target_temperature, self.time_range
         )
     }
 }
@@ -125,10 +240,6 @@ impl Action for NoHeatingDuringVentilation {
             .current()
             .await
             .map(|v| v == DegreeCelsius(0.0))
-    }
-
-    async fn is_user_controlled(&self) -> Result<bool> {
-        Ok(false) //no user override possible
     }
 
     async fn start(&self) -> Result<()> {
@@ -178,19 +289,14 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             .current_set_point()
             .current()
             .await
-            .map(|v| v == DegreeCelsius(7.0))
-    }
-
-    async fn is_user_controlled(&self) -> Result<bool> {
-        //TODO check also latest command sent
-        self.heating_zone.auto_mode().current().await.map(|v| !v)
+            .map(|v| v == DegreeCelsius(7.1))
     }
 
     async fn start(&self) -> Result<()> {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
-                temperature: DegreeCelsius(7.0),
+                temperature: DegreeCelsius(7.1),
                 until: Utc::now() + Duration::hours(1),
             },
         }
@@ -220,4 +326,21 @@ impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
             self.heating_zone
         )
     }
+}
+
+async fn is_manual_heating_to(
+    heating_zone: &HeatingZone,
+    target_temperature: DegreeCelsius,
+) -> Result<DataPoint<bool>> {
+    let (set_point, auto_mode) = (heating_zone.current_set_point(), heating_zone.auto_mode());
+
+    let (set_point, auto_mode) = tokio::try_join!(
+        set_point.current_data_point(),
+        auto_mode.current_data_point()
+    )?;
+
+    Ok(DataPoint {
+        value: set_point.value == target_temperature && !auto_mode.value,
+        timestamp: std::cmp::max(set_point.timestamp, auto_mode.timestamp),
+    })
 }

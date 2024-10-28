@@ -6,6 +6,7 @@ mod external_auto_control;
 mod opened;
 mod powered;
 mod relative_humidity;
+mod resident;
 mod risk_of_mould;
 mod set_point;
 mod temperature;
@@ -14,7 +15,9 @@ mod user_controlled;
 
 pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
+pub use opened::Opened;
 pub use powered::Powered;
+pub use resident::{Resident, ResidentState};
 pub use risk_of_mould::RiskOfMould;
 pub use set_point::SetPoint;
 pub use temperature::Temperature;

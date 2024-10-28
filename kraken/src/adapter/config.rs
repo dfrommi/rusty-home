@@ -382,24 +382,24 @@ lazy_static! {
             // USER CONTROLLED
             //
             (
-                "binary_sensor.arbeitszimmer_overlay",
-                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::RoomOfRequirementsThermostat)
+                "climate.arbeitszimmer",
+                HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::RoomOfRequirementsThermostat)
             ),
             (
-                "binary_sensor.bad_overlay",
-                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::BathroomThermostat)
+                "climate.bad",
+                HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::BathroomThermostat)
             ),
             (
-                "binary_sensor.kuche_overlay",
-                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::KitchenThermostat)
+                "climate.kuche",
+                HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::KitchenThermostat)
             ),
             (
-                "binary_sensor.schlafzimmer_overlay",
-                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::BedroomThermostat)
+                "climate.schlafzimmer",
+                HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::BedroomThermostat)
             ),
             (
-                "binary_sensor.wohnzimmer_overlay",
-                HaChannel::ThermostatAutoControl(api::state::ExternalAutoControl::LivingRoomThermostat)
+                "climate.wohnzimmer",
+                HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::LivingRoomThermostat)
             ),
 
             //

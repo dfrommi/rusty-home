@@ -1,6 +1,8 @@
 use std::{f64, fmt::Display};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+use derive_more::derive::AsRef;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef)]
 pub struct Percent(pub f64);
 
 impl From<&Percent> for f64 {

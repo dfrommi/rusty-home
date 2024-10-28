@@ -143,7 +143,7 @@ mod test {
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
-                    temperature: DegreeCelsius(22.5),
+                    temperature: DegreeCelsius::from(22.5),
                     until: Utc.with_ymd_and_hms(2024, 10, 14, 13, 37, 42).unwrap()
                 },
             },

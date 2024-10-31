@@ -2,7 +2,7 @@ use self::schema::*;
 
 pub mod schema {
     #[derive(Debug, Clone, sqlx::Type)]
-    #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
+    #[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
     pub enum DbCommandState {
         Pending,
         InProgress,
@@ -11,7 +11,7 @@ pub mod schema {
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
-    #[sqlx(type_name = "VARCHAR", rename_all = "SCREAMING_SNAKE_CASE")]
+    #[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
     pub enum DbCommandSource {
         System,
         User,

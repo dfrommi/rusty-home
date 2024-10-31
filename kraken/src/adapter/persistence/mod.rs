@@ -1,6 +1,6 @@
 use api::{
     command::{
-        db::schema::{DbCommandState, DbThingCommandRow},
+        db::schema::{DbCommandSource, DbCommandState, DbThingCommandRow},
         CommandExecution,
     },
     get_tag_id,
@@ -50,15 +50,16 @@ impl BackendApi {
     pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.db_pool.begin().await?;
 
-        let maybe_rec: Option<DbThingCommandRow> = sqlx::query_as(
-            "SELECT * 
+        let maybe_rec = sqlx::query_as!(
+            DbThingCommandRow,
+            r#"SELECT id, command, timestamp, status as "status: DbCommandState", error, source as "source: DbCommandSource"
                 from THING_COMMANDS 
                 where status = $1
                 order by TIMESTAMP DESC
                 limit 1
-                for update skip locked",
+                for update skip locked"#,
+            DbCommandState::Pending as DbCommandState,
         )
-        .bind(DbCommandState::Pending)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -111,8 +112,8 @@ impl BackendApi {
 
         let fvalue: DbValue = value.into();
 
-        sqlx::query(
-            "WITH latest_value AS (
+        sqlx::query!(
+            r#"WITH latest_value AS (
                 SELECT value
                 FROM thing_values
                 WHERE tag_id = $1
@@ -121,11 +122,11 @@ impl BackendApi {
             )
             INSERT INTO thing_values (tag_id, value, timestamp)
             SELECT $1, $2, $3
-            WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)",
+            WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
+            tags_id,
+            fvalue.as_ref(),
+            timestamp
         )
-        .bind(tags_id)
-        .bind(fvalue)
-        .bind(timestamp)
         .execute(&self.db_pool)
         .await?;
 
@@ -159,21 +160,23 @@ async fn set_command_status_in_tx(
     status: DbCommandState,
     error_message: Option<&str>,
 ) -> Result<()> {
-    sqlx::query("UPDATE THING_COMMANDS SET status = $2, error = $3 WHERE id = $1")
-        .bind(command_id)
-        .bind(status)
-        .bind(error_message)
-        .execute(executor)
-        .await
-        .map(|_| ())
-        .map_err(Into::into)
+    sqlx::query!(
+        r#"UPDATE THING_COMMANDS SET status = $2, error = $3 WHERE id = $1"#,
+        command_id,
+        status as DbCommandState,
+        error_message
+    )
+    .execute(executor)
+    .await
+    .map(|_| ())
+    .map_err(Into::into)
 }
 
 async fn mark_other_commands_superseeded(
     executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     excluded_command_id: i64,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("
+    sqlx::query!(r#"
         WITH excluded_command AS (
             SELECT command->'type' as type, command->'device' as device FROM THING_COMMANDS WHERE id = $1
         )
@@ -182,11 +185,11 @@ async fn mark_other_commands_superseeded(
         WHERE id != $1
         AND status = $4
         AND command->'type' = (SELECT type FROM excluded_command)
-        AND command->'device' = (SELECT device FROM excluded_command)")
-    .bind(excluded_command_id)
-    .bind(DbCommandState::Error)
-    .bind(format!("Command was superseded by {}", excluded_command_id))
-    .bind(DbCommandState::Pending)
+        AND command->'device' = (SELECT device FROM excluded_command)"#, 
+        excluded_command_id, 
+        DbCommandState::Error as DbCommandState,
+        format!("Command was superseded by {}", excluded_command_id), 
+        DbCommandState::Pending as DbCommandState)
     .execute(executor)
     .await?;
 

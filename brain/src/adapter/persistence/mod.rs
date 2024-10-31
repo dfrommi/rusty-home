@@ -1,18 +1,15 @@
 use anyhow::Result;
 use api::{
     command::{
-        db::schema::{DbCommandSource, DbCommandState, DbThingCommandRow},
-        Command, CommandExecution, CommandSource, CommandTarget,
+        db::schema::{DbCommandSource, DbCommandState},
+        Command, CommandSource, CommandTarget,
     },
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
     EventListener,
 };
 use chrono::{DateTime, Utc};
-use sqlx::{
-    postgres::{PgListener, PgRow},
-    PgPool, Row,
-};
+use sqlx::{postgres::PgListener, PgPool};
 use support::ext::ToOk;
 use tokio::sync::broadcast::Receiver;
 
@@ -76,21 +73,21 @@ impl HomeApi {
         let tag_id = get_tag_id(&self.db_pool, id.into(), false).await?;
 
         //TODO rewrite to max query
-        let rec: Option<PgRow> = sqlx::query(
-            "SELECT value, timestamp
+        let rec = sqlx::query!(
+            r#"SELECT value as "value: DbValue", timestamp
             FROM THING_VALUES
             WHERE TAG_ID = $1
             ORDER BY timestamp DESC, id DESC
-            LIMIT 1",
+            LIMIT 1"#,
+            tag_id
         )
-        .bind(tag_id)
         .fetch_optional(&self.db_pool)
         .await?;
 
         match rec {
             Some(r) => Ok(DataPoint {
-                value: r.get::<DbValue, _>("value").into(),
-                timestamp: r.get("timestamp"),
+                value: r.value.into(),
+                timestamp: r.timestamp,
             }),
             None => anyhow::bail!("No data found"),
         }
@@ -108,8 +105,8 @@ impl HomeApi {
         let tags_id = get_tag_id(&self.db_pool, id.into(), false).await?;
 
         //TODO rewrite to max query
-        let rec = sqlx::query(
-            "(SELECT value, timestamp
+        let rec = sqlx::query!(
+            r#"(SELECT value as "value!: DbValue", timestamp as "timestamp!: DateTime<Utc>"
               FROM THING_VALUES
               WHERE TAG_ID = $1
               AND timestamp > $2)
@@ -119,18 +116,18 @@ impl HomeApi {
               WHERE TAG_ID = $1
               AND timestamp <= $2
               ORDER BY timestamp DESC
-              LIMIT 1)",
+              LIMIT 1)"#,
+            tags_id,
+            start
         )
-        .bind(tags_id)
-        .bind(start)
         .fetch_all(&self.db_pool)
         .await?;
 
         let dps: Vec<DataPoint<C::ValueType>> = rec
             .into_iter()
             .map(|row| DataPoint {
-                value: C::ValueType::from(row.get("value")),
-                timestamp: row.get("timestamp"),
+                value: C::ValueType::from(row.value),
+                timestamp: row.timestamp,
             })
             .collect();
 
@@ -141,13 +138,15 @@ impl HomeApi {
         let db_command = serde_json::json!(command);
         let db_source: DbCommandSource = source.into();
 
-        sqlx::query( "INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)")
-            .bind(db_command)
-            .bind(chrono::Utc::now())
-            .bind(DbCommandState::Pending)
-            .bind(db_source)
-            .execute(&self.db_pool)
-            .await?;
+        sqlx::query!(
+            r#"INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)"#,
+            db_command,
+            chrono::Utc::now(),
+            DbCommandState::Pending as DbCommandState,
+            db_source as DbCommandSource
+        )
+        .execute(&self.db_pool)
+        .await?;
 
         Ok(())
     }
@@ -161,16 +160,15 @@ impl HomeApi {
         let target: CommandTarget = command.into();
         let db_target = serde_json::json!(target);
 
-        let row: Option<DbThingCommandRow> = sqlx::query_as(
-            "SELECT *
-            from THING_COMMANDS
-            where command @> $1
-            and timestamp > $2
-           order by timestamp desc
-           limit 1",
+        let row = sqlx::query!(
+            r#"SELECT command, source as "source: DbCommandSource"
+                from THING_COMMANDS 
+                where command @> $1 and timestamp > $2 
+                order by timestamp desc 
+                limit 1"#,
+            db_target,
+            since
         )
-        .bind(db_target)
-        .bind(since)
         .fetch_optional(&self.db_pool)
         .await?;
 

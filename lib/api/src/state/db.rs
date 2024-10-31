@@ -1,9 +1,10 @@
 use cached::proc_macro::cached;
+use derive_more::derive::AsRef;
 use sqlx::PgPool;
 
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, sqlx::Type, AsRef)]
 #[sqlx(transparent)]
 pub struct DbValue(f64);
 
@@ -25,34 +26,39 @@ pub async fn get_tag_id(
         .as_str()
         .unwrap();
 
-    let query = if create_if_missing {
-        "WITH tags_ins AS (
+    if create_if_missing {
+        sqlx::query_scalar!(
+            r#"WITH tags_ins AS (
                 INSERT INTO tags (channel, name)
                 VALUES ($1, $2)
                 ON CONFLICT (channel, name)
                 DO NOTHING
                 RETURNING id
             )
-            SELECT id FROM tags_ins
+            SELECT id as "id!"
+            FROM tags_ins
             UNION ALL
             SELECT id FROM tags
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
-                LIMIT 1"
+                LIMIT 1"#,
+            channel_name,
+            device_name
+        )
+        .fetch_one(db_pool)
+        .await
     } else {
-        "SELECT id FROM tags
+        sqlx::query_scalar!(
+            r#"SELECT id FROM tags
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
-                LIMIT 1"
-    };
-
-    let rec: (i32,) = sqlx::query_as(query)
-        .bind(channel_name)
-        .bind(device_name)
+                LIMIT 1"#,
+            channel_name,
+            device_name
+        )
         .fetch_one(db_pool)
-        .await?;
-
-    Ok(rec.0)
+        .await
+    }
 }
 
 mod mapper {

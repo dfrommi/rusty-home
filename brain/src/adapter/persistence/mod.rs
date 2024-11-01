@@ -2,7 +2,7 @@ use anyhow::Result;
 use api::{
     command::{
         db::schema::{DbCommandSource, DbCommandState},
-        Command, CommandSource, CommandTarget,
+        Command, CommandExecution, CommandId, CommandSource, CommandState, CommandTarget,
     },
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
@@ -151,17 +151,16 @@ impl HomeApi {
         Ok(())
     }
 
-    pub async fn is_latest_command_since(
+    pub async fn get_latest_command_since<C: CommandId>(
         &self,
-        command: &Command,
+        target: C,
         since: DateTime<Utc>,
-        source: Option<&CommandSource>,
-    ) -> Result<bool> {
-        let target: CommandTarget = command.into();
+    ) -> Result<Option<CommandExecution<C::CommandType>>> {
+        let target: CommandTarget = target.into();
         let db_target = serde_json::json!(target);
 
-        let row = sqlx::query!(
-            r#"SELECT command, source as "source: DbCommandSource"
+        let maybe_row = sqlx::query!(
+            r#"SELECT id, command, timestamp, status as "status: DbCommandState", error, source as "source: DbCommandSource"
                 from THING_COMMANDS 
                 where command @> $1 and timestamp > $2 
                 order by timestamp desc 
@@ -172,15 +171,112 @@ impl HomeApi {
         .fetch_optional(&self.db_pool)
         .await?;
 
-        match row {
-            Some(row) => {
-                let returned_command: Command = serde_json::from_value(row.command)?;
-                let returned_source: CommandSource = row.source.into();
-                (source.is_none() || source == Some(&returned_source))
-                    && &returned_command == command
-            }
+        match maybe_row {
+            Some(row) => Ok(Some(CommandExecution {
+                id: row.id,
+                command: serde_json::from_value(row.command)?,
+                state: CommandState::from((row.status, row.error)),
+                created: row.timestamp,
+                source: row.source.into(),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn is_latest_command_since(
+        &self,
+        command: impl Into<Command>,
+        since: DateTime<Utc>,
+        source: Option<CommandSource>,
+    ) -> Result<bool> {
+        let command: Command = command.into();
+        let target = CommandTarget::from(&command);
+
+        let result = self.get_latest_command_since(target, since).await?;
+
+        match result {
+            Some(row) => (source.is_none() || source == Some(row.source)) && row.command == command,
             None => false,
         }
         .to_ok()
+    }
+}
+
+#[cfg(test)]
+mod get_latest_command_since {
+    use super::*;
+    use api::command::{PowerToggle, SetPower};
+    use chrono::Duration;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_command_found(db_pool: PgPool) {
+        let command = prepare_db(&db_pool).await;
+        let api = HomeApi::new(db_pool);
+
+        let result = api
+            .get_latest_command_since(
+                PowerToggle::Dehumidifier,
+                chrono::Utc::now() - Duration::minutes(10),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().command, command);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_no_command(db_pool: PgPool) {
+        prepare_db(&db_pool).await;
+        let api = HomeApi::new(db_pool);
+
+        let result = api
+            .get_latest_command_since(
+                PowerToggle::Dehumidifier,
+                chrono::Utc::now() - Duration::minutes(2),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    async fn prepare_db(db_pool: &PgPool) -> SetPower {
+        let command = SetPower {
+            device: PowerToggle::Dehumidifier,
+            power_on: true,
+        };
+
+        insert_command(db_pool, &command, Duration::minutes(5)).await;
+        insert_command(
+            db_pool,
+            &SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: true,
+            },
+            Duration::minutes(3),
+        )
+        .await;
+
+        command
+    }
+
+    async fn insert_command<C: Into<Command> + Clone>(
+        db_pool: &PgPool,
+        command: &C,
+        ago: Duration,
+    ) {
+        let command: Command = command.clone().into();
+
+        sqlx::query!(
+            r#"INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)"#,
+            serde_json::to_value(command).unwrap(),
+            chrono::Utc::now() - ago,
+            DbCommandState::Pending as DbCommandState,
+            DbCommandSource::System as DbCommandSource
+        )
+        .execute(db_pool)
+        .await
+        .unwrap();
     }
 }

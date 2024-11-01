@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, PowerToggle};
+use api::command::{PowerToggle, SetPower};
 
 use crate::thing::Executable;
 
@@ -21,7 +21,7 @@ impl Action for Dehumidify {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetPower {
+        SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
         }
@@ -30,7 +30,7 @@ impl Action for Dehumidify {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetPower {
+        SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: false,
         }

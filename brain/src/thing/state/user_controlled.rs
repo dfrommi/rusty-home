@@ -4,7 +4,7 @@ use chrono::{Duration, Utc};
 
 use crate::{adapter::persistence::DataPoint, home_api};
 use api::{
-    command::{CommandSource, PowerToggle},
+    command::{CommandSource, PowerToggle, SetPower},
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 
@@ -92,12 +92,12 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
 
     let was_triggered_by_system = home_api()
         .is_latest_command_since(
-            &api::command::Command::SetPower {
+            SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: power.value,
             },
             power.timestamp - Duration::minutes(2),
-            Some(&CommandSource::System),
+            Some(CommandSource::System),
         )
         .await?;
 

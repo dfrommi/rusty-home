@@ -1,56 +1,41 @@
 use chrono::{DateTime, Utc};
-use r#macro::CommandTarget;
-use serde::{Deserialize, Serialize};
+use derive_more::derive::From;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use support::unit::DegreeCelsius;
 
 pub mod db;
 
-#[derive(Debug, Clone, CommandTarget, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
-    SetPower {
-        device: PowerToggle,
-        power_on: bool,
-    },
-    SetHeating {
-        device: Thermostat,
-        #[serde(flatten)]
-        target_state: HeatingTargetState,
-    },
+    SetPower(SetPower),
+    SetHeating(SetHeating),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PowerToggle {
-    Dehumidifier,
-    LivingRoomNotificationLight,
+#[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
+#[serde(tag = "type", content = "device", rename_all = "snake_case")]
+pub enum CommandTarget {
+    SetPower(PowerToggle),
+    SetHeating(Thermostat),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Thermostat {
-    LivingRoom,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
+impl CommandId for CommandTarget {
+    type CommandType = Command;
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-pub enum HeatingTargetState {
-    Auto,
-    Off, //TODO support off-timer (not supported via HA)
-    Heat {
-        temperature: DegreeCelsius,
-        until: DateTime<Utc>,
-    },
+impl From<&Command> for CommandTarget {
+    fn from(val: &Command) -> Self {
+        match val {
+            Command::SetPower(SetPower { device, .. }) => device.clone().into(),
+            Command::SetHeating(SetHeating { device, .. }) => device.clone().into(),
+        }
+    }
 }
 
 #[derive(Debug)]
-pub struct CommandExecution {
+pub struct CommandExecution<C: Into<Command>> {
     pub id: i64,
-    pub command: Command,
+    pub command: C,
     pub state: CommandState,
     pub created: DateTime<Utc>,
     pub source: CommandSource,
@@ -70,6 +55,61 @@ pub enum CommandSource {
     User,
 }
 
+pub trait CommandId: Into<CommandTarget> {
+    type CommandType: Into<Command> + DeserializeOwned;
+}
+
+//
+// SET POWER
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SetPower {
+    pub device: PowerToggle,
+    pub power_on: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PowerToggle {
+    Dehumidifier,
+    LivingRoomNotificationLight,
+}
+impl CommandId for PowerToggle {
+    type CommandType = SetPower;
+}
+
+//
+// SET HEATING
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SetHeating {
+    pub device: Thermostat,
+    #[serde(flatten)]
+    pub target_state: HeatingTargetState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Thermostat {
+    LivingRoom,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HeatingTargetState {
+    Auto,
+    Off, //TODO support off-timer (not supported via HA)
+    Heat {
+        temperature: DegreeCelsius,
+        until: DateTime<Utc>,
+    },
+}
+
+impl CommandId for Thermostat {
+    type CommandType = SetHeating;
+}
+
 #[cfg(test)]
 mod test {
     use assert_json_diff::assert_json_eq;
@@ -81,10 +121,10 @@ mod test {
     #[test]
     fn set_power() {
         assert_json_eq!(
-            Command::SetPower {
+            Command::SetPower(SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
-            },
+            }),
             json!({
                 "type": "set_power",
                 "device": "living_room_notification_light",
@@ -103,10 +143,10 @@ mod test {
     #[test]
     fn set_heating_auto() {
         assert_json_eq!(
-            Command::SetHeating {
+            Command::SetHeating(SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Auto,
-            },
+            }),
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
@@ -125,10 +165,10 @@ mod test {
     #[test]
     fn set_heating_off() {
         assert_json_eq!(
-            Command::SetHeating {
+            Command::SetHeating(SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Off
-            },
+            }),
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
@@ -140,13 +180,13 @@ mod test {
     #[test]
     fn set_heating_temperature() {
         assert_json_eq!(
-            Command::SetHeating {
+            Command::SetHeating(SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
                     temperature: DegreeCelsius::from(22.5),
                     until: Utc.with_ymd_and_hms(2024, 10, 14, 13, 37, 42).unwrap()
                 },
-            },
+            }),
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",

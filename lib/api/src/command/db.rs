@@ -30,26 +30,18 @@ pub mod schema {
 
 pub mod mapper {
     use super::*;
-    use crate::command::{CommandExecution, CommandSource, CommandState};
+    use crate::command::{CommandSource, CommandState};
 
-    impl TryInto<CommandExecution> for DbThingCommandRow {
-        type Error = anyhow::Error;
-
-        fn try_into(self) -> std::result::Result<CommandExecution, Self::Error> {
-            Ok(CommandExecution {
-                id: self.id,
-                command: serde_json::from_value(self.command)?,
-                state: match self.status {
-                    DbCommandState::Pending => CommandState::Pending,
-                    DbCommandState::InProgress => CommandState::InProgress,
-                    DbCommandState::Success => CommandState::Success,
-                    DbCommandState::Error => {
-                        CommandState::Error(self.error.unwrap_or("unknown error".to_string()))
-                    }
-                },
-                created: self.timestamp,
-                source: self.source.into(),
-            })
+    impl From<(DbCommandState, Option<String>)> for CommandState {
+        fn from((status, error): (DbCommandState, Option<String>)) -> Self {
+            match status {
+                DbCommandState::Pending => CommandState::Pending,
+                DbCommandState::InProgress => CommandState::InProgress,
+                DbCommandState::Success => CommandState::Success,
+                DbCommandState::Error => {
+                    CommandState::Error(error.unwrap_or("unknown error".to_string()))
+                }
+            }
         }
     }
 

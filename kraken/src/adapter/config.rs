@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use api::command::{HeatingTargetState, Thermostat};
+use api::command::{HeatingTargetState, SetHeating, SetPower, Thermostat};
 use lazy_static::lazy_static;
 
 use crate::adapter::CommandBackendService;
@@ -19,24 +19,24 @@ pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
 
 pub fn to_backend_command(command: &Command) -> CommandBackendService {
     match command {
-        Command::SetPower {
+        Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on,
-        } => CommandBackendService::HomeAssistant(HaService::SwitchTurnOnOff {
+        }) => CommandBackendService::HomeAssistant(HaService::SwitchTurnOnOff {
             id: "switch.dehumidifier".to_owned(),
             power_on: *power_on,
         }),
-        Command::SetPower {
+        Command::SetPower(SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
             power_on,
-        } => CommandBackendService::HomeAssistant(HaService::LightTurnOnOff {
+        }) => CommandBackendService::HomeAssistant(HaService::LightTurnOnOff {
             id: "light.hue_go".to_owned(),
             power_on: *power_on,
         }),
-        Command::SetHeating {
+        Command::SetHeating(SetHeating {
             device: item,
             target_state,
-        } => {
+        }) => {
             let thermostat = match item {
                 Thermostat::LivingRoom => "climate.wohnzimmer",
                 Thermostat::Bedroom => "climate.schlafzimmer",

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::{Ok, Result};
-use api::command::Command;
+use api::command::SetHeating;
 use chrono::{Duration, Utc};
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
@@ -140,7 +140,7 @@ impl Action for ExtendHeatingUntilSleeping {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature,
@@ -152,7 +152,7 @@ impl Action for ExtendHeatingUntilSleeping {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Auto,
         }
@@ -186,7 +186,7 @@ impl Action for DeferHeatingUntilVentilationDone {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature,
@@ -198,7 +198,7 @@ impl Action for DeferHeatingUntilVentilationDone {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Auto,
         }
@@ -243,7 +243,7 @@ impl Action for NoHeatingDuringVentilation {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Off,
         }
@@ -252,7 +252,7 @@ impl Action for NoHeatingDuringVentilation {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Auto,
         }
@@ -293,7 +293,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: DegreeCelsius(7.1),
@@ -305,7 +305,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetHeating {
+        SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Auto,
         }

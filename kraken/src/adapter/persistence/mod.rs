@@ -1,7 +1,6 @@
 use api::{
     command::{
-        db::schema::{DbCommandSource, DbCommandState, DbThingCommandRow},
-        CommandExecution,
+        db::schema::DbCommandState, Command, CommandExecution, CommandState, db::schema::DbCommandSource,
     },
     get_tag_id,
     state::{db::DbValue, ChannelValue},
@@ -47,11 +46,10 @@ impl BackendApi {
     }
 
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
-    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
+    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution<Command>>> {
         let mut tx = self.db_pool.begin().await?;
 
-        let maybe_rec = sqlx::query_as!(
-            DbThingCommandRow,
+        let maybe_rec = sqlx::query!(
             r#"SELECT id, command, timestamp, status as "status: DbCommandState", error, source as "source: DbCommandSource"
                 from THING_COMMANDS 
                 where status = $1
@@ -69,9 +67,11 @@ impl BackendApi {
                 let id = rec.id;
 
                 mark_other_commands_superseeded(&mut *tx, id).await?;
+                
+                let command_res: std::result::Result<Command, serde_json::Error> = serde_json::from_value(rec.command);
 
-                let result: Option<CommandExecution> =
-                    match TryInto::<CommandExecution>::try_into(rec) {
+                let result =
+                    match command_res {
                         Ok(command) => {
                             set_command_status_in_tx(
                                 &mut *tx,
@@ -81,7 +81,13 @@ impl BackendApi {
                             )
                             .await?;
 
-                            Some(command)
+                            Some(CommandExecution {
+                                id,
+                                command,
+                                state: CommandState::InProgress,
+                                created: rec.timestamp,
+                                source: rec.source.into(),
+                            })
                         }
                         Err(e) => {
                             set_command_status_in_tx(

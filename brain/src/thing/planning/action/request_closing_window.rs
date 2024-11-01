@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::thing::state::Powered;
 use crate::thing::{ColdAirComingIn, DataPointAccess, Executable};
 use anyhow::Result;
-use api::command::{Command, PowerToggle};
+use api::command::{Command, PowerToggle, SetPower};
 
 use super::{Action, Resource};
 
@@ -29,7 +29,7 @@ impl Action for RequestClosingWindow {
     }
 
     async fn start(&self) -> Result<()> {
-        Command::SetPower {
+        SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
             power_on: true,
         }
@@ -38,7 +38,7 @@ impl Action for RequestClosingWindow {
     }
 
     async fn stop(&self) -> Result<()> {
-        Command::SetPower {
+        SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
             power_on: false,
         }

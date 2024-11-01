@@ -10,18 +10,20 @@ pub mod state;
 pub use planning::do_plan;
 
 pub trait Executable {
-    async fn execute(&self) -> Result<()>;
-    async fn execute_on_behalf_of_user(&self) -> Result<()>;
+    async fn execute(self) -> Result<()>;
+    async fn execute_on_behalf_of_user(self) -> Result<()>;
 }
 
-impl Executable for Command {
-    async fn execute(&self) -> Result<()> {
+impl<C: Into<Command>> Executable for C {
+    async fn execute(self) -> Result<()> {
         home_api()
-            .execute_command(self, &CommandSource::System)
+            .execute_command(&self.into(), &CommandSource::System)
             .await
     }
 
-    async fn execute_on_behalf_of_user(&self) -> Result<()> {
-        home_api().execute_command(self, &CommandSource::User).await
+    async fn execute_on_behalf_of_user(self) -> Result<()> {
+        home_api()
+            .execute_command(&self.into(), &CommandSource::User)
+            .await
     }
 }

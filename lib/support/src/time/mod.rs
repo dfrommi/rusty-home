@@ -1,3 +1,4 @@
+mod builder;
 mod range;
 
 pub use range::DailyTimeRange;

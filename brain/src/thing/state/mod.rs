@@ -19,8 +19,6 @@ pub use opened::Opened;
 pub use powered::Powered;
 pub use resident::{Resident, ResidentState};
 pub use risk_of_mould::RiskOfMould;
-pub use set_point::SetPoint;
-pub use temperature::Temperature;
 pub use user_controlled::UserControlled;
 
 use crate::adapter::persistence::DataPoint;

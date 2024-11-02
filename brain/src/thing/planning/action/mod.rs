@@ -8,7 +8,6 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::state::ExternalAutoControl;
-use api::state::Temperature;
 use api::{command::Thermostat, state::SetPoint};
 use enum_dispatch::enum_dispatch;
 
@@ -101,16 +100,6 @@ impl HeatingZone {
             HeatingZone::Kitchen => ExternalAutoControl::KitchenThermostat,
             HeatingZone::RoomOfRequirements => ExternalAutoControl::RoomOfRequirementsThermostat,
             HeatingZone::Bathroom => ExternalAutoControl::BathroomThermostat,
-        }
-    }
-
-    pub fn current_room_temperature(&self) -> Temperature {
-        match self {
-            HeatingZone::LivingRoom => Temperature::LivingRoomDoor,
-            HeatingZone::Bedroom => Temperature::BedroomDoor,
-            HeatingZone::Kitchen => Temperature::KitchenOuterWall,
-            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirementsDoor,
-            HeatingZone::Bathroom => Temperature::BathroomShower,
         }
     }
 }

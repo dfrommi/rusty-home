@@ -1,6 +1,7 @@
 use api::{
     command::{
-        db::schema::DbCommandState, Command, CommandExecution, CommandState, db::schema::DbCommandSource,
+        db::schema::DbCommandSource, db::schema::DbCommandState, Command, CommandExecution,
+        CommandState,
     },
     get_tag_id,
     state::{db::DbValue, ChannelValue},
@@ -67,41 +68,39 @@ impl BackendApi {
                 let id = rec.id;
 
                 mark_other_commands_superseeded(&mut *tx, id).await?;
-                
-                let command_res: std::result::Result<Command, serde_json::Error> = serde_json::from_value(rec.command);
 
-                let result =
-                    match command_res {
-                        Ok(command) => {
-                            set_command_status_in_tx(
-                                &mut *tx,
-                                id,
-                                DbCommandState::InProgress,
-                                Option::None,
-                            )
-                            .await?;
+                let command_res: std::result::Result<Command, serde_json::Error> =
+                    serde_json::from_value(rec.command);
 
-                            Some(CommandExecution {
-                                id,
-                                command,
-                                state: CommandState::InProgress,
-                                created: rec.timestamp,
-                                source: rec.source.into(),
-                            })
-                        }
-                        Err(e) => {
-                            set_command_status_in_tx(
-                                &mut *tx,
-                                id,
-                                DbCommandState::Error,
-                                Option::Some(
-                                    format!("Error reading stored command: {}", e).as_str(),
-                                ),
-                            )
-                            .await?;
-                            None
-                        }
-                    };
+                let result = match command_res {
+                    Ok(command) => {
+                        set_command_status_in_tx(
+                            &mut *tx,
+                            id,
+                            DbCommandState::InProgress,
+                            Option::None,
+                        )
+                        .await?;
+
+                        Some(CommandExecution {
+                            id,
+                            command,
+                            state: CommandState::InProgress,
+                            created: rec.timestamp,
+                            source: rec.source.into(),
+                        })
+                    }
+                    Err(e) => {
+                        set_command_status_in_tx(
+                            &mut *tx,
+                            id,
+                            DbCommandState::Error,
+                            Option::Some(format!("Error reading stored command: {}", e).as_str()),
+                        )
+                        .await?;
+                        None
+                    }
+                };
 
                 tx.commit().await?;
                 Ok(result)
@@ -192,7 +191,7 @@ async fn mark_other_commands_superseeded(
         AND status = $4
         AND command->'type' = (SELECT type FROM excluded_command)
         AND command->'device' = (SELECT device FROM excluded_command)"#, 
-        excluded_command_id, 
+        excluded_command_id,
         DbCommandState::Error as DbCommandState,
         format!("Command was superseded by {}", excluded_command_id), 
         DbCommandState::Pending as DbCommandState)

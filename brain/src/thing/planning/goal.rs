@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(clippy::enum_variant_names)]
 pub enum Room {
     LivingRoom,
     Bedroom,

@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub trait ResultExt<T> {
     fn unwrap_or_warn(self, default: T, error_message: &str) -> T;
 }

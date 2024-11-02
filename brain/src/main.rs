@@ -5,8 +5,6 @@ use sqlx::postgres::PgListener;
 use std::sync::OnceLock;
 use thing::do_plan;
 use tokio::task::JoinSet;
-use tracing::trace;
-use tracing_subscriber::fmt::format;
 
 mod adapter;
 mod prelude;

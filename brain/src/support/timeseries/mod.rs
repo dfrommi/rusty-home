@@ -69,6 +69,7 @@ where
         Self::new(dps, since)
     }
 
+    #[allow(dead_code)]
     pub fn first(&self) -> DataPoint<T> {
         self.values
             .values()

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::thing::state::Powered;
 use crate::thing::{ColdAirComingIn, DataPointAccess, Executable};
 use anyhow::Result;
-use api::command::{Command, PowerToggle, SetPower};
+use api::command::{PowerToggle, SetPower};
 
 use super::{Action, Resource};
 

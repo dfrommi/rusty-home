@@ -42,6 +42,7 @@ pub struct CommandExecution<C: Into<Command>> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CommandState {
     Pending,
     InProgress,
@@ -50,6 +51,7 @@ pub enum CommandState {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CommandSource {
     System,
     User,
@@ -63,12 +65,14 @@ pub trait CommandId: Into<CommandTarget> {
 // SET POWER
 //
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct SetPower {
     pub device: PowerToggle,
     pub power_on: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
     LivingRoomNotificationLight,
@@ -81,6 +85,7 @@ impl CommandId for PowerToggle {
 // SET HEATING
 //
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct SetHeating {
     pub device: Thermostat,
     #[serde(flatten)]
@@ -88,6 +93,7 @@ pub struct SetHeating {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Thermostat {
     LivingRoom,
     Bedroom,
@@ -97,6 +103,7 @@ pub enum Thermostat {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
 pub enum HeatingTargetState {
     Auto,
     Off, //TODO support off-timer (not supported via HA)

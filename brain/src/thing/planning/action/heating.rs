@@ -1,19 +1,19 @@
 use std::fmt::Display;
 
 use anyhow::{Ok, Result};
-use api::command::SetHeating;
+use api::command::{Command, SetHeating};
 use chrono::{Duration, Utc};
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
     adapter::persistence::DataPoint,
     thing::{
-        AutomaticTemperatureIncrease, ColdAirComingIn, DataPointAccess, Executable, Opened,
-        Resident, ResidentState,
+        AutomaticTemperatureIncrease, ColdAirComingIn, DataPointAccess, Opened, Resident,
+        ResidentState,
     },
 };
 
-use super::{Action, HeatingZone, Resource};
+use super::{Action, HeatingZone};
 
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringVentilation {
@@ -139,29 +139,27 @@ impl Action for ExtendHeatingUntilSleeping {
         Ok(matches_target.value && self.time_range.contains(matches_target.timestamp))
     }
 
-    async fn start(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
-                temperature: self.target_temperature,
-                until: self.time_range.for_today().1,
-            },
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Heat {
+                    temperature: self.target_temperature,
+                    until: self.time_range.for_today().1,
+                },
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Auto,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(self.heating_zone.resource())
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            }
+            .into(),
+        )
     }
 }
 
@@ -185,29 +183,27 @@ impl Action for DeferHeatingUntilVentilationDone {
                 .contains(has_expected_manual_heating.timestamp))
     }
 
-    async fn start(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
-                temperature: self.target_temperature,
-                until: self.time_range.for_today().1,
-            },
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Heat {
+                    temperature: self.target_temperature,
+                    until: self.time_range.for_today().1,
+                },
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Auto,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(self.heating_zone.resource())
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            }
+            .into(),
+        )
     }
 }
 
@@ -242,26 +238,24 @@ impl Action for NoHeatingDuringVentilation {
             .map(|v| v == DegreeCelsius(0.0))
     }
 
-    async fn start(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Off,
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Off,
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Auto,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(self.heating_zone.resource())
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            }
+            .into(),
+        )
     }
 }
 
@@ -292,29 +286,27 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             .map(|v| v == DegreeCelsius(7.1))
     }
 
-    async fn start(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
-                temperature: DegreeCelsius(7.1),
-                until: Utc::now() + Duration::hours(1),
-            },
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Heat {
+                    temperature: DegreeCelsius(7.1),
+                    until: Utc::now() + Duration::hours(1),
+                },
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Auto,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(self.heating_zone.resource())
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            }
+            .into(),
+        )
     }
 }
 

@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
 use crate::thing::state::Powered;
-use crate::thing::{ColdAirComingIn, DataPointAccess, Executable};
+use crate::thing::{ColdAirComingIn, DataPointAccess};
 use anyhow::Result;
-use api::command::{PowerToggle, SetPower};
+use api::command::{Command, PowerToggle, SetPower};
 
-use super::{Action, Resource};
+use super::Action;
 
 #[derive(Debug, Clone)]
 pub struct RequestClosingWindow;
@@ -28,26 +28,24 @@ impl Action for RequestClosingWindow {
         Powered::LivingRoomNotificationLight.current().await
     }
 
-    async fn start(&self) -> Result<()> {
-        SetPower {
-            device: PowerToggle::LivingRoomNotificationLight,
-            power_on: true,
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: true,
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetPower {
-            device: PowerToggle::LivingRoomNotificationLight,
-            power_on: false,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(Resource::LivingRoomNotificationLight)
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: false,
+            }
+            .into(),
+        )
     }
 }
 

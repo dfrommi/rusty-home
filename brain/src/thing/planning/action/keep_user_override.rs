@@ -1,15 +1,16 @@
 use std::fmt::Display;
 
-use super::{Action, Resource};
+use super::Action;
 use crate::thing::{DataPointAccess, UserControlled};
 use anyhow::Result;
+use api::command::{Command, CommandTarget};
 
 #[derive(Debug, Clone)]
-pub struct KeepUserOverride(UserControlled, Resource);
+pub struct KeepUserOverride(UserControlled, CommandTarget);
 
 impl KeepUserOverride {
-    pub fn new(user_controlled: UserControlled, resource: Resource) -> Self {
-        Self(user_controlled, resource)
+    pub fn new(user_controlled: UserControlled, target: CommandTarget) -> Self {
+        Self(user_controlled, target)
     }
 }
 
@@ -23,15 +24,17 @@ impl Action for KeepUserOverride {
         self.preconditions_fulfilled().await
     }
 
-    async fn start(&self) -> Result<()> {
-        anyhow::bail!("User controlled action {} should never be started", self);
+    fn start_command(&self) -> Option<Command> {
+        tracing::warn!("User controlled action {} should never be started", self);
+        None
     }
 
-    async fn stop(&self) -> Result<()> {
-        anyhow::bail!("User controlled action {} should never be stopped", self);
+    fn stop_command(&self) -> Option<Command> {
+        tracing::warn!("User controlled action {} should never be stopped", self);
+        None
     }
 
-    fn controls_resource(&self) -> Option<Resource> {
+    fn controls_target(&self) -> Option<CommandTarget> {
         Some(self.1.clone())
     }
 }

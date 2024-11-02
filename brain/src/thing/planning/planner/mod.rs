@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Debug, hash::Hash};
+use std::fmt::Debug;
 
 use tabled::Tabled;
 
@@ -37,7 +37,7 @@ where
             let mut result = ActionResult::new(action);
             result.is_goal_active = is_goal_active;
 
-            let used_resource = action.controls_resource();
+            let used_resource = action.controls_target();
 
             if resource_lock.is_locked(&used_resource) {
                 result.locked = true;
@@ -64,11 +64,13 @@ where
 
     for result in action_results.iter_mut() {
         if result.should_be_stopped {
-            if resource_lock.is_locked(&result.action.controls_resource()) {
+            let resource = result.action.controls_target();
+
+            if resource_lock.is_locked(&resource) {
                 result.should_be_stopped = false;
                 result.locked = true;
             } else {
-                resource_lock.lock(result.action.controls_resource());
+                resource_lock.lock(resource);
             }
         }
     }
@@ -127,23 +129,25 @@ async fn get_action_state(action: &impl Action) -> (bool, bool) {
     (is_fulfilled, is_running)
 }
 
+//no HashSet to avoid Hash and Eq constraints. Performance should be good enough as not many
+//entries are expected
 struct ResourceLock<R> {
-    resources: HashSet<R>,
+    resources: Vec<R>,
 }
 
 impl<R> ResourceLock<R>
 where
-    R: Eq + Hash,
+    R: PartialEq,
 {
     fn new() -> Self {
         Self {
-            resources: HashSet::new(),
+            resources: Vec::new(),
         }
     }
 
     fn lock(&mut self, resource: Option<R>) {
         if let Some(resource) = resource {
-            self.resources.insert(resource);
+            self.resources.push(resource);
         }
     }
 

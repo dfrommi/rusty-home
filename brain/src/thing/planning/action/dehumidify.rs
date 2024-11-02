@@ -1,11 +1,9 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{PowerToggle, SetPower};
+use api::command::{Command, PowerToggle, SetPower};
 
-use crate::thing::Executable;
-
-use super::{Action, Resource};
+use super::Action;
 use crate::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -20,26 +18,24 @@ impl Action for Dehumidify {
         Powered::Dehumidifier.current().await
     }
 
-    async fn start(&self) -> Result<()> {
-        SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: true,
-        }
-        .execute()
-        .await
+    fn start_command(&self) -> Option<Command> {
+        Some(
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            }
+            .into(),
+        )
     }
 
-    async fn stop(&self) -> Result<()> {
-        SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: false,
-        }
-        .execute()
-        .await
-    }
-
-    fn controls_resource(&self) -> Option<Resource> {
-        Some(Resource::Dehumidifier)
+    fn stop_command(&self) -> Option<Command> {
+        Some(
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: false,
+            }
+            .into(),
+        )
     }
 }
 

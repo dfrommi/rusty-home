@@ -7,6 +7,8 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use anyhow::Result;
+use api::command::Command;
+use api::command::CommandTarget;
 use api::state::ExternalAutoControl;
 use api::{command::Thermostat, state::SetPoint};
 use enum_dispatch::enum_dispatch;
@@ -28,17 +30,6 @@ pub enum HomeAction {
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Resource {
-    Dehumidifier,
-    LivingRoomNotificationLight,
-    LivingRoomThermostat,
-    BedroomThermostat,
-    KitchenThermostat,
-    RoomOfRequirementsThermostat,
-    BathroomThermostat,
-}
-
 #[derive(Debug, Clone)]
 pub enum HeatingZone {
     LivingRoom,
@@ -56,10 +47,30 @@ pub trait Action: Debug + Display {
     //action was just triggered or effect of action is fulfilled based on current state
     async fn is_running(&self) -> Result<bool>;
 
-    async fn start(&self) -> Result<()>;
-    async fn stop(&self) -> Result<()>;
+    fn start_command(&self) -> Option<Command>;
 
-    fn controls_resource(&self) -> Option<Resource>;
+    fn stop_command(&self) -> Option<Command>;
+
+    fn controls_target(&self) -> Option<CommandTarget> {
+        let start_target = self.start_command().map(|c| CommandTarget::from(&c));
+        let stop_target = self.stop_command().map(|c| CommandTarget::from(&c));
+
+        match (start_target, stop_target) {
+            (Some(start), Some(stop)) => {
+                if start != stop {
+                    tracing::error!(
+                        "Action {} controls different devices in start and stop commands. Falling back to start command",
+                        self
+                    );
+                }
+
+                Some(start)
+            }
+            (Some(start), None) => Some(start),
+            (None, Some(stop)) => Some(stop),
+            (None, None) => None,
+        }
+    }
 }
 
 impl HeatingZone {
@@ -70,16 +81,6 @@ impl HeatingZone {
             HeatingZone::Kitchen => Thermostat::Kitchen,
             HeatingZone::RoomOfRequirements => Thermostat::RoomOfRequirements,
             HeatingZone::Bathroom => Thermostat::Bathroom,
-        }
-    }
-
-    pub fn resource(&self) -> Resource {
-        match self {
-            HeatingZone::LivingRoom => Resource::LivingRoomThermostat,
-            HeatingZone::Bedroom => Resource::BedroomThermostat,
-            HeatingZone::Kitchen => Resource::KitchenThermostat,
-            HeatingZone::RoomOfRequirements => Resource::RoomOfRequirementsThermostat,
-            HeatingZone::Bathroom => Resource::BathroomThermostat,
         }
     }
 

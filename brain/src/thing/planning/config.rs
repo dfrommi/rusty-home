@@ -1,3 +1,4 @@
+use api::command::{PowerToggle, Thermostat};
 use support::unit::DegreeCelsius;
 
 use crate::thing::planning::action::HeatingZone;
@@ -6,7 +7,7 @@ use crate::thing::UserControlled;
 use super::action::{
     DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,
     KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, NoHeatingDuringVentilation,
-    RequestClosingWindow, Resource,
+    RequestClosingWindow,
 };
 use super::goal::{HomeGoal, Room};
 
@@ -17,7 +18,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::LivingRoom),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
-            KeepUserOverride::new(UserControlled::LivingRoomThermostat, Resource::LivingRoomThermostat).into(),
+            KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::new(HeatingZone::LivingRoom, DegreeCelsius(19.1), (22,30), (2,30)).into(),
             DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(17.6), (6,12), (12,30)).into(),
@@ -27,7 +28,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::Bedroom),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
-            KeepUserOverride::new(UserControlled::BedroomThermostat, Resource::BedroomThermostat).into(),
+            KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
             ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(18.6), (22,30), (2,30)).into(),
             DeferHeatingUntilVentilationDone::new(HeatingZone::Bedroom, DegreeCelsius(15.1), (6,12), (12,30)).into(),
@@ -37,7 +38,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::Kitchen),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
-            KeepUserOverride::new(UserControlled::KitchenThermostat, Resource::KitchenThermostat).into(),
+            KeepUserOverride::new(UserControlled::KitchenThermostat, Thermostat::Kitchen.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
             DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.1), (6,12), (12,30)).into(),
         ]
@@ -46,7 +47,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::RoomOfRequirements),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements).into(),
-            KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Resource::RoomOfRequirementsThermostat).into(),
+            KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Thermostat::RoomOfRequirements.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements).into(),
         ]
     ),
@@ -54,7 +55,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::Bathroom),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
-            KeepUserOverride::new(UserControlled::BathroomThermostat, Resource::BathroomThermostat).into(),
+            KeepUserOverride::new(UserControlled::BathroomThermostat, Thermostat::Bathroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
         ]
     ),
@@ -67,7 +68,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::PreventMouldInBathroom,
         vec![
-            KeepUserOverride::new(UserControlled::Dehumidifier, Resource::Dehumidifier).into(),
+            KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
             Dehumidify.into()
         ],
     ),

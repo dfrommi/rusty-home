@@ -10,7 +10,6 @@ use api::{
 };
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgListener, PgPool};
-use support::ext::ToOk;
 use tokio::sync::broadcast::Receiver;
 
 #[derive(Debug, Clone)]

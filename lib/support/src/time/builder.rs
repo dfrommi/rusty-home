@@ -1,41 +1,37 @@
-use chrono::{Duration, NaiveTime, Utc};
-
 #[macro_export]
 macro_rules! t {
     (now) => {{
-        Utc::now()
+        chrono::Utc::now()
     }};
 
     ($hour:literal : $minute:literal) => {{
-        NaiveTime::from_hms_opt($hour, $minute, 0).unwrap()
+        chrono::NaiveTime::from_hms_opt($hour, $minute, 0).unwrap()
     }};
 
     ($amount:literal seconds) => {{
-        Duration::seconds($amount)
+        chrono::Duration::seconds($amount)
     }};
     ($amount:literal minutes) => {{
-        Duration::minutes($amount)
+        chrono::Duration::minutes($amount)
     }};
     ($amount:literal hours) => {{
-        Duration::hours($amount)
+        chrono::Duration::hours($amount)
     }};
 
     ($amount:literal seconds ago) => {{
-        Utc::now() - t!($amount seconds)
+        chrono::Utc::now() - t!($amount seconds)
     }};
     ($amount:literal minutes ago) => {{
-        Utc::now() - t!($amount minutes)
+        chrono::Utc::now() - t!($amount minutes)
     }};
     ($amount:literal hours ago) => {{
-        Utc::now() - t!($amount hours)
+        chrono::Utc::now() - t!($amount hours)
     }};
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Timelike, Utc};
-
-    use super::*;
+    use chrono::{Duration, Timelike, Utc};
 
     #[test]
     fn test_time() {

@@ -1,8 +1,11 @@
+pub mod action_ext;
+
 use std::fmt::Debug;
 
 use tabled::Tabled;
 
 use super::Action;
+use action_ext::ActionPlannerExt;
 
 #[derive(Debug, Tabled)]
 pub struct ActionResult<'a, A: Action> {
@@ -45,7 +48,11 @@ where
                 continue;
             }
 
-            let (is_fulfilled, is_running) = get_action_state(action).await;
+            let (is_fulfilled, is_running) = tokio::join!(
+                action.preconditions_fulfilled_or_log_error(),
+                action.is_running_or_scheduled(),
+            );
+
             result.is_fulfilled = Some(is_fulfilled);
             result.is_running = Some(is_running);
 
@@ -102,31 +109,6 @@ fn display_option(o: &Option<bool>) -> String {
         Some(false) => "❌".to_string(),
         None => "-".to_string(),
     }
-}
-
-async fn get_action_state(action: &impl Action) -> (bool, bool) {
-    let (is_fulfilled_res, is_running_res) =
-        tokio::join!(action.preconditions_fulfilled(), action.is_running(),);
-
-    let is_fulfilled = is_fulfilled_res.unwrap_or_else(|e| {
-        tracing::warn!(
-            "Error checking preconditions of action {:?}, assuming not fulfilled: {:?}",
-            action,
-            e
-        );
-        false
-    });
-
-    let is_running = is_running_res.unwrap_or_else(|e| {
-        tracing::warn!(
-            "Error checking running state of action {:?}, assuming not running: {:?}",
-            action,
-            e
-        );
-        false
-    });
-
-    (is_fulfilled, is_running)
 }
 
 //no HashSet to avoid Hash and Eq constraints. Performance should be good enough as not many

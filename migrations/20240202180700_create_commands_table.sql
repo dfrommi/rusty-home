@@ -1,14 +1,15 @@
 CREATE TABLE THING_COMMANDS (
     id BIGSERIAL NOT NULL PRIMARY KEY,
     command JSONB NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
+    created TIMESTAMPTZ NOT NULL,
     status VARCHAR(50) NOT NULL,
     error TEXT,
-    source VARCHAR(50) NOT NULL
+    source_type VARCHAR(50) NOT NULL,
+    source_id VARCHAR(255) NOT NULL
 );
 
 CREATE INDEX idx_thing_commands_target ON THING_COMMANDS((command->>'type'),(command->>'device'));
-CREATE INDEX idx_thing_commands_timestamp ON THING_COMMANDS(timestamp);
+CREATE INDEX idx_thing_commands_created ON THING_COMMANDS(created);
 
 CREATE OR REPLACE FUNCTION notify_thing_command() RETURNS TRIGGER AS $$
 BEGIN

@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use chrono::{Duration, Utc};
+use support::t;
 
 use crate::{adapter::persistence::DataPoint, home_api};
 use api::{
-    command::{CommandSource, PowerToggle, SetPower},
+    command::{CommandExecution, CommandSource, PowerToggle, SetPower},
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 
@@ -90,16 +91,18 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
         });
     }
 
-    let was_triggered_by_system = home_api()
-        .is_latest_command_since(
-            SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: power.value,
-            },
-            power.timestamp - Duration::minutes(2),
-            Some(CommandSource::System),
-        )
+    let last_command = home_api()
+        .get_latest_command_since(PowerToggle::Dehumidifier, t!(2 minutes ago))
         .await?;
+
+    let was_triggered_by_system = match last_command {
+        Some(CommandExecution {
+            command: SetPower { power_on, .. },
+            source: CommandSource::System(_),
+            ..
+        }) => power_on == power.value,
+        _ => false,
+    };
 
     Ok(DataPoint {
         value: !was_triggered_by_system,

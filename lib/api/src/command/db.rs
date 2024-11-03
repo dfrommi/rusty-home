@@ -45,20 +45,20 @@ pub mod mapper {
         }
     }
 
-    impl From<DbCommandSource> for CommandSource {
-        fn from(value: DbCommandSource) -> Self {
-            match value {
-                DbCommandSource::System => CommandSource::System,
-                DbCommandSource::User => CommandSource::User,
+    impl From<(DbCommandSource, String)> for CommandSource {
+        fn from(value: (DbCommandSource, String)) -> Self {
+            match value.0 {
+                DbCommandSource::System => CommandSource::System(value.1),
+                DbCommandSource::User => CommandSource::User(value.1),
             }
         }
     }
 
-    impl From<&CommandSource> for DbCommandSource {
+    impl From<&CommandSource> for (DbCommandSource, String) {
         fn from(val: &CommandSource) -> Self {
             match val {
-                CommandSource::System => DbCommandSource::System,
-                CommandSource::User => DbCommandSource::User,
+                CommandSource::System(id) => (DbCommandSource::System, id.to_owned()),
+                CommandSource::User(id) => (DbCommandSource::User, id.to_owned()),
             }
         }
     }

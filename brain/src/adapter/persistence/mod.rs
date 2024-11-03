@@ -136,14 +136,15 @@ impl HomeApi {
 
     pub async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()> {
         let db_command = serde_json::json!(command);
-        let db_source: DbCommandSource = source.into();
+        let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)"#,
+            r#"INSERT INTO THING_COMMANDS (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             db_command,
             chrono::Utc::now(),
             DbCommandState::Pending as DbCommandState,
-            db_source as DbCommandSource
+            db_source_type as DbCommandSource,
+            db_source_id
         )
         .execute(&self.db_pool)
         .await?;
@@ -160,10 +161,10 @@ impl HomeApi {
         let db_target = serde_json::json!(target);
 
         let records = sqlx::query!(
-            r#"SELECT id, command, timestamp, status as "status: DbCommandState", error, source as "source: DbCommandSource"
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
                 from THING_COMMANDS 
-                where command @> $1 and timestamp >= $2 
-                order by timestamp asc"#,
+                where command @> $1 and created >= $2 
+                order by created asc"#,
             db_target,
             since
         )
@@ -173,12 +174,13 @@ impl HomeApi {
         records
             .into_iter()
             .map(|row| {
+                let source = CommandSource::from((row.source_type, row.source_id));
                 Ok(CommandExecution {
                     id: row.id,
                     command: serde_json::from_value(row.command)?,
                     state: CommandState::from((row.status, row.error)),
-                    created: row.timestamp,
-                    source: row.source.into(),
+                    created: row.created,
+                    source,
                 })
             })
             .collect()
@@ -192,24 +194,6 @@ impl HomeApi {
     ) -> Result<Option<CommandExecution<C::CommandType>>> {
         let mut all_commands = self.get_all_commands_since(target, since).await?;
         Ok(all_commands.pop())
-    }
-
-    pub async fn is_latest_command_since(
-        &self,
-        command: impl Into<Command>,
-        since: DateTime<Utc>,
-        source: Option<CommandSource>,
-    ) -> Result<bool> {
-        let command: Command = command.into();
-        let target = CommandTarget::from(&command);
-
-        let result = self.get_latest_command_since(target, since).await?;
-
-        match result {
-            Some(row) => (source.is_none() || source == Some(row.source)) && row.command == command,
-            None => false,
-        }
-        .to_ok()
     }
 }
 
@@ -311,11 +295,12 @@ mod get_all_commands_since {
         let command: Command = command.clone().into();
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMANDS (COMMAND, TIMESTAMP, STATUS, SOURCE) VALUES ($1, $2, $3, $4)"#,
+            r#"INSERT INTO THING_COMMANDS (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             serde_json::to_value(command).unwrap(),
             at,
             DbCommandState::Pending as DbCommandState,
-            DbCommandSource::System as DbCommandSource
+            DbCommandSource::System as DbCommandSource,
+            "unit-test".to_owned()
         )
         .execute(db_pool)
         .await

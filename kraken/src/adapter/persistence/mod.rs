@@ -1,7 +1,7 @@
 use api::{
     command::{
-        db::schema::DbCommandSource, db::schema::DbCommandState, Command, CommandExecution,
-        CommandState,
+        db::schema::{DbCommandSource, DbCommandState},
+        Command, CommandExecution, CommandSource, CommandState,
     },
     get_tag_id,
     state::{db::DbValue, ChannelValue},
@@ -51,10 +51,10 @@ impl BackendApi {
         let mut tx = self.db_pool.begin().await?;
 
         let maybe_rec = sqlx::query!(
-            r#"SELECT id, command, timestamp, status as "status: DbCommandState", error, source as "source: DbCommandSource"
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
                 from THING_COMMANDS 
                 where status = $1
-                order by TIMESTAMP DESC
+                order by created DESC
                 limit 1
                 for update skip locked"#,
             DbCommandState::Pending as DbCommandState,
@@ -82,12 +82,14 @@ impl BackendApi {
                         )
                         .await?;
 
+                        let source = CommandSource::from((rec.source_type, rec.source_id));
+
                         Some(CommandExecution {
                             id,
                             command,
                             state: CommandState::InProgress,
-                            created: rec.timestamp,
-                            source: rec.source.into(),
+                            created: rec.created,
+                            source,
                         })
                     }
                     Err(e) => {

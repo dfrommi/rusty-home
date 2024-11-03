@@ -53,8 +53,8 @@ pub enum CommandState {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandSource {
-    System,
-    User,
+    System(String),
+    User(String),
 }
 
 pub trait CommandId: Into<CommandTarget> {

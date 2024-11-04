@@ -174,7 +174,10 @@ where
             })
         }
 
-        (Some(prev_dp), None) => Some(prev_dp.clone()),
+        (Some(prev_dp), None) => Some(DataPoint {
+            timestamp: at,
+            value: prev_dp.value.clone(),
+        }),
 
         _ => None,
     }
@@ -279,5 +282,38 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 9, 10, 13, 0, 0).unwrap(),
         )
         .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod combined {
+    use chrono::TimeZone;
+    use support::unit::{DegreeCelsius, Percent};
+
+    use super::*;
+
+    #[test]
+    fn single_item_per_series_out_of_range() {
+        let t_series = TimeSeries::new(
+            vec![DataPoint {
+                timestamp: Utc.with_ymd_and_hms(2024, 11, 3, 15, 23, 46).unwrap(),
+                value: DegreeCelsius(19.93),
+            }],
+            Utc.with_ymd_and_hms(2024, 11, 4, 5, 10, 9).unwrap(),
+        )
+        .unwrap();
+
+        let h_series = TimeSeries::new(
+            vec![DataPoint {
+                timestamp: Utc.with_ymd_and_hms(2024, 11, 3, 15, 23, 47).unwrap(),
+                value: Percent(61.1),
+            }],
+            Utc.with_ymd_and_hms(2024, 11, 4, 5, 10, 9).unwrap(),
+        )
+        .unwrap();
+
+        let result = TimeSeries::combined(&t_series, &h_series, |a, b| DegreeCelsius(a.0 + b.0));
+
+        assert_eq!(result.iter().len(), 1);
     }
 }

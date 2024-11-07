@@ -10,3 +10,15 @@ impl Display for KiloWattHours {
         write!(f, "{} kWh", self.0)
     }
 }
+
+impl From<&KiloWattHours> for f64 {
+    fn from(value: &KiloWattHours) -> Self {
+        value.0
+    }
+}
+
+impl From<f64> for KiloWattHours {
+    fn from(value: f64) -> Self {
+        Self(value)
+    }
+}

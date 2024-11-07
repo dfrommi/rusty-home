@@ -17,11 +17,12 @@ pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use opened::Opened;
 pub use powered::Powered;
-pub use resident::{Resident, ResidentState};
+pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
 pub use user_controlled::UserControlled;
 
 use crate::adapter::persistence::DataPoint;
+use crate::support::timeseries::interpolate::Interpolatable;
 use crate::support::timeseries::TimeSeries;
 use anyhow::Result;
 
@@ -33,7 +34,7 @@ pub trait DataPointAccess<T> {
     }
 }
 
-pub trait TimeSeriesAccess<T> {
+pub trait TimeSeriesAccess<T: Clone + Interpolatable> {
     async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<T>>;
 
     async fn series_of_last(&self, duration: ::chrono::Duration) -> Result<TimeSeries<T>> {

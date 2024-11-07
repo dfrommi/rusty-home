@@ -1,32 +1,29 @@
-use chrono::{DateTime, Utc};
-use std::{collections::BTreeMap, fmt::Debug};
+pub mod interpolate;
+
+use chrono::{DateTime, Duration, Utc};
+use interpolate::Interpolatable;
+use std::collections::BTreeMap;
 
 use crate::adapter::persistence::DataPoint;
 use anyhow::{ensure, Result};
 
-#[derive(Debug)]
-pub struct TimeSeries<T> {
-    values: BTreeMap<DateTime<Utc>, DataPoint<T>>,
+pub struct TimeSeries<T: Clone + Interpolatable> {
+    values: BTreeMap<DateTime<Utc>, T>,
 }
 
-//TODO less clone, better usage of references, maybe not always via f64
-impl<T> TimeSeries<T>
-where
-    T: From<f64> + Clone + Debug,
-    for<'a> &'a T: Into<f64>,
-{
+impl<T: Clone + Interpolatable> TimeSeries<T> {
     pub fn new(
         data_points: impl IntoIterator<Item = DataPoint<T>>,
         start_at: DateTime<Utc>,
     ) -> Result<Self> {
-        let mut values: BTreeMap<DateTime<Utc>, DataPoint<T>> = BTreeMap::new();
+        let mut values: BTreeMap<DateTime<Utc>, T> = BTreeMap::new();
         for dp in data_points.into_iter() {
-            values.insert(dp.timestamp, dp);
+            values.insert(dp.timestamp, dp.value);
         }
 
         ensure!(!values.is_empty(), "data points are empty");
 
-        if let Some(interpolated) = interpolate(&values, start_at) {
+        if let Some(interpolated) = Self::interpolate(start_at, &values) {
             values.insert(start_at, interpolated);
         }
 
@@ -35,32 +32,28 @@ where
         })
     }
 
-    pub fn combined<U, V, F>(
+    pub fn combined<U: Clone + Interpolatable, V: Clone + Interpolatable, F>(
         first_series: &TimeSeries<U>,
         second_series: &TimeSeries<V>,
         merge: F,
     ) -> Result<Self>
     where
-        U: From<f64> + Clone + Debug,
-        for<'a> &'a U: Into<f64>,
-        V: From<f64> + Clone + Debug,
-        for<'b> &'b V: Into<f64>,
         F: Fn(&U, &V) -> T,
     {
         let mut dps: Vec<DataPoint<T>> = Vec::new();
 
-        for first_dp in first_series.iter() {
-            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
-                let value = (merge)(&first_dp.value, &second_dp.value);
-                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+        for (first_timestamp, first_value) in first_series.values.iter() {
+            if let Some(second_dp) = second_series.at(*first_timestamp) {
+                let value = (merge)(first_value, &second_dp.value);
+                let timestamp = std::cmp::max(*first_timestamp, second_dp.timestamp);
                 dps.push(DataPoint { value, timestamp });
             }
         }
 
-        for second_dp in second_series.iter() {
-            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
-                let value = (merge)(&first_dp.value, &second_dp.value);
-                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+        for (second_timestamp, second_value) in second_series.values.iter() {
+            if let Some(first_dp) = first_series.at(*second_timestamp) {
+                let value = (merge)(&first_dp.value, second_value);
+                let timestamp = std::cmp::max(first_dp.timestamp, *second_timestamp);
                 dps.push(DataPoint { value, timestamp });
             }
         }
@@ -71,36 +64,45 @@ where
 
     #[allow(dead_code)]
     pub fn first(&self) -> DataPoint<T> {
-        self.values
-            .values()
-            .next()
-            .expect("Internal error: map should not be empty")
-            .clone()
+        let (timestamp, value) = self.values.first_key_value().unwrap();
+
+        DataPoint {
+            timestamp: *timestamp,
+            value: value.clone(),
+        }
     }
 
     pub fn last(&self) -> DataPoint<T> {
-        self.values
-            .values()
-            .last()
-            .expect("Internal error: map should not be empty")
-            .clone()
+        let (timestamp, value) = self.values.last_key_value().unwrap();
+
+        DataPoint {
+            timestamp: *timestamp,
+            value: value.clone(),
+        }
     }
 
     //linear interpolation or last seen
     pub fn at(&self, at: chrono::DateTime<chrono::Utc>) -> Option<DataPoint<T>> {
-        interpolate(&self.values, at)
+        Self::interpolate(at, &self.values).map(|v| DataPoint {
+            timestamp: at,
+            value: v,
+        })
     }
 
-    pub fn min(&self) -> DataPoint<T> {
-        self.values
-            .values()
-            .min_by(|&dp_a, &dp_b| {
-                let a: f64 = (&dp_a.value).into();
-                let b: f64 = (&dp_b.value).into();
-                a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .expect("Internal error: map should not be empty")
-            .clone()
+    pub fn min(&self) -> DataPoint<T>
+    where
+        for<'a> &'a T: PartialOrd,
+    {
+        let (timestamp, value) = self
+            .values
+            .iter()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal))
+            .expect("Internal error: map should not be empty");
+
+        DataPoint {
+            timestamp: *timestamp,
+            value: value.clone(),
+        }
     }
 
     fn starting_at(&self) -> DateTime<Utc> {
@@ -111,20 +113,66 @@ where
             .expect("Internal error: map should not be empty")
     }
 
-    fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
-        self.values.values()
+    pub fn with_duration(&self) -> Vec<DataPoint<(T, Duration)>> {
+        self.current_and_next()
+            .into_iter()
+            .map(|((timestamp, value), next)| DataPoint {
+                timestamp: *timestamp,
+                value: (
+                    value.clone(),
+                    next.map_or(Utc::now(), |n| *n.0) - *timestamp,
+                ),
+            })
+            .collect::<Vec<_>>()
     }
 
+    fn current_and_next(&self) -> Vec<((&DateTime<Utc>, &T), Option<(&DateTime<Utc>, &T)>)> {
+        let mut result = vec![];
+        let mut iter = self.values.iter().peekable();
+
+        while let Some((current_timestamp, value)) = iter.next() {
+            let next: Option<(&DateTime<Utc>, &T)> = iter.peek().map(|(t, v)| (*t, *v));
+            result.push(((current_timestamp, value), next));
+        }
+
+        result
+    }
+
+    pub fn interpolate(
+        at: chrono::DateTime<chrono::Utc>,
+        values: &BTreeMap<DateTime<Utc>, T>,
+    ) -> Option<T> {
+        let prev = values
+            .range(..=at)
+            .next_back()
+            .map(|(t, v)| DataPoint::new(v.clone(), *t));
+        let next = values
+            .range(at..)
+            .next()
+            .map(|(t, v)| DataPoint::new(v.clone(), *t));
+
+        T::interpolate(at, prev.as_ref(), next.as_ref())
+    }
+}
+
+//MATH FUNCTIONS
+impl<T> TimeSeries<T>
+where
+    T: Clone + Interpolatable + From<f64>,
+    for<'a> &'a T: Into<f64>,
+{
+    //weighted by duration
     pub fn mean(&self) -> T {
         let mut weighted_sum = 0.0;
-        let mut total_duration = 0.0;
+        let mut total_duration = 0.0; //in milliseconds
 
-        let mut iter = self.values.values().peekable();
-        while let Some(current) = iter.next() {
-            if let Some(next) = iter.peek() {
-                let duration = (next.timestamp - current.timestamp).num_seconds() as f64;
-                let current_f64 = (&current.value).into();
-                let next_f64 = (&next.value).into();
+        let mut iter = self.values.iter().peekable();
+        while let Some((current_timestamp, current_value)) = iter.next() {
+            if let Some((next_timestamp, next_value)) = iter.peek() {
+                let duration = (next_timestamp.timestamp_millis()
+                    - current_timestamp.timestamp_millis()) as f64;
+                let current_f64 = current_value.into();
+                let next_f64: f64 = (*next_value).into();
 
                 //linear interpolated
                 weighted_sum += ((current_f64 + next_f64) / 2.0) * duration;
@@ -133,53 +181,10 @@ where
         }
 
         if total_duration == 0.0 {
-            return self.values.values().next().unwrap().value.clone();
+            return self.values.values().next().unwrap().clone();
         }
 
         (weighted_sum / total_duration).into()
-    }
-}
-
-//linear interpolation or last seen
-fn interpolate<T>(
-    values: &BTreeMap<DateTime<Utc>, DataPoint<T>>,
-    at: chrono::DateTime<chrono::Utc>,
-) -> Option<DataPoint<T>>
-where
-    T: From<f64> + Clone,
-    for<'a> &'a T: Into<f64>,
-{
-    if let Some(dp) = values.get(&at) {
-        return Some(dp.clone());
-    }
-
-    let prev = values.range(..=at).next_back().map(|(_, dp)| dp);
-    let next = values.range(at..).next().map(|(_, dp)| dp);
-
-    match (prev, next) {
-        (Some(prev_dp), Some(next_dp)) => {
-            let prev_time = prev_dp.timestamp.timestamp() as f64;
-            let next_time = next_dp.timestamp.timestamp() as f64;
-            let at_time = at.timestamp() as f64;
-
-            let prev_value: f64 = (&prev_dp.value).into();
-            let next_value: f64 = (&next_dp.value).into();
-
-            let interpolated_value = prev_value
-                + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
-
-            Some(DataPoint {
-                timestamp: at,
-                value: interpolated_value.into(),
-            })
-        }
-
-        (Some(prev_dp), None) => Some(DataPoint {
-            timestamp: at,
-            value: prev_dp.value.clone(),
-        }),
-
-        _ => None,
     }
 }
 
@@ -231,31 +236,6 @@ mod tests {
 
             assert!(dp_opt.is_none());
         }
-    }
-
-    #[test]
-    fn test_iter() {
-        let ts = test_series();
-
-        let dps: Vec<&DataPoint<DegreeCelsius>> = ts.iter().collect();
-
-        assert_eq!(
-            dps[0].timestamp,
-            Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap()
-        );
-        assert_eq!(dps[0].value.0, 10.0);
-
-        assert_eq!(
-            dps[1].timestamp,
-            Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap()
-        );
-        assert_eq!(dps[1].value.0, 20.0);
-
-        assert_eq!(
-            dps[2].timestamp,
-            Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap()
-        );
-        assert_eq!(dps[2].value.0, 30.0);
     }
 
     fn assert_some<T>(val: Option<T>) -> T {

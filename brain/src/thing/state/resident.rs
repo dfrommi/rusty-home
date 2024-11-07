@@ -1,60 +1,84 @@
 use anyhow::Result;
 use api::state::Presence;
-use chrono::Duration;
-use support::{
-    ext::ToOk,
-    time::{elapsed_since, in_time_range},
+use chrono::Utc;
+use support::t;
+
+use crate::{
+    adapter::persistence::DataPoint,
+    home_api,
+    support::timeseries::{interpolate, TimeSeries},
 };
 
-use crate::{adapter::persistence::DataPoint, home_api};
-
-use super::DataPointAccess;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ResidentState {
-    Home,
-    Away,
-    Sleeping,
-}
+use super::{DataPointAccess, TimeSeriesAccess};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Resident {
-    Dennis,
-    Sabine,
+    DennisSleeping,
+    SabineSleeping,
 }
 
 //TODO maybe combination via Baysian to detect resident state
-impl DataPointAccess<ResidentState> for Resident {
-    async fn current_data_point(&self) -> Result<DataPoint<ResidentState>> {
-        let (at_home, in_bed) = match self {
-            Resident::Dennis => (Presence::AtHomeDennis, Presence::BedDennis),
-            Resident::Sabine => (Presence::AtHomeSabine, Presence::BedSabine),
-        };
-
-        let at_home = home_api().get_latest(&at_home).await?;
-
-        if !at_home.value {
-            return Ok(DataPoint {
-                value: ResidentState::Away,
-                timestamp: at_home.timestamp,
-            });
+impl DataPointAccess<bool> for Resident {
+    async fn current_data_point(&self) -> Result<DataPoint<bool>> {
+        match self {
+            Resident::DennisSleeping => sleeping(Presence::BedDennis).await,
+            Resident::SabineSleeping => sleeping(Presence::BedSabine).await,
         }
+    }
+}
 
-        let in_bed = home_api().get_latest(&in_bed).await?;
+async fn at_home(presence: Presence) -> Result<DataPoint<bool>> {
+    home_api().get_latest(&presence).await
+}
 
-        //in bed or not more than 5 minutes out of bed
-        //TODO and if blinds are closed
-        let sleeping = in_time_range(in_bed.timestamp, (21, 0), (3, 0))?
-            && (elapsed_since(in_bed.timestamp) < Duration::minutes(5) || in_bed.value);
+async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
+    let in_bed_full_range = t!(21:00 - 13:00);
+    let in_bed_start_range = t!(21:00 - 3:00);
 
-        DataPoint {
-            value: if sleeping {
-                ResidentState::Sleeping
-            } else {
-                ResidentState::Home
-            },
-            timestamp: std::cmp::max(at_home.timestamp, in_bed.timestamp),
-        }
-        .to_ok()
+    let now = Utc::now();
+    if !in_bed_full_range.contains(now) {
+        return Ok(DataPoint {
+            value: false,
+            timestamp: now,
+        });
+    }
+
+    //TODO TimeSeries with date in future?
+    let range_start = in_bed_full_range.for_today().0;
+    let ts = in_bed.series_since(range_start).await?.with_duration();
+
+    let sleeping_started = ts.iter().find(|dp| {
+        in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)
+    });
+
+    let sleeping_stopped = sleeping_started.and_then(|started_dp| {
+        ts.iter().find(|dp| {
+            !dp.value.0 && dp.value.1 > t!(5 minutes) && started_dp.timestamp < dp.timestamp
+        })
+    });
+
+    let result = match (sleeping_started, sleeping_stopped) {
+        (_, Some(stopped_dp)) => (false, stopped_dp.timestamp),
+
+        //started but not stopped
+        (Some(started_dp), None) => (true, started_dp.timestamp),
+
+        //should not happen
+        (None, None) => (false, now),
+    };
+
+    Ok(DataPoint {
+        value: result.0,
+        timestamp: result.1,
+    })
+}
+
+//TODO blanket impl
+impl TimeSeriesAccess<bool> for Presence {
+    async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<bool>> {
+        home_api()
+            .get_covering(self, since)
+            .await
+            .map(|v| TimeSeries::new(v, since))?
     }
 }

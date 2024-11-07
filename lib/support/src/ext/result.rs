@@ -3,7 +3,6 @@ pub trait ResultExt<T> {
 }
 
 impl<T> ResultExt<T> for anyhow::Result<T> {
-    //fn unwrap_or_warn(self, default: T, error_message: &str) -> T {
     fn unwrap_or_warn(self, default: T, error_message: &str) -> T {
         match self {
             Ok(value) => value,

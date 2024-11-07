@@ -8,6 +8,13 @@ macro_rules! t {
         chrono::NaiveTime::from_hms_opt($hour, $minute, 0).unwrap()
     }};
 
+    ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
+        support::time::DailyTimeRange::new(
+            ($from_hour, $from_minute),
+            ($to_hour, $to_minute)
+        )
+    }};
+
     ($amount:literal seconds) => {{
         chrono::Duration::seconds($amount)
     }};

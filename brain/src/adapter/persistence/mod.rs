@@ -18,6 +18,12 @@ pub struct DataPoint<V> {
     pub timestamp: DateTime<Utc>,
 }
 
+impl<V> DataPoint<V> {
+    pub fn new(value: V, timestamp: DateTime<Utc>) -> Self {
+        Self { value, timestamp }
+    }
+}
+
 #[derive(Debug)]
 pub struct HomeApi {
     db_pool: PgPool,
@@ -193,6 +199,15 @@ impl HomeApi {
     ) -> Result<Option<CommandExecution<C::CommandType>>> {
         let mut all_commands = self.get_all_commands_since(target, since).await?;
         Ok(all_commands.pop())
+    }
+
+    pub async fn get_latest_command_source_since(
+        &self,
+        target: CommandTarget,
+        since: DateTime<Utc>,
+    ) -> Result<Option<CommandSource>> {
+        let maybe_command = self.get_latest_command_since(target, since).await?;
+        Ok(maybe_command.map(|c| c.source))
     }
 }
 

@@ -24,6 +24,16 @@ impl DailyTimeRange {
         }
     }
 
+    pub fn prev_start(&self) -> DateTime<Utc> {
+        let now = Utc::now();
+        let mut start = now.with_time(self.start).unwrap();
+        if start > now {
+            start -= chrono::Duration::days(1)
+        }
+
+        start
+    }
+
     pub fn for_today(&self) -> (DateTime<Utc>, DateTime<Utc>) {
         let now = Utc::now();
         let start = now.with_time(self.start).unwrap();

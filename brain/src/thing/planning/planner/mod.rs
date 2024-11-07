@@ -1,7 +1,9 @@
 pub mod action_ext;
+mod resource_lock;
 
 use std::fmt::Debug;
 
+use resource_lock::ResourceLock;
 use tabled::Tabled;
 
 use super::Action;
@@ -49,8 +51,8 @@ where
             }
 
             let (is_fulfilled, is_running) = tokio::join!(
-                action.preconditions_fulfilled_or_log_error(),
-                action.is_running_or_scheduled(),
+                action.preconditions_fulfilled_or_default(),
+                action.is_running_or_scheduled_or_default(),
             );
 
             result.is_fulfilled = Some(is_fulfilled);
@@ -108,34 +110,5 @@ fn display_option(o: &Option<bool>) -> String {
         Some(true) => "✅".to_string(),
         Some(false) => "❌".to_string(),
         None => "-".to_string(),
-    }
-}
-
-//no HashSet to avoid Hash and Eq constraints. Performance should be good enough as not many
-//entries are expected
-struct ResourceLock<R> {
-    resources: Vec<R>,
-}
-
-impl<R> ResourceLock<R>
-where
-    R: PartialEq,
-{
-    fn new() -> Self {
-        Self {
-            resources: Vec::new(),
-        }
-    }
-
-    fn lock(&mut self, resource: Option<R>) {
-        if let Some(resource) = resource {
-            self.resources.push(resource);
-        }
-    }
-
-    fn is_locked(&self, resource: &Option<R>) -> bool {
-        resource
-            .as_ref()
-            .map_or(false, |resource| self.resources.contains(resource))
     }
 }

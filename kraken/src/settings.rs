@@ -5,6 +5,7 @@ use serde::Deserialize;
 #[allow(unused)]
 pub struct Settings {
     pub database: Database,
+    pub migration_db: Database,
     pub mqtt: Mqtt,
     pub homeassistant: HomeAssitant,
 }

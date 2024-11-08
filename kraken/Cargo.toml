@@ -29,3 +29,12 @@ support = { path = "../lib/support" }
 
 [dev-dependencies]
 assert-json-diff = "2"
+
+
+[[bin]]
+name = "kraken"
+path = "src/main.rs"
+
+[[bin]]
+name = "kraken-migration"
+path = "src/migration.rs"

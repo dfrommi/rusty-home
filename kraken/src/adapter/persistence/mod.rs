@@ -1,3 +1,5 @@
+pub mod energy_reading;
+
 use api::{
     command::{
         db::schema::{DbCommandSource, DbCommandState},

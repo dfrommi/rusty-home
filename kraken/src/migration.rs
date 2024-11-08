@@ -31,7 +31,8 @@ pub async fn main() {
 
     tracing::info!("Migrating data");
 
-    thing_values::migrate(&source_pool, &api).await;
+    //thing_values::migrate(&source_pool, &api).await;
+    energy_reading::migrate(&source_pool, &api).await;
 }
 
 mod thing_values {
@@ -378,6 +379,77 @@ mod thing_values {
     struct SourceThingValues {
         id: i64,
         tag_id: i32,
+        value: f64,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    }
+}
+
+mod energy_reading {
+    use crate::adapter::persistence::{energy_reading::*, BackendApi};
+
+    pub async fn migrate(source_pool: &sqlx::PgPool, api: &BackendApi) {
+        let mut source_readings: Vec<SourceReading> =
+            sqlx::query_as(r#"SELECT * FROM energy_readings order by timestamp asc"#)
+                .fetch_all(source_pool)
+                .await
+                .unwrap();
+
+        for source_reading in source_readings {
+            let target = into_target(&source_reading);
+
+            tracing::info!("Migrating {:?}", target);
+
+            api.add_energy_reading(target, source_reading.timestamp)
+                .await
+                .unwrap();
+        }
+    }
+
+    fn into_target(source: &SourceReading) -> EnergyReading {
+        match (
+            source.r#type.as_str(),
+            source.room.as_str(),
+            source.position.as_deref(),
+        ) {
+            ("HEATING", "LIVING_ROOM", Some("OUTER_WALL")) => {
+                EnergyReading::Heating(Radiator::LivingRoomBig, source.value)
+            }
+            ("HEATING", "LIVING_ROOM", Some("BALCONY_DOOR")) => {
+                EnergyReading::Heating(Radiator::LivingRoomSmall, source.value)
+            }
+            ("HEATING", "BEDROOM", None) => EnergyReading::Heating(Radiator::Bedroom, source.value),
+            ("HEATING", "KITCHEN", None) => EnergyReading::Heating(Radiator::Kitchen, source.value),
+            ("HEATING", "ROOM_OF_REQUIREMENTS", None) => {
+                EnergyReading::Heating(Radiator::RoomOfRequirements, source.value)
+            }
+            ("HEATING", "BATHROOM", None) => {
+                EnergyReading::Heating(Radiator::Bathroom, source.value)
+            }
+
+            ("WATER_COLD", "KITCHEN", None) => {
+                EnergyReading::ColdWater(Faucet::Kitchen, source.value)
+            }
+            ("WATER_COLD", "BATHROOM", None) => {
+                EnergyReading::ColdWater(Faucet::Bathroom, source.value)
+            }
+
+            ("WATER_HOT", "KITCHEN", None) => {
+                EnergyReading::HotWater(Faucet::Kitchen, source.value)
+            }
+            ("WATER_HOT", "BATHROOM", None) => {
+                EnergyReading::HotWater(Faucet::Bathroom, source.value)
+            }
+
+            _ => panic!("Unsupported reading {:?}", source),
+        }
+    }
+
+    #[derive(Debug, sqlx::FromRow)]
+    struct SourceReading {
+        id: i64,
+        r#type: String,
+        room: String,
+        position: Option<String>,
         value: f64,
         timestamp: chrono::DateTime<chrono::Utc>,
     }

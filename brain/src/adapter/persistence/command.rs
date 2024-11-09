@@ -32,7 +32,7 @@ impl CommandRepository for HomeApi {
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMANDS (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             db_command,
             chrono::Utc::now(),
             DbCommandState::Pending as DbCommandState,
@@ -55,7 +55,7 @@ impl CommandRepository for HomeApi {
 
         let records = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
-                from THING_COMMANDS 
+                from THING_COMMAND 
                 where command @> $1 and created >= $2 
                 order by created asc"#,
             db_target,

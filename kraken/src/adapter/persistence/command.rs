@@ -20,7 +20,7 @@ impl CommandRepository for BackendApi {
 
         let maybe_rec = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
-                from THING_COMMANDS 
+                from THING_COMMAND
                 where status = $1
                 order by created DESC
                 limit 1
@@ -100,7 +100,7 @@ async fn set_command_status_in_tx(
     error_message: Option<&str>,
 ) -> Result<()> {
     sqlx::query!(
-        r#"UPDATE THING_COMMANDS SET status = $2, error = $3 WHERE id = $1"#,
+        r#"UPDATE THING_COMMAND SET status = $2, error = $3 WHERE id = $1"#,
         command_id,
         status as DbCommandState,
         error_message
@@ -117,9 +117,9 @@ async fn mark_other_commands_superseeded(
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(r#"
         WITH excluded_command AS (
-            SELECT command->'type' as type, command->'device' as device FROM THING_COMMANDS WHERE id = $1
+            SELECT command->'type' as type, command->'device' as device FROM THING_COMMAND WHERE id = $1
         )
-        UPDATE THING_COMMANDS
+        UPDATE THING_COMMAND
         SET status = $2, error = $3
         WHERE id != $1
         AND status = $4

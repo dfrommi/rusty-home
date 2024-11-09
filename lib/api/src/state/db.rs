@@ -28,17 +28,17 @@ pub async fn get_tag_id(
 
     if create_if_missing {
         sqlx::query_scalar!(
-            r#"WITH tags_ins AS (
-                INSERT INTO tags (channel, name)
+            r#"WITH thing_value_tag_ins AS (
+                INSERT INTO thing_value_tag (channel, name)
                 VALUES ($1, $2)
                 ON CONFLICT (channel, name)
                 DO NOTHING
                 RETURNING id
             )
             SELECT id as "id!"
-            FROM tags_ins
+            FROM thing_value_tag_ins
             UNION ALL
-            SELECT id FROM tags
+            SELECT id FROM thing_value_tag
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
@@ -49,7 +49,7 @@ pub async fn get_tag_id(
         .await
     } else {
         sqlx::query_scalar!(
-            r#"SELECT id FROM tags
+            r#"SELECT id FROM thing_value_tag
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,

@@ -36,7 +36,7 @@ impl StateRepository for HomeApi {
         //TODO rewrite to max query
         let rec = sqlx::query!(
             r#"SELECT value as "value: DbValue", timestamp
-            FROM THING_VALUES
+            FROM THING_VALUE
             WHERE TAG_ID = $1
             ORDER BY timestamp DESC, id DESC
             LIMIT 1"#,
@@ -68,12 +68,12 @@ impl StateRepository for HomeApi {
         //TODO rewrite to max query
         let rec = sqlx::query!(
             r#"(SELECT value as "value!: DbValue", timestamp as "timestamp!: DateTime<Utc>"
-              FROM THING_VALUES
+              FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp > $2)
             UNION ALL
             (SELECT value, timestamp
-              FROM THING_VALUES
+              FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp <= $2
               ORDER BY timestamp DESC

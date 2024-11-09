@@ -21,12 +21,12 @@ impl StateRepository for BackendApi {
         sqlx::query!(
             r#"WITH latest_value AS (
                 SELECT value
-                FROM thing_values
+                FROM thing_value
                 WHERE tag_id = $1
                 ORDER BY timestamp DESC, id DESC
                 LIMIT 1
             )
-            INSERT INTO thing_values (tag_id, value, timestamp)
+            INSERT INTO thing_value (tag_id, value, timestamp)
             SELECT $1, $2, $3
             WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
             tags_id,
@@ -35,8 +35,6 @@ impl StateRepository for BackendApi {
         )
         .execute(&self.db_pool)
         .await?;
-
-        //info!("Inserted new value: {:?}", event);
 
         Ok(())
     }

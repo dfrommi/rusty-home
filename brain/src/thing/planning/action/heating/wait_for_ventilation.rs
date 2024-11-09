@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use anyhow::{Ok, Result};
 use api::command::{Command, SetHeating};
-use chrono::Utc;
-use support::{time::DailyTimeRange, unit::DegreeCelsius};
+use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::thing::{
     planning::action::{Action, HeatingZone},
@@ -44,7 +43,7 @@ impl DeferHeatingUntilVentilationDone {
 
 impl Action for DeferHeatingUntilVentilationDone {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
-        if !self.time_range.contains(Utc::now()) {
+        if !self.time_range.contains(t!(now)) {
             return Ok(false);
         }
 

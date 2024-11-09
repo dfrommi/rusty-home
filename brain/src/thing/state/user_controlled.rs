@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use chrono::{Duration, Utc};
 use support::t;
 
 use crate::{
@@ -87,7 +86,7 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
     let power = Powered::Dehumidifier.current_data_point().await?;
 
     //user-control only valid for 15 minutes
-    if power.timestamp < Utc::now() - Duration::minutes(15) {
+    if power.timestamp < t!(15 minutes ago) {
         return Ok(DataPoint {
             value: false,
             timestamp: power.timestamp,

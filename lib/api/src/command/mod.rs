@@ -1,7 +1,6 @@
-use chrono::{DateTime, Utc};
 use derive_more::derive::From;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use support::unit::DegreeCelsius;
+use support::{time::DateTime, unit::DegreeCelsius};
 
 pub mod db;
 
@@ -37,7 +36,7 @@ pub struct CommandExecution<C: Into<Command>> {
     pub id: i64,
     pub command: C,
     pub state: CommandState,
-    pub created: DateTime<Utc>,
+    pub created: DateTime,
     pub source: CommandSource,
 }
 
@@ -109,7 +108,7 @@ pub enum HeatingTargetState {
     Off, //TODO support off-timer (not supported via HA)
     Heat {
         temperature: DegreeCelsius,
-        until: DateTime<Utc>,
+        until: DateTime,
     },
 }
 
@@ -120,7 +119,6 @@ impl CommandId for Thermostat {
 #[cfg(test)]
 mod test {
     use assert_json_diff::assert_json_eq;
-    use chrono::TimeZone;
     use serde_json::json;
 
     use super::*;
@@ -191,7 +189,7 @@ mod test {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
                     temperature: DegreeCelsius::from(22.5),
-                    until: Utc.with_ymd_and_hms(2024, 10, 14, 13, 37, 42).unwrap()
+                    until: DateTime::from_iso("2024-10-14T13:37:42Z").unwrap()
                 },
             }),
             json!({

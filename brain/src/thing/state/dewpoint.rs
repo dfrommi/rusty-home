@@ -2,7 +2,10 @@ use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};
 
-use support::unit::{DegreeCelsius, Percent};
+use support::{
+    time::DateTime,
+    unit::{DegreeCelsius, Percent},
+};
 use tokio::try_join;
 
 #[derive(Debug, Clone)]
@@ -57,10 +60,7 @@ impl DataPointAccess<DegreeCelsius> for DewPoint {
 }
 
 impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
-    async fn series_since(
-        &self,
-        since: chrono::DateTime<chrono::Utc>,
-    ) -> Result<TimeSeries<DegreeCelsius>> {
+    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<DegreeCelsius>> {
         let (t_series, h_series) = {
             let temp = self.temperature();
             let humidity = self.relative_humidity();

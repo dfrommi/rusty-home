@@ -19,6 +19,7 @@ pub use opened::Opened;
 pub use powered::Powered;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
+use support::time::DateTime;
 pub use user_controlled::UserControlled;
 
 use crate::adapter::persistence::DataPoint;
@@ -35,9 +36,5 @@ pub trait DataPointAccess<T> {
 }
 
 pub trait TimeSeriesAccess<T: Clone + Interpolatable> {
-    async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<T>>;
-
-    async fn series_of_last(&self, duration: ::chrono::Duration) -> Result<TimeSeries<T>> {
-        self.series_since(chrono::Utc::now() - duration).await
-    }
+    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<T>>;
 }

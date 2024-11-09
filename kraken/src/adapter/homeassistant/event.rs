@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use parse::{HaEvent, StateValue};
 use serde_json::Value;
 use support::mqtt::MqttInMessage;
+use support::time::DateTime;
 use support::unit::*;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -103,7 +104,7 @@ fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
                         ha_channel,
                         state_value,
                         &new_state.attributes,
-                        new_state.last_changed,
+                        new_state.last_changed.clone(),
                     );
 
                     match dp_result {
@@ -158,7 +159,7 @@ fn to_persistent_data_point(
     channel: HaChannel,
     ha_value: &str,
     attributes: &HashMap<String, Value>,
-    timestamp: chrono::DateTime<chrono::Utc>,
+    timestamp: DateTime,
 ) -> Result<PersistentDataPoint> {
     let dp = match channel {
         HaChannel::Temperature(channel) => PersistentDataPoint {
@@ -228,9 +229,9 @@ fn to_persistent_data_point(
 mod parse {
     use std::collections::HashMap;
 
-    use chrono::{DateTime, Utc};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_json::Value;
+    use support::time::DateTime;
 
     #[derive(Deserialize, Serialize, Debug)]
     #[serde(tag = "event_type", content = "event_data")]
@@ -249,8 +250,8 @@ mod parse {
     pub struct StateChangedEvent {
         pub entity_id: String,
         pub state: StateValue,
-        pub last_changed: DateTime<Utc>,
-        pub last_updated: DateTime<Utc>,
+        pub last_changed: DateTime,
+        pub last_updated: DateTime,
         pub attributes: HashMap<String, Value>,
     }
 

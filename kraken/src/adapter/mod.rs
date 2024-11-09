@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use api::state::ChannelValue;
 
 mod config;
@@ -13,6 +11,7 @@ use homeassistant::HaService;
 pub use homeassistant::HaStateCollector;
 use persistence::CommandRepository;
 use persistence::StateRepository;
+use support::time::DateTime;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
@@ -20,7 +19,7 @@ use tokio::task::JoinSet;
 #[derive(Debug, Clone)]
 pub struct PersistentDataPoint {
     value: ChannelValue,
-    timestamp: DateTime<Utc>,
+    timestamp: DateTime,
 }
 
 #[derive(Debug, Clone)]

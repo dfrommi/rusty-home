@@ -1,6 +1,5 @@
 use api::command::CommandSource;
-use chrono::{DateTime, Utc};
-use support::{ext::ResultExt, t};
+use support::{ext::ResultExt, t, time::DateTime};
 
 use crate::{adapter::persistence::CommandRepository, home_api, thing::planning::action::Action};
 
@@ -53,7 +52,7 @@ impl<A: Action> ActionPlannerExt for A {
 
 async fn get_last_command_type_since(
     action: &impl Action,
-    since: DateTime<Utc>,
+    since: DateTime,
 ) -> Option<CommandSourceType> {
     let last_source = if let Some(target) = action.controls_target() {
         home_api()

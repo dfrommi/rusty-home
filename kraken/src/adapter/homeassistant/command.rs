@@ -41,9 +41,9 @@ impl CommandExecutor<HaService> for HaCommandExecutor {
 mod serialize {
     use std::collections::HashMap;
 
-    use chrono::{Duration, Utc};
     use serde::Serialize;
     use serde_json::{json, Value};
+    use support::time::Duration;
 
     use crate::adapter::homeassistant::{HaClimateHvacMode, HaService};
 
@@ -92,9 +92,7 @@ mod serialize {
                         ("temperature".to_string(), json!(temperature)),
                         (
                             "time_period".to_string(),
-                            json!(to_ha_duration_format(
-                                until.signed_duration_since(Utc::now())
-                            )),
+                            json!(to_ha_duration_format(Duration::until(until))),
                         ),
                     ]),
                 },
@@ -128,7 +126,7 @@ mod serialize {
     }
 
     fn to_ha_duration_format(duration: Duration) -> String {
-        let total_seconds = duration.num_seconds();
+        let total_seconds = duration.as_secs();
         let hh = total_seconds / 3600;
         let mm = (total_seconds % 3600) / 60;
         let ss = total_seconds % 60;

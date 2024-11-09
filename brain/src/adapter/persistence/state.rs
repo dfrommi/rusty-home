@@ -1,11 +1,10 @@
+use super::{DataPoint, HomeApi};
 use anyhow::Result;
 use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
-use chrono::{DateTime, Utc};
-
-use super::{DataPoint, HomeApi};
+use support::time::DateTime;
 
 pub trait StateRepository {
     async fn get_latest<'a, C: ChannelTypeInfo>(
@@ -18,7 +17,7 @@ pub trait StateRepository {
     async fn get_covering<'a, C: ChannelTypeInfo>(
         &self,
         id: &'a C,
-        start: DateTime<Utc>,
+        start: DateTime,
     ) -> Result<Vec<DataPoint<C::ValueType>>>
     where
         &'a C: Into<Channel>,
@@ -48,7 +47,7 @@ impl StateRepository for HomeApi {
         match rec {
             Some(r) => Ok(DataPoint {
                 value: r.value.into(),
-                timestamp: r.timestamp,
+                timestamp: DateTime::from_db(r.timestamp),
             }),
             None => anyhow::bail!("No data found"),
         }
@@ -57,7 +56,7 @@ impl StateRepository for HomeApi {
     async fn get_covering<'a, C: ChannelTypeInfo>(
         &self,
         id: &'a C,
-        start: DateTime<Utc>,
+        start: DateTime,
     ) -> Result<Vec<DataPoint<C::ValueType>>>
     where
         &'a C: Into<Channel>,
@@ -67,7 +66,7 @@ impl StateRepository for HomeApi {
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
-            r#"(SELECT value as "value!: DbValue", timestamp as "timestamp!: DateTime<Utc>"
+            r#"(SELECT value as "value!: DbValue", timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp > $2)
@@ -79,7 +78,7 @@ impl StateRepository for HomeApi {
               ORDER BY timestamp DESC
               LIMIT 1)"#,
             tags_id,
-            start
+            start.into_db()
         )
         .fetch_all(&self.db_pool)
         .await?;
@@ -88,7 +87,7 @@ impl StateRepository for HomeApi {
             .into_iter()
             .map(|row| DataPoint {
                 value: C::ValueType::from(row.value),
-                timestamp: row.timestamp,
+                timestamp: DateTime::from_db(row.timestamp.unwrap()),
             })
             .collect();
 

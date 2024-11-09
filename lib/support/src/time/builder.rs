@@ -1,77 +1,87 @@
 #[macro_export]
 macro_rules! t {
     (now) => {{
-        chrono::Utc::now()
+        $crate::time::DateTime::now()
     }};
 
     ($hour:literal : $minute:literal) => {{
-        chrono::NaiveTime::from_hms_opt($hour, $minute, 0).unwrap()
+        $crate::time::Time::at($hour, $minute).unwrap()
     }};
 
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
-        support::time::DailyTimeRange::new(
+        $crate::time::DailyTimeRange::new(
             ($from_hour, $from_minute),
             ($to_hour, $to_minute)
         )
     }};
 
     ($amount:literal seconds) => {{
-        chrono::Duration::seconds($amount)
+        $crate::time::Duration::seconds($amount)
     }};
     ($amount:literal minutes) => {{
-        chrono::Duration::minutes($amount)
+        $crate::time::Duration::minutes($amount)
     }};
     ($amount:literal hours) => {{
-        chrono::Duration::hours($amount)
+        $crate::time::Duration::hours($amount)
     }};
 
     ($amount:literal seconds ago) => {{
-        chrono::Utc::now() - t!($amount seconds)
+        t!(now) - t!($amount seconds)
     }};
     ($amount:literal minutes ago) => {{
-        chrono::Utc::now() - t!($amount minutes)
+        t!(now) - t!($amount minutes)
     }};
     ($amount:literal hours ago) => {{
-        chrono::Utc::now() - t!($amount hours)
+        t!(now) - t!($amount hours)
+    }};
+
+    (in $amount:literal seconds) => {{
+        t!(now) + t!($amount seconds)
+    }};
+    (in $amount:literal minutes) => {{
+        t!(now) + t!($amount minutes)
+    }};
+    (in $amount:literal hours) => {{
+        t!(now) + t!($amount hours)
     }};
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Duration, Timelike, Utc};
+    use crate::time::*;
 
     #[test]
     fn test_time() {
-        let dt = Utc::now().with_time(t!(5:34)).earliest().unwrap();
+        let t = t!(5:34);
 
-        assert_eq!(dt.hour(), 5);
-        assert_eq!(dt.minute(), 34);
+        assert_eq!(t.hour(), 5);
+        assert_eq!(t.minute(), 34);
     }
 
     #[test]
     fn test_duration_seconds() {
         let duration = t!(10 seconds);
 
-        assert_eq!(duration.num_seconds(), 10);
+        assert_eq!(duration.as_secs(), 10);
     }
 
     #[test]
     fn test_duration_minutes() {
         let duration = t!(10 minutes);
 
-        assert_eq!(duration.num_minutes(), 10);
+        assert_eq!(duration.as_minutes(), 10);
     }
 
     #[test]
     fn test_duration_hours() {
         let duration = t!(10 hours);
 
-        assert_eq!(duration.num_hours(), 10);
+        assert_eq!(duration.as_hours(), 10);
     }
 
     #[test]
     fn test_duration_seconds_ago() {
-        let now = Utc::now();
+        let now = DateTime::now();
         let dt = t!(10 seconds ago);
 
         assert!(now >= dt);
@@ -80,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_duration_minutes_ago() {
-        let now = Utc::now();
+        let now = DateTime::now();
         let dt = t!(10 minutes ago);
 
         assert!(now >= dt);
@@ -89,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_duration_hours_ago() {
-        let now = Utc::now();
+        let now = DateTime::now();
         let dt = t!(10 hours ago);
 
         assert!(now >= dt);

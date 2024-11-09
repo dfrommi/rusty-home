@@ -1,7 +1,6 @@
 use anyhow::Result;
 use api::state::Presence;
-use chrono::Utc;
-use support::t;
+use support::{t, time::DateTime};
 
 use crate::{
     adapter::persistence::{DataPoint, StateRepository},
@@ -31,7 +30,7 @@ async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
     let in_bed_full_range = t!(21:00 - 13:00);
     let in_bed_start_range = t!(21:00 - 3:00);
 
-    let now = Utc::now();
+    let now = t!(now);
     if !in_bed_full_range.contains(now) {
         return Ok(DataPoint {
             value: false,
@@ -71,7 +70,7 @@ async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
 
 //TODO blanket impl
 impl TimeSeriesAccess<bool> for Presence {
-    async fn series_since(&self, since: chrono::DateTime<chrono::Utc>) -> Result<TimeSeries<bool>> {
+    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<bool>> {
         home_api()
             .get_covering(self, since)
             .await

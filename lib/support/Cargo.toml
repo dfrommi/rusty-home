@@ -12,3 +12,5 @@ serde_json = "1"
 chrono = "0.4"
 anyhow = "1"
 derive_more = { version = "1", features = ["from"] }
+
+sqlx = { version = "0.8", features = ["postgres", "macros", "chrono"] }

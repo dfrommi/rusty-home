@@ -3,8 +3,8 @@ mod state;
 
 use anyhow::Result;
 use api::EventListener;
-use chrono::{DateTime, Utc};
 use sqlx::{postgres::PgListener, PgPool};
+use support::time::DateTime;
 use tokio::sync::broadcast::Receiver;
 
 pub use command::CommandRepository;
@@ -13,11 +13,11 @@ pub use state::StateRepository;
 #[derive(Debug, Clone)]
 pub struct DataPoint<V> {
     pub value: V,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: DateTime,
 }
 
 impl<V> DataPoint<V> {
-    pub fn new(value: V, timestamp: DateTime<Utc>) -> Self {
+    pub fn new(value: V, timestamp: DateTime) -> Self {
         Self { value, timestamp }
     }
 }
@@ -37,7 +37,7 @@ impl<T> DataPoint<T> {
         let value = f(&self.value);
         DataPoint {
             value,
-            timestamp: self.timestamp,
+            timestamp: self.timestamp.clone(),
         }
     }
 }

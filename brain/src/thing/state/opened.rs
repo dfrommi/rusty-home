@@ -1,3 +1,5 @@
+use support::t;
+
 use crate::{
     adapter::persistence::{DataPoint, StateRepository},
     home_api,
@@ -47,7 +49,7 @@ async fn any_of(opened_states: Vec<api::state::Opened>) -> anyhow::Result<DataPo
 
     match res {
         Ok(values) => {
-            let timestamp = values.iter().map(|v| v.timestamp).max().unwrap_or_default();
+            let timestamp = values.iter().map(|v| v.timestamp).max().unwrap_or(t!(now));
             let value = values.iter().any(|v| v.value);
 
             Ok(DataPoint { value, timestamp })

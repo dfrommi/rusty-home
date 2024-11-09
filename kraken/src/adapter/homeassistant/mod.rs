@@ -6,10 +6,9 @@ use api::state::{
     RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
 
-use chrono::{DateTime, Utc};
 pub use command::HaCommandExecutor;
 pub use event::HaStateCollector;
-use support::unit::DegreeCelsius;
+use support::{time::DateTime, unit::DegreeCelsius};
 
 #[derive(Debug, Clone)]
 pub enum HaChannel {
@@ -40,7 +39,7 @@ pub enum HaService {
     TadoSetClimateTimer {
         id: String,
         temperature: DegreeCelsius,
-        until: DateTime<Utc>,
+        until: DateTime,
     },
     ClimateSetHvacMode {
         id: String,

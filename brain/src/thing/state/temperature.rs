@@ -1,7 +1,7 @@
 use super::*;
 use crate::{adapter::persistence::StateRepository, prelude::*};
 use anyhow::Result;
-use support::unit::DegreeCelsius;
+use support::{time::DateTime, unit::DegreeCelsius};
 
 pub use api::state::Temperature;
 
@@ -12,10 +12,7 @@ impl DataPointAccess<DegreeCelsius> for Temperature {
 }
 
 impl TimeSeriesAccess<DegreeCelsius> for Temperature {
-    async fn series_since(
-        &self,
-        since: chrono::DateTime<chrono::Utc>,
-    ) -> Result<TimeSeries<DegreeCelsius>> {
+    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<DegreeCelsius>> {
         home_api()
             .get_covering(self, since)
             .await

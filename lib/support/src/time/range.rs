@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-use chrono::{DateTime, NaiveTime, Utc};
+use super::{DateTime, Duration, Time};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DailyTimeRange {
-    start: NaiveTime,
-    end: NaiveTime,
+    start: Time,
+    end: Time,
 }
 
 impl Display for DailyTimeRange {
@@ -17,36 +17,36 @@ impl Display for DailyTimeRange {
 impl DailyTimeRange {
     pub fn new(start: (u32, u32), end: (u32, u32)) -> Self {
         Self {
-            start: NaiveTime::from_hms_opt(start.0, start.1, 0)
-                .unwrap_or_else(|| panic!("Error parsing time {}:{}", start.0, start.1)),
-            end: NaiveTime::from_hms_opt(end.0, end.1, 0)
-                .unwrap_or_else(|| panic!("Error parsing time {}:{}", end.0, end.1)),
+            start: Time::at(start.0, start.1)
+                .unwrap_or_else(|_| panic!("Error parsing time {}:{}", start.0, start.1)),
+            end: Time::at(end.0, end.1)
+                .unwrap_or_else(|_| panic!("Error parsing time {}:{}", end.0, end.1)),
         }
     }
 
-    pub fn prev_start(&self) -> DateTime<Utc> {
-        let now = Utc::now();
-        let mut start = now.with_time(self.start).unwrap();
+    pub fn prev_start(&self) -> DateTime {
+        let now = DateTime::now();
+        let mut start = now.at(self.start).unwrap();
         if start > now {
-            start -= chrono::Duration::days(1)
+            start -= Duration::days(1)
         }
 
         start
     }
 
-    pub fn for_today(&self) -> (DateTime<Utc>, DateTime<Utc>) {
-        let now = Utc::now();
-        let start = now.with_time(self.start).unwrap();
-        let mut end = start.with_time(self.end).unwrap();
+    pub fn for_today(&self) -> (DateTime, DateTime) {
+        let now = DateTime::now();
+        let start = now.at(self.start).unwrap();
+        let mut end = start.at(self.end).unwrap();
 
         if start > end {
-            end += chrono::Duration::days(1);
+            end += Duration::days(1);
         }
 
         (start, end)
     }
 
-    pub fn contains(&self, datetime: DateTime<Utc>) -> bool {
+    pub fn contains(&self, datetime: DateTime) -> bool {
         let time = datetime.time();
 
         // same-day scenario

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use chrono::{DateTime, Utc};
+use support::time::DateTime;
 
 use super::BackendApi;
 
@@ -38,7 +38,7 @@ pub trait EnergyReadingRepository {
     async fn add_energy_reading(
         &self,
         reading: EnergyReading,
-        timestamp: DateTime<Utc>,
+        timestamp: DateTime,
     ) -> anyhow::Result<()>;
 }
 
@@ -46,7 +46,7 @@ impl EnergyReadingRepository for BackendApi {
     async fn add_energy_reading(
         &self,
         reading: EnergyReading,
-        timestamp: DateTime<Utc>,
+        timestamp: DateTime,
     ) -> anyhow::Result<()> {
         //TODO derive automatically from enum
         let (type_, item, value) = match reading {
@@ -86,7 +86,7 @@ impl EnergyReadingRepository for BackendApi {
             type_,
             item,
             value,
-            timestamp,
+            timestamp.into_db(),
         )
         .execute(&self.db_pool)
         .await?;

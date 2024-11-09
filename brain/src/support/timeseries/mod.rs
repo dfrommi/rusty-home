@@ -1,22 +1,25 @@
 pub mod interpolate;
 
-use chrono::{DateTime, Duration, Utc};
 use interpolate::Interpolatable;
 use std::collections::BTreeMap;
+use support::{
+    t,
+    time::{DateTime, Duration},
+};
 
 use crate::adapter::persistence::DataPoint;
 use anyhow::{ensure, Result};
 
 pub struct TimeSeries<T: Clone + Interpolatable> {
-    values: BTreeMap<DateTime<Utc>, T>,
+    values: BTreeMap<DateTime, T>,
 }
 
 impl<T: Clone + Interpolatable> TimeSeries<T> {
     pub fn new(
         data_points: impl IntoIterator<Item = DataPoint<T>>,
-        start_at: DateTime<Utc>,
+        start_at: DateTime,
     ) -> Result<Self> {
-        let mut values: BTreeMap<DateTime<Utc>, T> = BTreeMap::new();
+        let mut values: BTreeMap<DateTime, T> = BTreeMap::new();
         for dp in data_points.into_iter() {
             values.insert(dp.timestamp, dp.value);
         }
@@ -82,7 +85,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
     }
 
     //linear interpolation or last seen
-    pub fn at(&self, at: chrono::DateTime<chrono::Utc>) -> Option<DataPoint<T>> {
+    pub fn at(&self, at: DateTime) -> Option<DataPoint<T>> {
         Self::interpolate(at, &self.values).map(|v| DataPoint {
             timestamp: at,
             value: v,
@@ -105,7 +108,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         }
     }
 
-    fn starting_at(&self) -> DateTime<Utc> {
+    fn starting_at(&self) -> DateTime {
         *self
             .values
             .keys()
@@ -118,30 +121,24 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             .into_iter()
             .map(|((timestamp, value), next)| DataPoint {
                 timestamp: *timestamp,
-                value: (
-                    value.clone(),
-                    next.map_or(Utc::now(), |n| *n.0) - *timestamp,
-                ),
+                value: (value.clone(), next.map_or(t!(now), |n| *n.0) - *timestamp),
             })
             .collect::<Vec<_>>()
     }
 
-    fn current_and_next(&self) -> Vec<((&DateTime<Utc>, &T), Option<(&DateTime<Utc>, &T)>)> {
+    fn current_and_next(&self) -> Vec<((&DateTime, &T), Option<(&DateTime, &T)>)> {
         let mut result = vec![];
         let mut iter = self.values.iter().peekable();
 
         while let Some((current_timestamp, value)) = iter.next() {
-            let next: Option<(&DateTime<Utc>, &T)> = iter.peek().map(|(t, v)| (*t, *v));
+            let next: Option<(&DateTime, &T)> = iter.peek().map(|(t, v)| (*t, *v));
             result.push(((current_timestamp, value), next));
         }
 
         result
     }
 
-    pub fn interpolate(
-        at: chrono::DateTime<chrono::Utc>,
-        values: &BTreeMap<DateTime<Utc>, T>,
-    ) -> Option<T> {
+    pub fn interpolate(at: DateTime, values: &BTreeMap<DateTime, T>) -> Option<T> {
         let prev = values
             .range(..=at)
             .next_back()
@@ -169,8 +166,9 @@ where
         let mut iter = self.values.iter().peekable();
         while let Some((current_timestamp, current_value)) = iter.next() {
             if let Some((next_timestamp, next_value)) = iter.peek() {
-                let duration = (next_timestamp.timestamp_millis()
-                    - current_timestamp.timestamp_millis()) as f64;
+                let duration: f64 = next_timestamp
+                    .elapsed_since(*current_timestamp)
+                    .as_secs_f64();
                 let current_f64 = current_value.into();
                 let next_f64: f64 = (*next_value).into();
 
@@ -191,7 +189,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ::chrono::{TimeZone, Utc};
     use support::unit::DegreeCelsius;
 
     #[test]
@@ -207,12 +204,12 @@ mod tests {
         fn test_points_around() {
             let ts = test_series();
 
-            let dp_opt = ts.at(Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap());
+            let dp_opt = ts.at(DateTime::from_iso("2024-09-10T16:30:00Z").unwrap());
 
             let dp = assert_some(dp_opt);
             assert_eq!(
                 dp.timestamp,
-                Utc.with_ymd_and_hms(2024, 9, 10, 16, 30, 0).unwrap()
+                DateTime::from_iso("2024-09-10T16:30:00Z").unwrap()
             );
             assert_eq!(dp.value.0, 22.5);
         }
@@ -220,7 +217,7 @@ mod tests {
         #[test]
         fn test_point_exact_match() {
             let ts = test_series();
-            let dt = Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap();
+            let dt = DateTime::from_iso("2024-09-10T16:00:00Z").unwrap();
 
             let dp_opt = ts.at(dt);
 
@@ -232,7 +229,7 @@ mod tests {
         #[test]
         fn test_no_point_before() {
             let ts = test_series();
-            let dp_opt = ts.at(Utc.with_ymd_and_hms(2024, 9, 10, 12, 0, 0).unwrap());
+            let dp_opt = ts.at(DateTime::from_iso("2024-09-10T12:00:00Z").unwrap());
 
             assert!(dp_opt.is_none());
         }
@@ -247,19 +244,19 @@ mod tests {
         TimeSeries::new(
             vec![
                 DataPoint {
-                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 14, 0, 0).unwrap(),
+                    timestamp: DateTime::from_iso("2024-09-10T14:00:00Z").unwrap(),
                     value: DegreeCelsius(10.0),
                 },
                 DataPoint {
-                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 18, 0, 0).unwrap(),
+                    timestamp: DateTime::from_iso("2024-09-10T18:00:00Z").unwrap(),
                     value: DegreeCelsius(30.0),
                 },
                 DataPoint {
-                    timestamp: Utc.with_ymd_and_hms(2024, 9, 10, 16, 0, 0).unwrap(),
+                    timestamp: DateTime::from_iso("2024-09-10T16:00:00Z").unwrap(),
                     value: DegreeCelsius(20.0),
                 },
             ],
-            Utc.with_ymd_and_hms(2024, 9, 10, 13, 0, 0).unwrap(),
+            DateTime::from_iso("2024-09-10T13:00:00Z").unwrap(),
         )
         .unwrap()
     }
@@ -267,7 +264,6 @@ mod tests {
 
 #[cfg(test)]
 mod combined {
-    use chrono::TimeZone;
     use support::unit::{DegreeCelsius, Percent};
 
     use super::*;
@@ -276,19 +272,19 @@ mod combined {
     fn single_item_per_series_out_of_range() {
         let t_series = TimeSeries::new(
             vec![DataPoint {
-                timestamp: Utc.with_ymd_and_hms(2024, 11, 3, 15, 23, 46).unwrap(),
+                timestamp: DateTime::from_iso("2024-11-03T15:23:46Z").unwrap(),
                 value: DegreeCelsius(19.93),
             }],
-            Utc.with_ymd_and_hms(2024, 11, 4, 5, 10, 9).unwrap(),
+            DateTime::from_iso("2024-11-04T05:10:09Z").unwrap(),
         )
         .unwrap();
 
         let h_series = TimeSeries::new(
             vec![DataPoint {
-                timestamp: Utc.with_ymd_and_hms(2024, 11, 3, 15, 23, 47).unwrap(),
+                timestamp: DateTime::from_iso("2024-11-03T15:23:47Z").unwrap(),
                 value: Percent(61.1),
             }],
-            Utc.with_ymd_and_hms(2024, 11, 4, 5, 10, 9).unwrap(),
+            DateTime::from_iso("2024-11-04T05:10:09Z").unwrap(),
         )
         .unwrap();
 

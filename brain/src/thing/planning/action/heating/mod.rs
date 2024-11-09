@@ -13,8 +13,7 @@ use api::{
     command::{HeatingTargetState, SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
 };
-use chrono::{DateTime, Utc};
-use support::{ext::ToOk, unit::DegreeCelsius};
+use support::{ext::ToOk, t, time::DateTime, unit::DegreeCelsius};
 
 pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
 pub use ventilation_in_progress::NoHeatingDuringVentilation;
@@ -81,7 +80,7 @@ impl HeatingZone {
     async fn manual_heating_already_triggrered(
         &self,
         target_temperature: DegreeCelsius,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> anyhow::Result<DataPoint<bool>> {
         let commands = home_api()
             .get_all_commands_since(self.thermostat(), since)
@@ -98,7 +97,7 @@ impl HeatingZone {
         if let Some(trigger) = trigger {
             DataPoint::new(true, trigger.created)
         } else {
-            DataPoint::new(false, Utc::now())
+            DataPoint::new(false, t!(now))
         }
         .to_ok()
     }

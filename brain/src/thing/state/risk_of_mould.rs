@@ -1,6 +1,8 @@
 use api::state::RelativeHumidity;
-use chrono::Duration;
-use support::unit::{DegreeCelsius, Percent};
+use support::{
+    t,
+    unit::{DegreeCelsius, Percent},
+};
 
 use crate::adapter::persistence::DataPoint;
 use anyhow::Result;
@@ -57,7 +59,7 @@ impl RiskOfMould {
 
         let mut ref_sum: f64 = 0.0;
         for ref_dp in &ref_dewpoints {
-            let ts = ref_dp.series_of_last(Duration::hours(3)).await?;
+            let ts = ref_dp.series_since(t!(3 hours ago)).await?;
             ref_sum += ts.mean().0;
         }
 

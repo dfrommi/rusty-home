@@ -2,18 +2,18 @@ use api::{
     get_tag_id,
     state::{db::DbValue, ChannelValue},
 };
-use chrono::{DateTime, Utc};
 
 use anyhow::Result;
+use support::time::DateTime;
 
 use super::BackendApi;
 
 pub trait StateRepository {
-    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime<Utc>) -> Result<()>;
+    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()>;
 }
 
 impl StateRepository for BackendApi {
-    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime<Utc>) -> Result<()> {
+    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.db_pool, value.into(), true).await?;
 
         let fvalue: DbValue = value.into();
@@ -31,7 +31,7 @@ impl StateRepository for BackendApi {
             WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
             tags_id,
             fvalue.as_ref(),
-            timestamp
+            timestamp.into_db()
         )
         .execute(&self.db_pool)
         .await?;

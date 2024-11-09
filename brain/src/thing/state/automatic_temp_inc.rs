@@ -1,5 +1,4 @@
-use chrono::{Duration, Utc};
-use support::unit::DegreeCelsius;
+use support::{t, unit::DegreeCelsius};
 
 use crate::adapter::persistence::DataPoint;
 
@@ -33,17 +32,17 @@ impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
         };
 
         let window_opened = window.current_data_point().await?;
-        let opened_elapsed = Utc::now() - window_opened.timestamp;
+        let opened_elapsed = t!(now) - window_opened.timestamp;
 
-        if window_opened.value || opened_elapsed > Duration::minutes(30) {
+        if window_opened.value || opened_elapsed > t!(30 minutes) {
             return Ok(window_opened.map_value(|_| false));
         }
 
-        if opened_elapsed < Duration::minutes(5) {
+        if opened_elapsed < t!(5 minutes) {
             return Ok(window_opened.map_value(|_| true));
         }
 
-        let temperature = temp_sensor.series_of_last(Duration::minutes(5)).await?;
+        let temperature = temp_sensor.series_since(t!(5 minutes ago)).await?;
 
         //temperature increase settled
         Ok(temperature

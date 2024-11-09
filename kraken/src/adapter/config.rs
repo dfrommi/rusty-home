@@ -58,7 +58,7 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
                 HeatingTargetState::Heat { temperature, until } => HaService::TadoSetClimateTimer {
                     id: thermostat,
                     temperature: *temperature,
-                    until: *until,
+                    until: until.clone(),
                 },
             })
         }

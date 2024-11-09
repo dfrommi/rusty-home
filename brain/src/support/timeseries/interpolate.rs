@@ -1,11 +1,13 @@
-use chrono::{DateTime, Utc};
-use support::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
+use support::{
+    time::DateTime,
+    unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
+};
 
 use crate::adapter::persistence::DataPoint;
 
 pub trait Interpolatable: Sized {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<Self>>,
         next: Option<&DataPoint<Self>>,
     ) -> Option<Self>;
@@ -13,7 +15,7 @@ pub trait Interpolatable: Sized {
 
 impl Interpolatable for bool {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<bool>>,
         next: Option<&DataPoint<bool>>,
     ) -> Option<bool> {
@@ -23,7 +25,7 @@ impl Interpolatable for bool {
 
 impl Interpolatable for DegreeCelsius {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<DegreeCelsius>>,
         next: Option<&DataPoint<DegreeCelsius>>,
     ) -> Option<DegreeCelsius> {
@@ -33,7 +35,7 @@ impl Interpolatable for DegreeCelsius {
 
 impl Interpolatable for Percent {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<Percent>>,
         next: Option<&DataPoint<Percent>>,
     ) -> Option<Percent> {
@@ -43,7 +45,7 @@ impl Interpolatable for Percent {
 
 impl Interpolatable for Watt {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<Watt>>,
         next: Option<&DataPoint<Watt>>,
     ) -> Option<Watt> {
@@ -53,7 +55,7 @@ impl Interpolatable for Watt {
 
 impl Interpolatable for KiloWattHours {
     fn interpolate(
-        at: DateTime<Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<KiloWattHours>>,
         next: Option<&DataPoint<KiloWattHours>>,
     ) -> Option<KiloWattHours> {
@@ -65,7 +67,7 @@ pub mod algo {
     use super::*;
 
     pub fn last_seen<T>(
-        _: DateTime<Utc>,
+        _: DateTime,
         prev: Option<&DataPoint<T>>,
         _: Option<&DataPoint<T>>,
     ) -> Option<T>
@@ -77,7 +79,7 @@ pub mod algo {
 
     //linear interpolation or last seen
     pub fn linear<T>(
-        at: chrono::DateTime<chrono::Utc>,
+        at: DateTime,
         prev: Option<&DataPoint<T>>,
         next: Option<&DataPoint<T>>,
     ) -> Option<T>
@@ -90,9 +92,9 @@ pub mod algo {
             (_, Some(next)) if next.timestamp == at => Some(next.value.clone()),
 
             (Some(prev), Some(next)) => {
-                let prev_time = prev.timestamp.timestamp() as f64;
-                let next_time = next.timestamp.timestamp() as f64;
-                let at_time = at.timestamp() as f64;
+                let prev_time: f64 = prev.timestamp.into();
+                let next_time: f64 = next.timestamp.into();
+                let at_time: f64 = at.into();
 
                 let prev_value: f64 = (&prev.value).into();
                 let next_value: f64 = (&next.value).into();

@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::command::{Command, SetHeating};
-use chrono::{Duration, Utc};
-use support::unit::DegreeCelsius;
+use support::{t, unit::DegreeCelsius};
 
 use crate::thing::{
     planning::action::{Action, HeatingZone},
@@ -48,7 +47,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
                 device: self.heating_zone.thermostat(),
                 target_state: api::command::HeatingTargetState::Heat {
                     temperature: DegreeCelsius(7.1),
-                    until: Utc::now() + Duration::hours(1),
+                    until: t!(in 1 hours),
                 },
             }
             .into(),

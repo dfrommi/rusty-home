@@ -4,7 +4,7 @@ use super::*;
 use crate::{adapter::persistence::StateRepository, prelude::*};
 
 pub use api::state::RelativeHumidity;
-use support::unit::Percent;
+use support::{time::DateTime, unit::Percent};
 
 impl DataPointAccess<Percent> for RelativeHumidity {
     async fn current_data_point(&self) -> Result<DataPoint<Percent>> {
@@ -13,10 +13,7 @@ impl DataPointAccess<Percent> for RelativeHumidity {
 }
 
 impl TimeSeriesAccess<Percent> for RelativeHumidity {
-    async fn series_since(
-        &self,
-        since: chrono::DateTime<chrono::Utc>,
-    ) -> Result<TimeSeries<Percent>> {
+    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<Percent>> {
         home_api()
             .get_covering(self, since)
             .await

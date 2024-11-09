@@ -5,24 +5,24 @@ use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandId, CommandSource, CommandState, CommandTarget,
 };
-use chrono::{DateTime, Utc};
+use support::time::DateTime;
 
 pub trait CommandRepository {
     async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()>;
     async fn get_all_commands_since<C: CommandId>(
         &self,
         target: C,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Vec<CommandExecution<C::CommandType>>>;
     async fn get_latest_command_since<C: CommandId>(
         &self,
         target: C,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Option<CommandExecution<C::CommandType>>>;
     async fn get_latest_command_source_since(
         &self,
         target: CommandTarget,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Option<CommandSource>>;
 }
 
@@ -34,7 +34,7 @@ impl CommandRepository for HomeApi {
         sqlx::query!(
             r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             db_command,
-            chrono::Utc::now(),
+            DateTime::now().into_db(),
             DbCommandState::Pending as DbCommandState,
             db_source_type as DbCommandSource,
             db_source_id
@@ -48,7 +48,7 @@ impl CommandRepository for HomeApi {
     async fn get_all_commands_since<C: CommandId>(
         &self,
         target: C,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Vec<CommandExecution<C::CommandType>>> {
         let target: CommandTarget = target.into();
         let db_target = serde_json::json!(target);
@@ -59,7 +59,7 @@ impl CommandRepository for HomeApi {
                 where command @> $1 and created >= $2 
                 order by created asc"#,
             db_target,
-            since
+            since.into_db()
         )
         .fetch_all(&self.db_pool)
         .await?;
@@ -72,7 +72,7 @@ impl CommandRepository for HomeApi {
                     id: row.id,
                     command: serde_json::from_value(row.command)?,
                     state: CommandState::from((row.status, row.error)),
-                    created: row.created,
+                    created: DateTime::from_db(row.created),
                     source,
                 })
             })
@@ -83,7 +83,7 @@ impl CommandRepository for HomeApi {
     async fn get_latest_command_since<C: CommandId>(
         &self,
         target: C,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Option<CommandExecution<C::CommandType>>> {
         let mut all_commands = self.get_all_commands_since(target, since).await?;
         Ok(all_commands.pop())
@@ -92,7 +92,7 @@ impl CommandRepository for HomeApi {
     async fn get_latest_command_source_since(
         &self,
         target: CommandTarget,
-        since: DateTime<Utc>,
+        since: DateTime,
     ) -> Result<Option<CommandSource>> {
         let maybe_command = self.get_latest_command_since(target, since).await?;
         Ok(maybe_command.map(|c| c.source))
@@ -103,7 +103,6 @@ impl CommandRepository for HomeApi {
 mod get_all_commands_since {
     use super::*;
     use api::command::{PowerToggle, SetPower};
-    use chrono::Duration;
     use sqlx::PgPool;
     use support::t;
 
@@ -140,10 +139,7 @@ mod get_all_commands_since {
 
         //WHEN
         let result = api
-            .get_all_commands_since(
-                PowerToggle::Dehumidifier,
-                chrono::Utc::now() - Duration::minutes(8),
-            )
+            .get_all_commands_since(PowerToggle::Dehumidifier, t!(8 minutes ago))
             .await
             .unwrap();
 
@@ -190,17 +186,13 @@ mod get_all_commands_since {
         assert_eq!(result.len(), 0);
     }
 
-    async fn insert_command<C: Into<Command> + Clone>(
-        db_pool: &PgPool,
-        command: &C,
-        at: DateTime<Utc>,
-    ) {
+    async fn insert_command<C: Into<Command> + Clone>(db_pool: &PgPool, command: &C, at: DateTime) {
         let command: Command = command.clone().into();
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMANDS (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             serde_json::to_value(command).unwrap(),
-            at,
+            at.into_db(),
             DbCommandState::Pending as DbCommandState,
             DbCommandSource::System as DbCommandSource,
             "unit-test".to_owned()

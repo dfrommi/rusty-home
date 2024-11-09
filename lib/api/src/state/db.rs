@@ -1,3 +1,4 @@
+use anyhow::Context;
 use cached::proc_macro::cached;
 use derive_more::derive::AsRef;
 use sqlx::PgPool;
@@ -13,7 +14,7 @@ pub async fn get_tag_id(
     db_pool: &PgPool,
     channel: Channel,
     create_if_missing: bool,
-) -> std::result::Result<i32, sqlx::Error> {
+) -> anyhow::Result<i32> {
     let channel_json = serde_json::to_value(channel).unwrap();
     let channel_name = channel_json
         .get("type")
@@ -47,6 +48,12 @@ pub async fn get_tag_id(
         )
         .fetch_one(db_pool)
         .await
+        .with_context(|| {
+            format!(
+                "Error getting or creating tag id for {}/{}",
+                channel_name, device_name
+            )
+        })
     } else {
         sqlx::query_scalar!(
             r#"SELECT id FROM thing_value_tag
@@ -58,6 +65,7 @@ pub async fn get_tag_id(
         )
         .fetch_one(db_pool)
         .await
+        .with_context(|| format!("Error getting tag id for {}/{}", channel_name, device_name))
     }
 }
 

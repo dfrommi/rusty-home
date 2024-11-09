@@ -13,8 +13,8 @@ use api::{
 use super::homeassistant::{HaChannel, HaClimateHvacMode};
 use super::HaService;
 
-pub fn ha_incoming_event_channel(entity_id: &str) -> Option<HaChannel> {
-    HA_ENTITIES.get(&entity_id).cloned()
+pub fn ha_incoming_event_channel(entity_id: &str) -> Vec<HaChannel> {
+    HA_ENTITIES.get(&entity_id).unwrap_or(&vec![]).clone()
 }
 
 pub fn to_backend_command(command: &Command) -> CommandBackendService {
@@ -66,7 +66,7 @@ pub fn to_backend_command(command: &Command) -> CommandBackendService {
 }
 
 lazy_static! {
-    static ref HA_ENTITIES: HashMap<&'static str, HaChannel> = {
+    static ref HA_ENTITIES: HashMap<&'static str, Vec<HaChannel>> = {
         let v = [
             //
             // TEMPERATURE
@@ -435,10 +435,10 @@ lazy_static! {
             ),
         ];
 
-        let mut m = HashMap::new();
+        let mut m: HashMap<&str, Vec<HaChannel>> = HashMap::new();
 
         for (id, channel) in v {
-            m.insert(id, channel);
+            m.entry(id).or_default().push(channel);
         }
 
         m

@@ -40,8 +40,8 @@ impl StateCollector for HaStateCollector {
 
         while let Some(msg) = self.event_rx.recv().await {
             match serde_json::from_str(&msg.payload) {
-                Ok(event) => match to_smart_home_event(&event) {
-                    Some(dp) => {
+                Ok(event) => {
+                    for dp in to_smart_home_events(&event) {
                         if let Err(e) = dp_tx.send(dp).await {
                             tracing::error!(
                                 "Error sending data-point to channel for processing: {}",
@@ -49,12 +49,7 @@ impl StateCollector for HaStateCollector {
                             );
                         }
                     }
-
-                    //unsupported entity
-                    None => {
-                        tracing::trace!("Unsupported event {:?} received", event);
-                    }
-                },
+                }
 
                 //json parsing error
                 Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
@@ -72,7 +67,7 @@ impl HaStateCollector {
     ) -> Result<()> {
         info!("Persisting current HA states");
         for event in get_current_states(&self.api_url, &self.api_token).await? {
-            if let Some(dp) = to_smart_home_event(&event) {
+            for dp in to_smart_home_events(&event) {
                 dp_tx.send(dp).await?;
             }
         }
@@ -81,53 +76,57 @@ impl HaStateCollector {
     }
 }
 
-fn to_smart_home_event(event: &HaEvent) -> Option<PersistentDataPoint> {
+fn to_smart_home_events(event: &HaEvent) -> Vec<PersistentDataPoint> {
     match event {
         HaEvent::StateChanged {
             entity_id,
             new_state,
             ..
         } => {
-            let ha_channel = match ha_incoming_event_channel(entity_id as &str) {
-                Some(c) => c,
-                None => {
-                    tracing::trace!("Skipped {}", entity_id);
-                    return None;
-                }
-            };
+            let ha_channels = ha_incoming_event_channel(entity_id as &str);
+
+            if ha_channels.is_empty() {
+                tracing::trace!("Skipped {}", entity_id);
+                return vec![];
+            }
 
             match &new_state.state {
                 StateValue::Available(state_value) => {
                     info!("Received supported event {}", entity_id);
 
-                    let dp_result = to_persistent_data_point(
-                        ha_channel,
-                        state_value,
-                        &new_state.attributes,
-                        new_state.last_changed.clone(),
-                    );
-
-                    match dp_result {
-                        Ok(dp) => Some(dp),
-                        Err(e) => {
-                            tracing::error!(
-                                "Error processing homeassistant event of {}: {:?}",
-                                entity_id,
-                                e
+                    ha_channels
+                        .iter()
+                        .filter_map(|ha_channel| {
+                            let dp_result = to_persistent_data_point(
+                                ha_channel.clone(),
+                                state_value,
+                                &new_state.attributes,
+                                new_state.last_changed,
                             );
-                            None
-                        }
-                    }
+
+                            match dp_result {
+                                Ok(dp) => Some(dp),
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Error processing homeassistant event of {}: {:?}",
+                                        entity_id,
+                                        e
+                                    );
+                                    None
+                                }
+                            }
+                        })
+                        .collect()
                 }
                 _ => {
                     warn!("Value of {} is not available", entity_id);
-                    None
+                    vec![]
                 }
             }
         }
         HaEvent::Unknown(_) => {
             debug!("Received unsupported event");
-            None
+            vec![]
         }
     }
 }

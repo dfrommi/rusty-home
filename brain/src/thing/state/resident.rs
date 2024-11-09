@@ -4,9 +4,9 @@ use chrono::Utc;
 use support::t;
 
 use crate::{
-    adapter::persistence::DataPoint,
+    adapter::persistence::{DataPoint, StateRepository},
     home_api,
-    support::timeseries::{interpolate, TimeSeries},
+    support::timeseries::TimeSeries,
 };
 
 use super::{DataPointAccess, TimeSeriesAccess};
@@ -25,10 +25,6 @@ impl DataPointAccess<bool> for Resident {
             Resident::SabineSleeping => sleeping(Presence::BedSabine).await,
         }
     }
-}
-
-async fn at_home(presence: Presence) -> Result<DataPoint<bool>> {
-    home_api().get_latest(&presence).await
 }
 
 async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {

@@ -1,6 +1,6 @@
 use api::command::{Command, CommandSource};
 
-use crate::prelude::*;
+use crate::{adapter::persistence::CommandRepository, prelude::*};
 
 use anyhow::Result;
 

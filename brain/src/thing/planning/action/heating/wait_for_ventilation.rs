@@ -5,12 +5,9 @@ use api::command::{Command, SetHeating};
 use chrono::Utc;
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
-use crate::{
-    adapter::persistence::DataPoint,
-    thing::{
-        planning::action::{Action, HeatingZone},
-        DataPointAccess, Opened,
-    },
+use crate::thing::{
+    planning::action::{Action, HeatingZone},
+    DataPointAccess, Opened,
 };
 
 #[derive(Debug, Clone)]

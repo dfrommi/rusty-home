@@ -1,4 +1,7 @@
-use crate::{adapter::persistence::DataPoint, home_api};
+use crate::{
+    adapter::persistence::{DataPoint, StateRepository},
+    home_api,
+};
 
 use super::DataPointAccess;
 use anyhow::Result;

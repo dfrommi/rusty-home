@@ -96,7 +96,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         let (timestamp, value) = self
             .values
             .iter()
-            .min_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .expect("Internal error: map should not be empty");
 
         DataPoint {

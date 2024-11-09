@@ -1,5 +1,3 @@
-use crate::support::timeseries::interpolate;
-
 use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};

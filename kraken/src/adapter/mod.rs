@@ -11,6 +11,8 @@ use config::to_backend_command;
 pub use homeassistant::HaCommandExecutor;
 use homeassistant::HaService;
 pub use homeassistant::HaStateCollector;
+use persistence::CommandRepository;
+use persistence::StateRepository;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;

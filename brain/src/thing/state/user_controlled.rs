@@ -3,7 +3,10 @@ use std::fmt::Display;
 use chrono::{Duration, Utc};
 use support::t;
 
-use crate::{adapter::persistence::DataPoint, home_api};
+use crate::{
+    adapter::persistence::{CommandRepository, DataPoint},
+    home_api,
+};
 use api::{
     command::{CommandExecution, CommandSource, PowerToggle, SetPower},
     state::{ExternalAutoControl, Powered, SetPoint},

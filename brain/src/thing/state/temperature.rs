@@ -1,5 +1,5 @@
 use super::*;
-use crate::prelude::*;
+use crate::{adapter::persistence::StateRepository, prelude::*};
 use anyhow::Result;
 use support::unit::DegreeCelsius;
 

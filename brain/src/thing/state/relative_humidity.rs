@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use super::*;
-use crate::prelude::*;
+use crate::{adapter::persistence::StateRepository, prelude::*};
 
 pub use api::state::RelativeHumidity;
 use support::unit::Percent;

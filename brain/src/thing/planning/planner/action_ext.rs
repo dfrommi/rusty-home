@@ -2,15 +2,13 @@ use api::command::CommandSource;
 use chrono::{DateTime, Utc};
 use support::{ext::ResultExt, t};
 
-use crate::{home_api, thing::planning::action::Action};
+use crate::{adapter::persistence::CommandRepository, home_api, thing::planning::action::Action};
 
 pub trait ActionPlannerExt {
     fn command_source_start(&self) -> CommandSource;
     fn command_source_stop(&self) -> CommandSource;
     async fn preconditions_fulfilled_or_default(&self) -> bool;
     async fn is_running_or_scheduled_or_default(&self) -> bool;
-
-    async fn was_started_since(&self, since: DateTime<Utc>) -> bool;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,13 +48,6 @@ impl<A: Action> ActionPlannerExt for A {
                 format!("Error checking running state of action {}", self).as_str(),
             ),
         }
-    }
-
-    async fn was_started_since(&self, since: DateTime<Utc>) -> bool {
-        get_last_command_type_since(self, since)
-            .await
-            .map(|t| t == CommandSourceType::Start)
-            .unwrap_or(false)
     }
 }
 

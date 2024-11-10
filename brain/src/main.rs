@@ -50,12 +50,19 @@ pub async fn main() {
 
     let event_listener = HomeEventListener::new(db_listener);
 
-    tasks.spawn(async {
+    let mut planning_trigger = event_listener.new_thing_value_added_listener();
+    tasks.spawn(async move {
+        let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
+
         loop {
+            tokio::select! {
+                _ = timer.tick() => {},
+                _ = planning_trigger.recv() => {},
+            }
+
             tracing::info!("Start planning");
             do_plan().await;
             tracing::info!("Planning done");
-            tokio::time::sleep(time::Duration::from_secs_f64(30.0)).await;
         }
     });
 

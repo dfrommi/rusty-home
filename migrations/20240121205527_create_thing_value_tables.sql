@@ -25,6 +25,8 @@ DECLARE
     end_date TIMESTAMPTZ;
     partition_name TEXT;
 BEGIN
+    SET LOCAL timezone to 'UTC';
+
     -- Parse the input string to construct the start and end dates
     start_date := to_timestamp(target_year_month || '-01', 'YYYY-MM-DD');
     end_date := start_date + INTERVAL '1 month';

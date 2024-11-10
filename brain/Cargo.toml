@@ -11,12 +11,14 @@ enum_dispatch = "0.3"
 derive_more = { version = "1", features = ["display"] }
 tracing = "*"
 tracing-subscriber = "*"
+uuid = { version = "1", features = ["v4"] }
 
 sqlx = { version = "0.8", features = [
   "postgres",
   "runtime-tokio",
   "macros",
   "chrono",
+  "uuid",
 ] }
 
 config = "0.14.0"

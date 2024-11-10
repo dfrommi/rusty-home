@@ -1,5 +1,6 @@
 CREATE TABLE action_plan_log (
     id BIGSERIAL PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL,
     run_id UUID NOT NULL,
     seq INT NOT NULL,
     action VARCHAR NOT NULL,
@@ -8,6 +9,5 @@ CREATE TABLE action_plan_log (
     goal_active BOOLEAN NOT NULL,
     locked BOOLEAN NOT NULL,
     fulfilled BOOLEAN,
-    running BOOLEAN,
-    timestamp TIMESTAMPTZ NOT NULL
+    running BOOLEAN
 );

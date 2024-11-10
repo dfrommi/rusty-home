@@ -12,7 +12,9 @@ use action::Action;
 use planner::action_ext::ActionPlannerExt;
 use tabled::Table;
 
-use crate::thing::Executable;
+use crate::{adapter::persistence::PlanLogRepository, home_api, thing::Executable};
+
+pub use planner::ActionResult;
 
 #[rustfmt::skip]
 fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -29,6 +31,10 @@ pub async fn do_plan() {
         "Planning result:\n{}",
         Table::new(&action_results).to_string()
     );
+
+    if let Err(e) = home_api().add_planning_log(&action_results).await {
+        tracing::error!("Error logging planning result: {:?}", e);
+    }
 
     for result in action_results {
         let action = result.action;

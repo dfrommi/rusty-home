@@ -1,4 +1,5 @@
 mod command;
+mod plan_log;
 mod state;
 
 use anyhow::Result;
@@ -8,6 +9,7 @@ use support::time::DateTime;
 use tokio::sync::broadcast::Receiver;
 
 pub use command::CommandRepository;
+pub use plan_log::PlanLogRepository;
 pub use state::StateRepository;
 
 #[derive(Debug, Clone)]

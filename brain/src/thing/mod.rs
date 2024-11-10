@@ -7,7 +7,7 @@ use anyhow::Result;
 mod planning;
 pub mod state;
 
-pub use planning::do_plan;
+pub use planning::{do_plan, ActionResult};
 
 pub trait Executable {
     async fn execute(self, source: CommandSource) -> Result<()>;

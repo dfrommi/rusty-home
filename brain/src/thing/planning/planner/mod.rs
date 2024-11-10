@@ -1,7 +1,7 @@
 pub mod action_ext;
 mod resource_lock;
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use resource_lock::ResourceLock;
 use tabled::Tabled;
@@ -10,7 +10,7 @@ use super::Action;
 use action_ext::ActionPlannerExt;
 
 #[derive(Debug, Tabled)]
-pub struct ActionResult<'a, A: Action> {
+pub struct ActionResult<'a, A: Display> {
     pub action: &'a A,
     #[tabled(display_with = "display_bool")]
     pub should_be_started: bool,

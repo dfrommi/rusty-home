@@ -1,4 +1,5 @@
 use api::command::{PowerToggle, Thermostat};
+use support::t;
 use support::unit::DegreeCelsius;
 
 use crate::thing::planning::action::HeatingZone;
@@ -20,8 +21,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
             KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
-            ExtendHeatingUntilSleeping::new(HeatingZone::LivingRoom, DegreeCelsius(19.1), (22,30), (2,30)).into(),
-            DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(17.6), (6,12), (12,30)).into(),
+            ExtendHeatingUntilSleeping::new(HeatingZone::LivingRoom, DegreeCelsius(19.1), t!(22:30-2:30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(17.6), t!(6:12-12:30)).into(),
         ]
     ),
     (
@@ -30,8 +31,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
             KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
-            ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(18.6), (22,30), (2,30)).into(),
-            DeferHeatingUntilVentilationDone::new(HeatingZone::Bedroom, DegreeCelsius(15.1), (6,12), (12,30)).into(),
+            ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(18.6), t!(22:30-2:30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::Bedroom, DegreeCelsius(15.1), t!(6:12-12:30)).into(),
         ]
     ),
     (
@@ -40,7 +41,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
             KeepUserOverride::new(UserControlled::KitchenThermostat, Thermostat::Kitchen.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
-            DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.1), (6,12), (12,30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.1), t!(6:12-12:30)).into(),
         ]
     ),
     (

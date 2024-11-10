@@ -47,7 +47,7 @@ impl StateRepository for HomeApi {
         match rec {
             Some(r) => Ok(DataPoint {
                 value: r.value.into(),
-                timestamp: DateTime::from_db(r.timestamp),
+                timestamp: r.timestamp.into(),
             }),
             None => anyhow::bail!("No data found"),
         }
@@ -87,7 +87,7 @@ impl StateRepository for HomeApi {
             .into_iter()
             .map(|row| DataPoint {
                 value: C::ValueType::from(row.value),
-                timestamp: DateTime::from_db(row.timestamp.unwrap()),
+                timestamp: row.timestamp.unwrap().into(),
             })
             .collect();
 

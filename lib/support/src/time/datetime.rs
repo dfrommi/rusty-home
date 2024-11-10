@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Add, Sub};
 
 use super::{Duration, Time};
 
@@ -7,22 +7,26 @@ use super::{Duration, Time};
 )]
 #[serde(transparent)]
 pub struct DateTime {
-    pub(super) delegate: chrono::DateTime<chrono::Utc>,
+    delegate: chrono::DateTime<chrono::Local>,
 }
 
 impl DateTime {
-    pub(super) fn new(delegate: chrono::DateTime<chrono::Utc>) -> Self {
-        Self { delegate }
+    fn new<T: chrono::TimeZone>(delegate: chrono::DateTime<T>) -> Self {
+        Self {
+            delegate: delegate.with_timezone(&chrono::Local),
+        }
+    }
+
+    pub(super) fn delegate(&self) -> &chrono::DateTime<chrono::Local> {
+        &self.delegate
     }
 
     pub fn now() -> Self {
-        Self::new(chrono::Utc::now())
+        chrono::Local::now().into()
     }
 
     pub fn from_iso(iso8601: &str) -> anyhow::Result<Self> {
-        Ok(Self::new(
-            chrono::DateTime::parse_from_rfc3339(iso8601)?.with_timezone(&chrono::Utc),
-        ))
+        Ok(chrono::DateTime::parse_from_rfc3339(iso8601)?.into())
     }
 
     pub fn time(&self) -> Time {
@@ -38,19 +42,35 @@ impl DateTime {
                 anyhow::anyhow!("Error parsing time {:?} for date-time {:?}", time, self)
             })?;
 
-        Ok(DateTime::new(dt))
+        Ok(dt.into())
+    }
+
+    pub fn on_next_day(&self) -> Self {
+        //failing only at the edges of what can be stored in a date-time
+        self.delegate
+            .checked_add_signed(chrono::Duration::days(1))
+            .unwrap()
+            .into()
+    }
+
+    pub fn on_prev_day(&self) -> Self {
+        //failing only at the edges of what can be stored in a date-time
+        self.delegate
+            .checked_sub_signed(chrono::Duration::days(1))
+            .unwrap()
+            .into()
     }
 
     pub fn elapsed_since(&self, since: Self) -> Duration {
         Duration::new(self.delegate - since.delegate)
     }
 
-    pub fn into_db(&self) -> chrono::DateTime<chrono::Utc> {
-        self.delegate
+    pub fn elapsed(&self) -> Duration {
+        Self::now().elapsed_since(*self)
     }
 
-    pub fn from_db(delegate: chrono::DateTime<chrono::Utc>) -> Self {
-        Self::new(delegate)
+    pub fn into_db(&self) -> chrono::DateTime<chrono::Local> {
+        self.delegate
     }
 }
 
@@ -70,28 +90,14 @@ impl Sub<Duration> for DateTime {
     }
 }
 
-impl Sub<DateTime> for DateTime {
-    type Output = Duration;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Duration::new(self.delegate - rhs.delegate)
-    }
-}
-
-impl AddAssign<Duration> for DateTime {
-    fn add_assign(&mut self, rhs: Duration) {
-        self.delegate += rhs.delegate;
-    }
-}
-
-impl SubAssign<Duration> for DateTime {
-    fn sub_assign(&mut self, rhs: Duration) {
-        self.delegate -= rhs.delegate;
-    }
-}
-
 impl From<DateTime> for f64 {
     fn from(val: DateTime) -> Self {
         (val.delegate.timestamp_millis() as f64) / 1000.0
+    }
+}
+
+impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
+    fn from(val: chrono::DateTime<T>) -> Self {
+        DateTime::new(val)
     }
 }

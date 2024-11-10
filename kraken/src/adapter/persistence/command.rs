@@ -4,7 +4,6 @@ use api::command::{
 };
 
 use anyhow::Result;
-use support::time::DateTime;
 
 use super::BackendApi;
 
@@ -57,7 +56,7 @@ impl CommandRepository for BackendApi {
                             id,
                             command,
                             state: CommandState::InProgress,
-                            created: DateTime::from_db(rec.created),
+                            created: rec.created.into(),
                             source,
                         })
                     }

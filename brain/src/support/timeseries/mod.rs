@@ -121,7 +121,10 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             .into_iter()
             .map(|((timestamp, value), next)| DataPoint {
                 timestamp: *timestamp,
-                value: (value.clone(), next.map_or(t!(now), |n| *n.0) - *timestamp),
+                value: (
+                    value.clone(),
+                    next.map_or(t!(now), |n| *n.0).elapsed_since(*timestamp),
+                ),
             })
             .collect::<Vec<_>>()
     }

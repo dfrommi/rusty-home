@@ -11,7 +11,7 @@ impl Duration {
     }
 
     pub fn until(date_time: &DateTime) -> Self {
-        Self::new(date_time.delegate - DateTime::now().delegate)
+        Self::new(*date_time.delegate() - DateTime::now().delegate())
     }
 
     pub fn days(days: i64) -> Self {
@@ -46,4 +46,3 @@ impl Duration {
         self.delegate.num_hours()
     }
 }
-

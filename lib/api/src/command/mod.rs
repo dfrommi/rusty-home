@@ -197,7 +197,7 @@ mod test {
                 "device": "room_of_requirements",
                 "mode": "heat",
                 "temperature": 22.5,
-                "until": "2024-10-14T13:37:42Z"
+                "until": "2024-10-14T15:37:42+02:00"
             })
         );
     }

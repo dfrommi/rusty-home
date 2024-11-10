@@ -72,7 +72,7 @@ impl CommandRepository for HomeApi {
                     id: row.id,
                     command: serde_json::from_value(row.command)?,
                     state: CommandState::from((row.status, row.error)),
-                    created: DateTime::from_db(row.created),
+                    created: row.created.into(),
                     source,
                 })
             })

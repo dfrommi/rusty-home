@@ -20,13 +20,12 @@ impl ExtendHeatingUntilSleeping {
     pub fn new(
         heating_zone: HeatingZone,
         target_temperature: DegreeCelsius,
-        start_hm: (u32, u32),
-        latest_until_hm: (u32, u32),
+        time_range: DailyTimeRange,
     ) -> Self {
         Self {
             heating_zone,
             target_temperature,
-            time_range: DailyTimeRange::new(start_hm, latest_until_hm),
+            time_range,
         }
     }
 }

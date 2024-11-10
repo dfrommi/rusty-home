@@ -32,7 +32,7 @@ impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
         };
 
         let window_opened = window.current_data_point().await?;
-        let opened_elapsed = t!(now) - window_opened.timestamp;
+        let opened_elapsed = window_opened.timestamp.elapsed();
 
         if window_opened.value || opened_elapsed > t!(30 minutes) {
             return Ok(window_opened.map_value(|_| false));

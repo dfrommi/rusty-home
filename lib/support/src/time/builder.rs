@@ -4,15 +4,12 @@ macro_rules! t {
         $crate::time::DateTime::now()
     }};
 
-    ($hour:literal : $minute:literal) => {{
-        $crate::time::Time::at($hour, $minute).unwrap()
+    ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
+        $crate::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
     }};
 
-    ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
-        $crate::time::DailyTimeRange::new(
-            ($from_hour, $from_minute),
-            ($to_hour, $to_minute)
-        )
+    ($hour:literal : $minute:literal) => {{
+        $crate::time::Time::at($hour, $minute).unwrap()
     }};
 
     ($amount:literal seconds) => {{

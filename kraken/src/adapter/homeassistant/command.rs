@@ -1,22 +1,61 @@
-use serialize::to_message;
-use support::mqtt::MqttOutMessage;
-use tokio::sync::mpsc::Sender;
+use anyhow::Context;
+use serialize::{to_message, HaMessage, HaServiceData};
 
 use crate::adapter::CommandExecutor;
 
 use super::HaService;
 
 pub struct HaCommandExecutor {
-    mqtt_sender: Sender<MqttOutMessage>,
-    command_mqtt_topic: String,
+    client: reqwest::Client,
+    url: String,
 }
 
 impl HaCommandExecutor {
-    pub fn new(mqtt_sender: Sender<MqttOutMessage>, command_mqtt_topic: &str) -> Self {
+    pub fn new(url: &str, token: &str) -> Self {
+        use reqwest::header;
+
+        let mut headers = header::HeaderMap::new();
+        let mut auth_value =
+            header::HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap();
+        auth_value.set_sensitive(true);
+        headers.insert(header::AUTHORIZATION, auth_value);
+
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
         Self {
-            mqtt_sender,
-            command_mqtt_topic: command_mqtt_topic.to_owned(),
+            client,
+            url: url.to_owned(),
         }
+    }
+
+    async fn call_service(
+        &self,
+        domain: &str,
+        service: &str,
+        service_data: HaServiceData,
+    ) -> anyhow::Result<()> {
+        tracing::info!(
+            "Calling HA service {}/{}: {:?}",
+            domain,
+            service,
+            service_data
+        );
+
+        let response = self
+            .client
+            .post(format!("{}/api/services/{}/{}", self.url, domain, service))
+            .json(&service_data)
+            .send()
+            .await;
+
+        tracing::info!("Response: {:?}", response);
+
+        response
+            .with_context(|| format!("Error calling HA service {}/{}", domain, service))
+            .map(|_| ())
     }
 }
 
@@ -24,17 +63,16 @@ impl CommandExecutor<HaService> for HaCommandExecutor {
     async fn execute_command(&self, command: &HaService) -> anyhow::Result<bool> {
         let payload = to_message(command)?;
 
-        let mqtt_msg = MqttOutMessage {
-            topic: self.command_mqtt_topic.to_owned(),
-            payload,
-            retain: false,
-        };
-
-        self.mqtt_sender
-            .send(mqtt_msg)
-            .await
-            .map(|_| true)
-            .map_err(Into::into)
+        match payload {
+            HaMessage::CallService {
+                domain,
+                service,
+                service_data,
+            } => {
+                self.call_service(domain, service, service_data).await?;
+                Ok(true)
+            }
+        }
     }
 }
 
@@ -47,7 +85,7 @@ mod serialize {
 
     use crate::adapter::homeassistant::{HaClimateHvacMode, HaService};
 
-    pub fn to_message(service: &HaService) -> Result<String, serde_json::Error> {
+    pub fn to_message(service: &HaService) -> Result<HaMessage, serde_json::Error> {
         let message = match service {
             HaService::SwitchTurnOnOff { id, power_on } => HaMessage::CallService {
                 domain: "switch",
@@ -99,12 +137,12 @@ mod serialize {
             },
         };
 
-        serde_json::to_string(&message)
+        Ok(message)
     }
 
     #[derive(Serialize, Debug)]
     #[serde(tag = "event_type", content = "event_data")]
-    enum HaMessage {
+    pub enum HaMessage {
         #[serde(rename = "call_service")]
         CallService {
             domain: &'static str,
@@ -115,7 +153,7 @@ mod serialize {
 
     #[derive(Serialize, Debug)]
     #[serde(untagged)]
-    enum HaServiceData {
+    pub enum HaServiceData {
         ForEntities {
             #[serde(rename = "entity_id")]
             ids: Vec<String>,

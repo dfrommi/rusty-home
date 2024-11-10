@@ -48,10 +48,8 @@ pub async fn main() {
         ha_event_rx,
     );
 
-    let ha_cmd_executor = adapter::HaCommandExecutor::new(
-        mqtt_client.new_publisher(),
-        &settings.homeassistant.topic_command,
-    );
+    let ha_cmd_executor =
+        adapter::HaCommandExecutor::new(&settings.homeassistant.url, &settings.homeassistant.token);
 
     let state_collect_api = api.clone();
     tasks.spawn(

@@ -10,7 +10,7 @@ use anyhow::Result;
 
 pub use command::CommandRepository;
 #[allow(unused_imports)]
-pub use energy_reading::EnergyReadingRepository;
+pub use energy_reading::*;
 pub use state::StateRepository;
 
 #[derive(Debug)]

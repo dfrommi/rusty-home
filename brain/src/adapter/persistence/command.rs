@@ -5,7 +5,7 @@ use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandId, CommandSource, CommandState, CommandTarget,
 };
-use support::time::DateTime;
+use support::{t, time::DateTime};
 
 pub trait CommandRepository {
     async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()>;
@@ -34,7 +34,7 @@ impl CommandRepository for HomeApi {
         sqlx::query!(
             r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             db_command,
-            DateTime::now().into_db(),
+            t!(now).into_db(),
             DbCommandState::Pending as DbCommandState,
             db_source_type as DbCommandSource,
             db_source_id
@@ -56,10 +56,13 @@ impl CommandRepository for HomeApi {
         let records = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
                 from THING_COMMAND 
-                where command @> $1 and created >= $2 
+                where command @> $1 
+                and created >= $2
+                and created <= $3
                 order by created asc"#,
             db_target,
-            since.into_db()
+            since.into_db(),
+            t!(now).into_db(), //For timeshift in tests
         )
         .fetch_all(&self.db_pool)
         .await?;

@@ -33,3 +33,29 @@ impl Settings {
         s.try_deserialize()
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use support::file::find_file_upwards;
+
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    pub struct TestSettings {
+        pub live_database: Database,
+    }
+
+    impl TestSettings {
+        pub fn load() -> Result<Self, ConfigError> {
+            let source = match find_file_upwards("test.toml") {
+                Some(p) => File::from(p),
+                None => return Err(ConfigError::NotFound("test.toml".to_owned())),
+            };
+
+            Config::builder()
+                .add_source(source)
+                .build()?
+                .try_deserialize()
+        }
+    }
+}

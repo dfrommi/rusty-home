@@ -24,7 +24,7 @@ impl<V> DataPoint<V> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HomeApi {
     db_pool: PgPool,
 }

@@ -4,7 +4,7 @@ use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
-use support::time::DateTime;
+use support::{t, time::DateTime};
 
 pub trait StateRepository {
     async fn get_latest<'a, C: ChannelTypeInfo>(
@@ -37,9 +37,11 @@ impl StateRepository for HomeApi {
             r#"SELECT value as "value: DbValue", timestamp
             FROM THING_VALUE
             WHERE TAG_ID = $1
+            AND timestamp <= $2
             ORDER BY timestamp DESC, id DESC
             LIMIT 1"#,
-            tag_id
+            tag_id,
+            t!(now).into_db(), //For timeshift in tests
         )
         .fetch_optional(&self.db_pool)
         .await?;
@@ -69,7 +71,8 @@ impl StateRepository for HomeApi {
             r#"(SELECT value as "value!: DbValue", timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
-              AND timestamp > $2)
+              AND timestamp > $2
+              AND timestamp <= $3)
             UNION ALL
             (SELECT value, timestamp
               FROM THING_VALUE
@@ -78,7 +81,8 @@ impl StateRepository for HomeApi {
               ORDER BY timestamp DESC
               LIMIT 1)"#,
             tags_id,
-            start.into_db()
+            start.into_db(),
+            t!(now).into_db(), //For timeshift in tests
         )
         .fetch_all(&self.db_pool)
         .await?;

@@ -7,7 +7,7 @@ use crate::{
     home_api,
 };
 use api::{
-    command::{CommandExecution, CommandSource, PowerToggle, SetPower},
+    command::{CommandExecution, CommandSource, PowerToggle, SetPower, Thermostat},
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 
@@ -45,6 +45,7 @@ impl DataPointAccess<bool> for UserControlled {
             //consider timer expiration
             UserControlled::LivingRoomThermostat => {
                 current_data_point_for_thermostat(
+                    Thermostat::LivingRoom,
                     ExternalAutoControl::LivingRoomThermostat,
                     SetPoint::LivingRoom,
                 )
@@ -52,6 +53,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(
+                    Thermostat::Bedroom,
                     ExternalAutoControl::BedroomThermostat,
                     SetPoint::Bedroom,
                 )
@@ -59,6 +61,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::KitchenThermostat => {
                 current_data_point_for_thermostat(
+                    Thermostat::Kitchen,
                     ExternalAutoControl::KitchenThermostat,
                     SetPoint::Kitchen,
                 )
@@ -66,6 +69,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(
+                    Thermostat::RoomOfRequirements,
                     ExternalAutoControl::RoomOfRequirementsThermostat,
                     SetPoint::RoomOfRequirements,
                 )
@@ -73,6 +77,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
+                    Thermostat::Bathroom,
                     ExternalAutoControl::BathroomThermostat,
                     SetPoint::Bathroom,
                 )
@@ -112,25 +117,44 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
     })
 }
 
-//TODO check last executed command and timestamp
 async fn current_data_point_for_thermostat(
+    thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,
 ) -> anyhow::Result<DataPoint<bool>> {
-    let (auto_mode_on, set_point) = tokio::try_join!(
+    let (auto_mode_on, set_point, latest_command) = tokio::try_join!(
         auto_mode.current_data_point(),
-        set_point.current_data_point()
+        set_point.current_data_point(),
+        home_api().get_latest_command_since(thermostat, t!(24 hours ago))
     )?;
 
-    let set_point_value = *set_point.value.as_ref();
-    //assumption: user never sets to 0.0
-    let system_triggered = auto_mode_on.value
-        || set_point_value == 0.0
-        || set_point_value.fract() == 0.0
-        || set_point_value.fract() == 0.5;
+    let most_recent_change = std::cmp::max(auto_mode_on.timestamp, set_point.timestamp);
 
-    Ok(DataPoint {
-        value: !system_triggered,
-        timestamp: std::cmp::max(auto_mode_on.timestamp, set_point.timestamp),
-    })
+    //if no command, then overridden by user only if in manual mode
+    if latest_command.is_none() {
+        return Ok(auto_mode_on.map_value(|v| !v));
+    }
+
+    let latest_command = latest_command.unwrap();
+    let triggered_by_user = matches!(latest_command.source, CommandSource::User(_));
+
+    //command after change? -> triggered but roundtrip not yet done -> command source wins
+    if latest_command.created > most_recent_change {
+        return Ok(DataPoint::new(triggered_by_user, most_recent_change));
+    }
+
+    let is_expired = latest_command
+        .command
+        .get_expiration()
+        .map_or(false, |expiration| expiration < t!(now));
+
+    let comand_setting_followed = latest_command
+        .command
+        .matches(auto_mode_on.value, set_point.value);
+
+    match (is_expired, comand_setting_followed) {
+        (true, _) => Ok(DataPoint::new(auto_mode_on.value, most_recent_change)),
+        (false, true) => Ok(DataPoint::new(triggered_by_user, most_recent_change)),
+        (false, false) => Ok(DataPoint::new(true, most_recent_change)),
+    }
 }

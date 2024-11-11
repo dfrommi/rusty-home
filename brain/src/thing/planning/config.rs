@@ -22,7 +22,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::new(HeatingZone::LivingRoom, DegreeCelsius(19.9), t!(22:30-2:30)).into(),
-            DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(18.6), t!(6:12-12:30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::LivingRoom, DegreeCelsius(18.5), t!(6:12-12:30)).into(),
         ]
     ),
     (
@@ -31,7 +31,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
             KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
-            ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(18.9), t!(22:30-2:30)).into(),
+            ExtendHeatingUntilSleeping::new(HeatingZone::Bedroom, DegreeCelsius(19.0), t!(22:30-2:30)).into(),
             DeferHeatingUntilVentilationDone::new(HeatingZone::Bedroom, DegreeCelsius(18.1), t!(6:12-12:30)).into(),
         ]
     ),
@@ -41,7 +41,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
             KeepUserOverride::new(UserControlled::KitchenThermostat, Thermostat::Kitchen.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
-            DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.1), t!(6:12-12:30)).into(),
+            DeferHeatingUntilVentilationDone::new(HeatingZone::Kitchen, DegreeCelsius(15.0), t!(6:12-12:30)).into(),
         ]
     ),
     (

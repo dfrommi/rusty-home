@@ -27,8 +27,8 @@ impl DataPointAccess<bool> for Resident {
 }
 
 async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
-    let in_bed_full_range = t!(21:00 - 13:00);
-    let in_bed_start_range = t!(21:00 - 3:00);
+    let in_bed_full_range = t!(21:00 - 13:00).starting_today();
+    let in_bed_start_range = t!(21:00 - 3:00).starting_today();
 
     let now = t!(now);
     if !in_bed_full_range.contains(now) {
@@ -39,7 +39,7 @@ async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
     }
 
     //TODO TimeSeries with date in future?
-    let range_start = in_bed_full_range.for_today().0;
+    let range_start = in_bed_full_range.start();
     let ts = in_bed.series_since(range_start).await?.with_duration();
 
     let sleeping_started = ts.iter().find(|dp| {

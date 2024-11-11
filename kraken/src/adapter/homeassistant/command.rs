@@ -37,11 +37,12 @@ impl HaCommandExecutor {
         service: &str,
         service_data: HaServiceData,
     ) -> anyhow::Result<()> {
+        let url = format!("{}/api/services/{}/{}", self.url, domain, service);
+
         tracing::info!(
-            "Calling HA service {}/{}: {:?}",
-            domain,
-            service,
-            service_data
+            "Calling HA service {}: {:?}",
+            url,
+            serde_json::to_string(&service_data)?
         );
 
         let response = self
@@ -109,7 +110,7 @@ mod serialize {
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
                     extra: HashMap::from([(
-                        "mode".to_string(),
+                        "hvac_mode".to_string(),
                         json!(match mode {
                             HaClimateHvacMode::Off => "off",
                             HaClimateHvacMode::Auto => "auto",

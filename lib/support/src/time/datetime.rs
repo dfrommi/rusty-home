@@ -1,6 +1,15 @@
-use std::ops::{Add, Sub};
+use std::{
+    fmt::Display,
+    ops::{Add, Sub},
+};
+
+use tokio::task_local;
 
 use super::{Duration, Time};
+
+task_local! {
+    pub static FIXED_NOW: DateTime;
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -22,7 +31,9 @@ impl DateTime {
     }
 
     pub fn now() -> Self {
-        chrono::Local::now().into()
+        FIXED_NOW
+            .try_with(|t| *t)
+            .unwrap_or_else(|_| chrono::Local::now().into())
     }
 
     pub fn from_iso(iso8601: &str) -> anyhow::Result<Self> {
@@ -71,6 +82,12 @@ impl DateTime {
 
     pub fn into_db(&self) -> chrono::DateTime<chrono::Local> {
         self.delegate
+    }
+}
+
+impl Display for DateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.delegate)
     }
 }
 

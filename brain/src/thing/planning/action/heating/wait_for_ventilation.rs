@@ -42,20 +42,20 @@ impl DeferHeatingUntilVentilationDone {
 
 impl Action for DeferHeatingUntilVentilationDone {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
-        if !self.time_range.contains(t!(now)) {
+        let time_range = self.time_range.starting_today();
+        if !time_range.contains(t!(now)) {
             return Ok(false);
         }
 
         let window_opened = self.window().current_data_point().await?;
-        if self.time_range.contains(window_opened.timestamp) {
+
+        if time_range.contains(window_opened.timestamp) {
             return Ok(false);
         }
 
         let (already_triggered, has_expected_manual_heating) = tokio::try_join!(
-            self.heating_zone.manual_heating_already_triggrered(
-                self.target_temperature,
-                self.time_range.prev_start(),
-            ),
+            self.heating_zone
+                .manual_heating_already_triggrered(self.target_temperature, time_range.start(),),
             self.heating_zone
                 .is_manual_heating_to(self.target_temperature)
         )?;
@@ -72,6 +72,7 @@ impl Action for DeferHeatingUntilVentilationDone {
         Ok(has_expected_manual_heating.value
             && self
                 .time_range
+                .starting_today()
                 .contains(has_expected_manual_heating.timestamp))
     }
 
@@ -81,7 +82,7 @@ impl Action for DeferHeatingUntilVentilationDone {
                 device: self.heating_zone.thermostat(),
                 target_state: api::command::HeatingTargetState::Heat {
                     temperature: self.target_temperature,
-                    until: self.time_range.for_today().1,
+                    until: self.time_range.starting_today().end(),
                 },
             }
             .into(),

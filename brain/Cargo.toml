@@ -32,3 +32,4 @@ support = { path = "../lib/support" }
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"
+tokio-shared-rt = "*"

@@ -48,6 +48,12 @@ mod tests {
     use crate::time::*;
 
     #[test]
+    fn test_now() {
+        let now = t!(now);
+        assert!(DateTime::now().elapsed_since(now) < Duration::seconds(1));
+    }
+
+    #[test]
     fn test_time() {
         let t = t!(5:34);
 

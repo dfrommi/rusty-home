@@ -116,6 +116,35 @@ impl CommandId for Thermostat {
     type CommandType = SetHeating;
 }
 
+impl SetHeating {
+    pub fn matches(&self, auto_mode_enabled: bool, set_point: DegreeCelsius) -> bool {
+        match self {
+            SetHeating {
+                target_state: HeatingTargetState::Auto,
+                ..
+            } => auto_mode_enabled,
+            SetHeating {
+                target_state: HeatingTargetState::Heat { temperature, .. },
+                ..
+            } => !auto_mode_enabled && set_point == *temperature,
+            SetHeating {
+                target_state: HeatingTargetState::Off,
+                ..
+            } => !auto_mode_enabled && set_point == DegreeCelsius(0.0),
+        }
+    }
+
+    pub fn get_expiration(&self) -> Option<DateTime> {
+        match self {
+            SetHeating {
+                target_state: HeatingTargetState::Heat { until, .. },
+                ..
+            } => Some(*until),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use assert_json_diff::assert_json_eq;

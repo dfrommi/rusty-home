@@ -8,7 +8,19 @@ pub struct DailyTimeRange {
     end: Time,
 }
 
+#[derive(Debug, Clone)]
+pub struct DateTimeRange {
+    start: DateTime,
+    end: DateTime,
+}
+
 impl Display for DailyTimeRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.start, self.end)
+    }
+}
+
+impl Display for DateTimeRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}-{}", self.start, self.end)
     }
@@ -19,17 +31,7 @@ impl DailyTimeRange {
         Self { start, end }
     }
 
-    pub fn prev_start(&self) -> DateTime {
-        let now = DateTime::now();
-        let mut start = now.at(self.start).unwrap();
-        if start > now {
-            start = start.on_prev_day();
-        }
-
-        start
-    }
-
-    pub fn for_today(&self) -> (DateTime, DateTime) {
+    pub fn starting_today(&self) -> DateTimeRange {
         let now = DateTime::now();
         let start = now.at(self.start).unwrap();
         let mut end = start.at(self.end).unwrap();
@@ -38,18 +40,24 @@ impl DailyTimeRange {
             end = end.on_next_day();
         }
 
-        (start, end)
+        DateTimeRange::new(start, end)
+    }
+}
+
+impl DateTimeRange {
+    pub fn new(start: DateTime, end: DateTime) -> Self {
+        Self { start, end }
+    }
+
+    pub fn start(&self) -> DateTime {
+        self.start
+    }
+
+    pub fn end(&self) -> DateTime {
+        self.end
     }
 
     pub fn contains(&self, datetime: DateTime) -> bool {
-        let time = datetime.time();
-
-        // same-day scenario
-        if self.start <= self.end {
-            self.start <= time && time <= self.end
-        } else {
-            // cross-day scenario
-            self.start <= time || time <= self.end
-        }
+        datetime >= self.start && datetime <= self.end
     }
 }

@@ -153,7 +153,7 @@ async fn current_data_point_for_thermostat(
         .matches(auto_mode_on.value, set_point.value);
 
     match (is_expired, comand_setting_followed) {
-        (true, _) => Ok(DataPoint::new(auto_mode_on.value, most_recent_change)),
+        (true, _) => Ok(DataPoint::new(!auto_mode_on.value, most_recent_change)),
         (false, true) => Ok(DataPoint::new(triggered_by_user, most_recent_change)),
         (false, false) => Ok(DataPoint::new(true, most_recent_change)),
     }

@@ -9,6 +9,8 @@ use crate::thing::{
     AutomaticTemperatureIncrease, DataPointAccess,
 };
 
+static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
+
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringAutomaticTemperatureIncrease {
     heating_zone: HeatingZone,
@@ -38,7 +40,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             .current_set_point()
             .current()
             .await
-            .map(|v| v == DegreeCelsius(7.1))
+            .map(|v| v == NO_HEATING_SET_POINT)
     }
 
     fn start_command(&self) -> Option<Command> {
@@ -46,7 +48,7 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             SetHeating {
                 device: self.heating_zone.thermostat(),
                 target_state: api::command::HeatingTargetState::Heat {
-                    temperature: DegreeCelsius(7.1),
+                    temperature: NO_HEATING_SET_POINT,
                     until: t!(in 1 hours),
                 },
             }

@@ -8,6 +8,9 @@ mod config;
 mod goal;
 mod planner;
 
+#[cfg(test)]
+mod tests;
+
 use action::Action;
 use planner::action_ext::ActionPlannerExt;
 use tabled::Table;
@@ -23,9 +26,7 @@ fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
 }
 
 pub async fn do_plan() {
-    let config = default_config();
-    let goals = get_active_goals();
-    let action_results = planner::find_next_actions(goals, config).await;
+    let action_results = get_action_results().await;
 
     tracing::info!(
         "Planning result:\n{}",
@@ -64,4 +65,10 @@ pub async fn do_plan() {
             }
         }
     }
+}
+
+async fn get_action_results() -> Vec<ActionResult<'static, HomeAction>> {
+    let config = default_config();
+    let goals = get_active_goals();
+    planner::find_next_actions(goals, config).await
 }

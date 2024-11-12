@@ -6,7 +6,7 @@ use support::{t, unit::DegreeCelsius};
 
 use crate::thing::{
     planning::action::{Action, HeatingZone},
-    AutomaticTemperatureIncrease, DataPointAccess,
+    AutomaticTemperatureIncrease, DataPointAccess, Opened,
 };
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
@@ -24,15 +24,36 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
 
 impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
     async fn preconditions_fulfilled(&self) -> Result<bool> {
-        match self.heating_zone {
-            HeatingZone::LivingRoom => AutomaticTemperatureIncrease::LivingRoom,
-            HeatingZone::Bedroom => AutomaticTemperatureIncrease::Bedroom,
-            HeatingZone::Kitchen => AutomaticTemperatureIncrease::Kitchen,
-            HeatingZone::RoomOfRequirements => AutomaticTemperatureIncrease::RoomOfRequirements,
-            HeatingZone::Bathroom => AutomaticTemperatureIncrease::Bedroom,
+        let (temp_increase, window_opened) = match self.heating_zone {
+            HeatingZone::LivingRoom => (
+                AutomaticTemperatureIncrease::LivingRoom,
+                Opened::LivingRoomWindowOrDoor,
+            ),
+            HeatingZone::Bedroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
+            HeatingZone::Kitchen => (AutomaticTemperatureIncrease::Kitchen, Opened::KitchenWindow),
+            HeatingZone::RoomOfRequirements => (
+                AutomaticTemperatureIncrease::RoomOfRequirements,
+                Opened::RoomOfRequirementsWindow,
+            ),
+            HeatingZone::Bathroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
+        };
+
+        let (window_opened, temp_increase) =
+            tokio::try_join!(window_opened.current_data_point(), temp_increase.current())?;
+
+        //window still open or no temp increase
+        if !temp_increase || window_opened.value {
+            return Ok(false);
         }
-        .current()
-        .await
+
+        //another place very similar to the rest
+        let (already_triggered, has_expected_manual_heating) = tokio::try_join!(
+            self.heating_zone
+                .manual_heating_already_triggrered(NO_HEATING_SET_POINT, window_opened.timestamp),
+            self.heating_zone.is_manual_heating_to(NO_HEATING_SET_POINT)
+        )?;
+
+        Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
     async fn is_running(&self) -> Result<bool> {

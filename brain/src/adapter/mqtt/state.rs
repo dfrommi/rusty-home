@@ -1,18 +1,20 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
 use api::state::Powered;
 use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
-use crate::prelude::DataPointAccess;
+use crate::thing::state::DataPointAccess;
 
-pub async fn export_state(
-    base_topic: &str,
+pub async fn export_state<T>(
+    api: &T,
+    base_topic: String,
     tx: Sender<MqttOutMessage>,
     mut state_changed: Receiver<()>,
-) {
-    let mut sender = MqttStateSender::new(base_topic.to_string(), tx);
+) where
+    T: DataPointAccess<Powered>,
+{
+    let mut sender = MqttStateSender::new(base_topic.to_owned(), tx);
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
 
     loop {
@@ -21,7 +23,7 @@ pub async fn export_state(
             _ = timer.tick() => {},
         }
 
-        sender.send(Powered::Dehumidifier).await;
+        sender.send(Powered::Dehumidifier, api).await;
     }
 }
 
@@ -40,11 +42,22 @@ impl MqttStateSender {
         }
     }
 
-    async fn send(&mut self, state: impl IntoMqttState) {
-        let state = state.into_mqtt_state().await.unwrap();
+    async fn send<'a, 'b: 'a, T>(&'a mut self, state: impl IntoMqttStateId, api: &'b T)
+    where
+        T: DataPointAccess<Powered>,
+    {
+        //let state = state.into_mqtt_state(api).await.unwrap();
+        let id = state.into_mqtt_state_id().await.unwrap();
+        let value = MqttStateValue::from(
+            api.current_data_point(Powered::Dehumidifier)
+                .await
+                .unwrap()
+                .value,
+        );
+
         let msg = MqttOutMessage {
-            topic: format!("{}/{}/{}", self.base_topic, state.name, state.channel),
-            payload: state.payload,
+            topic: format!("{}/{}/{}", self.base_topic, id.name, id.channel),
+            payload: value.0,
             retain: true,
         };
 
@@ -57,31 +70,26 @@ impl MqttStateSender {
     }
 }
 
-struct MqttState {
+struct MqttStateId {
     name: String,
     channel: String,
-    payload: String,
 }
-
 struct MqttStateValue(String);
 
-trait IntoMqttState {
-    async fn into_mqtt_state(self) -> Result<MqttState>;
+trait IntoMqttStateId {
+    async fn into_mqtt_state_id(&self) -> Option<MqttStateId>;
 }
 
-impl IntoMqttState for Powered {
-    async fn into_mqtt_state(self) -> Result<MqttState> {
+impl IntoMqttStateId for Powered {
+    async fn into_mqtt_state_id(&self) -> Option<MqttStateId> {
         let (name, channel) = match self {
             Powered::Dehumidifier => ("dehumidifier", "power"),
-            _ => bail!("Unsupported state"),
+            _ => return None,
         };
 
-        let v: MqttStateValue = self.current().await?.into();
-
-        Ok(MqttState {
+        Some(MqttStateId {
             name: name.to_string(),
             channel: channel.to_string(),
-            payload: v.0,
         })
     }
 }

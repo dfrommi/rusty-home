@@ -1,13 +1,12 @@
 use std::sync::OnceLock;
 
+use sqlx::PgPool;
 use support::time::{DateTime, FIXED_NOW};
 use tokio::runtime::Runtime;
 
 use crate::{
-    adapter::persistence::HomeApi,
     settings,
     thing::planning::action::{Action, HomeAction},
-    HOME_API_INSTANCE,
 };
 
 pub struct ActionState {
@@ -20,9 +19,10 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     let action: HomeAction = action.into();
 
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
-        //init_api().await;
+        let api = infrastructure();
+
         let (is_fulfilled, is_running) =
-            tokio::try_join!(action.preconditions_fulfilled(), action.is_running()).unwrap();
+            tokio::try_join!(action.preconditions_fulfilled(api), action.is_running(api)).unwrap();
 
         ActionState {
             is_fulfilled,
@@ -31,29 +31,39 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     }))
 }
 
-static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+struct TestInfrastructure {
+    runtime: Runtime,
+    db_pool: PgPool,
+}
 
-fn runtime() -> &'static tokio::runtime::Runtime {
-    RUNTIME.get_or_init(|| {
+impl AsRef<PgPool> for TestInfrastructure {
+    fn as_ref(&self) -> &PgPool {
+        &self.db_pool
+    }
+}
+
+static INFRASTRUCTURE: OnceLock<TestInfrastructure> = OnceLock::new();
+
+fn runtime() -> &'static Runtime {
+    &infrastructure().runtime
+}
+
+fn infrastructure() -> &'static TestInfrastructure {
+    INFRASTRUCTURE.get_or_init(|| {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("Failed building the Runtime");
 
-        HOME_API_INSTANCE.get_or_init(|| runtime.block_on(create_api()));
+        let db_pool = runtime.block_on(async {
+            let settings = settings::test::TestSettings::load().unwrap();
+            sqlx::postgres::PgPoolOptions::new()
+                .max_connections(4)
+                .connect(settings.live_database.url.as_str())
+                .await
+                .unwrap()
+        });
 
-        runtime
+        TestInfrastructure { runtime, db_pool }
     })
-}
-
-async fn create_api() -> HomeApi {
-    let settings = settings::test::TestSettings::load().unwrap();
-
-    let db_pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(4)
-        .connect(settings.live_database.url.as_str())
-        .await
-        .unwrap();
-
-    HomeApi::new(db_pool)
 }

@@ -1,23 +1,22 @@
-use std::sync::OnceLock;
+use std::{fmt::Display, sync::OnceLock};
 
 use action::HomeAction;
+use api::command::{Command, Thermostat};
+use api::state::{ExternalAutoControl, RelativeHumidity, SetPoint};
 use goal::{get_active_goals, HomeGoal};
 
 mod action;
 mod config;
 mod goal;
 mod planner;
+use planner::action_ext::ExecutionAwareAction;
+pub use planner::ActionResult;
 
 #[cfg(test)]
 mod tests;
 
-use action::Action;
-use planner::action_ext::ActionPlannerExt;
-use tabled::Table;
-
-use crate::{adapter::persistence::PlanLogRepository, home_api, thing::Executable};
-
-pub use planner::ActionResult;
+use super::state::{DataPointAccess, RiskOfMould};
+use super::{state::*, CommandAccess, CommandExecutor};
 
 #[rustfmt::skip]
 fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -25,50 +24,45 @@ fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
     CONFIG.get_or_init(|| { config::default_config() })
 }
 
-pub async fn do_plan() {
-    let action_results = get_action_results().await;
+pub async fn plan_for_home<T>(api: &T)
+where
+    T: DataPointAccess<Powered>
+        + DataPointAccess<ExternalAutoControl>
+        + DataPointAccess<SetPoint>
+        + DataPointAccess<RiskOfMould>
+        + DataPointAccess<ColdAirComingIn>
+        + DataPointAccess<Opened>
+        + DataPointAccess<AutomaticTemperatureIncrease>
+        + DataPointAccess<UserControlled>
+        + DataPointAccess<RelativeHumidity>
+        + DataPointAccess<Resident>
+        + CommandAccess<Thermostat>
+        + CommandAccess<Command>
+        + CommandExecutor<Command>
+        + PlanningResultTracer,
+{
+    let goals = get_active_goals();
 
-    tracing::info!(
-        "Planning result:\n{}",
-        Table::new(&action_results).to_string()
-    );
+    //TODO move mapping to static init
+    let config = default_config()
+        .iter()
+        .map(|(goal, actions)| {
+            (
+                goal.clone(),
+                actions
+                    .iter()
+                    .map(|a| ExecutionAwareAction::new(a.clone()))
+                    .collect(),
+            )
+        })
+        .collect::<Vec<_>>();
 
-    if let Err(e) = home_api().add_planning_log(&action_results).await {
-        tracing::error!("Error logging planning result: {:?}", e);
-    }
-
-    for result in action_results {
-        let action = result.action;
-        if result.should_be_started {
-            match action.start_command() {
-                Some(command) => match command.execute(action.command_source_start()).await {
-                    Ok(_) => tracing::info!("Action {} started", action),
-                    Err(e) => tracing::error!("Error starting action {}: {:?}", action, e),
-                },
-                None => tracing::info!(
-                    "Action {} should be started, but no command is configured",
-                    action
-                ),
-            }
-        }
-
-        if result.should_be_stopped {
-            match action.stop_command() {
-                Some(command) => match command.execute(action.command_source_stop()).await {
-                    Ok(_) => tracing::info!("Action {} stopped", action),
-                    Err(e) => tracing::error!("Error stopping action {}: {:?}", action, e),
-                },
-                None => tracing::info!(
-                    "Action {} should be stopped, but no command is configured",
-                    action
-                ),
-            }
-        }
-    }
+    planner::do_plan(&goals, &config, api).await;
 }
 
-async fn get_action_results() -> Vec<ActionResult<'static, HomeAction>> {
-    let config = default_config();
-    let goals = get_active_goals();
-    planner::find_next_actions(goals, config).await
+pub trait PlanningResultTracer {
+    async fn add_planning_trace<'a, A: Display>(
+        &self,
+        results: &[ActionResult<'a, A>],
+    ) -> anyhow::Result<()>;
 }

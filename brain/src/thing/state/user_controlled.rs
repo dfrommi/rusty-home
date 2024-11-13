@@ -2,13 +2,10 @@ use std::fmt::Display;
 
 use support::t;
 
-use crate::{
-    adapter::persistence::{CommandRepository, DataPoint},
-    home_api,
-};
+use crate::{adapter::persistence::DataPoint, thing::CommandAccess};
 use api::{
     command::{CommandExecution, CommandSource, PowerToggle, SetPower, Thermostat},
-    state::{ExternalAutoControl, Powered, SetPoint},
+    state::{ChannelTypeInfo, ExternalAutoControl, Powered, SetPoint},
 };
 
 use super::DataPointAccess;
@@ -37,14 +34,26 @@ impl Display for UserControlled {
     }
 }
 
-impl DataPointAccess<bool> for UserControlled {
-    async fn current_data_point(&self) -> anyhow::Result<DataPoint<bool>> {
-        match self {
-            UserControlled::Dehumidifier => current_data_point_for_dehumidifier().await,
+impl ChannelTypeInfo for UserControlled {
+    type ValueType = bool;
+}
+
+impl<T> DataPointAccess<UserControlled> for T
+where
+    T: DataPointAccess<Powered>
+        + DataPointAccess<ExternalAutoControl>
+        + DataPointAccess<SetPoint>
+        + CommandAccess<PowerToggle>
+        + CommandAccess<Thermostat>,
+{
+    async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
+        match item {
+            UserControlled::Dehumidifier => current_data_point_for_dehumidifier(self).await,
             //check expected state according to last action and compare with current state. Also
             //consider timer expiration
             UserControlled::LivingRoomThermostat => {
                 current_data_point_for_thermostat(
+                    self,
                     Thermostat::LivingRoom,
                     ExternalAutoControl::LivingRoomThermostat,
                     SetPoint::LivingRoom,
@@ -53,6 +62,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(
+                    self,
                     Thermostat::Bedroom,
                     ExternalAutoControl::BedroomThermostat,
                     SetPoint::Bedroom,
@@ -61,6 +71,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::KitchenThermostat => {
                 current_data_point_for_thermostat(
+                    self,
                     Thermostat::Kitchen,
                     ExternalAutoControl::KitchenThermostat,
                     SetPoint::Kitchen,
@@ -69,6 +80,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(
+                    self,
                     Thermostat::RoomOfRequirements,
                     ExternalAutoControl::RoomOfRequirementsThermostat,
                     SetPoint::RoomOfRequirements,
@@ -77,6 +89,7 @@ impl DataPointAccess<bool> for UserControlled {
             }
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
+                    self,
                     Thermostat::Bathroom,
                     ExternalAutoControl::BathroomThermostat,
                     SetPoint::Bathroom,
@@ -87,8 +100,10 @@ impl DataPointAccess<bool> for UserControlled {
     }
 }
 
-async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>> {
-    let power = Powered::Dehumidifier.current_data_point().await?;
+async fn current_data_point_for_dehumidifier(
+    api: &(impl DataPointAccess<Powered> + CommandAccess<PowerToggle>),
+) -> anyhow::Result<DataPoint<bool>> {
+    let power = api.current_data_point(Powered::Dehumidifier).await?;
 
     //user-control only valid for 15 minutes
     if power.timestamp < t!(15 minutes ago) {
@@ -98,8 +113,8 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
         });
     }
 
-    let last_command = home_api()
-        .get_latest_command_since(PowerToggle::Dehumidifier, t!(2 minutes ago))
+    let last_command = api
+        .get_latest_command(PowerToggle::Dehumidifier, t!(2 minutes ago))
         .await?;
 
     let was_triggered_by_system = match last_command {
@@ -118,14 +133,17 @@ async fn current_data_point_for_dehumidifier() -> anyhow::Result<DataPoint<bool>
 }
 
 async fn current_data_point_for_thermostat(
+    api: &(impl DataPointAccess<ExternalAutoControl>
+          + DataPointAccess<SetPoint>
+          + CommandAccess<Thermostat>),
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,
 ) -> anyhow::Result<DataPoint<bool>> {
     let (auto_mode_on, set_point, latest_command) = tokio::try_join!(
-        auto_mode.current_data_point(),
-        set_point.current_data_point(),
-        home_api().get_latest_command_since(thermostat, t!(24 hours ago))
+        api.current_data_point(auto_mode),
+        api.current_data_point(set_point),
+        api.get_latest_command(thermostat, t!(24 hours ago))
     )?;
 
     let most_recent_change = std::cmp::max(auto_mode_on.timestamp, set_point.timestamp);

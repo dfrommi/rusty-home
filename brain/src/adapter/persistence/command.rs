@@ -1,33 +1,49 @@
-use super::HomeApi;
+use crate::thing::{CommandAccess, CommandExecutor};
 
 use anyhow::Result;
 use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandId, CommandSource, CommandState, CommandTarget,
 };
+use sqlx::PgPool;
 use support::{t, time::DateTime};
 
-pub trait CommandRepository {
-    async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()>;
-    async fn get_all_commands_since<C: CommandId>(
+impl<DB: AsRef<PgPool>, C: CommandId> CommandAccess<C> for DB {
+    async fn get_latest_command(
         &self,
-        target: C,
+        target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Vec<CommandExecution<C::CommandType>>>;
-    async fn get_latest_command_since<C: CommandId>(
+    ) -> Result<Option<CommandExecution<<C as CommandId>::CommandType>>> {
+        let mut all_commands = get_all_commands::<C>(self.as_ref(), target.into(), since).await?;
+        Ok(all_commands.pop())
+    }
+
+    async fn get_all_commands(
         &self,
-        target: C,
+        target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandExecution<C::CommandType>>>;
-    async fn get_latest_command_source_since(
+    ) -> Result<Vec<CommandExecution<<C as CommandId>::CommandType>>> {
+        get_all_commands::<C>(self.as_ref(), target.into(), since).await
+    }
+
+    async fn get_latest_command_source(
         &self,
-        target: CommandTarget,
+        target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandSource>>;
+    ) -> Result<Option<CommandSource>> {
+        let maybe_command = CommandAccess::<C>::get_latest_command(self, target, since).await?;
+        Ok(maybe_command.map(|c| c.source))
+    }
 }
 
-impl CommandRepository for HomeApi {
-    async fn execute_command(&self, command: &Command, source: &CommandSource) -> Result<()> {
+impl<DB, C> CommandExecutor<C> for DB
+where
+    C: Into<Command>,
+    DB: AsRef<PgPool>,
+{
+    async fn execute(&self, command: C, source: CommandSource) -> Result<()> {
+        let command: Command = command.into();
+
         let db_command = serde_json::json!(command);
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
@@ -39,21 +55,21 @@ impl CommandRepository for HomeApi {
             db_source_type as DbCommandSource,
             db_source_id
         )
-        .execute(&self.db_pool)
+        .execute(self.as_ref())
         .await?;
 
         Ok(())
     }
+}
 
-    async fn get_all_commands_since<C: CommandId>(
-        &self,
-        target: C,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution<C::CommandType>>> {
-        let target: CommandTarget = target.into();
-        let db_target = serde_json::json!(target);
+async fn get_all_commands<C: CommandId>(
+    db_pool: &PgPool,
+    target: CommandTarget,
+    since: DateTime,
+) -> Result<Vec<CommandExecution<<C>::CommandType>>> {
+    let db_target = serde_json::json!(target);
 
-        let records = sqlx::query!(
+    let records = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
                 from THING_COMMAND 
                 where command @> $1 
@@ -64,42 +80,22 @@ impl CommandRepository for HomeApi {
             since.into_db(),
             t!(now).into_db(), //For timeshift in tests
         )
-        .fetch_all(&self.db_pool)
+        .fetch_all(db_pool)
         .await?;
 
-        records
-            .into_iter()
-            .map(|row| {
-                let source = CommandSource::from((row.source_type, row.source_id));
-                Ok(CommandExecution {
-                    id: row.id,
-                    command: serde_json::from_value(row.command)?,
-                    state: CommandState::from((row.status, row.error)),
-                    created: row.created.into(),
-                    source,
-                })
+    records
+        .into_iter()
+        .map(|row| {
+            let source = CommandSource::from((row.source_type, row.source_id));
+            Ok(CommandExecution {
+                id: row.id,
+                command: serde_json::from_value(row.command)?,
+                state: CommandState::from((row.status, row.error)),
+                created: row.created.into(),
+                source,
             })
-            .collect()
-    }
-
-    //Can also be optimized to directly query the latest command
-    async fn get_latest_command_since<C: CommandId>(
-        &self,
-        target: C,
-        since: DateTime,
-    ) -> Result<Option<CommandExecution<C::CommandType>>> {
-        let mut all_commands = self.get_all_commands_since(target, since).await?;
-        Ok(all_commands.pop())
-    }
-
-    async fn get_latest_command_source_since(
-        &self,
-        target: CommandTarget,
-        since: DateTime,
-    ) -> Result<Option<CommandSource>> {
-        let maybe_command = self.get_latest_command_since(target, since).await?;
-        Ok(maybe_command.map(|c| c.source))
-    }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -138,13 +134,14 @@ mod get_all_commands_since {
         )
         .await;
 
-        let api = HomeApi::new(db_pool);
-
         //WHEN
-        let result = api
-            .get_all_commands_since(PowerToggle::Dehumidifier, t!(8 minutes ago))
-            .await
-            .unwrap();
+        let result = get_all_commands::<PowerToggle>(
+            &db_pool,
+            PowerToggle::Dehumidifier.into(),
+            t!(8 minutes ago),
+        )
+        .await
+        .unwrap();
 
         //THEN
         assert_eq!(result.len(), 2);
@@ -177,13 +174,14 @@ mod get_all_commands_since {
         )
         .await;
 
-        let api = HomeApi::new(db_pool);
-
         //WHEN
-        let result = api
-            .get_all_commands_since(PowerToggle::Dehumidifier, t!(8 minutes ago))
-            .await
-            .unwrap();
+        let result = get_all_commands::<PowerToggle>(
+            &db_pool,
+            PowerToggle::Dehumidifier.into(),
+            t!(8 minutes ago),
+        )
+        .await
+        .unwrap();
 
         //THEN
         assert_eq!(result.len(), 0);

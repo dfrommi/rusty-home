@@ -11,6 +11,19 @@ pub enum Command {
     SetHeating(SetHeating),
 }
 
+impl CommandId for Command {
+    type CommandType = Command;
+}
+
+impl From<Command> for CommandTarget {
+    fn from(val: Command) -> Self {
+        match val {
+            Command::SetPower(SetPower { device, .. }) => device.clone().into(),
+            Command::SetHeating(SetHeating { device, .. }) => device.clone().into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
 #[serde(tag = "type", content = "device", rename_all = "snake_case")]
 pub enum CommandTarget {

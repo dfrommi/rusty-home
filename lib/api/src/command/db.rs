@@ -54,8 +54,8 @@ pub mod mapper {
         }
     }
 
-    impl From<&CommandSource> for (DbCommandSource, String) {
-        fn from(val: &CommandSource) -> Self {
+    impl From<CommandSource> for (DbCommandSource, String) {
+        fn from(val: CommandSource) -> Self {
             match val {
                 CommandSource::System(id) => (DbCommandSource::System, id.to_owned()),
                 CommandSource::User(id) => (DbCommandSource::User, id.to_owned()),

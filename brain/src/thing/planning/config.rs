@@ -3,7 +3,7 @@ use support::t;
 use support::unit::DegreeCelsius;
 
 use crate::thing::planning::action::HeatingZone;
-use crate::thing::UserControlled;
+use crate::thing::state::UserControlled;
 
 use super::action::{
     DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,

@@ -44,6 +44,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
             // Generate the From implementation
             from_impls.push(quote! {
+                impl From<#type_1> for Channel {
+                    fn from(val: #type_1) -> Self {
+                        Channel::#variant_name(val)
+                    }
+                }
+
                 impl From<&#type_1> for Channel {
                     fn from(val: &#type_1) -> Self {
                         Channel::#variant_name(val.clone())

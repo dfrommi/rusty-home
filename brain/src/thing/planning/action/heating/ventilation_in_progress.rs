@@ -1,12 +1,15 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, SetHeating};
+use api::{
+    command::{Command, SetHeating},
+    state::SetPoint,
+};
 use support::unit::DegreeCelsius;
 
 use crate::thing::{
     planning::action::{Action, HeatingZone},
-    ColdAirComingIn, DataPointAccess,
+    state::{ColdAirComingIn, DataPointAccess},
 };
 
 #[derive(Debug, Clone)]
@@ -26,23 +29,25 @@ impl Display for NoHeatingDuringVentilation {
     }
 }
 
-impl Action for NoHeatingDuringVentilation {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
-        match self.heating_zone {
+impl<T> Action<T> for NoHeatingDuringVentilation
+where
+    T: DataPointAccess<ColdAirComingIn>
+        + DataPointAccess<ColdAirComingIn>
+        + DataPointAccess<SetPoint>,
+{
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+        api.current(match self.heating_zone {
             HeatingZone::LivingRoom => ColdAirComingIn::LivingRoom,
             HeatingZone::Bedroom => ColdAirComingIn::Bedroom,
             HeatingZone::Kitchen => ColdAirComingIn::Kitchen,
             HeatingZone::RoomOfRequirements => ColdAirComingIn::RoomOfRequirements,
             HeatingZone::Bathroom => ColdAirComingIn::Bedroom,
-        }
-        .current()
+        })
         .await
     }
 
-    async fn is_running(&self) -> Result<bool> {
-        self.heating_zone
-            .current_set_point()
-            .current()
+    async fn is_running(&self, api: &T) -> Result<bool> {
+        api.current(self.heating_zone.current_set_point())
             .await
             .map(|v| v == DegreeCelsius(0.0))
     }

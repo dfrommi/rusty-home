@@ -18,19 +18,6 @@ pub enum DewPoint {
 }
 
 impl DewPoint {
-    fn dewpoint(
-        &self,
-        temperature: &DataPoint<DegreeCelsius>,
-        relative_humidity: &DataPoint<Percent>,
-    ) -> DataPoint<DegreeCelsius> {
-        let dp = calculate_dew_point(&temperature.value, &relative_humidity.value);
-
-        DataPoint {
-            value: dp,
-            timestamp: std::cmp::max(temperature.timestamp, relative_humidity.timestamp),
-        }
-    }
-
     fn temperature(&self) -> Temperature {
         match self {
             DewPoint::LivingRoomDoor => Temperature::LivingRoomDoor,
@@ -50,24 +37,53 @@ impl DewPoint {
     }
 }
 
-impl DataPointAccess<DegreeCelsius> for DewPoint {
-    async fn current_data_point(&self) -> Result<DataPoint<DegreeCelsius>> {
-        let t_value = self.temperature().current_data_point().await?;
-        let h_value = self.relative_humidity().current_data_point().await?;
+impl ChannelTypeInfo for DewPoint {
+    type ValueType = DegreeCelsius;
+}
 
-        Ok(self.dewpoint(&t_value, &h_value))
+impl<T> DataPointAccess<DewPoint> for T
+where
+    T: DataPointAccess<Temperature> + DataPointAccess<RelativeHumidity>,
+{
+    async fn current_data_point(&self, item: DewPoint) -> Result<DataPoint<DegreeCelsius>> {
+        let t_value: DataPoint<DegreeCelsius> = self.current_data_point(item.temperature()).await?;
+        let h_value: DataPoint<Percent> = self.current_data_point(item.relative_humidity()).await?;
+
+        Ok(dewpoint(&t_value, &h_value))
     }
 }
 
-impl TimeSeriesAccess<DegreeCelsius> for DewPoint {
-    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<DegreeCelsius>> {
+impl<T> TimeSeriesAccess<DewPoint> for T
+where
+    T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<RelativeHumidity>,
+{
+    async fn series_since(
+        &self,
+        item: DewPoint,
+        since: DateTime,
+    ) -> Result<TimeSeries<DegreeCelsius>> {
         let (t_series, h_series) = {
-            let temp = self.temperature();
-            let humidity = self.relative_humidity();
-            try_join!(temp.series_since(since), humidity.series_since(since))?
+            let temp = item.temperature();
+            let humidity = item.relative_humidity();
+            try_join!(
+                self.series_since(temp, since),
+                self.series_since(humidity, since)
+            )?
         };
 
         TimeSeries::combined(&t_series, &h_series, calculate_dew_point)
+    }
+}
+
+fn dewpoint(
+    temperature: &DataPoint<DegreeCelsius>,
+    relative_humidity: &DataPoint<Percent>,
+) -> DataPoint<DegreeCelsius> {
+    let dp = calculate_dew_point(&temperature.value, &relative_humidity.value);
+
+    DataPoint {
+        value: dp,
+        timestamp: std::cmp::max(temperature.timestamp, relative_humidity.timestamp),
     }
 }
 

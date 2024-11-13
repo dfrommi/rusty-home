@@ -1,13 +1,19 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, SetHeating};
+use api::{
+    command::{Command, SetHeating, Thermostat},
+    state::{ExternalAutoControl, SetPoint},
+};
 use support::{t, unit::DegreeCelsius};
 
 use crate::thing::{
     planning::action::{Action, HeatingZone},
-    AutomaticTemperatureIncrease, DataPointAccess, Opened,
+    state::{DataPointAccess, Opened},
+    CommandAccess,
 };
+
+use crate::thing::state::AutomaticTemperatureIncrease;
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 
@@ -22,8 +28,15 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
     }
 }
 
-impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
+impl<T> Action<T> for NoHeatingDuringAutomaticTemperatureIncrease
+where
+    T: DataPointAccess<Opened>
+        + DataPointAccess<AutomaticTemperatureIncrease>
+        + DataPointAccess<SetPoint>
+        + DataPointAccess<ExternalAutoControl>
+        + CommandAccess<Thermostat>,
+{
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
             HeatingZone::LivingRoom => (
                 AutomaticTemperatureIncrease::LivingRoom,
@@ -38,8 +51,10 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
             HeatingZone::Bathroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
         };
 
-        let (window_opened, temp_increase) =
-            tokio::try_join!(window_opened.current_data_point(), temp_increase.current())?;
+        let (window_opened, temp_increase) = tokio::try_join!(
+            api.current_data_point(window_opened),
+            api.current(temp_increase)
+        )?;
 
         //window still open or no temp increase
         if !temp_increase || window_opened.value {
@@ -48,18 +63,20 @@ impl Action for NoHeatingDuringAutomaticTemperatureIncrease {
 
         //another place very similar to the rest
         let (already_triggered, has_expected_manual_heating) = tokio::try_join!(
+            self.heating_zone.manual_heating_already_triggrered(
+                api,
+                NO_HEATING_SET_POINT,
+                window_opened.timestamp
+            ),
             self.heating_zone
-                .manual_heating_already_triggrered(NO_HEATING_SET_POINT, window_opened.timestamp),
-            self.heating_zone.is_manual_heating_to(NO_HEATING_SET_POINT)
+                .is_manual_heating_to(api, NO_HEATING_SET_POINT)
         )?;
 
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    async fn is_running(&self) -> Result<bool> {
-        self.heating_zone
-            .current_set_point()
-            .current()
+    async fn is_running(&self, api: &T) -> Result<bool> {
+        api.current(self.heating_zone.current_set_point())
             .await
             .map(|v| v == NO_HEATING_SET_POINT)
     }

@@ -1,8 +1,9 @@
+use api::state::{ChannelTypeInfo, Temperature};
 use support::{t, unit::DegreeCelsius};
 
 use crate::adapter::persistence::DataPoint;
 
-use super::{opened::Opened, temperature::Temperature, DataPointAccess, TimeSeriesAccess};
+use super::{opened::Opened, DataPointAccess, TimeSeriesAccess};
 
 #[derive(Clone, Debug)]
 pub enum AutomaticTemperatureIncrease {
@@ -12,10 +13,20 @@ pub enum AutomaticTemperatureIncrease {
     RoomOfRequirements,
 }
 
+impl ChannelTypeInfo for AutomaticTemperatureIncrease {
+    type ValueType = bool;
+}
+
 //TODO detect active heating and summer mode
-impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
-    async fn current_data_point(&self) -> anyhow::Result<DataPoint<bool>> {
-        let (window, temp_sensor) = match self {
+impl<T> DataPointAccess<AutomaticTemperatureIncrease> for T
+where
+    T: DataPointAccess<Opened> + DataPointAccess<Temperature> + TimeSeriesAccess<Temperature>,
+{
+    async fn current_data_point(
+        &self,
+        item: AutomaticTemperatureIncrease,
+    ) -> anyhow::Result<DataPoint<bool>> {
+        let (window, temp_sensor) = match item {
             AutomaticTemperatureIncrease::LivingRoom => {
                 (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor)
             }
@@ -31,7 +42,7 @@ impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
             ),
         };
 
-        let window_opened = window.current_data_point().await?;
+        let window_opened = self.current_data_point(window).await?;
         let opened_elapsed = window_opened.timestamp.elapsed();
 
         if window_opened.value || opened_elapsed > t!(30 minutes) {
@@ -42,7 +53,7 @@ impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
             return Ok(window_opened.map_value(|_| true));
         }
 
-        let temperature = temp_sensor.series_since(t!(5 minutes ago)).await?;
+        let temperature = self.series_since(temp_sensor, t!(5 minutes ago)).await?;
 
         //temperature increase settled
         Ok(temperature

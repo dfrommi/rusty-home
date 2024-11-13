@@ -1,21 +1,23 @@
 use std::fmt::Display;
 
 use crate::thing::state::Powered;
-use crate::thing::{ColdAirComingIn, DataPointAccess};
 use anyhow::Result;
 use api::command::{Command, PowerToggle, SetPower};
 
-use super::Action;
+use super::{Action, ColdAirComingIn, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct RequestClosingWindow;
 
-impl Action for RequestClosingWindow {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
+impl<T> Action<T> for RequestClosingWindow
+where
+    T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Powered>,
+{
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let result: Result<Vec<bool>> = futures::future::join_all([
-            ColdAirComingIn::Bedroom.current(),
-            ColdAirComingIn::Kitchen.current(),
-            ColdAirComingIn::RoomOfRequirements.current(),
+            api.current(ColdAirComingIn::Bedroom),
+            api.current(ColdAirComingIn::Kitchen),
+            api.current(ColdAirComingIn::RoomOfRequirements),
         ])
         .await
         .into_iter()
@@ -24,8 +26,8 @@ impl Action for RequestClosingWindow {
         Ok(result?.into_iter().any(|v| v))
     }
 
-    async fn is_running(&self) -> Result<bool> {
-        Powered::LivingRoomNotificationLight.current().await
+    async fn is_running(&self, api: &T) -> Result<bool> {
+        api.current(Powered::LivingRoomNotificationLight).await
     }
 
     fn start_command(&self) -> Option<Command> {

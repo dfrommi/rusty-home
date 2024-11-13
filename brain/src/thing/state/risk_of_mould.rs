@@ -1,4 +1,4 @@
-use api::state::RelativeHumidity;
+use api::state::{ChannelTypeInfo, RelativeHumidity};
 use support::{
     t,
     unit::{DegreeCelsius, Percent},
@@ -14,13 +14,20 @@ pub enum RiskOfMould {
     Bathroom,
 }
 
-impl DataPointAccess<bool> for RiskOfMould {
-    async fn current_data_point(&self) -> Result<DataPoint<bool>> {
-        let humidity = match self {
-            RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
-        }
-        .current_data_point()
-        .await?;
+impl ChannelTypeInfo for RiskOfMould {
+    type ValueType = bool;
+}
+
+impl<T> DataPointAccess<RiskOfMould> for T
+where
+    T: DataPointAccess<RelativeHumidity> + DataPointAccess<DewPoint> + TimeSeriesAccess<DewPoint>,
+{
+    async fn current_data_point(&self, item: RiskOfMould) -> Result<DataPoint<bool>> {
+        let humidity = self
+            .current_data_point(match item {
+                RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
+            })
+            .await?;
 
         if humidity.value < Percent(60.0) {
             return Ok(DataPoint {
@@ -29,13 +36,13 @@ impl DataPointAccess<bool> for RiskOfMould {
             });
         }
 
-        let this_dp = match self {
-            RiskOfMould::Bathroom => DewPoint::BathroomShower,
-        }
-        .current_data_point()
-        .await?;
+        let this_dp = self
+            .current_data_point(match item {
+                RiskOfMould::Bathroom => DewPoint::BathroomShower,
+            })
+            .await?;
 
-        let ref_dp = self.get_reference_dewpoint().await?;
+        let ref_dp = item.get_reference_dewpoint(self).await?;
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
@@ -48,7 +55,10 @@ impl DataPointAccess<bool> for RiskOfMould {
 }
 
 impl RiskOfMould {
-    async fn get_reference_dewpoint(&self) -> Result<DegreeCelsius> {
+    async fn get_reference_dewpoint(
+        &self,
+        api: &impl TimeSeriesAccess<DewPoint>,
+    ) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
                 DewPoint::LivingRoomDoor,
@@ -59,7 +69,7 @@ impl RiskOfMould {
 
         let mut ref_sum: f64 = 0.0;
         for ref_dp in &ref_dewpoints {
-            let ts = ref_dp.series_since(t!(3 hours ago)).await?;
+            let ts = api.series_since(ref_dp.clone(), t!(3 hours ago)).await?;
             ref_sum += ts.mean().0;
         }
 

@@ -8,7 +8,7 @@ use crate::thing::{
     planning::action::{
         HeatingZone, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
     },
-    UserControlled,
+    state::UserControlled,
 };
 
 use super::action::DeferHeatingUntilVentilationDone;

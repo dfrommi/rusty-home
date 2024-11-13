@@ -1,12 +1,8 @@
 use anyhow::Result;
-use api::state::Presence;
-use support::{t, time::DateTime};
+use api::state::{ChannelTypeInfo, Presence};
+use support::t;
 
-use crate::{
-    adapter::persistence::{DataPoint, StateRepository},
-    home_api,
-    support::timeseries::TimeSeries,
-};
+use crate::adapter::persistence::DataPoint;
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
@@ -16,17 +12,27 @@ pub enum Resident {
     SabineSleeping,
 }
 
+impl ChannelTypeInfo for Resident {
+    type ValueType = bool;
+}
+
 //TODO maybe combination via Baysian to detect resident state
-impl DataPointAccess<bool> for Resident {
-    async fn current_data_point(&self) -> Result<DataPoint<bool>> {
-        match self {
-            Resident::DennisSleeping => sleeping(Presence::BedDennis).await,
-            Resident::SabineSleeping => sleeping(Presence::BedSabine).await,
+impl<T> DataPointAccess<Resident> for T
+where
+    T: DataPointAccess<Presence> + TimeSeriesAccess<Presence>,
+{
+    async fn current_data_point(&self, item: Resident) -> Result<DataPoint<bool>> {
+        match item {
+            Resident::DennisSleeping => sleeping(Presence::BedDennis, self).await,
+            Resident::SabineSleeping => sleeping(Presence::BedSabine, self).await,
         }
     }
 }
 
-async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
+async fn sleeping(
+    in_bed: Presence,
+    api: &impl TimeSeriesAccess<Presence>,
+) -> Result<DataPoint<bool>> {
     let in_bed_full_range = t!(21:00 - 13:00).starting_today();
     let in_bed_start_range = t!(21:00 - 3:00).starting_today();
 
@@ -40,7 +46,7 @@ async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
 
     //TODO TimeSeries with date in future?
     let range_start = in_bed_full_range.start();
-    let ts = in_bed.series_since(range_start).await?.with_duration();
+    let ts = api.series_since(in_bed, range_start).await?.with_duration();
 
     let sleeping_started = ts.iter().find(|dp| {
         in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)
@@ -66,14 +72,4 @@ async fn sleeping(in_bed: Presence) -> Result<DataPoint<bool>> {
         value: result.0,
         timestamp: result.1,
     })
-}
-
-//TODO blanket impl
-impl TimeSeriesAccess<bool> for Presence {
-    async fn series_since(&self, since: DateTime) -> Result<TimeSeries<bool>> {
-        home_api()
-            .get_covering(self, since)
-            .await
-            .map(|v| TimeSeries::new(v, since))?
-    }
 }

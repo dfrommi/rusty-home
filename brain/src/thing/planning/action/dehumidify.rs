@@ -1,21 +1,23 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, PowerToggle, SetPower};
+use api::{
+    command::{Command, PowerToggle, SetPower},
+    state::Powered,
+};
 
-use super::Action;
-use crate::prelude::*;
+use super::{Action, DataPointAccess, RiskOfMould};
 
 #[derive(Debug, Clone)]
 pub struct Dehumidify;
 
-impl Action for Dehumidify {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
-        RiskOfMould::Bathroom.current().await
+impl<T: DataPointAccess<RiskOfMould> + DataPointAccess<Powered>> Action<T> for Dehumidify {
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+        api.current(RiskOfMould::Bathroom).await
     }
 
-    async fn is_running(&self) -> Result<bool> {
-        Powered::Dehumidifier.current().await
+    async fn is_running(&self, api: &T) -> Result<bool> {
+        api.current(Powered::Dehumidifier).await
     }
 
     fn start_command(&self) -> Option<Command> {

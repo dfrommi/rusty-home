@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
-use super::Action;
-use crate::thing::{DataPointAccess, UserControlled};
+use super::{Action, DataPointAccess, UserControlled};
 use anyhow::Result;
 use api::command::{Command, CommandTarget};
 
@@ -14,14 +13,17 @@ impl KeepUserOverride {
     }
 }
 
-impl Action for KeepUserOverride {
-    async fn preconditions_fulfilled(&self) -> Result<bool> {
-        self.0.current().await
+impl<T> Action<T> for KeepUserOverride
+where
+    T: DataPointAccess<UserControlled>,
+{
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+        api.current(self.0.clone()).await
     }
 
     //TODO avoid duplicate call and potential issue around time gap
-    async fn is_running(&self) -> Result<bool> {
-        self.preconditions_fulfilled().await
+    async fn is_running(&self, api: &T) -> Result<bool> {
+        self.preconditions_fulfilled(api).await
     }
 
     fn start_command(&self) -> Option<Command> {

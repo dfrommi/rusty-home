@@ -3,11 +3,13 @@ mod resource_lock;
 
 use std::fmt::{Debug, Display};
 
+use api::command::Command;
 use resource_lock::ResourceLock;
-use tabled::Tabled;
+use tabled::{Table, Tabled};
 
-use super::Action;
-use action_ext::ActionPlannerExt;
+use crate::thing::CommandExecutor;
+
+use super::{action::Action, PlanningResultTracer};
 
 #[derive(Debug, Tabled)]
 pub struct ActionResult<'a, A: Display> {
@@ -26,11 +28,62 @@ pub struct ActionResult<'a, A: Display> {
     pub is_running: Option<bool>,
 }
 
-//sorting order of config is important - first come, first serve
-pub async fn find_next_actions<G, A>(goals: Vec<G>, config: &[(G, Vec<A>)]) -> Vec<ActionResult<A>>
+pub async fn do_plan<G, A, T>(active_goals: &[G], config: &[(G, Vec<A>)], api: &T)
 where
     G: Eq,
-    A: Action + Debug,
+    A: Action<T>,
+    T: PlanningResultTracer + CommandExecutor<Command>,
+{
+    let action_results = find_next_actions(active_goals, config, api).await;
+
+    tracing::info!(
+        "Planning result:\n{}",
+        Table::new(&action_results).to_string()
+    );
+
+    if let Err(e) = api.add_planning_trace(&action_results).await {
+        tracing::error!("Error logging planning result: {:?}", e);
+    }
+
+    for result in action_results {
+        let action = result.action;
+        if result.should_be_started {
+            match action.start_command() {
+                Some(command) => match api.execute(command, action.start_command_source()).await {
+                    Ok(_) => tracing::info!("Action {} started", action),
+                    Err(e) => tracing::error!("Error starting action {}: {:?}", action, e),
+                },
+                None => tracing::info!(
+                    "Action {} should be started, but no command is configured",
+                    action
+                ),
+            }
+        }
+
+        if result.should_be_stopped {
+            match action.stop_command() {
+                Some(command) => match api.execute(command, action.stop_command_source()).await {
+                    Ok(_) => tracing::info!("Action {} stopped", action),
+                    Err(e) => tracing::error!("Error stopping action {}: {:?}", action, e),
+                },
+                None => tracing::info!(
+                    "Action {} should be stopped, but no command is configured",
+                    action
+                ),
+            }
+        }
+    }
+}
+
+//sorting order of config is important - first come, first serve
+pub async fn find_next_actions<'a, G, A, T>(
+    goals: &'a [G],
+    config: &'a [(G, Vec<A>)],
+    api: &T,
+) -> Vec<ActionResult<'a, A>>
+where
+    G: Eq,
+    A: Action<T>,
 {
     let mut resource_lock = ResourceLock::new();
     let mut action_results: Vec<ActionResult<A>> = Vec::new();
@@ -50,21 +103,26 @@ where
                 continue;
             }
 
-            let (is_fulfilled, is_running) = if action.just_started().await {
-                (true, true)
-            } else if action.just_stopped().await {
-                (false, false)
-            } else {
-                tokio::join!(
-                    action.preconditions_fulfilled_or_default(),
-                    action.is_running_or_scheduled_or_default(),
-                )
-            };
+            let (is_fulfilled, is_running) =
+                tokio::join!(action.preconditions_fulfilled(api), action.is_running(api),);
 
-            tokio::join!(
-                action.preconditions_fulfilled_or_default(),
-                action.is_running_or_scheduled_or_default(),
-            );
+            let is_fulfilled = is_fulfilled.unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Error checking preconditions of action {}, assuming not fulfilled: {:?}",
+                    action,
+                    e
+                );
+                false
+            });
+
+            let is_running = is_running.unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Error checking running state of action {}, assuming not running: {:?}",
+                    action,
+                    e
+                );
+                false
+            });
 
             result.is_fulfilled = Some(is_fulfilled);
             result.is_running = Some(is_running);
@@ -98,7 +156,7 @@ where
     action_results
 }
 
-impl<'a, A: Action> ActionResult<'a, A> {
+impl<'a, A: Display> ActionResult<'a, A> {
     fn new(action: &'a A) -> Self {
         Self {
             action,

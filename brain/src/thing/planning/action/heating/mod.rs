@@ -5,10 +5,7 @@ mod wait_for_ventilation;
 
 use std::fmt::Display;
 
-use crate::{
-    adapter::persistence::CommandRepository, adapter::persistence::DataPoint, home_api,
-    thing::DataPointAccess,
-};
+use crate::{adapter::persistence::DataPoint, thing::CommandAccess};
 use api::{
     command::{HeatingTargetState, SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
@@ -19,6 +16,8 @@ pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
 pub use ventilation_in_progress::NoHeatingDuringVentilation;
 pub use wait_for_sleeping::ExtendHeatingUntilSleeping;
 pub use wait_for_ventilation::DeferHeatingUntilVentilationDone;
+
+use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
 pub enum HeatingZone {
@@ -60,15 +59,19 @@ impl HeatingZone {
         }
     }
 
-    async fn is_manual_heating_to(
+    async fn is_manual_heating_to<T>(
         &self,
+        api: &T,
         temperature: DegreeCelsius,
-    ) -> anyhow::Result<DataPoint<bool>> {
+    ) -> anyhow::Result<DataPoint<bool>>
+    where
+        T: DataPointAccess<SetPoint> + DataPointAccess<ExternalAutoControl>,
+    {
         let (set_point, auto_mode) = (self.current_set_point(), self.auto_mode());
 
         let (set_point, auto_mode) = tokio::try_join!(
-            set_point.current_data_point(),
-            auto_mode.current_data_point()
+            api.current_data_point(set_point),
+            api.current_data_point(auto_mode)
         )?;
 
         Ok(DataPoint {
@@ -77,14 +80,16 @@ impl HeatingZone {
         })
     }
 
-    async fn manual_heating_already_triggrered(
+    async fn manual_heating_already_triggrered<T>(
         &self,
+        api: &T,
         target_temperature: DegreeCelsius,
         since: DateTime,
-    ) -> anyhow::Result<DataPoint<bool>> {
-        let commands = home_api()
-            .get_all_commands_since(self.thermostat(), since)
-            .await?;
+    ) -> anyhow::Result<DataPoint<bool>>
+    where
+        T: CommandAccess<Thermostat>,
+    {
+        let commands = api.get_all_commands(self.thermostat(), since).await?;
 
         let trigger = commands.into_iter().find(|c| match c.command {
             SetHeating {

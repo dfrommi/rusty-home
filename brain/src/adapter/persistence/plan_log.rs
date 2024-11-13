@@ -1,18 +1,12 @@
 use std::fmt::Display;
 
-use sqlx::QueryBuilder;
+use sqlx::{PgPool, QueryBuilder};
 use support::t;
 
-use crate::thing::ActionResult;
+use crate::thing::planning::{ActionResult, PlanningResultTracer};
 
-use super::HomeApi;
-
-pub trait PlanLogRepository {
-    async fn add_planning_log<A: Display>(&self, result: &[ActionResult<A>]) -> anyhow::Result<()>;
-}
-
-impl PlanLogRepository for HomeApi {
-    async fn add_planning_log<'a, A: Display>(
+impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
+    async fn add_planning_trace<'a, A: Display>(
         &self,
         results: &[ActionResult<'a, A>],
     ) -> anyhow::Result<()> {
@@ -35,7 +29,7 @@ impl PlanLogRepository for HomeApi {
                 .push_bind(t!(now).into_db());
         });
 
-        builder.build().execute(&self.db_pool).await?;
+        builder.build().execute(self.as_ref()).await?;
 
         Ok(())
     }

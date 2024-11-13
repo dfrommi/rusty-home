@@ -4,13 +4,9 @@ mod state;
 
 use anyhow::Result;
 use api::EventListener;
-use sqlx::{postgres::PgListener, PgPool};
+use sqlx::postgres::PgListener;
 use support::time::DateTime;
 use tokio::sync::broadcast::Receiver;
-
-pub use command::CommandRepository;
-pub use plan_log::PlanLogRepository;
-pub use state::StateRepository;
 
 #[derive(Debug, Clone)]
 pub struct DataPoint<V> {
@@ -24,11 +20,6 @@ impl<V> DataPoint<V> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct HomeApi {
-    db_pool: PgPool,
-}
-
 #[derive(Debug)]
 pub struct HomeEventListener {
     delegate: EventListener,
@@ -39,7 +30,7 @@ impl<T> DataPoint<T> {
         let value = f(&self.value);
         DataPoint {
             value,
-            timestamp: self.timestamp.clone(),
+            timestamp: self.timestamp,
         }
     }
 }
@@ -59,11 +50,5 @@ impl HomeEventListener {
 
     pub async fn dispatch_events(self) -> Result<()> {
         self.delegate.dispatch_events().await
-    }
-}
-
-impl HomeApi {
-    pub fn new(db_pool: PgPool) -> Self {
-        Self { db_pool }
     }
 }

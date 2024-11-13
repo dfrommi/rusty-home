@@ -27,6 +27,8 @@ serde_json = "1.0"
 
 tabled = "0"
 
+scoped-futures = "*"
+
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }
 

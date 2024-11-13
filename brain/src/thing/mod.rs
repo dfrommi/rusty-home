@@ -1,20 +1,31 @@
-use api::command::{Command, CommandSource};
-
-use crate::{adapter::persistence::CommandRepository, prelude::*};
+use api::command::{Command, CommandExecution, CommandId, CommandSource, CommandTarget};
+use support::time::DateTime;
 
 use anyhow::Result;
 
-mod planning;
+pub mod planning;
 pub mod state;
 
-pub use planning::{do_plan, ActionResult};
+pub trait CommandAccess<C: CommandId> {
+    async fn get_latest_command(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Option<CommandExecution<C::CommandType>>>;
 
-pub trait Executable {
-    async fn execute(self, source: CommandSource) -> Result<()>;
+    async fn get_all_commands(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Vec<CommandExecution<C::CommandType>>>;
+
+    async fn get_latest_command_source(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Option<CommandSource>>;
 }
 
-impl<C: Into<Command>> Executable for C {
-    async fn execute(self, source: CommandSource) -> Result<()> {
-        home_api().execute_command(&self.into(), &source).await
-    }
+pub trait CommandExecutor<C: Into<Command>> {
+    async fn execute(&self, command: C, source: CommandSource) -> Result<()>;
 }

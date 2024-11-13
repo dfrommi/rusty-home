@@ -1,36 +1,25 @@
-use super::{DataPoint, HomeApi};
+use crate::{
+    support::timeseries::{interpolate::Interpolatable, TimeSeries},
+    thing::state::DataPointAccess,
+};
+
+use super::DataPoint;
 use anyhow::Result;
 use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
+use sqlx::PgPool;
 use support::{t, time::DateTime};
 
-pub trait StateRepository {
-    async fn get_latest<'a, C: ChannelTypeInfo>(
-        &self,
-        id: &'a C,
-    ) -> Result<DataPoint<C::ValueType>>
-    where
-        &'a C: Into<Channel>,
-        C::ValueType: From<DbValue>;
-    async fn get_covering<'a, C: ChannelTypeInfo>(
-        &self,
-        id: &'a C,
-        start: DateTime,
-    ) -> Result<Vec<DataPoint<C::ValueType>>>
-    where
-        &'a C: Into<Channel>,
-        C::ValueType: From<DbValue>;
-}
-
-impl StateRepository for HomeApi {
-    async fn get_latest<'a, C: ChannelTypeInfo>(&self, id: &'a C) -> Result<DataPoint<C::ValueType>>
-    where
-        &'a C: Into<Channel>,
-        C::ValueType: From<DbValue>,
-    {
-        let tag_id = get_tag_id(&self.db_pool, id.into(), false).await?;
+impl<DB, T> DataPointAccess<T> for DB
+where
+    T: Into<Channel> + ChannelTypeInfo,
+    T::ValueType: From<DbValue>,
+    DB: AsRef<PgPool>,
+{
+    async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>> {
+        let tag_id = get_tag_id(self.as_ref(), item.into(), false).await?;
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
@@ -43,7 +32,7 @@ impl StateRepository for HomeApi {
             tag_id,
             t!(now).into_db(), //For timeshift in tests
         )
-        .fetch_optional(&self.db_pool)
+        .fetch_optional(self.as_ref())
         .await?;
 
         match rec {
@@ -54,17 +43,16 @@ impl StateRepository for HomeApi {
             None => anyhow::bail!("No data found"),
         }
     }
+}
 
-    async fn get_covering<'a, C: ChannelTypeInfo>(
-        &self,
-        id: &'a C,
-        start: DateTime,
-    ) -> Result<Vec<DataPoint<C::ValueType>>>
-    where
-        &'a C: Into<Channel>,
-        C::ValueType: From<DbValue>,
-    {
-        let tags_id = get_tag_id(&self.db_pool, id.into(), false).await?;
+impl<DB, T> crate::thing::state::TimeSeriesAccess<T> for DB
+where
+    T: ChannelTypeInfo + Into<Channel>,
+    T::ValueType: Clone + Interpolatable + From<DbValue>,
+    DB: AsRef<PgPool>,
+{
+    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T::ValueType>> {
+        let tags_id = get_tag_id(self.as_ref(), item.into(), false).await?;
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
@@ -81,20 +69,20 @@ impl StateRepository for HomeApi {
               ORDER BY timestamp DESC
               LIMIT 1)"#,
             tags_id,
-            start.into_db(),
+            since.into_db(),
             t!(now).into_db(), //For timeshift in tests
         )
-        .fetch_all(&self.db_pool)
+        .fetch_all(self.as_ref())
         .await?;
 
-        let dps: Vec<DataPoint<C::ValueType>> = rec
+        let dps: Vec<DataPoint<T::ValueType>> = rec
             .into_iter()
             .map(|row| DataPoint {
-                value: C::ValueType::from(row.value),
+                value: T::ValueType::from(row.value),
                 timestamp: row.timestamp.unwrap().into(),
             })
             .collect();
 
-        Ok(dps)
+        Ok(TimeSeries::new(dps, since)?)
     }
 }

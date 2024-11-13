@@ -50,7 +50,18 @@ where
                 continue;
             }
 
-            let (is_fulfilled, is_running) = tokio::join!(
+            let (is_fulfilled, is_running) = if action.just_started().await {
+                (true, true)
+            } else if action.just_stopped().await {
+                (false, false)
+            } else {
+                tokio::join!(
+                    action.preconditions_fulfilled_or_default(),
+                    action.is_running_or_scheduled_or_default(),
+                )
+            };
+
+            tokio::join!(
                 action.preconditions_fulfilled_or_default(),
                 action.is_running_or_scheduled_or_default(),
             );

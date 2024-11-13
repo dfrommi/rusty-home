@@ -6,6 +6,8 @@ use crate::{adapter::persistence::CommandRepository, home_api, thing::planning::
 pub trait ActionPlannerExt {
     fn command_source_start(&self) -> CommandSource;
     fn command_source_stop(&self) -> CommandSource;
+    async fn just_started(&self) -> bool;
+    async fn just_stopped(&self) -> bool;
     async fn preconditions_fulfilled_or_default(&self) -> bool;
     async fn is_running_or_scheduled_or_default(&self) -> bool;
 }
@@ -23,6 +25,15 @@ impl<A: Action> ActionPlannerExt for A {
 
     fn command_source_stop(&self) -> CommandSource {
         CommandSource::System(format!("planning:{}:stop", self))
+    }
+
+    async fn just_started(&self) -> bool {
+        get_last_command_type_since(self, t!(30 seconds ago)).await
+            == Some(CommandSourceType::Start)
+    }
+
+    async fn just_stopped(&self) -> bool {
+        get_last_command_type_since(self, t!(30 seconds ago)).await == Some(CommandSourceType::Stop)
     }
 
     async fn preconditions_fulfilled_or_default(&self) -> bool {

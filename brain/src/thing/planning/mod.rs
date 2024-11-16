@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::OnceLock};
+use std::sync::OnceLock;
 
 use action::HomeAction;
 use api::command::{Command, Thermostat};
@@ -15,8 +15,10 @@ pub use planner::ActionResult;
 #[cfg(test)]
 mod tests;
 
-use super::state::{DataPointAccess, RiskOfMould};
-use super::{state::*, CommandAccess, CommandExecutor};
+use crate::port::{CommandAccess, CommandExecutor, DataPointAccess, PlanningResultTracer};
+
+use super::state::RiskOfMould;
+use super::state::*;
 
 #[rustfmt::skip]
 fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -58,11 +60,4 @@ where
         .collect::<Vec<_>>();
 
     planner::do_plan(&goals, &config, api).await;
-}
-
-pub trait PlanningResultTracer {
-    async fn add_planning_trace<'a, A: Display>(
-        &self,
-        results: &[ActionResult<'a, A>],
-    ) -> anyhow::Result<()>;
 }

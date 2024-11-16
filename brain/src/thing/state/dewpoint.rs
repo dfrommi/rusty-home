@@ -1,3 +1,5 @@
+use crate::{adapter::persistence::DataPoint, support::timeseries::TimeSeries};
+
 use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};

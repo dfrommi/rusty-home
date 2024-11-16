@@ -7,9 +7,12 @@ use api::{
 };
 use support::unit::DegreeCelsius;
 
-use crate::thing::{
-    planning::action::{Action, HeatingZone},
-    state::{ColdAirComingIn, DataPointAccess},
+use crate::{
+    port::DataPointAccess,
+    thing::{
+        planning::action::{Action, HeatingZone},
+        state::ColdAirComingIn,
+    },
 };
 
 #[derive(Debug, Clone)]

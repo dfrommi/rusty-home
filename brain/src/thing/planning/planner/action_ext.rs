@@ -1,7 +1,7 @@
 use api::command::{Command, CommandSource, CommandTarget};
 use support::{ext::ResultExt, t, time::DateTime};
 
-use crate::thing::{planning::action::Action, CommandAccess};
+use crate::{port::CommandAccess, thing::planning::action::Action};
 
 pub struct ExecutionAwareAction<T, A>
 where
@@ -66,12 +66,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.action)
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CommandSourceType {
-    Start,
-    Stop,
 }
 
 impl<T, A> ExecutionAwareAction<T, A>

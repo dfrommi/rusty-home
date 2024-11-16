@@ -7,7 +7,7 @@ use api::command::Command;
 use resource_lock::ResourceLock;
 use tabled::{Table, Tabled};
 
-use crate::thing::CommandExecutor;
+use crate::port::CommandExecutor;
 
 use super::{action::Action, PlanningResultTracer};
 

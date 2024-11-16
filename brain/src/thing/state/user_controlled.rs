@@ -2,13 +2,13 @@ use std::fmt::Display;
 
 use support::t;
 
-use crate::{adapter::persistence::DataPoint, thing::CommandAccess};
+use crate::adapter::persistence::DataPoint;
 use api::{
     command::{CommandExecution, CommandSource, PowerToggle, SetPower, Thermostat},
     state::{ChannelTypeInfo, ExternalAutoControl, Powered, SetPoint},
 };
 
-use super::DataPointAccess;
+use super::{CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub enum UserControlled {

@@ -2,7 +2,7 @@ use api::command::{Command, CommandSource, PowerToggle, SetPower};
 use support::mqtt::MqttInMessage;
 use tokio::sync::mpsc::Receiver;
 
-use crate::thing::CommandExecutor;
+use crate::port::CommandExecutor;
 
 pub async fn process_commands(
     base_topic: String,

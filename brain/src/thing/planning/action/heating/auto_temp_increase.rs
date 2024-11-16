@@ -7,10 +7,12 @@ use api::{
 };
 use support::{t, unit::DegreeCelsius};
 
-use crate::thing::{
-    planning::action::{Action, HeatingZone},
-    state::{DataPointAccess, Opened},
-    CommandAccess,
+use crate::{
+    port::{CommandAccess, DataPointAccess},
+    thing::{
+        planning::action::{Action, HeatingZone},
+        state::Opened,
+    },
 };
 
 use crate::thing::state::AutomaticTemperatureIncrease;

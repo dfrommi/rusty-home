@@ -5,7 +5,7 @@ mod wait_for_ventilation;
 
 use std::fmt::Display;
 
-use crate::{adapter::persistence::DataPoint, thing::CommandAccess};
+use crate::adapter::persistence::DataPoint;
 use api::{
     command::{HeatingTargetState, SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
@@ -17,7 +17,7 @@ pub use ventilation_in_progress::NoHeatingDuringVentilation;
 pub use wait_for_sleeping::ExtendHeatingUntilSleeping;
 pub use wait_for_ventilation::DeferHeatingUntilVentilationDone;
 
-use super::DataPointAccess;
+use super::{CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub enum HeatingZone {

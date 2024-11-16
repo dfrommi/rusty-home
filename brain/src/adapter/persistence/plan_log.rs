@@ -3,7 +3,7 @@ use std::fmt::Display;
 use sqlx::{PgPool, QueryBuilder};
 use support::t;
 
-use crate::thing::planning::{ActionResult, PlanningResultTracer};
+use crate::{port::PlanningResultTracer, thing::planning::ActionResult};
 
 impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
     async fn add_planning_trace<'a, A: Display>(

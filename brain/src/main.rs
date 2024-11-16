@@ -7,6 +7,7 @@ use thing::planning::plan_for_home;
 use tokio::task::JoinSet;
 
 mod adapter;
+pub mod port;
 mod settings;
 mod support;
 mod thing;

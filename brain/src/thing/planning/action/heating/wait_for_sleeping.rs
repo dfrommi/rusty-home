@@ -7,10 +7,12 @@ use api::{
 };
 use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
-use crate::thing::{
-    planning::action::{Action, HeatingZone},
-    state::{DataPointAccess, Resident},
-    CommandAccess,
+use crate::{
+    port::{CommandAccess, DataPointAccess},
+    thing::{
+        planning::action::{Action, HeatingZone},
+        state::Resident,
+    },
 };
 
 #[derive(Debug, Clone)]

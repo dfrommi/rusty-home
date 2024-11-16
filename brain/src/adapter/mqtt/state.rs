@@ -4,7 +4,7 @@ use api::state::Powered;
 use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
-use crate::thing::state::DataPointAccess;
+use crate::port::DataPointAccess;
 
 pub async fn export_state<T>(
     api: &T,

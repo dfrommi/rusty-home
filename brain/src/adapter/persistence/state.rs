@@ -1,6 +1,6 @@
 use crate::{
+    port::DataPointAccess,
     support::timeseries::{interpolate::Interpolatable, TimeSeries},
-    thing::state::DataPointAccess,
 };
 
 use super::DataPoint;
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<DB, T> crate::thing::state::TimeSeriesAccess<T> for DB
+impl<DB, T> crate::port::TimeSeriesAccess<T> for DB
 where
     T: ChannelTypeInfo + Into<Channel>,
     T::ValueType: Clone + Interpolatable + From<DbValue>,

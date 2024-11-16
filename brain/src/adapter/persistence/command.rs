@@ -1,5 +1,3 @@
-use crate::thing::{CommandAccess, CommandExecutor};
-
 use anyhow::Result;
 use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
@@ -7,6 +5,8 @@ use api::command::{
 };
 use sqlx::PgPool;
 use support::{t, time::DateTime};
+
+use crate::port::{CommandAccess, CommandExecutor};
 
 impl<DB: AsRef<PgPool>, C: CommandId> CommandAccess<C> for DB {
     async fn get_latest_command(

@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use support::{
     t,
     time::{DateTime, Duration},
+    DataPoint,
 };
 
-use crate::adapter::persistence::DataPoint;
 use anyhow::{ensure, Result};
 
 pub struct TimeSeries<T: Clone + Interpolatable> {

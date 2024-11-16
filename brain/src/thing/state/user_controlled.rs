@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
-use support::t;
+use support::{t, DataPoint};
 
-use crate::adapter::persistence::DataPoint;
 use api::{
     command::{CommandExecution, CommandSource, PowerToggle, SetPower, Thermostat},
     state::{ChannelTypeInfo, ExternalAutoControl, Powered, SetPoint},

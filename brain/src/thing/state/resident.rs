@@ -1,8 +1,6 @@
 use anyhow::Result;
 use api::state::{ChannelTypeInfo, Presence};
-use support::t;
-
-use crate::adapter::persistence::DataPoint;
+use support::{t, DataPoint};
 
 use super::{DataPointAccess, TimeSeriesAccess};
 

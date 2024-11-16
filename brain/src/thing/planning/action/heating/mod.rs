@@ -5,12 +5,11 @@ mod wait_for_ventilation;
 
 use std::fmt::Display;
 
-use crate::adapter::persistence::DataPoint;
 use api::{
     command::{HeatingTargetState, SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
 };
-use support::{ext::ToOk, t, time::DateTime, unit::DegreeCelsius};
+use support::{ext::ToOk, t, time::DateTime, unit::DegreeCelsius, DataPoint};
 
 pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
 pub use ventilation_in_progress::NoHeatingDuringVentilation;

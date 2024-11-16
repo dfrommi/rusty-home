@@ -1,9 +1,8 @@
 use support::{
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
+    DataPoint,
 };
-
-use crate::adapter::persistence::DataPoint;
 
 pub trait Interpolatable: Sized {
     fn interpolate(

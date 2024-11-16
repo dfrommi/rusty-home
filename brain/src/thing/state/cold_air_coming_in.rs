@@ -1,9 +1,9 @@
 use api::state::{ChannelTypeInfo, Temperature};
 use support::unit::DegreeCelsius;
 
-use crate::{adapter::persistence::DataPoint, thing::state::opened::Opened};
-
 use super::DataPointAccess;
+use crate::thing::state::opened::Opened;
+use support::DataPoint;
 
 #[derive(Debug, Clone)]
 pub enum ColdAirComingIn {

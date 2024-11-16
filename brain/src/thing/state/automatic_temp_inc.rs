@@ -1,7 +1,7 @@
 use api::state::{ChannelTypeInfo, Temperature};
 use support::{t, unit::DegreeCelsius};
 
-use crate::adapter::persistence::DataPoint;
+use support::DataPoint;
 
 use super::{opened::Opened, DataPointAccess, TimeSeriesAccess};
 

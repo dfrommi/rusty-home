@@ -1,7 +1,5 @@
 use api::state::ChannelTypeInfo;
-use support::t;
-
-use crate::adapter::persistence::DataPoint;
+use support::{t, DataPoint};
 
 use super::DataPointAccess;
 

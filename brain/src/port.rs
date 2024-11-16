@@ -7,10 +7,9 @@ use api::{
     command::{Command, CommandExecution, CommandId, CommandSource, CommandTarget},
     state::ChannelTypeInfo,
 };
-use support::time::DateTime;
+use support::{time::DateTime, DataPoint};
 
 use crate::{
-    adapter::persistence::DataPoint,
     support::timeseries::{interpolate::Interpolatable, TimeSeries},
     thing::planning::ActionResult,
 };

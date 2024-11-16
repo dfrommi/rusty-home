@@ -1,4 +1,4 @@
-use crate::{adapter::persistence::DataPoint, support::timeseries::TimeSeries};
+use crate::support::timeseries::TimeSeries;
 
 use super::*;
 use anyhow::Result;
@@ -7,6 +7,7 @@ use api::state::{RelativeHumidity, Temperature};
 use support::{
     time::DateTime,
     unit::{DegreeCelsius, Percent},
+    DataPoint,
 };
 use tokio::try_join;
 

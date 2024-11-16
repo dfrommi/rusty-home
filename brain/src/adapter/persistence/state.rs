@@ -3,14 +3,13 @@ use crate::{
     support::timeseries::{interpolate::Interpolatable, TimeSeries},
 };
 
-use super::DataPoint;
 use anyhow::Result;
 use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
 use sqlx::PgPool;
-use support::{t, time::DateTime};
+use support::{t, time::DateTime, DataPoint};
 
 impl<DB, T> DataPointAccess<T> for DB
 where

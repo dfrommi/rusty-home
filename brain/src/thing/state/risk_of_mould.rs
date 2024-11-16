@@ -2,9 +2,9 @@ use api::state::{ChannelTypeInfo, RelativeHumidity};
 use support::{
     t,
     unit::{DegreeCelsius, Percent},
+    DataPoint,
 };
 
-use crate::adapter::persistence::DataPoint;
 use anyhow::Result;
 
 use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};

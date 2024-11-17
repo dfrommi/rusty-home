@@ -82,6 +82,6 @@ where
             })
             .collect();
 
-        Ok(TimeSeries::new(dps, since)?)
+        TimeSeries::new(dps, since)
     }
 }

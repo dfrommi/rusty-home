@@ -84,6 +84,10 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
     //linear interpolation or last seen
     pub fn at(&self, at: DateTime) -> Option<DataPoint<T>> {
         Self::interpolate(at, &self.values).map(|v| DataPoint {

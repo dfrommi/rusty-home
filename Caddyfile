@@ -1,0 +1,18 @@
+{
+    auto_https off
+    debug
+}
+
+http://:80
+
+# Proxy /api/states to ha.home.lan
+route /api/states* {
+    reverse_proxy http://ha.home.lan {
+      header_up Host {upstream_hostport}
+    }
+}
+
+# Default response for all other paths
+route {
+    respond "{}" 200
+}

@@ -11,3 +11,14 @@ services:
     # volumes:
     #   - ./data:/var/lib/postgresql/data
 
+  caddy:
+    image: caddy:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+

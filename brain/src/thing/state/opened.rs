@@ -76,3 +76,63 @@ async fn any_of(
         Err(e) => Err(e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use support::time::DateTime;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_any_of_some_opened() {
+        let api = FakeAccess {
+            left: true,
+            right: false,
+            side: true,
+            balcony: false,
+        };
+
+        let result = api.current_data_point(Opened::LivingRoomWindowOrDoor).await;
+
+        assert!(result.unwrap().value);
+    }
+
+    #[tokio::test]
+    async fn test_any_of_all_closed() {
+        let api = FakeAccess {
+            left: false,
+            right: false,
+            side: false,
+            balcony: false,
+        };
+
+        let result = api.current_data_point(Opened::LivingRoomWindowOrDoor).await;
+
+        assert!(!result.unwrap().value);
+    }
+
+    struct FakeAccess {
+        left: bool,
+        right: bool,
+        side: bool,
+        balcony: bool,
+    }
+
+    impl DataPointAccess<api::state::Opened> for FakeAccess {
+        async fn current_data_point(
+            &self,
+            item: api::state::Opened,
+        ) -> anyhow::Result<DataPoint<bool>> {
+            Ok(DataPoint {
+                value: match item {
+                    api::state::Opened::LivingRoomWindowLeft => self.left,
+                    api::state::Opened::LivingRoomWindowRight => self.right,
+                    api::state::Opened::LivingRoomWindowSide => self.side,
+                    api::state::Opened::LivingRoomBalconyDoor => self.balcony,
+                    _ => panic!("Unexpected item {:?}", item),
+                },
+                timestamp: DateTime::now(),
+            })
+        }
+    }
+}

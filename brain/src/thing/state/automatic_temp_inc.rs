@@ -53,11 +53,30 @@ where
             return Ok(window_opened.map_value(|_| true));
         }
 
-        let temperature = self.series_since(temp_sensor, t!(5 minutes ago)).await?;
+        let temperature = self
+            .series_since(temp_sensor, window_opened.timestamp)
+            .await?;
 
-        //temperature increase settled
-        Ok(temperature
-            .last()
-            .map_value(|current| current - &temperature.min().value > DegreeCelsius(0.1)))
+        //wait for a mearurement. until then assume opened window still has effect
+        if temperature.len() < 2 {
+            return Ok(window_opened.map_value(|_| true));
+        }
+
+        let current_temperature = temperature.at(t!(now));
+        let start_temperature = temperature.at(t!(5 minutes ago));
+        let any_timestamp = current_temperature
+            .as_ref()
+            .or(start_temperature.as_ref())
+            .map(|v| v.timestamp)
+            .unwrap_or(window_opened.timestamp);
+
+        match (current_temperature, start_temperature) {
+            (Some(current_temperature), Some(start_temperature)) => {
+                let diff = current_temperature.value - start_temperature.value;
+                //temperature still increasing significantly
+                Ok(current_temperature.map_value(|current| current - &diff > DegreeCelsius(0.1)))
+            }
+            _ => Ok(DataPoint::new(true, any_timestamp)),
+        }
     }
 }

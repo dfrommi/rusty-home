@@ -43,6 +43,17 @@ fn heating_started_before_window_was_opened_in_one_room() {
 }
 
 #[test]
+fn defered_heating_after_ventilation_stopped_too_early() {
+    let action = NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom);
+    let result = get_state_at("2024-11-16T16:57:27.8+01:00", action);
+
+    assert!(
+        result.is_fulfilled,
+        "Should be fulfilled. Check handling when too few temperature mearements exist after ventilation stopped"
+    );
+}
+
+#[test]
 fn no_heating_during_automatic_temperature_increase_toggling() {
     let action = NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom);
 

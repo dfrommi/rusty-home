@@ -14,7 +14,7 @@ services:
   caddy:
     image: caddy:latest
     ports:
-      - "8080:80"
+      - "8090:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     logging:

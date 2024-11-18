@@ -8,6 +8,7 @@ pub use energy_reading::*;
 pub use command::NewCommandAvailablePgListener;
 use sqlx::PgPool;
 
+#[derive(Clone)]
 pub struct Database {
     db_pool: PgPool,
 }

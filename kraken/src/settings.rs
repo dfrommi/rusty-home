@@ -7,6 +7,7 @@ pub struct Settings {
     pub database: Database,
     pub mqtt: Mqtt,
     pub homeassistant: HomeAssitant,
+    pub http_server: HttpServer,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -21,6 +22,12 @@ pub struct Mqtt {
     pub host: String,
     pub port: u16,
     pub client_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct HttpServer {
+    pub port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]

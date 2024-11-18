@@ -1,9 +1,11 @@
 use adapter::{
+    energy_meter::ManualEnergyMeter,
     persistence::{Database, NewCommandAvailablePgListener},
     HaRestClient, HaStateCollector,
 };
 use anyhow::Context;
 use api::DbEventListener;
+use axum::Router;
 use config::{default_ha_command_config, default_ha_state_config};
 use settings::Settings;
 use sqlx::postgres::PgListener;
@@ -23,6 +25,8 @@ struct Infrastructure {
     database: Arc<Database>,
     event_listener: DbEventListener,
     mqtt_client: support::mqtt::Mqtt,
+    router: Router,
+    http_listener: tokio::net::TcpListener,
 }
 
 #[tokio::main]
@@ -95,10 +99,19 @@ impl Infrastructure {
             &settings.mqtt.client_id,
         );
 
+        let database = Arc::new(Database::new(db_pool));
+        let router = ManualEnergyMeter::new(database.clone());
+        let http_listener =
+            tokio::net::TcpListener::bind(format!("0.0.0.0:{}", settings.http_server.port))
+                .await
+                .unwrap();
+
         Self {
-            database: Arc::new(Database::new(db_pool)),
+            database,
             mqtt_client,
             event_listener: DbEventListener::new(db_listener, vec![api::THING_COMMAND_ADDED_EVENT]),
+            router,
+            http_listener,
         }
     }
 
@@ -118,9 +131,12 @@ impl Infrastructure {
     }
 
     async fn process(self) {
+        let http = async { axum::serve(self.http_listener, self.router).await.unwrap() };
+
         tokio::select!(
             _ = self.mqtt_client.process() => {},
             _ = self.event_listener.dispatch_events() => {},
+            _ = http => {},
         )
     }
 }

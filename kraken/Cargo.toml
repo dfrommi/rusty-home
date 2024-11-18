@@ -24,6 +24,8 @@ sqlx = { version = "0.8", features = [
   #  "chrono",
 ] }
 derive_more = { version = "1", features = ["from"] }
+axum = "0"
+trait-variant = "0"
 
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }

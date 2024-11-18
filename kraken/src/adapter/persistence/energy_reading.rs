@@ -34,6 +34,7 @@ pub enum Faucet {
     Bathroom,
 }
 
+#[trait_variant::make(Send)] //for axum
 pub trait EnergyReadingRepository {
     async fn add_energy_reading(
         &self,

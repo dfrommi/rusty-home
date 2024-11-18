@@ -39,6 +39,8 @@ RUN apt-get update -y \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/*
 
+EXPOSE 8080
+
 COPY --from=builder /usr/src/myapp/*/release/brain /usr/local/bin/
 COPY --from=builder /usr/src/myapp/*/release/kraken /usr/local/bin/
 ENV TZ=Europe/Berlin

@@ -6,14 +6,12 @@ use api::{
 use anyhow::Result;
 use support::time::DateTime;
 
-use super::BackendApi;
+use crate::port::StateStorage;
 
-pub trait StateRepository {
-    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()>;
-}
+use super::Database;
 
-impl StateRepository for BackendApi {
-    async fn add_thing_value(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
+impl StateStorage for Database {
+    async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.db_pool, value.into(), true).await?;
 
         let fvalue: DbValue = value.into();

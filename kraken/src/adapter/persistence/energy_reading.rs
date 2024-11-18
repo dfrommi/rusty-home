@@ -2,7 +2,7 @@
 
 use support::time::DateTime;
 
-use super::BackendApi;
+use super::Database;
 
 #[derive(Debug, Clone)]
 pub enum EnergyReading {
@@ -42,7 +42,7 @@ pub trait EnergyReadingRepository {
     ) -> anyhow::Result<()>;
 }
 
-impl EnergyReadingRepository for BackendApi {
+impl EnergyReadingRepository for Database {
     async fn add_energy_reading(
         &self,
         reading: EnergyReading,

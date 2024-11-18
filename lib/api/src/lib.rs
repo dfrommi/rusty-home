@@ -13,12 +13,12 @@ pub const THING_VALUE_ADDED_EVENT: &str = "thing_values_insert";
 pub const THING_COMMAND_ADDED_EVENT: &str = "thing_command_insert";
 
 #[derive(Debug)]
-pub struct EventListener {
+pub struct DbEventListener {
     db_listener: PgListener,
     sender_by_topic: HashMap<String, Sender<()>>,
 }
 
-impl EventListener {
+impl DbEventListener {
     pub fn new(db_listener: PgListener, topics: Vec<&str>) -> Self {
         let mut sender_by_topic = HashMap::new();
 

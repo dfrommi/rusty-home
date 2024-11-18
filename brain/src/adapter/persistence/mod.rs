@@ -3,19 +3,19 @@ mod plan_log;
 mod state;
 
 use anyhow::Result;
-use api::EventListener;
+use api::DbEventListener;
 use sqlx::postgres::PgListener;
 use tokio::sync::broadcast::Receiver;
 
 #[derive(Debug)]
 pub struct HomeEventListener {
-    delegate: EventListener,
+    delegate: DbEventListener,
 }
 
 impl HomeEventListener {
     pub fn new(db_listener: PgListener) -> Self {
         Self {
-            delegate: EventListener::new(db_listener, vec![api::THING_VALUE_ADDED_EVENT]),
+            delegate: DbEventListener::new(db_listener, vec![api::THING_VALUE_ADDED_EVENT]),
         }
     }
 

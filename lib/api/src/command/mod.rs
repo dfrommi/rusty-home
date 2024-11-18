@@ -24,7 +24,7 @@ impl From<Command> for CommandTarget {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize)]
 #[serde(tag = "type", content = "device", rename_all = "snake_case")]
 pub enum CommandTarget {
     SetPower(PowerToggle),

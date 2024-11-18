@@ -1,19 +1,40 @@
-use api::command::{
-    db::schema::{DbCommandSource, DbCommandState},
-    Command, CommandExecution, CommandSource, CommandState,
+use api::{
+    command::{
+        db::schema::{DbCommandSource, DbCommandState},
+        Command, CommandExecution, CommandSource, CommandState,
+    },
+    DbEventListener,
 };
 
 use anyhow::Result;
 
-use super::BackendApi;
+use crate::port::{CommandRepository, NewCommandAvailableTrigger};
 
-pub trait CommandRepository {
-    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution<Command>>>;
-    async fn set_command_state_success(&self, command_id: i64) -> Result<()>;
-    async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()>;
+use super::Database;
+
+pub struct NewCommandAvailablePgListener {
+    receiver: tokio::sync::broadcast::Receiver<()>,
 }
 
-impl CommandRepository for BackendApi {
+impl NewCommandAvailablePgListener {
+    pub fn new(listener: &DbEventListener) -> anyhow::Result<Self> {
+        let receiver = listener.new_listener(api::THING_COMMAND_ADDED_EVENT)?;
+        Ok(Self { receiver })
+    }
+}
+
+impl NewCommandAvailableTrigger for NewCommandAvailablePgListener {
+    async fn recv(&mut self) {
+        loop {
+            match self.receiver.recv().await {
+                Ok(_) => break,
+                Err(e) => tracing::error!("Error listening for new command: {}", e),
+            }
+        }
+    }
+}
+
+impl CommandRepository for Database {
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
     async fn get_command_for_processing(&self) -> Result<Option<CommandExecution<Command>>> {
         let mut tx = self.db_pool.begin().await?;

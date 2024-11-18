@@ -1,68 +1,54 @@
-use anyhow::Context;
-use serialize::{to_message, HaMessage, HaServiceData};
+use api::command::{Command, CommandExecution, CommandTarget};
+use serialize::{to_message, HaMessage};
 
-use crate::adapter::CommandExecutor;
+use crate::port::CommandExecutor;
 
-use super::HaService;
+use super::{HaRestClient, HaServiceTarget};
 
 pub struct HaCommandExecutor {
-    client: reqwest::Client,
-    url: String,
+    client: HaRestClient,
+    config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HaCommandExecutor {
-    pub fn new(url: &str, token: &str) -> Self {
-        use reqwest::header;
+    pub fn new(client: HaRestClient, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
+        let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
-        let mut headers = header::HeaderMap::new();
-        let mut auth_value =
-            header::HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap();
-        auth_value.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, auth_value);
-
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap();
+        for (cmd, ha) in config {
+            data.push((cmd.clone(), ha.clone()));
+        }
 
         Self {
             client,
-            url: url.to_owned(),
+            config: data,
         }
-    }
-
-    async fn call_service(
-        &self,
-        domain: &str,
-        service: &str,
-        service_data: HaServiceData,
-    ) -> anyhow::Result<()> {
-        let url = format!("{}/api/services/{}/{}", self.url, domain, service);
-
-        tracing::info!(
-            "Calling HA service {}: {:?}",
-            url,
-            serde_json::to_string(&service_data)?
-        );
-
-        let response = self
-            .client
-            .post(format!("{}/api/services/{}/{}", self.url, domain, service))
-            .json(&service_data)
-            .send()
-            .await;
-
-        tracing::info!("Response: {:?}", response);
-
-        response
-            .with_context(|| format!("Error calling HA service {}/{}", domain, service))
-            .map(|_| ())
     }
 }
 
-impl CommandExecutor<HaService> for HaCommandExecutor {
-    async fn execute_command(&self, command: &HaService) -> anyhow::Result<bool> {
-        let payload = to_message(command)?;
+impl CommandExecutor for HaCommandExecutor {
+    async fn execute_command(&self, command: &CommandExecution<Command>) -> anyhow::Result<bool> {
+        let command_target: CommandTarget = command.command.clone().into();
+
+        //could be more efficient, but would require eq and hash on CommandTarget
+        let ha_target = self.config.iter().find_map(|(cmd, ha)| {
+            if cmd == &command_target {
+                Some(ha)
+            } else {
+                None
+            }
+        });
+
+        if ha_target.is_none() {
+            tracing::debug!(
+                "No HA service configured for command target {:?}",
+                command_target
+            );
+            return Ok(false);
+        }
+
+        let ha_target = ha_target.unwrap();
+
+        let payload = to_message(&command.command, ha_target)?;
 
         match payload {
             HaMessage::CallService {
@@ -70,7 +56,9 @@ impl CommandExecutor<HaService> for HaCommandExecutor {
                 service,
                 service_data,
             } => {
-                self.call_service(domain, service, service_data).await?;
+                self.client
+                    .call_service(domain, service, serde_json::to_value(service_data)?)
+                    .await?;
                 Ok(true)
             }
         }
@@ -80,49 +68,74 @@ impl CommandExecutor<HaService> for HaCommandExecutor {
 mod serialize {
     use std::collections::HashMap;
 
+    use api::command::{Command, HeatingTargetState, SetHeating, SetPower};
     use serde::Serialize;
     use serde_json::{json, Value};
     use support::time::Duration;
 
-    use crate::adapter::homeassistant::{HaClimateHvacMode, HaService};
+    use crate::adapter::homeassistant::HaServiceTarget;
 
-    pub fn to_message(service: &HaService) -> Result<HaMessage, serde_json::Error> {
-        let message = match service {
-            HaService::SwitchTurnOnOff { id, power_on } => HaMessage::CallService {
-                domain: "switch",
-                service: if *power_on { "turn_on" } else { "turn_off" },
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::new(),
-                },
-            },
-            HaService::LightTurnOnOff { id, power_on } => HaMessage::CallService {
-                domain: "light",
-                service: if *power_on { "turn_on" } else { "turn_off" },
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::new(),
-                },
-            },
-            HaService::ClimateSetHvacMode { id, mode } => HaMessage::CallService {
+    //TODO simplify HaMessage struct, maybe use new
+    pub fn to_message(command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<HaMessage> {
+        use HaServiceTarget::*;
+
+        let message = match (ha_target, command) {
+            (SwitchTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
+                HaMessage::CallService {
+                    domain: "switch",
+                    service: if *power_on { "turn_on" } else { "turn_off" },
+                    service_data: HaServiceData::ForEntities {
+                        ids: vec![id.to_owned()],
+                        extra: HashMap::new(),
+                    },
+                }
+            }
+            (LightTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
+                HaMessage::CallService {
+                    domain: "light",
+                    service: if *power_on { "turn_on" } else { "turn_off" },
+                    service_data: HaServiceData::ForEntities {
+                        ids: vec![id.to_owned()],
+                        extra: HashMap::new(),
+                    },
+                }
+            }
+            (
+                ClimateControl(id),
+                Command::SetHeating(SetHeating {
+                    target_state: HeatingTargetState::Off,
+                    ..
+                }),
+            ) => HaMessage::CallService {
                 domain: "climate",
                 service: "set_hvac_mode",
                 service_data: HaServiceData::ForEntities {
                     ids: vec![id.to_owned()],
-                    extra: HashMap::from([(
-                        "hvac_mode".to_string(),
-                        json!(match mode {
-                            HaClimateHvacMode::Off => "off",
-                            HaClimateHvacMode::Auto => "auto",
-                        }),
-                    )]),
+                    extra: HashMap::from([("hvac_mode".to_string(), json!("off"))]),
                 },
             },
-            HaService::TadoSetClimateTimer {
-                id,
-                temperature,
-                until,
-            } => HaMessage::CallService {
+
+            (
+                ClimateControl(id),
+                Command::SetHeating(SetHeating {
+                    target_state: HeatingTargetState::Auto,
+                    ..
+                }),
+            ) => HaMessage::CallService {
+                domain: "climate",
+                service: "set_hvac_mode",
+                service_data: HaServiceData::ForEntities {
+                    ids: vec![id.to_owned()],
+                    extra: HashMap::from([("hvac_mode".to_string(), json!("auto"))]),
+                },
+            },
+            (
+                ClimateControl(id),
+                Command::SetHeating(SetHeating {
+                    target_state: HeatingTargetState::Heat { temperature, until },
+                    ..
+                }),
+            ) => HaMessage::CallService {
                 domain: "tado",
                 service: "set_climate_timer",
                 service_data: HaServiceData::ForEntities {
@@ -136,6 +149,7 @@ mod serialize {
                     ]),
                 },
             },
+            conf => return Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         };
 
         Ok(message)

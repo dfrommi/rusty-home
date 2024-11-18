@@ -1,14 +1,15 @@
+mod api;
 mod command;
 mod event;
 
-use api::state::{
+use ::api::state::{
     CurrentPowerUsage, ExternalAutoControl, HeatingDemand, Opened, Powered, Presence,
     RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
 
+pub use api::HaRestClient;
 pub use command::HaCommandExecutor;
 pub use event::HaStateCollector;
-use support::{time::DateTime, unit::DegreeCelsius};
 
 #[derive(Debug, Clone)]
 pub enum HaChannel {
@@ -27,28 +28,8 @@ pub enum HaChannel {
 }
 
 #[derive(Debug, Clone)]
-pub enum HaService {
-    SwitchTurnOnOff {
-        id: String,
-        power_on: bool,
-    },
-    LightTurnOnOff {
-        id: String,
-        power_on: bool,
-    },
-    TadoSetClimateTimer {
-        id: String,
-        temperature: DegreeCelsius,
-        until: DateTime,
-    },
-    ClimateSetHvacMode {
-        id: String,
-        mode: HaClimateHvacMode,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum HaClimateHvacMode {
-    Off,
-    Auto,
+pub enum HaServiceTarget {
+    SwitchTurnOnOff(String),
+    LightTurnOnOff(String),
+    ClimateControl(String),
 }

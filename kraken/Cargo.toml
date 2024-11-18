@@ -23,6 +23,7 @@ sqlx = { version = "0.8", features = [
   "macros",
   #  "chrono",
 ] }
+derive_more = { version = "1", features = ["from"] }
 
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }

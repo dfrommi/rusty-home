@@ -19,11 +19,11 @@ pub struct DbEventListener {
 }
 
 impl DbEventListener {
-    pub fn new(db_listener: PgListener, topics: Vec<&str>) -> Self {
+    pub fn new(db_listener: PgListener) -> Self {
         let mut sender_by_topic = HashMap::new();
 
-        for topic in topics {
-            let (tx, _) = tokio::sync::broadcast::channel(1);
+        for topic in [THING_VALUE_ADDED_EVENT, THING_COMMAND_ADDED_EVENT] {
+            let (tx, _) = tokio::sync::broadcast::channel(16);
             sender_by_topic.insert(topic.to_string(), tx);
         }
 
@@ -41,7 +41,17 @@ impl DbEventListener {
     }
 
     pub async fn dispatch_events(mut self) -> Result<()> {
-        let topics: Vec<&str> = self.sender_by_topic.keys().map(|s| s.as_str()).collect();
+        let topics: Vec<&str> = self
+            .sender_by_topic
+            .iter()
+            .filter_map(|(k, v)| {
+                if v.receiver_count() > 0 {
+                    Some(k.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
         self.db_listener.listen_all(topics).await?;
 
         loop {

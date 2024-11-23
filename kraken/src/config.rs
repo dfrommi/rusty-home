@@ -6,7 +6,7 @@ use api::{
     state::Temperature,
 };
 
-use crate::adapter::{HaChannel, HaServiceTarget};
+use crate::homeassistant::{HaChannel, HaServiceTarget};
 
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![
@@ -41,7 +41,6 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     ]
 }
 
-//TODO use into to convert to HaChannel
 pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
     vec![
         //

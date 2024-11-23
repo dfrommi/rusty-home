@@ -6,9 +6,7 @@ use api::{
 use anyhow::Result;
 use support::time::DateTime;
 
-use crate::port::StateStorage;
-
-use super::Database;
+use crate::{core::domain::StateStorage, Database};
 
 impl StateStorage for Database {
     async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {

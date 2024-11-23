@@ -1,47 +1,8 @@
-#![allow(dead_code)]
-
 use support::time::DateTime;
 
-use super::Database;
+use crate::Database;
 
-#[derive(Debug, Clone)]
-pub enum EnergyReading {
-    Heating(Radiator, f64),
-    ColdWater(Faucet, f64),
-    HotWater(Faucet, f64),
-}
-
-#[derive(Debug, Clone)]
-pub enum EnergyReadingType {
-    Heating,
-    ColdWater,
-    HotWater,
-}
-
-#[derive(Debug, Clone)]
-pub enum Radiator {
-    LivingRoomBig,
-    LivingRoomSmall,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
-}
-
-#[derive(Debug, Clone)]
-pub enum Faucet {
-    Kitchen,
-    Bathroom,
-}
-
-#[trait_variant::make(Send)] //for axum
-pub trait EnergyReadingRepository {
-    async fn add_energy_reading(
-        &self,
-        reading: EnergyReading,
-        timestamp: DateTime,
-    ) -> anyhow::Result<()>;
-}
+use super::{EnergyReading, EnergyReadingRepository, Faucet, Radiator};
 
 impl EnergyReadingRepository for Database {
     async fn add_energy_reading(

@@ -15,7 +15,7 @@ pub struct HomeEventListener {
 impl HomeEventListener {
     pub fn new(db_listener: PgListener) -> Self {
         Self {
-            delegate: DbEventListener::new(db_listener, vec![api::THING_VALUE_ADDED_EVENT]),
+            delegate: DbEventListener::new(db_listener),
         }
     }
 

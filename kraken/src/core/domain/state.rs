@@ -1,4 +1,4 @@
-use crate::port::{StateCollector, StateStorage};
+use super::port::{StateCollector, StateStorage};
 
 //TODO more generic with Vec of StateCollector, but that's not possible yet because of async fn on
 //trait prevents building an object. async-trait crate might help.

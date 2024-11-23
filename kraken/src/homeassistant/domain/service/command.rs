@@ -1,17 +1,17 @@
-use api::command::{Command, CommandExecution, CommandTarget};
-use serialize::{to_message, HaMessage};
+use api::command::{Command, CommandTarget};
 
-use crate::port::CommandExecutor;
+use crate::{
+    core::CommandExecutor,
+    homeassistant::domain::{port::CallServicePort, HaServiceTarget},
+};
 
-use super::{HaRestClient, HaServiceTarget};
-
-pub struct HaCommandExecutor {
-    client: HaRestClient,
+pub struct HaCommandExecutor<C> {
+    client: C,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
-impl HaCommandExecutor {
-    pub fn new(client: HaRestClient, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
+impl<C> HaCommandExecutor<C> {
+    pub fn new(client: C, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
         for (cmd, ha) in config {
@@ -25,9 +25,9 @@ impl HaCommandExecutor {
     }
 }
 
-impl CommandExecutor for HaCommandExecutor {
-    async fn execute_command(&self, command: &CommandExecution<Command>) -> anyhow::Result<bool> {
-        let command_target: CommandTarget = command.command.clone().into();
+impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
+        let command_target: CommandTarget = command.clone().into();
 
         //could be more efficient, but would require eq and hash on CommandTarget
         let ha_target = self.config.iter().find_map(|(cmd, ha)| {
@@ -48,20 +48,16 @@ impl CommandExecutor for HaCommandExecutor {
 
         let ha_target = ha_target.unwrap();
 
-        let payload = to_message(&command.command, ha_target)?;
+        let payload = serialize::to_message(&command, ha_target)?;
 
-        match payload {
-            HaMessage::CallService {
-                domain,
-                service,
-                service_data,
-            } => {
-                self.client
-                    .call_service(domain, service, serde_json::to_value(service_data)?)
-                    .await?;
-                Ok(true)
-            }
-        }
+        self.client
+            .call_service(
+                payload.domain,
+                payload.service,
+                serde_json::to_value(payload.service_data)?,
+            )
+            .await
+            .map(|_| true)
     }
 }
 
@@ -73,15 +69,24 @@ mod serialize {
     use serde_json::{json, Value};
     use support::time::Duration;
 
-    use crate::adapter::homeassistant::HaServiceTarget;
+    use crate::homeassistant::domain::HaServiceTarget;
+
+    pub struct CallServiceRequest {
+        pub domain: &'static str,
+        pub service: &'static str,
+        pub service_data: HaServiceData,
+    }
 
     //TODO simplify HaMessage struct, maybe use new
-    pub fn to_message(command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<HaMessage> {
+    pub fn to_message(
+        command: &Command,
+        ha_target: &HaServiceTarget,
+    ) -> anyhow::Result<CallServiceRequest> {
         use HaServiceTarget::*;
 
         let message = match (ha_target, command) {
             (SwitchTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
-                HaMessage::CallService {
+                CallServiceRequest {
                     domain: "switch",
                     service: if *power_on { "turn_on" } else { "turn_off" },
                     service_data: HaServiceData::ForEntities {
@@ -91,7 +96,7 @@ mod serialize {
                 }
             }
             (LightTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
-                HaMessage::CallService {
+                CallServiceRequest {
                     domain: "light",
                     service: if *power_on { "turn_on" } else { "turn_off" },
                     service_data: HaServiceData::ForEntities {
@@ -106,7 +111,7 @@ mod serialize {
                     target_state: HeatingTargetState::Off,
                     ..
                 }),
-            ) => HaMessage::CallService {
+            ) => CallServiceRequest {
                 domain: "climate",
                 service: "set_hvac_mode",
                 service_data: HaServiceData::ForEntities {
@@ -121,7 +126,7 @@ mod serialize {
                     target_state: HeatingTargetState::Auto,
                     ..
                 }),
-            ) => HaMessage::CallService {
+            ) => CallServiceRequest {
                 domain: "climate",
                 service: "set_hvac_mode",
                 service_data: HaServiceData::ForEntities {
@@ -135,7 +140,7 @@ mod serialize {
                     target_state: HeatingTargetState::Heat { temperature, until },
                     ..
                 }),
-            ) => HaMessage::CallService {
+            ) => CallServiceRequest {
                 domain: "tado",
                 service: "set_climate_timer",
                 service_data: HaServiceData::ForEntities {
@@ -153,17 +158,6 @@ mod serialize {
         };
 
         Ok(message)
-    }
-
-    #[derive(Serialize, Debug)]
-    #[serde(tag = "event_type", content = "event_data")]
-    pub enum HaMessage {
-        #[serde(rename = "call_service")]
-        CallService {
-            domain: &'static str,
-            service: &'static str,
-            service_data: HaServiceData,
-        },
     }
 
     #[derive(Serialize, Debug)]
@@ -185,43 +179,5 @@ mod serialize {
         let ss = total_seconds % 60;
 
         format!("{:02}:{:02}:{:02}", hh, mm, ss)
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use assert_json_diff::assert_json_eq;
-        use serde_json::json;
-
-        use super::*;
-
-        #[test]
-        fn serialze_command() {
-            //GIVEN
-            let command = HaMessage::CallService {
-                domain: "testdomain",
-                service: "testservice",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec!["my_switch".to_string()],
-                    extra: HashMap::new(),
-                },
-            };
-
-            let expected_json = json!({
-                "event_type": "call_service",
-                "event_data": {
-                    "domain": "testdomain",
-                    "service": "testservice",
-                    "service_data": {
-                        "entity_id": ["my_switch"]
-                    }
-                }
-            });
-
-            //WHEN
-            let serialized = serde_json::to_value(command).unwrap();
-
-            //THEN
-            assert_json_eq!(&serialized, &expected_json)
-        }
     }
 }

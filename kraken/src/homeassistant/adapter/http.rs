@@ -1,5 +1,7 @@
 use anyhow::Context;
 
+use crate::homeassistant::domain::{CallServicePort, GetAllEntityStatesPort, StateChangedEvent};
+
 #[derive(Debug, Clone)]
 pub struct HaRestClient {
     client: reqwest::Client,
@@ -26,8 +28,10 @@ impl HaRestClient {
             base_url: url.to_owned(),
         }
     }
+}
 
-    pub async fn get_all_states(&self) -> anyhow::Result<Vec<serde_json::Value>> {
+impl GetAllEntityStatesPort for HaRestClient {
+    async fn get_current_state(&self) -> anyhow::Result<Vec<StateChangedEvent>> {
         let response = self
             .client
             .get(format!("{}/api/states", self.base_url))
@@ -35,12 +39,14 @@ impl HaRestClient {
             .await?;
 
         response
-            .json::<Vec<serde_json::Value>>()
+            .json::<Vec<StateChangedEvent>>()
             .await
             .context("Error getting all states")
     }
+}
 
-    pub async fn call_service(
+impl CallServicePort for HaRestClient {
+    async fn call_service(
         &self,
         domain: &str,
         service: &str,

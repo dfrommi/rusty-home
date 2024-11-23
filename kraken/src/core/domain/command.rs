@@ -1,4 +1,4 @@
-use crate::port::{CommandExecutor, CommandRepository, NewCommandAvailableTrigger};
+use super::port::{CommandExecutor, CommandRepository, NewCommandAvailableTrigger};
 
 use anyhow::Result;
 
@@ -25,7 +25,7 @@ pub async fn execute_commands(
             Ok(Some(cmd)) => {
                 got_cmd = true;
 
-                let res = executor.execute_command(&cmd).await;
+                let res = executor.execute_command(&cmd.command).await;
                 //TODO loop over executors and check bool result
 
                 handle_execution_result(cmd.id, res, repo).await;

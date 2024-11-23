@@ -34,7 +34,6 @@ pub struct HttpServer {
 #[allow(unused)]
 pub struct HomeAssitant {
     pub topic_event: String,
-    pub topic_command: String,
     pub url: String,
     pub token: String,
 }

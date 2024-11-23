@@ -9,7 +9,12 @@ use support::{time::DateTime, DataPoint};
 
 pub trait CommandExecutor {
     //Returns true if command was executed
-    async fn execute_command(&self, command: &CommandExecution<Command>) -> anyhow::Result<bool>;
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
+}
+
+pub trait StateCollector {
+    async fn get_current_state(&self) -> anyhow::Result<Vec<DataPoint<ChannelValue>>>;
+    async fn recv(&mut self) -> anyhow::Result<DataPoint<ChannelValue>>;
 }
 
 pub trait CommandRepository {
@@ -20,11 +25,6 @@ pub trait CommandRepository {
 
 pub trait NewCommandAvailableTrigger {
     async fn recv(&mut self);
-}
-
-pub trait StateCollector {
-    async fn get_current_state(&self) -> anyhow::Result<Vec<DataPoint<ChannelValue>>>;
-    async fn recv(&mut self) -> anyhow::Result<DataPoint<ChannelValue>>;
 }
 
 pub trait StateStorage {

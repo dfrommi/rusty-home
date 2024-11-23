@@ -8,9 +8,10 @@ use api::{
 
 use anyhow::Result;
 
-use crate::port::{CommandRepository, NewCommandAvailableTrigger};
-
-use super::Database;
+use crate::{
+    core::domain::{CommandRepository, NewCommandAvailableTrigger},
+    Database,
+};
 
 pub struct NewCommandAvailablePgListener {
     receiver: tokio::sync::broadcast::Receiver<()>,

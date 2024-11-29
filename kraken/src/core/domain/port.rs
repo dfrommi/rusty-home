@@ -23,10 +23,6 @@ pub trait CommandRepository {
     async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()>;
 }
 
-pub trait NewCommandAvailableTrigger {
-    async fn recv(&mut self);
-}
-
 pub trait StateStorage {
     async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> anyhow::Result<()>;
 }

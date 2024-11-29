@@ -16,6 +16,8 @@ pub enum ChannelValue {
     HeatingDemand(HeatingDemand, Percent),
     ExternalAutoControl(ExternalAutoControl, bool),
     Presence(Presence, bool),
+    TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
+    TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
 }
 
 pub trait ChannelTypeInfo {
@@ -151,4 +153,24 @@ pub enum Presence {
     CouchLeft,
     CouchCenter,
     CouchRight,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TotalRadiatorConsumption {
+    LivingRoomBig,
+    LivingRoomSmall,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TotalWaterConsumption {
+    KitchenCold,
+    KitchenWarm,
+    BathroomCold,
+    BathroomWarm,
 }

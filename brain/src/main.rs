@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use adapter::persistence::HomeEventListener;
+use api::DbEventListener;
 use settings::Settings;
 use sqlx::{postgres::PgListener, PgPool};
 use thing::planning::plan_for_home;
@@ -50,9 +50,9 @@ pub async fn main() {
 
     let infrastructure = Arc::new(Infrastructure { db_pool });
 
-    let event_listener = HomeEventListener::new(db_listener);
+    let event_listener = DbEventListener::new(db_listener);
 
-    let mut planning_trigger = event_listener.new_thing_value_added_listener();
+    let mut planning_trigger = event_listener.new_state_value_added_listener();
     tasks.spawn({
         let api = infrastructure.clone();
         async move {
@@ -75,7 +75,7 @@ pub async fn main() {
         let mqtt_api = infrastructure.clone();
         let mqtt_sender = mqtt_client.new_publisher();
         let state_topic = settings.mqtt.base_topic_status.clone();
-        let mqtt_trigger = event_listener.new_thing_value_added_listener();
+        let mqtt_trigger = event_listener.new_state_value_added_listener();
 
         async move {
             adapter::mqtt::export_state(mqtt_api.as_ref(), state_topic, mqtt_sender, mqtt_trigger)

@@ -1,13 +1,14 @@
 use anyhow::Context;
-use api::DbEventListener;
+use api::{CommandAddedEvent, DbEventListener};
 use axum::Router;
 use config::{default_ha_command_config, default_ha_state_config};
-use core::{CommandExecutor, NewCommandAvailablePgListener, StateCollector};
+use core::{CommandExecutor, StateCollector};
 use homeassistant::new_command_executor;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::env;
 use support::mqtt::MqttInMessage;
+use tokio::sync::broadcast::Receiver;
 use tracing::info;
 
 use sqlx::PgPool;
@@ -47,9 +48,13 @@ pub async fn main() {
 
     let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 
-    let (energy_meter_collector, energy_meter_router) =
-        energy_meter::new(infrastructure.database.clone())
-            .expect("Error initializing energy meter");
+    let (energy_meter_collector, energy_meter_router) = energy_meter::new(
+        infrastructure.database.clone(),
+        infrastructure
+            .event_listener
+            .new_energy_reading_insert_listener(),
+    )
+    .expect("Error initializing energy meter");
     infrastructure.add_to_router(energy_meter_router);
 
     let collect_states = {
@@ -71,11 +76,11 @@ pub async fn main() {
 
     let execute_commands = {
         let command_repo = infrastructure.database.clone();
-        let mut new_cmd_available = infrastructure.new_command_available_listener();
+        let new_cmd_available = infrastructure.new_command_available_listener();
         let ha_cmd_executor = settings.homeassistant.new_command_executor();
 
         async move {
-            core::execute_commands(&command_repo, &ha_cmd_executor, &mut new_cmd_available).await;
+            core::execute_commands(&command_repo, &ha_cmd_executor, new_cmd_available).await;
         }
     };
 
@@ -154,9 +159,8 @@ impl Infrastructure {
             .context("Error subscribing to MQTT topic")
     }
 
-    fn new_command_available_listener(&self) -> NewCommandAvailablePgListener {
-        NewCommandAvailablePgListener::new(&self.event_listener)
-            .expect("Error initializing database listener")
+    fn new_command_available_listener(&self) -> Receiver<CommandAddedEvent> {
+        self.event_listener.new_command_added_listener()
     }
 
     async fn process(self) {

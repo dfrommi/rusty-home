@@ -128,6 +128,30 @@ mod mapper {
         }
     }
 
+    impl From<&KiloCubicMeter> for DbValue {
+        fn from(value: &KiloCubicMeter) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for KiloCubicMeter {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
+    impl From<&HeatingUnit> for DbValue {
+        fn from(value: &HeatingUnit) -> Self {
+            DbValue(value.0)
+        }
+    }
+
+    impl From<DbValue> for HeatingUnit {
+        fn from(value: DbValue) -> Self {
+            Self(value.0)
+        }
+    }
+
     impl From<DbValue> for bool {
         fn from(value: DbValue) -> Self {
             value.0 > 0.0

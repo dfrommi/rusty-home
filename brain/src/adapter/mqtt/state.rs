@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use api::state::Powered;
+use api::{state::Powered, StateValueAddedEvent};
 use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
@@ -10,7 +10,7 @@ pub async fn export_state<T>(
     api: &T,
     base_topic: String,
     tx: Sender<MqttOutMessage>,
-    mut state_changed: Receiver<()>,
+    mut state_changed: Receiver<StateValueAddedEvent>,
 ) where
     T: DataPointAccess<Powered>,
 {

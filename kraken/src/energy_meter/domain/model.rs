@@ -6,13 +6,6 @@ pub enum EnergyReading {
 }
 
 #[derive(Debug, Clone)]
-pub enum EnergyReadingType {
-    Heating,
-    ColdWater,
-    HotWater,
-}
-
-#[derive(Debug, Clone)]
 pub enum Radiator {
     LivingRoomBig,
     LivingRoomSmall,
@@ -26,4 +19,17 @@ pub enum Radiator {
 pub enum Faucet {
     Kitchen,
     Bathroom,
+}
+
+impl Radiator {
+    pub fn factor(&self) -> f64 {
+        match self {
+            Radiator::LivingRoomBig => 1.728,
+            Radiator::LivingRoomSmall => 0.501,
+            Radiator::Bedroom => 1.401,
+            Radiator::Kitchen => 1.485,
+            Radiator::RoomOfRequirements => 1.193,
+            Radiator::Bathroom => 0.496,
+        }
+    }
 }

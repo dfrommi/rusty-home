@@ -1,11 +1,13 @@
-use super::port::{CommandExecutor, CommandRepository, NewCommandAvailableTrigger};
+use super::port::{CommandExecutor, CommandRepository};
 
 use anyhow::Result;
+use api::CommandAddedEvent;
+use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(
     repo: &impl CommandRepository,
     executor: &impl CommandExecutor,
-    new_command_available: &mut impl NewCommandAvailableTrigger,
+    mut new_command_available: Receiver<CommandAddedEvent>,
 ) {
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(15));
     let mut got_cmd = false;

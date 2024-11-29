@@ -1,39 +1,11 @@
-use api::{
-    command::{
-        db::schema::{DbCommandSource, DbCommandState},
-        Command, CommandExecution, CommandSource, CommandState,
-    },
-    DbEventListener,
+use api::command::{
+    db::schema::{DbCommandSource, DbCommandState},
+    Command, CommandExecution, CommandSource, CommandState,
 };
 
 use anyhow::Result;
 
-use crate::{
-    core::domain::{CommandRepository, NewCommandAvailableTrigger},
-    Database,
-};
-
-pub struct NewCommandAvailablePgListener {
-    receiver: tokio::sync::broadcast::Receiver<()>,
-}
-
-impl NewCommandAvailablePgListener {
-    pub fn new(listener: &DbEventListener) -> anyhow::Result<Self> {
-        let receiver = listener.new_listener(api::THING_COMMAND_ADDED_EVENT)?;
-        Ok(Self { receiver })
-    }
-}
-
-impl NewCommandAvailableTrigger for NewCommandAvailablePgListener {
-    async fn recv(&mut self) {
-        loop {
-            match self.receiver.recv().await {
-                Ok(_) => break,
-                Err(e) => tracing::error!("Error listening for new command: {}", e),
-            }
-        }
-    }
-}
+use crate::{core::domain::CommandRepository, Database};
 
 impl CommandRepository for Database {
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message

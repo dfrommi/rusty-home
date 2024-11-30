@@ -41,9 +41,11 @@ where
         Table::new(&action_results).to_string()
     );
 
+    /* too much data. Needs to be deduplicated
     if let Err(e) = api.add_planning_trace(&action_results).await {
         tracing::error!("Error logging planning result: {:?}", e);
     }
+    */
 
     for result in action_results {
         let action = result.action;

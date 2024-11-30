@@ -1,0 +1,2 @@
+ALTER TABLE energy_reading ADD COLUMN year_end BOOLEAN NOT NULL DEFAULT FALSE;
+

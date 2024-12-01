@@ -4,7 +4,7 @@ use interpolate::Interpolatable;
 use std::collections::BTreeMap;
 use support::{
     t,
-    time::{DateTime, Duration},
+    time::{DateTime, DateTimeRange, Duration},
     DataPoint,
 };
 
@@ -12,12 +12,13 @@ use anyhow::{ensure, Result};
 
 pub struct TimeSeries<T: Clone + Interpolatable> {
     values: BTreeMap<DateTime, T>,
+    range: DateTimeRange,
 }
 
 impl<T: Clone + Interpolatable> TimeSeries<T> {
     pub fn new(
         data_points: impl IntoIterator<Item = DataPoint<T>>,
-        start_at: DateTime,
+        range: DateTimeRange,
     ) -> Result<Self> {
         let mut values: BTreeMap<DateTime, T> = BTreeMap::new();
         for dp in data_points.into_iter() {
@@ -26,13 +27,17 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
 
         ensure!(!values.is_empty(), "data points are empty");
 
-        if let Some(interpolated) = Self::interpolate(start_at, &values) {
+        let start_at = range.start();
+        if let Some(interpolated) = Self::interpolate_or_guess(start_at, &values) {
             values.insert(start_at, interpolated);
         }
 
-        Ok(Self {
-            values: values.split_off(&start_at), //remove all values before start
-        })
+        let end_at = range.end();
+        if let Some(interpolated) = Self::interpolate_or_guess(end_at, &values) {
+            values.insert(end_at, interpolated);
+        }
+
+        Ok(Self { values, range })
     }
 
     pub fn combined<U: Clone + Interpolatable, V: Clone + Interpolatable, F>(
@@ -61,27 +66,12 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             }
         }
 
-        let since = std::cmp::max(first_series.starting_at(), second_series.starting_at());
-        Self::new(dps, since)
-    }
+        let range = DateTimeRange::new(
+            std::cmp::max(first_series.range.start(), second_series.range.start()),
+            std::cmp::min(first_series.range.end(), second_series.range.end()),
+        );
 
-    #[allow(dead_code)]
-    pub fn first(&self) -> DataPoint<T> {
-        let (timestamp, value) = self.values.first_key_value().unwrap();
-
-        DataPoint {
-            timestamp: *timestamp,
-            value: value.clone(),
-        }
-    }
-
-    pub fn last(&self) -> DataPoint<T> {
-        let (timestamp, value) = self.values.last_key_value().unwrap();
-
-        DataPoint {
-            timestamp: *timestamp,
-            value: value.clone(),
-        }
+        Self::new(dps, range)
     }
 
     pub fn len(&self) -> usize {
@@ -90,7 +80,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
 
     //linear interpolation or last seen
     pub fn at(&self, at: DateTime) -> Option<DataPoint<T>> {
-        Self::interpolate(at, &self.values).map(|v| DataPoint {
+        Self::interpolate_or_guess(at, &self.values).map(|v| DataPoint {
             timestamp: at,
             value: v,
         })
@@ -110,14 +100,6 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             timestamp: *timestamp,
             value: value.clone(),
         }
-    }
-
-    fn starting_at(&self) -> DateTime {
-        *self
-            .values
-            .keys()
-            .next()
-            .expect("Internal error: map should not be empty")
     }
 
     pub fn with_duration(&self) -> Vec<DataPoint<(T, Duration)>> {
@@ -145,7 +127,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         result
     }
 
-    pub fn interpolate(at: DateTime, values: &BTreeMap<DateTime, T>) -> Option<T> {
+    fn interpolate_or_guess(at: DateTime, values: &BTreeMap<DateTime, T>) -> Option<T> {
         let prev = values
             .range(..=at)
             .next_back()
@@ -155,7 +137,13 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             .next()
             .map(|(t, v)| DataPoint::new(v.clone(), *t));
 
-        T::interpolate(at, prev.as_ref(), next.as_ref())
+        //TODO handle prediction (linear interpolation)
+        match (prev, next) {
+            (Some(prev), Some(next)) => Some(T::interpolate(at, &prev, &next)),
+            (Some(prev), None) => Some(prev.value.clone()),
+            (None, Some(next)) => Some(next.value.clone()),
+            _ => None,
+        }
     }
 }
 
@@ -263,7 +251,7 @@ mod tests {
                     value: DegreeCelsius(20.0),
                 },
             ],
-            DateTime::from_iso("2024-09-10T13:00:00Z").unwrap(),
+            DateTimeRange::since(DateTime::from_iso("2024-09-10T13:00:00Z").unwrap()),
         )
         .unwrap()
     }
@@ -282,7 +270,7 @@ mod combined {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:46Z").unwrap(),
                 value: DegreeCelsius(19.93),
             }],
-            DateTime::from_iso("2024-11-04T05:10:09Z").unwrap(),
+            DateTimeRange::since(DateTime::from_iso("2024-11-04T05:10:09Z").unwrap()),
         )
         .unwrap();
 
@@ -291,7 +279,7 @@ mod combined {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:47Z").unwrap(),
                 value: Percent(61.1),
             }],
-            DateTime::from_iso("2024-11-04T05:10:09Z").unwrap(),
+            DateTimeRange::since(DateTime::from_iso("2024-11-04T05:10:09Z").unwrap()),
         )
         .unwrap();
 

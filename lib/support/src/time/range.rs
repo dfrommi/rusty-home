@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::t;
+
 use super::{DateTime, Time};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +49,10 @@ impl DailyTimeRange {
 impl DateTimeRange {
     pub fn new(start: DateTime, end: DateTime) -> Self {
         Self { start, end }
+    }
+
+    pub fn since(start: DateTime) -> Self {
+        Self::new(start, t!(now))
     }
 
     pub fn start(&self) -> DateTime {

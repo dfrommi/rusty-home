@@ -7,7 +7,11 @@ use api::{
     command::{Command, CommandExecution, CommandId, CommandSource, CommandTarget},
     state::ChannelTypeInfo,
 };
-use support::{time::DateTime, DataPoint};
+use support::{
+    t,
+    time::{DateTime, DateTimeRange},
+    DataPoint,
+};
 
 use crate::{
     support::timeseries::{interpolate::Interpolatable, TimeSeries},
@@ -27,7 +31,11 @@ where
     T: ChannelTypeInfo,
     T::ValueType: Clone + Interpolatable,
 {
-    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T::ValueType>>;
+    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T::ValueType>>;
+
+    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T::ValueType>> {
+        self.series(item, DateTimeRange::new(since, t!(now))).await
+    }
 }
 
 pub trait CommandAccess<C: CommandId> {

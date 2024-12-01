@@ -5,7 +5,7 @@ use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};
 
 use support::{
-    time::DateTime,
+    time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
     DataPoint,
 };
@@ -60,17 +60,17 @@ impl<T> TimeSeriesAccess<DewPoint> for T
 where
     T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<RelativeHumidity>,
 {
-    async fn series_since(
+    async fn series(
         &self,
         item: DewPoint,
-        since: DateTime,
+        range: DateTimeRange,
     ) -> Result<TimeSeries<DegreeCelsius>> {
         let (t_series, h_series) = {
             let temp = item.temperature();
             let humidity = item.relative_humidity();
             try_join!(
-                self.series_since(temp, since),
-                self.series_since(humidity, since)
+                self.series(temp, range.clone()),
+                self.series(humidity, range.clone())
             )?
         };
 

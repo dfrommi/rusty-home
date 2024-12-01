@@ -9,7 +9,11 @@ use api::{
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
 use sqlx::PgPool;
-use support::{t, time::DateTime, DataPoint};
+use support::{
+    t,
+    time::{DateTime, DateTimeRange},
+    DataPoint,
+};
 
 impl<DB, T> DataPointAccess<T> for DB
 where
@@ -50,7 +54,7 @@ where
     T::ValueType: Clone + Interpolatable + From<DbValue>,
     DB: AsRef<PgPool>,
 {
-    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T::ValueType>> {
+    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T::ValueType>> {
         let tags_id = get_tag_id(self.as_ref(), item.into(), false).await?;
 
         //TODO rewrite to max query
@@ -58,17 +62,28 @@ where
             r#"(SELECT value as "value!: DbValue", timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
-              AND timestamp > $2
-              AND timestamp <= $3)
+              AND timestamp >= $2
+              AND timestamp <= $3
+              AND timestamp <= $4)
             UNION ALL
             (SELECT value, timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
-              AND timestamp <= $2
+              AND timestamp < $2
+              AND timestamp <= $4
               ORDER BY timestamp DESC
+              LIMIT 1)
+            UNION ALL
+            (SELECT value, timestamp
+              FROM THING_VALUE
+              WHERE TAG_ID = $1
+              AND timestamp > $3
+              AND timestamp <= $4
+              ORDER BY timestamp ASC
               LIMIT 1)"#,
             tags_id,
-            since.into_db(),
+            range.start().into_db(),
+            range.end().into_db(),
             t!(now).into_db(), //For timeshift in tests
         )
         .fetch_all(self.as_ref())
@@ -82,6 +97,6 @@ where
             })
             .collect();
 
-        TimeSeries::new(dps, since)
+        TimeSeries::new(dps, range)
     }
 }

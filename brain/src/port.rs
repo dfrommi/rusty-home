@@ -14,7 +14,7 @@ use support::{
 };
 
 use crate::{
-    support::timeseries::{interpolate::Interpolatable, TimeSeries},
+    support::timeseries::{interpolate::Estimatable, TimeSeries},
     thing::planning::ActionResult,
 };
 
@@ -28,12 +28,11 @@ pub trait DataPointAccess<T: ChannelTypeInfo> {
 
 pub trait TimeSeriesAccess<T>
 where
-    T: ChannelTypeInfo,
-    T::ValueType: Clone + Interpolatable,
+    T: Estimatable,
 {
-    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T::ValueType>>;
+    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>>;
 
-    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T::ValueType>> {
+    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T>> {
         self.series(item, DateTimeRange::new(since, t!(now))).await
     }
 }

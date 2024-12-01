@@ -1,17 +1,37 @@
 use std::{cmp::Ordering, sync::Arc};
 
-use actix_web::{http::header, web, HttpResponse, Responder};
-use api::state::{ChannelTypeInfo, CurrentPowerUsage, HeatingDemand};
-use support::DataPoint;
+use actix_web::{
+    http::header,
+    web::{self, Query},
+    HttpResponse, Responder,
+};
+use api::state::{ChannelTypeInfo, CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use serde::Deserialize;
+use support::{
+    time::{DateTime, DateTimeRange},
+    DataPoint,
+};
 
-use crate::port::DataPointAccess;
+use crate::port::{DataPointAccess, TimeSeriesAccess};
+
+const EURO_PER_KWH: f64 = 0.3;
+
+#[derive(Clone, Debug, Deserialize)]
+struct QueryTimeRange {
+    from: DateTime,
+    to: DateTime,
+}
 
 pub fn new_routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: DataPointAccess<CurrentPowerUsage> + DataPointAccess<HeatingDemand> + 'static,
+    T: DataPointAccess<CurrentPowerUsage>
+        + DataPointAccess<HeatingDemand>
+        + TimeSeriesAccess<TotalEnergyConsumption>
+        + 'static,
 {
     web::scope("/grafana")
         .route("/ds/energy/current", web::get().to(current_power::<T>))
+        .route("/ds/energy/total", web::get().to(total_power::<T>))
         .route("/ds/heating/current", web::get().to(current_heating::<T>))
         .app_data(web::Data::from(api))
 }
@@ -93,6 +113,79 @@ where
         .body(csv)
 }
 
+async fn total_power<T>(api: web::Data<T>, time_range: Query<QueryTimeRange>) -> impl Responder
+where
+    T: TimeSeriesAccess<TotalEnergyConsumption>,
+{
+    struct Row {
+        name: String,
+        kwh: f64,
+        euro: f64,
+    }
+
+    let time_range: DateTimeRange = time_range.into_inner().into();
+
+    let all_items = vec![
+        TotalEnergyConsumption::Fridge,
+        TotalEnergyConsumption::Dehumidifier,
+        TotalEnergyConsumption::AppleTv,
+        TotalEnergyConsumption::Tv,
+        TotalEnergyConsumption::AirPurifier,
+        TotalEnergyConsumption::CouchLight,
+        TotalEnergyConsumption::Dishwasher,
+        TotalEnergyConsumption::Kettle,
+        TotalEnergyConsumption::WashingMachine,
+        TotalEnergyConsumption::Nuc,
+        TotalEnergyConsumption::DslModem,
+        TotalEnergyConsumption::InternetGateway,
+        TotalEnergyConsumption::NetworkSwitch,
+        TotalEnergyConsumption::InfraredHeater,
+        TotalEnergyConsumption::KitchenMultiPlug,
+        TotalEnergyConsumption::CouchPlug,
+        TotalEnergyConsumption::RoomOfRequirementsDesk,
+    ];
+
+    let mut rows: Vec<Row> = vec![];
+
+    for item in all_items {
+        let result = api.series(item.clone(), time_range.clone()).await;
+        if let Err(e) = result {
+            return HttpResponse::InternalServerError()
+                .body(format!("Error retrieving data: {}", e));
+        }
+        let result = result.unwrap();
+
+        let value = match (result.at(time_range.start()), result.at(time_range.end())) {
+            (Some(a), Some(b)) => b.value.0 - a.value.0,
+            _ => {
+                return HttpResponse::NotFound().body(format!(
+                    "No data found for {}",
+                    DashboardDisplay::display(&item)
+                ))
+            }
+        };
+
+        let price = value * EURO_PER_KWH;
+
+        rows.push(Row {
+            name: DashboardDisplay::display(&item).to_string(),
+            kwh: value,
+            euro: price,
+        });
+    }
+
+    rows.sort_by(|a, b| b.kwh.partial_cmp(&a.kwh).unwrap_or(Ordering::Equal));
+
+    let mut csv = "name,kwh,euro\n".to_string();
+    for row in rows {
+        csv.push_str(&format!("{},{},{}\n", row.name, row.kwh, row.euro));
+    }
+
+    HttpResponse::Ok()
+        .append_header(header::ContentType(mime::TEXT_CSV))
+        .body(csv)
+}
+
 //TODO move to repo trait
 async fn get_all_states<T: ChannelTypeInfo + Clone>(
     api: &impl DataPointAccess<T>,
@@ -106,6 +199,12 @@ async fn get_all_states<T: ChannelTypeInfo + Clone>(
     }
 
     Ok(result)
+}
+
+impl From<QueryTimeRange> for DateTimeRange {
+    fn from(val: QueryTimeRange) -> Self {
+        DateTimeRange::new(val.from, val.to)
+    }
 }
 
 trait DashboardDisplay {
@@ -132,6 +231,30 @@ impl DashboardDisplay for CurrentPowerUsage {
             CurrentPowerUsage::KitchenMultiPlug => "Küche Arbeitsplatte",
             CurrentPowerUsage::CouchPlug => "Couch-Stecker",
             CurrentPowerUsage::RoomOfRequirementsDesk => "Schreibtisch",
+        }
+    }
+}
+
+impl DashboardDisplay for TotalEnergyConsumption {
+    fn display(&self) -> &'static str {
+        match self {
+            TotalEnergyConsumption::Fridge => "Kühlschrank",
+            TotalEnergyConsumption::Dehumidifier => "Blasi",
+            TotalEnergyConsumption::AppleTv => "Apple TV",
+            TotalEnergyConsumption::Tv => "TV",
+            TotalEnergyConsumption::AirPurifier => "Luftfilter",
+            TotalEnergyConsumption::CouchLight => "Couchlicht",
+            TotalEnergyConsumption::Dishwasher => "Geschirrspüler",
+            TotalEnergyConsumption::Kettle => "Wasserkocher",
+            TotalEnergyConsumption::WashingMachine => "Waschmaschine",
+            TotalEnergyConsumption::Nuc => "Nuc",
+            TotalEnergyConsumption::DslModem => "DSL Modem",
+            TotalEnergyConsumption::InternetGateway => "Internet Gateway",
+            TotalEnergyConsumption::NetworkSwitch => "Network Switch",
+            TotalEnergyConsumption::InfraredHeater => "Infrarot-Heizung",
+            TotalEnergyConsumption::KitchenMultiPlug => "Küche Arbeitsplatte",
+            TotalEnergyConsumption::CouchPlug => "Couch-Stecker",
+            TotalEnergyConsumption::RoomOfRequirementsDesk => "Schreibtisch",
         }
     }
 }

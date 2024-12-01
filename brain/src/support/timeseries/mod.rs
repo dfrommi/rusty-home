@@ -1,6 +1,6 @@
 pub mod interpolate;
 
-use interpolate::Interpolatable;
+use interpolate::Estimatable;
 use std::collections::BTreeMap;
 use support::{
     t,
@@ -10,17 +10,19 @@ use support::{
 
 use anyhow::{ensure, Result};
 
-pub struct TimeSeries<T: Clone + Interpolatable> {
-    values: BTreeMap<DateTime, T>,
+pub struct TimeSeries<T: Estimatable> {
+    context: T,
+    values: BTreeMap<DateTime, T::Type>,
     range: DateTimeRange,
 }
 
-impl<T: Clone + Interpolatable> TimeSeries<T> {
+impl<T: Estimatable> TimeSeries<T> {
     pub fn new(
-        data_points: impl IntoIterator<Item = DataPoint<T>>,
+        context: T,
+        data_points: impl IntoIterator<Item = DataPoint<T::Type>>,
         range: DateTimeRange,
     ) -> Result<Self> {
-        let mut values: BTreeMap<DateTime, T> = BTreeMap::new();
+        let mut values: BTreeMap<DateTime, T::Type> = BTreeMap::new();
         for dp in data_points.into_iter() {
             values.insert(dp.timestamp, dp.value);
         }
@@ -28,27 +30,34 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         ensure!(!values.is_empty(), "data points are empty");
 
         let start_at = range.start();
-        if let Some(interpolated) = Self::interpolate_or_guess(start_at, &values) {
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, &values) {
             values.insert(start_at, interpolated);
         }
 
         let end_at = range.end();
-        if let Some(interpolated) = Self::interpolate_or_guess(end_at, &values) {
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, &values) {
             values.insert(end_at, interpolated);
         }
 
-        Ok(Self { values, range })
+        Ok(Self {
+            context,
+            values,
+            range,
+        })
     }
 
-    pub fn combined<U: Clone + Interpolatable, V: Clone + Interpolatable, F>(
+    pub fn combined<U, V, F>(
         first_series: &TimeSeries<U>,
         second_series: &TimeSeries<V>,
+        context: T,
         merge: F,
     ) -> Result<Self>
     where
-        F: Fn(&U, &V) -> T,
+        F: Fn(&U::Type, &V::Type) -> T::Type,
+        U: Estimatable,
+        V: Estimatable,
     {
-        let mut dps: Vec<DataPoint<T>> = Vec::new();
+        let mut dps: Vec<DataPoint<T::Type>> = Vec::new();
 
         for (first_timestamp, first_value) in first_series.values.iter() {
             if let Some(second_dp) = second_series.at(*first_timestamp) {
@@ -71,7 +80,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             std::cmp::min(first_series.range.end(), second_series.range.end()),
         );
 
-        Self::new(dps, range)
+        Self::new(context, dps, range)
     }
 
     pub fn len(&self) -> usize {
@@ -79,16 +88,16 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
     }
 
     //linear interpolation or last seen
-    pub fn at(&self, at: DateTime) -> Option<DataPoint<T>> {
-        Self::interpolate_or_guess(at, &self.values).map(|v| DataPoint {
+    pub fn at(&self, at: DateTime) -> Option<DataPoint<T::Type>> {
+        Self::interpolate_or_guess(&self.context, at, &self.values).map(|v| DataPoint {
             timestamp: at,
             value: v,
         })
     }
 
-    pub fn min(&self) -> DataPoint<T>
+    pub fn min(&self) -> DataPoint<T::Type>
     where
-        for<'a> &'a T: PartialOrd,
+        for<'a> &'a T::Type: PartialOrd,
     {
         let (timestamp, value) = self
             .values
@@ -102,7 +111,7 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
         }
     }
 
-    pub fn with_duration(&self) -> Vec<DataPoint<(T, Duration)>> {
+    pub fn with_duration(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
         self.current_and_next()
             .into_iter()
             .map(|((timestamp, value), next)| DataPoint {
@@ -115,19 +124,23 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
             .collect::<Vec<_>>()
     }
 
-    fn current_and_next(&self) -> Vec<((&DateTime, &T), Option<(&DateTime, &T)>)> {
+    fn current_and_next(&self) -> Vec<((&DateTime, &T::Type), Option<(&DateTime, &T::Type)>)> {
         let mut result = vec![];
         let mut iter = self.values.iter().peekable();
 
         while let Some((current_timestamp, value)) = iter.next() {
-            let next: Option<(&DateTime, &T)> = iter.peek().map(|(t, v)| (*t, *v));
+            let next: Option<(&DateTime, &T::Type)> = iter.peek().map(|(t, v)| (*t, *v));
             result.push(((current_timestamp, value), next));
         }
 
         result
     }
 
-    fn interpolate_or_guess(at: DateTime, values: &BTreeMap<DateTime, T>) -> Option<T> {
+    fn interpolate_or_guess(
+        context: &T,
+        at: DateTime,
+        values: &BTreeMap<DateTime, T::Type>,
+    ) -> Option<T::Type> {
         let prev = values
             .range(..=at)
             .next_back()
@@ -139,7 +152,10 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
 
         //TODO handle prediction (linear interpolation)
         match (prev, next) {
-            (Some(prev), Some(next)) => Some(T::interpolate(at, &prev, &next)),
+            (Some(prev), Some(next)) => {
+                let value = context.interpolate(at, &prev, &next);
+                Some(value)
+            }
             (Some(prev), None) => Some(prev.value.clone()),
             (None, Some(next)) => Some(next.value.clone()),
             _ => None,
@@ -148,13 +164,13 @@ impl<T: Clone + Interpolatable> TimeSeries<T> {
 }
 
 //MATH FUNCTIONS
-impl<T> TimeSeries<T>
+impl<T: Estimatable> TimeSeries<T>
 where
-    T: Clone + Interpolatable + From<f64>,
-    for<'a> &'a T: Into<f64>,
+    T::Type: From<f64>,
+    for<'a> &'a T::Type: Into<f64>,
 {
     //weighted by duration
-    pub fn mean(&self) -> T {
+    pub fn mean(&self) -> T::Type {
         let mut weighted_sum = 0.0;
         let mut total_duration = 0.0; //in milliseconds
 
@@ -184,6 +200,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use api::state::Temperature;
     use support::unit::DegreeCelsius;
 
     #[test]
@@ -235,8 +252,9 @@ mod tests {
         val.unwrap()
     }
 
-    fn test_series() -> TimeSeries<DegreeCelsius> {
+    fn test_series() -> TimeSeries<Temperature> {
         TimeSeries::new(
+            Temperature::Outside,
             vec![
                 DataPoint {
                     timestamp: DateTime::from_iso("2024-09-10T14:00:00Z").unwrap(),
@@ -259,6 +277,8 @@ mod tests {
 
 #[cfg(test)]
 mod combined {
+    use crate::thing::state::DewPoint;
+    use api::state::{RelativeHumidity, Temperature};
     use support::unit::{DegreeCelsius, Percent};
 
     use super::*;
@@ -266,6 +286,7 @@ mod combined {
     #[test]
     fn single_item_per_series_out_of_range() {
         let t_series = TimeSeries::new(
+            Temperature::LivingRoomDoor,
             vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:46Z").unwrap(),
                 value: DegreeCelsius(19.93),
@@ -275,6 +296,7 @@ mod combined {
         .unwrap();
 
         let h_series = TimeSeries::new(
+            RelativeHumidity::LivingRoomDoor,
             vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:47Z").unwrap(),
                 value: Percent(61.1),
@@ -283,7 +305,10 @@ mod combined {
         )
         .unwrap();
 
-        let result = TimeSeries::combined(&t_series, &h_series, |a, b| DegreeCelsius(a.0 + b.0));
+        let result =
+            TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoomDoor, |a, b| {
+                DegreeCelsius(a.0 + b.0)
+            });
 
         assert_eq!(result.iter().len(), 1);
     }

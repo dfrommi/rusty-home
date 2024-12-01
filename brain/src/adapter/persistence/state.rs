@@ -1,6 +1,6 @@
 use crate::{
-    port::DataPointAccess,
-    support::timeseries::{interpolate::Interpolatable, TimeSeries},
+    port::{DataPointAccess, TimeSeriesAccess},
+    support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
 use anyhow::Result;
@@ -9,11 +9,7 @@ use api::{
     state::{db::DbValue, Channel, ChannelTypeInfo},
 };
 use sqlx::PgPool;
-use support::{
-    t,
-    time::{DateTime, DateTimeRange},
-    DataPoint,
-};
+use support::{t, time::DateTimeRange, DataPoint};
 
 impl<DB, T> DataPointAccess<T> for DB
 where
@@ -48,14 +44,15 @@ where
     }
 }
 
-impl<DB, T> crate::port::TimeSeriesAccess<T> for DB
+impl<DB, T> TimeSeriesAccess<T> for DB
 where
-    T: ChannelTypeInfo + Into<Channel>,
-    T::ValueType: Clone + Interpolatable + From<DbValue>,
+    T: Into<Channel> + Estimatable + Clone,
+    T::Type: From<DbValue>,
     DB: AsRef<PgPool>,
 {
-    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T::ValueType>> {
-        let tags_id = get_tag_id(self.as_ref(), item.into(), false).await?;
+    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
+        //TODO no clone, use ref
+        let tags_id = get_tag_id(self.as_ref(), item.clone().into(), false).await?;
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
@@ -89,14 +86,14 @@ where
         .fetch_all(self.as_ref())
         .await?;
 
-        let dps: Vec<DataPoint<T::ValueType>> = rec
+        let dps: Vec<DataPoint<T::Type>> = rec
             .into_iter()
             .map(|row| DataPoint {
-                value: T::ValueType::from(row.value),
+                value: T::Type::from(row.value),
                 timestamp: row.timestamp.unwrap().into(),
             })
             .collect();
 
-        TimeSeries::new(dps, range)
+        TimeSeries::new(item, dps, range)
     }
 }

@@ -1,47 +1,72 @@
+use api::state::{Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use support::{
     time::DateTime,
-    unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
+    unit::{DegreeCelsius, KiloWattHours, Percent},
     DataPoint,
 };
 
-pub trait Interpolatable: Sized {
-    fn interpolate(at: DateTime, prev: &DataPoint<Self>, next: &DataPoint<Self>) -> Self;
-}
+pub trait Estimatable
+where
+    Self::Type: Clone,
+{
+    type Type;
 
-impl Interpolatable for bool {
-    fn interpolate(at: DateTime, prev: &DataPoint<bool>, next: &DataPoint<bool>) -> bool {
-        algo::last_seen(at, prev, next)
-    }
-}
-
-impl Interpolatable for DegreeCelsius {
     fn interpolate(
+        &self,
         at: DateTime,
-        prev: &DataPoint<DegreeCelsius>,
-        next: &DataPoint<DegreeCelsius>,
-    ) -> DegreeCelsius {
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type;
+}
+
+impl Estimatable for Temperature {
+    type Type = DegreeCelsius;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
         algo::linear(at, prev, next)
     }
 }
 
-impl Interpolatable for Percent {
-    fn interpolate(at: DateTime, prev: &DataPoint<Percent>, next: &DataPoint<Percent>) -> Percent {
+impl Estimatable for RelativeHumidity {
+    type Type = Percent;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
         algo::linear(at, prev, next)
     }
 }
 
-impl Interpolatable for Watt {
-    fn interpolate(at: DateTime, prev: &DataPoint<Watt>, next: &DataPoint<Watt>) -> Watt {
+impl Estimatable for Presence {
+    type Type = bool;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
         algo::last_seen(at, prev, next)
     }
 }
 
-impl Interpolatable for KiloWattHours {
+impl Estimatable for TotalEnergyConsumption {
+    type Type = KiloWattHours;
+
     fn interpolate(
+        &self,
         at: DateTime,
-        prev: &DataPoint<KiloWattHours>,
-        next: &DataPoint<KiloWattHours>,
-    ) -> KiloWattHours {
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
         algo::linear(at, prev, next)
     }
 }

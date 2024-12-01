@@ -1,4 +1,7 @@
-use crate::support::timeseries::TimeSeries;
+use crate::support::timeseries::{
+    interpolate::{self, Estimatable},
+    TimeSeries,
+};
 
 use super::*;
 use anyhow::Result;
@@ -44,6 +47,19 @@ impl ChannelTypeInfo for DewPoint {
     type ValueType = DegreeCelsius;
 }
 
+impl Estimatable for DewPoint {
+    type Type = DegreeCelsius;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
+        interpolate::algo::linear(at, prev, next)
+    }
+}
+
 impl<T> DataPointAccess<DewPoint> for T
 where
     T: DataPointAccess<Temperature> + DataPointAccess<RelativeHumidity>,
@@ -60,11 +76,7 @@ impl<T> TimeSeriesAccess<DewPoint> for T
 where
     T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<RelativeHumidity>,
 {
-    async fn series(
-        &self,
-        item: DewPoint,
-        range: DateTimeRange,
-    ) -> Result<TimeSeries<DegreeCelsius>> {
+    async fn series(&self, item: DewPoint, range: DateTimeRange) -> Result<TimeSeries<DewPoint>> {
         let (t_series, h_series) = {
             let temp = item.temperature();
             let humidity = item.relative_humidity();
@@ -74,7 +86,7 @@ where
             )?
         };
 
-        TimeSeries::combined(&t_series, &h_series, calculate_dew_point)
+        TimeSeries::combined(&t_series, &h_series, item, calculate_dew_point)
     }
 }
 

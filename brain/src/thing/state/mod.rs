@@ -17,6 +17,7 @@ use api::state::ChannelTypeInfo;
 pub use api::state::Powered;
 pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
+pub use dewpoint::DewPoint;
 pub use opened::Opened;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;

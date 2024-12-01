@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use actix_web::{App, HttpServer};
 use api::DbEventListener;
 use settings::Settings;
 use sqlx::{postgres::PgListener, PgPool};
@@ -108,6 +109,19 @@ pub async fn main() {
     });
 
     tasks.spawn(async move { mqtt_client.process().await });
+
+    let http_api = infrastructure.clone();
+    tasks.spawn(async move {
+        let http_server = HttpServer::new(move || {
+            App::new().service(adapter::grafana::new_routes(http_api.clone()))
+        })
+        .workers(1)
+        .disable_signals()
+        .bind(("0.0.0.0", settings.http_server.port))
+        .expect("Error configuring HTTP server");
+
+        http_server.run().await.unwrap();
+    });
 
     while let Some(task) = tasks.join_next().await {
         let () = task.unwrap();

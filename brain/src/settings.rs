@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct Settings {
     pub database: Database,
     pub mqtt: Mqtt,
+    pub http_server: HttpServer,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +33,12 @@ impl Settings {
 
         s.try_deserialize()
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct HttpServer {
+    pub port: u16,
 }
 
 #[cfg(test)]

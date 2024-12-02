@@ -55,6 +55,11 @@ impl DateTimeRange {
         Self::new(start, t!(now))
     }
 
+    pub fn non_future(&self) -> Self {
+        let now = t!(now);
+        Self::new(now.min(self.start), now.min(self.end))
+    }
+
     pub fn start(&self) -> DateTime {
         self.start
     }

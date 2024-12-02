@@ -69,7 +69,7 @@ pub enum Powered {
     LivingRoomNotificationLight,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
 #[serde(rename_all = "snake_case")]
 pub enum CurrentPowerUsage {
     Fridge,
@@ -91,7 +91,7 @@ pub enum CurrentPowerUsage {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
 #[serde(rename_all = "snake_case")]
 pub enum TotalEnergyConsumption {
     Fridge,
@@ -123,7 +123,7 @@ pub enum SetPoint {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
 #[serde(rename_all = "snake_case")]
 pub enum HeatingDemand {
     LivingRoom,

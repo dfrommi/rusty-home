@@ -1,0 +1,67 @@
+use std::cmp::Ordering;
+
+use actix_web::{
+    http::header,
+    web::{self},
+    HttpResponse, Responder,
+};
+use api::state::{ChannelTypeInfo, CurrentPowerUsage, HeatingDemand};
+use strum::VariantArray;
+use support::DataPoint;
+
+use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
+
+pub async fn current_power<T>(api: web::Data<T>) -> impl Responder
+where
+    T: DataPointAccess<CurrentPowerUsage>,
+{
+    current_values_response(api.as_ref(), CurrentPowerUsage::VARIANTS).await
+}
+
+pub async fn current_heating<T>(api: web::Data<T>) -> impl Responder
+where
+    T: DataPointAccess<HeatingDemand>,
+{
+    current_values_response(api.as_ref(), HeatingDemand::VARIANTS).await
+}
+
+async fn current_values_response<T>(api: &impl DataPointAccess<T>, items: &[T]) -> impl Responder
+where
+    T: ChannelTypeInfo + DashboardDisplay + Clone,
+    T::ValueType: PartialOrd + AsRef<f64>,
+{
+    let values = get_all_states(api, items).await;
+    if let Err(e) = values {
+        return HttpResponse::InternalServerError().body(format!("Error: {}", e));
+    }
+
+    let mut values = values.unwrap();
+    values.sort_by(|(_, a), (_, b)| b.value.partial_cmp(&a.value).unwrap_or(Ordering::Equal));
+
+    let mut csv = "name,value\n".to_string();
+
+    for (item, dp) in values {
+        let value = dp.value.as_ref();
+        let line = format!("{},{}\n", DashboardDisplay::display(&item), value);
+        csv.push_str(&line);
+    }
+
+    HttpResponse::Ok()
+        .append_header(header::ContentType(mime::TEXT_CSV))
+        .body(csv)
+}
+
+//TODO move to repo trait
+async fn get_all_states<T: ChannelTypeInfo + Clone>(
+    api: &impl DataPointAccess<T>,
+    items: &[T],
+) -> anyhow::Result<Vec<(T, DataPoint<T::ValueType>)>> {
+    let mut result = vec![];
+
+    for item in items {
+        let dp = api.current_data_point(item.clone()).await?;
+        result.push((item.clone(), dp));
+    }
+
+    Ok(result)
+}

@@ -309,7 +309,7 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             HaChannel::HeatingDemand(HeatingDemand::Bedroom),
         ),
         (
-            "sensor.arbeitsimmer_heating",
+            "sensor.arbeitszimmer_heating",
             HaChannel::HeatingDemand(HeatingDemand::RoomOfRequirements),
         ),
         (

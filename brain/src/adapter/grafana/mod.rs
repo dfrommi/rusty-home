@@ -14,7 +14,7 @@ use support::{
 
 use crate::port::{DataPointAccess, TimeSeriesAccess};
 
-const EURO_PER_KWH: f64 = 0.3;
+const EURO_PER_KWH: f64 = 0.349;
 
 #[derive(Clone, Debug, Deserialize)]
 struct QueryTimeRange {
@@ -27,12 +27,14 @@ where
     T: DataPointAccess<CurrentPowerUsage>
         + DataPointAccess<HeatingDemand>
         + TimeSeriesAccess<TotalEnergyConsumption>
+        + TimeSeriesAccess<HeatingDemand>
         + 'static,
 {
     web::scope("/grafana")
         .route("/ds/energy/current", web::get().to(current_power::<T>))
         .route("/ds/energy/total", web::get().to(total_power::<T>))
         .route("/ds/heating/current", web::get().to(current_heating::<T>))
+        .route("/ds/heating/total", web::get().to(total_heating::<T>))
         .app_data(web::Data::from(api))
 }
 
@@ -184,6 +186,65 @@ where
     HttpResponse::Ok()
         .append_header(header::ContentType(mime::TEXT_CSV))
         .body(csv)
+}
+
+async fn total_heating<T>(api: web::Data<T>, time_range: Query<QueryTimeRange>) -> impl Responder
+where
+    T: TimeSeriesAccess<HeatingDemand>,
+{
+    struct Row {
+        name: String,
+        value: f64,
+    }
+
+    let time_range: DateTimeRange = time_range.into_inner().into();
+
+    let all_items = vec![
+        HeatingDemand::LivingRoom,
+        HeatingDemand::Bedroom,
+        HeatingDemand::RoomOfRequirements,
+        HeatingDemand::Kitchen,
+        HeatingDemand::Bathroom,
+    ];
+
+    let mut rows: Vec<Row> = vec![];
+
+    for item in all_items {
+        let result = api.series(item.clone(), time_range.clone()).await;
+
+        if let Err(e) = result {
+            return HttpResponse::InternalServerError()
+                .body(format!("Error retrieving data: {}", e));
+        }
+        let result = result.unwrap();
+
+        let value = result.area_in_type_hours() + heating_factor(&item);
+
+        rows.push(Row {
+            name: DashboardDisplay::display(&item).to_string(),
+            value,
+        });
+    }
+
+    rows.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(Ordering::Equal));
+    let mut csv = "name,value\n".to_string();
+    for row in rows {
+        csv.push_str(&format!("{},{}\n", row.name, row.value));
+    }
+
+    HttpResponse::Ok()
+        .append_header(header::ContentType(mime::TEXT_CSV))
+        .body(csv)
+}
+
+fn heating_factor(item: &HeatingDemand) -> f64 {
+    match item {
+        HeatingDemand::LivingRoom => 1.728 + 0.501,
+        HeatingDemand::Bedroom => 1.401,
+        HeatingDemand::RoomOfRequirements => 1.193,
+        HeatingDemand::Kitchen => 1.485,
+        HeatingDemand::Bathroom => 0.496,
+    }
 }
 
 //TODO move to repo trait

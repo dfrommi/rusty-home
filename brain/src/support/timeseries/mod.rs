@@ -157,7 +157,6 @@ impl<T: Estimatable> TimeSeries<T> {
                 Some(value)
             }
             (Some(prev), None) => Some(prev.value.clone()),
-            (None, Some(next)) => Some(next.value.clone()),
             _ => None,
         }
     }
@@ -169,31 +168,51 @@ where
     T::Type: From<f64>,
     for<'a> &'a T::Type: Into<f64>,
 {
-    //weighted by duration
     pub fn mean(&self) -> T::Type {
+        let (weighted_sum, total_duration) = self.weighted_sum_and_duration_in_type_secs();
+
+        if total_duration == 0.0 {
+            weighted_sum.into()
+        } else {
+            (weighted_sum / total_duration).into()
+        }
+    }
+
+    pub fn area_in_type_hours(&self) -> f64 {
+        let (weighted_sum_secs, _) = self.weighted_sum_and_duration_in_type_secs();
+        weighted_sum_secs / 3600.0
+    }
+
+    //weighted by duration
+    fn weighted_sum_and_duration_in_type_secs(&self) -> (f64, f64) {
         let mut weighted_sum = 0.0;
         let mut total_duration = 0.0; //in milliseconds
 
-        let mut iter = self.values.iter().peekable();
-        while let Some((current_timestamp, current_value)) = iter.next() {
-            if let Some((next_timestamp, next_value)) = iter.peek() {
+        let mut iter = self.values.keys().peekable();
+        while let Some(current_timestamp) = iter.next() {
+            if let Some(next_timestamp) = iter.peek() {
+                let ref_value: T::Type = self
+                    .at(DateTime::midpoint(current_timestamp, next_timestamp))
+                    .expect("Unexpected error. Could not get value in the middle of two existing values")
+                    .value;
+
                 let duration: f64 = next_timestamp
                     .elapsed_since(*current_timestamp)
                     .as_secs_f64();
-                let current_f64 = current_value.into();
-                let next_f64: f64 = (*next_value).into();
 
-                //linear interpolated
-                weighted_sum += ((current_f64 + next_f64) / 2.0) * duration;
+                //good enough approximation for mean in range. Correct for linear and last-seen interpolation
+                let midpoint_f64: f64 = (&ref_value).into();
+
+                weighted_sum += midpoint_f64 * duration;
                 total_duration += duration;
             }
         }
 
         if total_duration == 0.0 {
-            return self.values.values().next().unwrap().clone();
+            weighted_sum = self.values.values().next().unwrap().into();
         }
 
-        (weighted_sum / total_duration).into()
+        (weighted_sum, total_duration)
     }
 }
 
@@ -206,7 +225,21 @@ mod tests {
     #[test]
     fn test_mean() {
         let ts = test_series();
-        assert_eq!(ts.mean().0, 20.0);
+
+        //mean value per time range, multiplied by duration, last section uses last seen value
+        let expected =
+            ((10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0)
+                / 5.0;
+
+        assert_eq!(ts.mean().0, expected);
+    }
+
+    #[test]
+    fn test_area_in_type_hours() {
+        let ts = test_series();
+        let expected =
+            (10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0;
+        assert_eq!(ts.area_in_type_hours(), expected);
     }
 
     mod at {
@@ -269,7 +302,10 @@ mod tests {
                     value: DegreeCelsius(20.0),
                 },
             ],
-            DateTimeRange::since(DateTime::from_iso("2024-09-10T13:00:00Z").unwrap()),
+            DateTimeRange::new(
+                DateTime::from_iso("2024-09-10T13:00:00Z").unwrap(),
+                DateTime::from_iso("2024-09-10T19:00:00Z").unwrap(),
+            ),
         )
         .unwrap()
     }

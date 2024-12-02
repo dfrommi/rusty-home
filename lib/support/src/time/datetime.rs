@@ -26,6 +26,18 @@ impl DateTime {
         }
     }
 
+    pub fn midpoint(start: &DateTime, end: &DateTime) -> DateTime {
+        let start_timestamp = start.delegate.timestamp_millis();
+        let end_timestamp = end.delegate.timestamp_millis();
+
+        // Calculate the midpoint in seconds
+        let mid_timestamp = (start_timestamp + end_timestamp) / 2;
+
+        chrono::DateTime::from_timestamp_millis(mid_timestamp)
+            .unwrap_or_else(|| panic!("Error calculating midpoint for {:?} and {:?}. Should not fail with reasonable dates", start, end))
+            .into()
+    }
+
     pub(super) fn delegate(&self) -> &chrono::DateTime<chrono::Local> {
         &self.delegate
     }
@@ -116,5 +128,36 @@ impl From<DateTime> for f64 {
 impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
     fn from(val: chrono::DateTime<T>) -> Self {
         DateTime::new(val)
+    }
+}
+
+#[cfg(test)]
+mod constructor {
+    use super::*;
+
+    #[test]
+    fn test_midpoint() {
+        let start = DateTime::from_iso("2024-11-03T15:23:46Z").unwrap();
+        let end = DateTime::from_iso("2024-11-03T17:23:46Z").unwrap();
+
+        let midpoint = DateTime::midpoint(&start, &end);
+
+        assert_eq!(
+            midpoint,
+            DateTime::from_iso("2024-11-03T16:23:46Z").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_midpoint_wrong_order() {
+        let start = DateTime::from_iso("2024-11-03T17:23:46Z").unwrap();
+        let end = DateTime::from_iso("2024-11-03T15:23:46Z").unwrap();
+
+        let midpoint = DateTime::midpoint(&start, &end);
+
+        assert_eq!(
+            midpoint,
+            DateTime::from_iso("2024-11-03T16:23:46Z").unwrap()
+        );
     }
 }

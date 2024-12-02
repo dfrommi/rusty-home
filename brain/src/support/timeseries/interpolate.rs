@@ -1,4 +1,4 @@
-use api::state::{Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
+use api::state::{HeatingDemand, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use support::{
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent},
@@ -47,6 +47,19 @@ impl Estimatable for RelativeHumidity {
 
 impl Estimatable for Presence {
     type Type = bool;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
+        algo::last_seen(at, prev, next)
+    }
+}
+
+impl Estimatable for HeatingDemand {
+    type Type = Percent;
 
     fn interpolate(
         &self,

@@ -38,19 +38,7 @@ where
         TotalEnergyConsumption::VARIANTS,
         time_range.clone(),
         move |_, ts| {
-            let (a_opt, b_opt) = (ts.at(time_range.start()), ts.at(time_range.end()));
-            let value = match (&a_opt, &b_opt) {
-                (Some(a), Some(b)) => b.value.0 - a.value.0,
-                _ => {
-                    tracing::warn!(
-                        "No data found for total power consumption: a={:?} / b={:?}",
-                        a_opt,
-                        b_opt
-                    );
-                    0.0
-                }
-            };
-
+            let value = ts.last().value.0 - ts.first().value.0;
             (value, value * EURO_PER_KWH)
         },
     )

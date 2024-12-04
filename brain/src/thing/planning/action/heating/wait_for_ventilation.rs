@@ -69,7 +69,7 @@ where
             self.heating_zone.manual_heating_already_triggrered(
                 api,
                 self.target_temperature,
-                time_range.start(),
+                *time_range.start(),
             ),
             self.heating_zone
                 .is_manual_heating_to(api, self.target_temperature)
@@ -97,7 +97,7 @@ where
                 device: self.heating_zone.thermostat(),
                 target_state: api::command::HeatingTargetState::Heat {
                     temperature: self.target_temperature,
-                    until: self.time_range.starting_today().end(),
+                    until: *self.time_range.starting_today().end(),
                 },
             }
             .into(),

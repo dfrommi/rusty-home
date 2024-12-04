@@ -44,7 +44,10 @@ async fn sleeping(
 
     //TODO TimeSeries with date in future?
     let range_start = in_bed_full_range.start();
-    let ts = api.series_since(in_bed, range_start).await?.with_duration();
+    let ts = api
+        .series_since(in_bed, *range_start)
+        .await?
+        .with_duration();
 
     let sleeping_started = ts.iter().find(|dp| {
         in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)

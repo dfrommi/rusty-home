@@ -60,12 +60,16 @@ impl DateTimeRange {
         Self::new(now.min(self.start), now.min(self.end))
     }
 
-    pub fn start(&self) -> DateTime {
-        self.start
+    pub fn intersection_with(&self, other: &Self) -> Self {
+        Self::new(self.start.max(other.start), self.end.min(other.end))
     }
 
-    pub fn end(&self) -> DateTime {
-        self.end
+    pub fn start(&self) -> &DateTime {
+        &self.start
+    }
+
+    pub fn end(&self) -> &DateTime {
+        &self.end
     }
 
     pub fn contains(&self, datetime: DateTime) -> bool {

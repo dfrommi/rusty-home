@@ -57,7 +57,7 @@ where
             .series_since(temp_sensor, window_opened.timestamp)
             .await?;
 
-        //wait for a mearurement. until then assume opened window still has effect
+        //wait for a measurement. until then assume opened window still has effect
         if temperature.len() < 2 {
             return Ok(window_opened.map_value(|_| true));
         }

@@ -1,19 +1,17 @@
 pub mod interpolate;
 
 use interpolate::Estimatable;
-use std::collections::BTreeMap;
+use support::DataFrame;
 use support::{
-    t,
     time::{DateTime, DateTimeRange, Duration},
     DataPoint,
 };
 
-use anyhow::{ensure, Result};
+use anyhow::Result;
 
 pub struct TimeSeries<T: Estimatable> {
     context: T,
-    values: BTreeMap<DateTime, T::Type>,
-    range: DateTimeRange,
+    values: DataFrame<T::Type>,
 }
 
 impl<T: Estimatable> TimeSeries<T> {
@@ -22,27 +20,21 @@ impl<T: Estimatable> TimeSeries<T> {
         data_points: impl IntoIterator<Item = DataPoint<T::Type>>,
         range: DateTimeRange,
     ) -> Result<Self> {
-        let mut values: BTreeMap<DateTime, T::Type> = BTreeMap::new();
-        for dp in data_points.into_iter() {
-            values.insert(dp.timestamp, dp.value);
+        let mut df = DataFrame::new(data_points)?;
+
+        let start_at = *range.start();
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, &df) {
+            df.insert(DataPoint::new(interpolated, start_at));
         }
 
-        ensure!(!values.is_empty(), "data points are empty");
-
-        let start_at = range.start();
-        if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, &values) {
-            values.insert(start_at, interpolated);
-        }
-
-        let end_at = range.end();
-        if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, &values) {
-            values.insert(end_at, interpolated);
+        let end_at = *range.end();
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, &df) {
+            df.insert(DataPoint::new(interpolated, end_at));
         }
 
         Ok(Self {
             context,
-            values,
-            range,
+            values: df.retain_range(&range),
         })
     }
 
@@ -59,32 +51,27 @@ impl<T: Estimatable> TimeSeries<T> {
     {
         let mut dps: Vec<DataPoint<T::Type>> = Vec::new();
 
-        for (first_timestamp, first_value) in first_series.values.iter() {
-            if let Some(second_dp) = second_series.at(*first_timestamp) {
-                let value = (merge)(first_value, &second_dp.value);
-                let timestamp = std::cmp::max(*first_timestamp, second_dp.timestamp);
+        for first_dp in first_series.values.iter() {
+            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
                 dps.push(DataPoint { value, timestamp });
             }
         }
 
-        for (second_timestamp, second_value) in second_series.values.iter() {
-            if let Some(first_dp) = first_series.at(*second_timestamp) {
-                let value = (merge)(&first_dp.value, second_value);
-                let timestamp = std::cmp::max(first_dp.timestamp, *second_timestamp);
+        for second_dp in second_series.values.iter() {
+            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
                 dps.push(DataPoint { value, timestamp });
             }
         }
 
-        let range = DateTimeRange::new(
-            std::cmp::max(first_series.range.start(), second_series.range.start()),
-            std::cmp::min(first_series.range.end(), second_series.range.end()),
-        );
+        let range = first_series
+            .range()
+            .intersection_with(&second_series.range());
 
         Self::new(context, dps, range)
-    }
-
-    pub fn len(&self) -> usize {
-        self.values.len()
     }
 
     //linear interpolation or last seen
@@ -95,70 +82,43 @@ impl<T: Estimatable> TimeSeries<T> {
         })
     }
 
-    pub fn min(&self) -> DataPoint<T::Type>
-    where
-        for<'a> &'a T::Type: PartialOrd,
-    {
-        let (timestamp, value) = self
-            .values
-            .iter()
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .expect("Internal error: map should not be empty");
-
-        DataPoint {
-            timestamp: *timestamp,
-            value: value.clone(),
-        }
-    }
-
-    pub fn with_duration(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
-        self.current_and_next()
-            .into_iter()
-            .map(|((timestamp, value), next)| DataPoint {
-                timestamp: *timestamp,
-                value: (
-                    value.clone(),
-                    next.map_or(t!(now), |n| *n.0).elapsed_since(*timestamp),
-                ),
-            })
-            .collect::<Vec<_>>()
-    }
-
-    fn current_and_next(&self) -> Vec<((&DateTime, &T::Type), Option<(&DateTime, &T::Type)>)> {
-        let mut result = vec![];
-        let mut iter = self.values.iter().peekable();
-
-        while let Some((current_timestamp, value)) = iter.next() {
-            let next: Option<(&DateTime, &T::Type)> = iter.peek().map(|(t, v)| (*t, *v));
-            result.push(((current_timestamp, value), next));
-        }
-
-        result
-    }
-
     fn interpolate_or_guess(
         context: &T,
         at: DateTime,
-        values: &BTreeMap<DateTime, T::Type>,
+        data: &DataFrame<T::Type>,
     ) -> Option<T::Type> {
-        let prev = values
-            .range(..=at)
-            .next_back()
-            .map(|(t, v)| DataPoint::new(v.clone(), *t));
-        let next = values
-            .range(at..)
-            .next()
-            .map(|(t, v)| DataPoint::new(v.clone(), *t));
-
         //TODO handle prediction (linear interpolation)
-        match (prev, next) {
+        match (data.prev_or_at(at), data.next(at)) {
             (Some(prev), Some(next)) => {
-                let value = context.interpolate(at, &prev, &next);
+                let value = context.interpolate(at, prev, next);
                 Some(value)
             }
             (Some(prev), None) => Some(prev.value.clone()),
             _ => None,
         }
+    }
+}
+
+//DataFrame delegates
+impl<T: Estimatable> TimeSeries<T> {
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn range(&self) -> DateTimeRange {
+        self.values.range()
+    }
+
+    pub fn first(&self) -> &DataPoint<T::Type> {
+        self.values.first()
+    }
+
+    pub fn last(&self) -> &DataPoint<T::Type> {
+        self.values.last()
+    }
+
+    pub fn with_duration(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
+        self.values.with_duration()
     }
 }
 
@@ -188,16 +148,16 @@ where
         let mut weighted_sum = 0.0;
         let mut total_duration = 0.0; //in milliseconds
 
-        let mut iter = self.values.keys().peekable();
+        let mut iter = self.values.iter().map(|v| v.timestamp).peekable();
         while let Some(current_timestamp) = iter.next() {
             if let Some(next_timestamp) = iter.peek() {
                 let ref_value: T::Type = self
-                    .at(DateTime::midpoint(current_timestamp, next_timestamp))
+                    .at(DateTime::midpoint(&current_timestamp, next_timestamp))
                     .expect("Unexpected error. Could not get value in the middle of two existing values")
                     .value;
 
                 let duration: f64 = next_timestamp
-                    .elapsed_since(*current_timestamp)
+                    .elapsed_since(current_timestamp)
                     .as_secs_f64();
 
                 //good enough approximation for mean in range. Correct for linear and last-seen interpolation
@@ -209,7 +169,7 @@ where
         }
 
         if total_duration == 0.0 {
-            weighted_sum = self.values.values().next().unwrap().into();
+            weighted_sum = (&self.values.first().value).into();
         }
 
         (weighted_sum, total_duration)

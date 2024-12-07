@@ -48,7 +48,7 @@ impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
 
         let ha_target = ha_target.unwrap();
 
-        let payload = serialize::to_message(&command, ha_target)?;
+        let payload = serialize::to_message(command, ha_target)?;
 
         self.client
             .call_service(

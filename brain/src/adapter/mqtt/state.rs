@@ -84,6 +84,7 @@ impl IntoMqttStateId for Powered {
     async fn into_mqtt_state_id(&self) -> Option<MqttStateId> {
         let (name, channel) = match self {
             Powered::Dehumidifier => ("dehumidifier", "power"),
+            Powered::InfraredHeater => ("irheater", "power"),
             _ => return None,
         };
 

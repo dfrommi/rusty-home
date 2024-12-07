@@ -87,6 +87,7 @@ pub struct SetPower {
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
+    InfaredHeater,
     LivingRoomNotificationLight,
 }
 impl CommandId for PowerToggle {

@@ -47,6 +47,11 @@ fn to_command(name: &str, channel: &str, payload: &str) -> Result<Command, Strin
             power_on: try_bool(payload)?,
         }
         .into()),
+        ("irheater", "power") => Ok(SetPower {
+            device: PowerToggle::InfaredHeater,
+            power_on: try_bool(payload)?,
+        }
+        .into()),
         _ => Err(format!("Device {} channel {} not supported", name, channel)),
     }
 }

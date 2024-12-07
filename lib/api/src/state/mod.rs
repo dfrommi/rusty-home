@@ -67,6 +67,7 @@ pub enum Opened {
 pub enum Powered {
     Dehumidifier,
     LivingRoomNotificationLight,
+    InfraredHeater,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]

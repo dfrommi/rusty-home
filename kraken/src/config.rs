@@ -15,6 +15,10 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             HaServiceTarget::SwitchTurnOnOff("switch.dehumidifier".to_owned()),
         ),
         (
+            PowerToggle::InfaredHeater.into(),
+            HaServiceTarget::SwitchTurnOnOff("switch.irheater".to_owned()),
+        ),
+        (
             PowerToggle::LivingRoomNotificationLight.into(),
             HaServiceTarget::LightTurnOnOff("light.hue_go".to_owned()),
         ),
@@ -150,6 +154,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "switch.dehumidifier",
             HaChannel::Powered(Powered::Dehumidifier),
+        ),
+        (
+            "switch.irheater",
+            HaChannel::Powered(Powered::InfraredHeater),
         ),
         (
             "light.hue_go",

@@ -1,5 +1,4 @@
-use r#macro::StateChannel;
-use serde::{Deserialize, Serialize};
+use r#macro::{StateChannel, TypedItem};
 use support::unit::*;
 
 pub mod db;
@@ -24,8 +23,7 @@ pub trait ChannelTypeInfo {
     type ValueType;
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum Temperature {
     Outside,
     LivingRoomDoor,
@@ -36,8 +34,7 @@ pub enum Temperature {
     BathroomShower,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum RelativeHumidity {
     Outside,
     LivingRoomDoor,
@@ -48,8 +45,7 @@ pub enum RelativeHumidity {
     BathroomShower,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum Opened {
     KitchenWindow,
     BedroomWindow,
@@ -62,16 +58,14 @@ pub enum Opened {
     RoomOfRequirementsWindowSide,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum Powered {
     Dehumidifier,
     LivingRoomNotificationLight,
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum CurrentPowerUsage {
     Fridge,
     Dehumidifier,
@@ -92,8 +86,7 @@ pub enum CurrentPowerUsage {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum TotalEnergyConsumption {
     Fridge,
     Dehumidifier,
@@ -114,8 +107,7 @@ pub enum TotalEnergyConsumption {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum SetPoint {
     LivingRoom,
     Bedroom,
@@ -124,8 +116,7 @@ pub enum SetPoint {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, strum::VariantArray)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum HeatingDemand {
     LivingRoom,
     Bedroom,
@@ -134,8 +125,7 @@ pub enum HeatingDemand {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum ExternalAutoControl {
     LivingRoomThermostat,
     BedroomThermostat,
@@ -144,8 +134,7 @@ pub enum ExternalAutoControl {
     BathroomThermostat,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,
@@ -156,8 +145,7 @@ pub enum Presence {
     CouchRight,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum TotalRadiatorConsumption {
     LivingRoomBig,
     LivingRoomSmall,
@@ -167,8 +155,7 @@ pub enum TotalRadiatorConsumption {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
 pub enum TotalWaterConsumption {
     KitchenCold,
     KitchenWarm,

@@ -6,7 +6,6 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use api::state::{ChannelTypeInfo, CurrentPowerUsage, HeatingDemand};
-use strum::VariantArray;
 use support::DataPoint;
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
@@ -15,14 +14,14 @@ pub async fn current_power<T>(api: web::Data<T>) -> impl Responder
 where
     T: DataPointAccess<CurrentPowerUsage>,
 {
-    current_values_response(api.as_ref(), CurrentPowerUsage::VARIANTS).await
+    current_values_response(api.as_ref(), CurrentPowerUsage::variants()).await
 }
 
 pub async fn current_heating<T>(api: web::Data<T>) -> impl Responder
 where
     T: DataPointAccess<HeatingDemand>,
 {
-    current_values_response(api.as_ref(), HeatingDemand::VARIANTS).await
+    current_values_response(api.as_ref(), HeatingDemand::variants()).await
 }
 
 async fn current_values_response<T>(api: &impl DataPointAccess<T>, items: &[T]) -> impl Responder

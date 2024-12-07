@@ -2,6 +2,7 @@ use anyhow::Context;
 use cached::proc_macro::cached;
 use derive_more::derive::AsRef;
 use sqlx::PgPool;
+use support::TypedItem;
 
 use super::*;
 
@@ -15,17 +16,8 @@ pub async fn get_tag_id(
     channel: Channel,
     create_if_missing: bool,
 ) -> anyhow::Result<i32> {
-    let channel_json = serde_json::to_value(channel).unwrap();
-    let channel_name = channel_json
-        .get("type")
-        .expect("Channel requires 'type' in serialized JSON")
-        .as_str()
-        .unwrap();
-    let device_name = channel_json
-        .get("item")
-        .expect("Channel requires 'item' in serialized JSON")
-        .as_str()
-        .unwrap();
+    let channel_name = channel.type_name();
+    let device_name = channel.item_name();
 
     if create_if_missing {
         sqlx::query_scalar!(

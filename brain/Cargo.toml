@@ -28,10 +28,7 @@ csv = "1"
 
 actix-web = "4"
 mime = "0.3"
-
 tabled = "0"
-
-strum = "0"
 
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }

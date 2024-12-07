@@ -6,7 +6,6 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use api::state::{ChannelTypeInfo, HeatingDemand, TotalEnergyConsumption};
-use strum::VariantArray;
 use support::time::DateTimeRange;
 
 use crate::{
@@ -35,7 +34,7 @@ where
 
     total_values_response(
         api.as_ref(),
-        TotalEnergyConsumption::VARIANTS,
+        TotalEnergyConsumption::variants(),
         time_range.clone(),
         move |_, ts| {
             let value = ts.last().value.0 - ts.first().value.0;
@@ -54,7 +53,7 @@ where
 {
     total_values_response(
         api.as_ref(),
-        HeatingDemand::VARIANTS,
+        HeatingDemand::variants(),
         time_range.range(),
         |item, ts| {
             let value = ts.area_in_type_hours();

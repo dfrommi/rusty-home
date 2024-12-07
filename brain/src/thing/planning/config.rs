@@ -2,7 +2,7 @@ use api::command::{PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::thing::planning::action::HeatingZone;
+use crate::thing::planning::action::{HeatingZone, ReduceNoiseAtNight};
 use crate::thing::state::UserControlled;
 
 use super::action::{
@@ -70,7 +70,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::PreventMouldInBathroom,
         vec![
             KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
-            //TODO night mode
+            ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
             Dehumidify.into()
         ],
     ),

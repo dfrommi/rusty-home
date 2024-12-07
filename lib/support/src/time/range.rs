@@ -33,6 +33,16 @@ impl DailyTimeRange {
         Self { start, end }
     }
 
+    pub fn contains(&self, time: Time) -> bool {
+        if self.start <= self.end {
+            //same-day scenario
+            self.start <= time && time <= self.end
+        } else {
+            //cross-day scenario
+            self.start <= time || time <= self.end
+        }
+    }
+
     pub fn starting_today(&self) -> DateTimeRange {
         let now = DateTime::now();
         let start = now.at(self.start).unwrap();
@@ -134,5 +144,27 @@ mod tests {
         assert_eq!(iter.next(), Some(t!(10:18).today()));
         assert_eq!(iter.next(), Some(t!(10:20).today()));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_contains_same_day() {
+        let range = t!(10:00 - 14:00);
+
+        assert!(!range.contains(t!(09:59)));
+        assert!(range.contains(t!(10:00)));
+        assert!(range.contains(t!(11:00)));
+        assert!(range.contains(t!(14:00)));
+        assert!(!range.contains(t!(14:01)));
+    }
+
+    #[test]
+    fn test_contains_cross_day() {
+        let range = t!(22:00 - 03:00);
+
+        assert!(!range.contains(t!(21:59)));
+        assert!(range.contains(t!(22:00)));
+        assert!(range.contains(t!(23:00)));
+        assert!(range.contains(t!(03:00)));
+        assert!(!range.contains(t!(03:01)));
     }
 }

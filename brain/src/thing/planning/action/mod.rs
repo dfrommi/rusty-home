@@ -1,6 +1,7 @@
 mod dehumidify;
 mod heating;
 mod keep_user_override;
+mod reduce_noise_at_night;
 mod request_closing_window;
 
 use std::fmt::Debug;
@@ -19,6 +20,7 @@ use api::state::SetPoint;
 pub use dehumidify::Dehumidify;
 pub use heating::*;
 pub use keep_user_override::KeepUserOverride;
+pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
 
 use crate::port::*;
@@ -33,6 +35,7 @@ pub enum HomeAction {
     KeepUserOverride(KeepUserOverride),
     ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
+    ReduceNoiseAtNight(ReduceNoiseAtNight),
 }
 
 pub trait Action<T>: Display {
@@ -124,6 +127,9 @@ where
                     .preconditions_fulfilled(api)
                     .await
             }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                reduce_noise_at_night.preconditions_fulfilled(api).await
+            }
         }
     }
 
@@ -151,6 +157,9 @@ where
             }
             HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
                 defer_heating_until_ventilation_done.is_running(api).await
+            }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                reduce_noise_at_night.is_running(api).await
             }
         }
     }
@@ -186,6 +195,9 @@ where
                     defer_heating_until_ventilation_done,
                 )
             }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                <ReduceNoiseAtNight as Action<T>>::start_command(reduce_noise_at_night)
+            }
         }
     }
 
@@ -220,6 +232,9 @@ where
                     defer_heating_until_ventilation_done,
                 )
             }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                <ReduceNoiseAtNight as Action<T>>::stop_command(reduce_noise_at_night)
+            }
         }
     }
 
@@ -253,6 +268,9 @@ where
                 <DeferHeatingUntilVentilationDone as Action<T>>::controls_target(
                     defer_heating_until_ventilation_done,
                 )
+            }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                <ReduceNoiseAtNight as Action<T>>::controls_target(reduce_noise_at_night)
             }
         }
     }

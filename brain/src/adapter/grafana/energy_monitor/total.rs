@@ -31,7 +31,7 @@ pub async fn total_power<T>(api: web::Data<T>, time_range: Query<QueryTimeRange>
 where
     T: TimeSeriesAccess<TotalEnergyConsumption>,
 {
-    let time_range: DateTimeRange = time_range.into_inner().into();
+    let time_range: DateTimeRange = time_range.range();
 
     total_values_response(
         api.as_ref(),
@@ -55,7 +55,7 @@ where
     total_values_response(
         api.as_ref(),
         HeatingDemand::VARIANTS,
-        time_range.into_inner().into(),
+        time_range.range(),
         |item, ts| {
             let value = ts.area_in_type_hours();
             (value, value * heating_factor(item))

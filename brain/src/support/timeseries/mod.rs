@@ -101,6 +101,10 @@ impl<T: Estimatable> TimeSeries<T> {
 
 //DataFrame delegates
 impl<T: Estimatable> TimeSeries<T> {
+    pub fn inner(&self) -> &DataFrame<T::Type> {
+        &self.values
+    }
+
     pub fn len(&self) -> usize {
         self.values.len()
     }

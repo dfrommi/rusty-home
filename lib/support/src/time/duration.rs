@@ -30,6 +30,10 @@ impl Duration {
         Self::new(chrono::Duration::seconds(seconds))
     }
 
+    pub fn millis(millis: i64) -> Self {
+        Self::new(chrono::Duration::milliseconds(millis))
+    }
+
     pub fn as_secs(&self) -> i64 {
         self.delegate.num_seconds()
     }

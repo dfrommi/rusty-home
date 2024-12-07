@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::t;
 
-use super::{DateTime, Time};
+use super::{DateTime, Duration, Time};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DailyTimeRange {
@@ -51,6 +51,10 @@ impl DateTimeRange {
         Self { start, end }
     }
 
+    pub fn step_by(&self, step: Duration) -> DateTimeIterator {
+        DateTimeIterator::new(self, &step)
+    }
+
     pub fn since(start: DateTime) -> Self {
         Self::new(start, t!(now))
     }
@@ -74,5 +78,61 @@ impl DateTimeRange {
 
     pub fn contains(&self, datetime: DateTime) -> bool {
         datetime >= self.start && datetime <= self.end
+    }
+}
+
+pub struct DateTimeIterator {
+    next: DateTime,
+    end: DateTime,
+    step: Duration,
+}
+
+impl DateTimeIterator {
+    pub fn new(range: &DateTimeRange, step: &Duration) -> Self {
+        Self {
+            next: *range.start(),
+            end: *range.end(),
+            step: step.clone(),
+        }
+    }
+}
+
+impl Iterator for DateTimeIterator {
+    type Item = DateTime;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next > self.end {
+            return None;
+        }
+
+        let current = self.next;
+        let next = current + self.step.clone();
+
+        //iterator should contain the end exactly
+        self.next = if current < self.end && next > self.end {
+            self.end
+        } else {
+            next
+        };
+
+        Some(current)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_step_by() {
+        let range = t!(10:03 - 10:20).starting_today();
+        let mut iter = range.step_by(Duration::minutes(5));
+
+        assert_eq!(iter.next(), Some(t!(10:03).today()));
+        assert_eq!(iter.next(), Some(t!(10:08).today()));
+        assert_eq!(iter.next(), Some(t!(10:13).today()));
+        assert_eq!(iter.next(), Some(t!(10:18).today()));
+        assert_eq!(iter.next(), Some(t!(10:20).today()));
+        assert_eq!(iter.next(), None);
     }
 }

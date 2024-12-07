@@ -70,6 +70,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::PreventMouldInBathroom,
         vec![
             KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
+            //TODO night mode
             Dehumidify.into()
         ],
     ),

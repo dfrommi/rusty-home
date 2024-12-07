@@ -18,7 +18,7 @@ impl<T: Clone> DataFrame<T> {
             data.insert(dp.timestamp, dp);
         }
 
-        ensure!(data.is_empty(), "data frames must not be empty");
+        ensure!(!data.is_empty(), "data frames must not be empty");
 
         Ok(Self { data })
     }

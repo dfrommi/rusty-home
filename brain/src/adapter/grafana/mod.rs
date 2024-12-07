@@ -1,13 +1,35 @@
 mod energy_monitor;
+mod state;
 
 use std::sync::Arc;
 
-use actix_web::web::{self};
-use api::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use actix_web::{
+    http::header,
+    web::{self},
+    HttpResponse, ResponseError,
+};
+use anyhow::Context;
+use api::state::{Channel, CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use derive_more::derive::{Display, Error};
 use serde::Deserialize;
-use support::time::{DateTime, DateTimeRange};
+use support::time::{DateTime, DateTimeRange, Duration};
 
 use crate::port::{DataPointAccess, TimeSeriesAccess};
+
+#[derive(Debug, Error, Display)]
+enum GrafanaApiError {
+    #[display("Channel not found: type={_0} / name={_1}")]
+    ChannelNotFound(String, String),
+
+    #[display("Channel not supported: {_0:?}")]
+    ChannelUnsupported(#[error(ignore)] Channel),
+
+    #[display("Error accessing data")]
+    DataAccessError(anyhow::Error),
+
+    #[display("Internal error")]
+    InternalError(anyhow::Error),
+}
 
 pub fn new_routes<T>(api: Arc<T>) -> actix_web::Scope
 where
@@ -34,6 +56,12 @@ where
             "/ds/heating/total",
             web::get().to(energy_monitor::total_heating::<T>),
         )
+        .route("/ds/state", web::get().to(state::get_types))
+        .route("/ds/state/{type}", web::get().to(state::get_items))
+        .route(
+            "/ds/state/{type}/{item}",
+            web::get().to(state::state_ts::<T>),
+        )
         .app_data(web::Data::from(api))
 }
 
@@ -41,11 +69,16 @@ where
 struct QueryTimeRange {
     from: DateTime,
     to: DateTime,
+    interval_ms: Option<i64>,
 }
 
-impl From<QueryTimeRange> for DateTimeRange {
-    fn from(val: QueryTimeRange) -> Self {
-        DateTimeRange::new(val.from, val.to)
+impl QueryTimeRange {
+    fn range(&self) -> DateTimeRange {
+        DateTimeRange::new(self.from, self.to)
+    }
+
+    fn interval(&self) -> Option<Duration> {
+        self.interval_ms.map(Duration::millis)
     }
 }
 
@@ -111,4 +144,35 @@ impl DashboardDisplay for HeatingDemand {
             HeatingDemand::Bathroom => "Bad",
         }
     }
+}
+
+impl ResponseError for GrafanaApiError {
+    fn status_code(&self) -> actix_web::http::StatusCode {
+        use actix_web::http::StatusCode;
+        match self {
+            GrafanaApiError::ChannelNotFound(_, _) => StatusCode::NOT_FOUND,
+            GrafanaApiError::ChannelUnsupported(_) => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+fn csv_response<S: serde::Serialize>(rows: &[S]) -> Result<HttpResponse, GrafanaApiError> {
+    let mut writer = csv::Writer::from_writer(vec![]);
+
+    for row in rows {
+        writer
+            .serialize(row)
+            .context("Error serializing row to CSV")
+            .map_err(GrafanaApiError::InternalError)?;
+    }
+
+    let csv = writer
+        .into_inner()
+        .context("Error creating CSV")
+        .map_err(GrafanaApiError::InternalError)?;
+
+    Ok(HttpResponse::Ok()
+        .append_header(header::ContentType(mime::TEXT_CSV))
+        .body(csv))
 }

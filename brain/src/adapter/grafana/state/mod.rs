@@ -4,7 +4,7 @@ use actix_web::{
     web::{self, Query},
     Responder,
 };
-use api::state::{Channel, HeatingDemand, TotalEnergyConsumption};
+use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use support::TypedItem;
 use support::{time::DateTime, DataPoint};
 
@@ -31,32 +31,33 @@ struct TypeAndItem {
     item: String,
 }
 
-pub async fn get_types() -> impl Responder {
+fn supported_channels() -> Vec<TypeAndItem> {
     let mut supported_channels: Vec<Channel> = vec![];
     supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.into()));
     supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.into()));
+    supported_channels.extend(Temperature::variants().iter().map(|c| c.into()));
+    supported_channels.extend(RelativeHumidity::variants().iter().map(|c| c.into()));
 
-    let rows: Vec<TypeAndItem> = supported_channels
+    supported_channels
         .iter()
         .map(|c| TypeAndItem {
             type_: c.type_name().to_string(),
             item: c.item_name().to_string(),
         })
-        .collect();
+        .collect()
+}
 
-    csv_response(&rows)
+pub async fn get_types() -> impl Responder {
+    csv_response(&supported_channels())
 }
 
 pub async fn get_items(path: web::Path<String>) -> impl Responder {
     let type_ = path.into_inner();
 
-    let mut supported_channels: Vec<Channel> = vec![];
-    supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.into()));
-    supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.into()));
-
+    let supported_channels = supported_channels();
     let items = supported_channels.iter().filter_map(|c| {
-        if type_ == c.type_name() {
-            Some(c.item_name().to_string())
+        if type_ == c.type_ {
+            Some(c.item.to_owned())
         } else {
             None
         }
@@ -71,7 +72,10 @@ pub async fn state_ts<T>(
     time_range: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
-    T: TimeSeriesAccess<TotalEnergyConsumption> + TimeSeriesAccess<HeatingDemand>,
+    T: TimeSeriesAccess<TotalEnergyConsumption>
+        + TimeSeriesAccess<HeatingDemand>
+        + TimeSeriesAccess<Temperature>
+        + TimeSeriesAccess<RelativeHumidity>,
 {
     let channel = Channel::from_type_and_item(&path.0, &path.1)
         .ok_or_else(|| GrafanaApiError::ChannelNotFound(path.0.to_string(), path.1.to_string()))?;
@@ -79,6 +83,8 @@ where
     let mut rows = match channel {
         Channel::TotalEnergyConsumption(item) => get_rows(api.as_ref(), &item, &time_range).await,
         Channel::HeatingDemand(item) => get_rows(api.as_ref(), &item, &time_range).await,
+        Channel::Temperature(item) => get_rows(api.as_ref(), &item, &time_range).await,
+        Channel::RelativeHumidity(item) => get_rows(api.as_ref(), &item, &time_range).await,
         _ => return Err(GrafanaApiError::ChannelUnsupported(channel)),
     }?;
 

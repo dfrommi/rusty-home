@@ -9,7 +9,10 @@ use actix_web::{
     HttpResponse, ResponseError,
 };
 use anyhow::Context;
-use api::state::{Channel, CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use api::state::{
+    Channel, CurrentPowerUsage, HeatingDemand, RelativeHumidity, Temperature,
+    TotalEnergyConsumption,
+};
 use derive_more::derive::{Display, Error};
 use serde::Deserialize;
 use support::time::{DateTime, DateTimeRange, Duration};
@@ -37,6 +40,8 @@ where
         + DataPointAccess<HeatingDemand>
         + TimeSeriesAccess<TotalEnergyConsumption>
         + TimeSeriesAccess<HeatingDemand>
+        + TimeSeriesAccess<Temperature>
+        + TimeSeriesAccess<RelativeHumidity>
         + 'static,
 {
     web::scope("/grafana")

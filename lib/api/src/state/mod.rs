@@ -32,6 +32,7 @@ pub enum Temperature {
     BedroomOuterWall,
     KitchenOuterWall,
     BathroomShower,
+    Dehumidifier,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
@@ -43,6 +44,7 @@ pub enum RelativeHumidity {
     BedroomOuterWall,
     KitchenOuterWall,
     BathroomShower,
+    Dehumidifier,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]

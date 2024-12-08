@@ -78,6 +78,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "sensor.home_temperature",
             HaChannel::Temperature(Temperature::Outside),
         ),
+        (
+            "sensor.bathroom_dehumidifier_temperature",
+            HaChannel::Temperature(Temperature::Dehumidifier),
+        ),
         //
         // HUMIDITY
         //
@@ -108,6 +112,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
+        ),
+        (
+            "sensor.bathroom_dehumidifier_humidity",
+            HaChannel::RelativeHumidity(RelativeHumidity::Dehumidifier),
         ),
         //
         // WINDOW CONTACTS

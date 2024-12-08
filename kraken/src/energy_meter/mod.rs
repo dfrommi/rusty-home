@@ -1,6 +1,5 @@
 use crate::{core::StateCollector, Database};
 use api::EnergyReadingInsertEvent;
-use axum::Router;
 use domain::{EnergyMeterService, EnergyMeterStateCollector};
 use tokio::sync::broadcast::Receiver;
 
@@ -10,11 +9,12 @@ mod domain;
 pub fn new(
     db: Database,
     new_reading_rx: Receiver<EnergyReadingInsertEvent>,
-) -> anyhow::Result<(impl StateCollector, Router)> {
-    let service = EnergyMeterService::new(db.clone());
-    let router = adapter::http::router(service);
-
+) -> anyhow::Result<impl StateCollector> {
     let collector = EnergyMeterStateCollector::new(db.clone(), new_reading_rx);
+    Ok(collector)
+}
 
-    Ok((collector, router))
+pub fn new_web_service(db: Database) -> actix_web::Scope {
+    let service = EnergyMeterService::new(db);
+    adapter::http::new_actix_web_scope(service)
 }

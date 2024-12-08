@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
-#chrono = { version = "0.4.38", features = ["serde", "std"] }
 rumqttc = "*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -17,15 +16,9 @@ reqwest = { version = "*", features = ["json"] }
 
 config = { version = "0.14.0", features = ["toml"] }
 
-sqlx = { version = "0.8", features = [
-  "postgres",
-  "runtime-tokio",
-  "macros",
-  #  "chrono",
-] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros"] }
 derive_more = { version = "1", features = ["from"] }
-axum = "0"
-trait-variant = "0"
+actix-web = "4"
 
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }

@@ -1,6 +1,6 @@
+use actix_web::App;
 use anyhow::Context;
 use api::{CommandAddedEvent, DbEventListener};
-use axum::Router;
 use config::{default_ha_command_config, default_ha_state_config};
 use core::{CommandExecutor, StateCollector};
 use homeassistant::new_command_executor;
@@ -23,8 +23,6 @@ struct Infrastructure {
     database: Database,
     event_listener: DbEventListener,
     mqtt_client: support::mqtt::Mqtt,
-    router: Router,
-    http_listener: tokio::net::TcpListener,
 }
 
 #[derive(Clone)]
@@ -48,14 +46,13 @@ pub async fn main() {
 
     let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 
-    let (energy_meter_collector, energy_meter_router) = energy_meter::new(
+    let energy_meter_collector = energy_meter::new(
         infrastructure.database.clone(),
         infrastructure
             .event_listener
             .new_energy_reading_insert_listener(),
     )
     .expect("Error initializing energy meter");
-    infrastructure.add_to_router(energy_meter_router);
 
     let collect_states = {
         let ha_state_collector = settings
@@ -84,9 +81,28 @@ pub async fn main() {
         }
     };
 
+    //TODO embed into infrastructure, type of factory is problematic
+    let http_db = infrastructure.database.clone();
+    let http_server = actix_web::HttpServer::new(move || {
+        App::new().service(energy_meter::new_web_service(http_db.clone()))
+    })
+    .workers(1)
+    .disable_signals()
+    .bind(("0.0.0.0", settings.http_server.port))
+    .expect("Error configuring HTTP server");
+
+    let http_server_exec = async move {
+        http_server.run().await.unwrap();
+    };
+
     let process_infrastucture = infrastructure.process();
 
-    tokio::join!(collect_states, execute_commands, process_infrastucture);
+    tokio::join!(
+        collect_states,
+        execute_commands,
+        process_infrastucture,
+        http_server_exec
+    );
 }
 
 impl settings::HomeAssitant {
@@ -131,22 +147,12 @@ impl Infrastructure {
         );
 
         let database = Database::new(db_pool);
-        let http_listener =
-            tokio::net::TcpListener::bind(format!("0.0.0.0:{}", settings.http_server.port))
-                .await
-                .unwrap();
 
         Ok(Self {
             database,
             mqtt_client,
             event_listener: DbEventListener::new(db_listener),
-            router: Router::new(),
-            http_listener,
         })
-    }
-
-    fn add_to_router(&mut self, router: Router) {
-        self.router = self.router.clone().merge(router);
     }
 
     async fn subscribe_to_mqtt(
@@ -164,12 +170,9 @@ impl Infrastructure {
     }
 
     async fn process(self) {
-        let http = async { axum::serve(self.http_listener, self.router).await.unwrap() };
-
         tokio::select!(
             _ = self.mqtt_client.process() => {},
             _ = self.event_listener.dispatch_events() => {},
-            _ = http => {},
         )
     }
 }

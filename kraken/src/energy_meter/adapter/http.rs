@@ -1,31 +1,18 @@
-use std::sync::Arc;
-
-use axum::{extract::State, http::StatusCode, routing::put, Json, Router};
+use actix_web::web::{self, Json};
+use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
 
 use super::AddEnergyReadingUseCase;
 use super::{EnergyReading, Faucet, Radiator};
 
-pub fn router<R>(add_reading: R) -> Router
+pub fn new_actix_web_scope<R>(add_reading: R) -> actix_web::Scope
 where
-    R: AddEnergyReadingUseCase + Clone + Send + Sync + 'static,
+    R: AddEnergyReadingUseCase + 'static,
 {
-    let app_state = AppState {
-        add_reading: Arc::new(add_reading),
-    };
-
-    Router::new()
-        .route("/api/energy/readings/heating", put(handle_heating_reading))
-        .route("/api/energy/readings/water", put(handle_water_reading))
-        .with_state(app_state)
-}
-
-#[derive(Clone)]
-struct AppState<R>
-where
-    R: AddEnergyReadingUseCase,
-{
-    add_reading: Arc<R>,
+    web::scope("/api/energy/readings")
+        .route("/heating", web::put().to(handle_heating_reading::<R>))
+        .route("/water", web::put().to(handle_water_reading::<R>))
+        .app_data(web::Data::new(add_reading))
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,9 +29,9 @@ struct WaterReadingDTO {
 }
 
 async fn handle_heating_reading<R>(
-    State(state): State<AppState<R>>,
+    api: web::Data<R>,
     Json(dto): Json<HeatingReadingDTO>,
-) -> StatusCode
+) -> impl Responder
 where
     R: AddEnergyReadingUseCase,
 {
@@ -55,42 +42,42 @@ where
         "Küche" => Radiator::Kitchen,
         "Schlafzimmer" => Radiator::Bedroom,
         "Bad" => Radiator::Bathroom,
-        _ => return StatusCode::BAD_REQUEST,
+        _ => return HttpResponse::BadRequest(),
     };
 
     let value = match dto.value.parse::<f64>() {
         Ok(v) => v,
-        Err(_) => return StatusCode::BAD_REQUEST,
+        Err(_) => return HttpResponse::BadRequest(),
     };
 
     let reading = EnergyReading::Heating(radiator, value);
 
     tracing::info!("Adding reading {:?}", reading);
 
-    if let Err(e) = state.add_reading.add_energy_reading(reading).await {
+    if let Err(e) = api.add_energy_reading(reading).await {
         tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-        return StatusCode::UNPROCESSABLE_ENTITY;
+        return HttpResponse::UnprocessableEntity();
     }
 
-    StatusCode::NO_CONTENT
+    HttpResponse::NoContent()
 }
 
 async fn handle_water_reading<R>(
-    State(state): State<AppState<R>>,
+    api: web::Data<R>,
     Json(dto): Json<WaterReadingDTO>,
-) -> StatusCode
+) -> impl Responder
 where
     R: AddEnergyReadingUseCase,
 {
     let faucet = match dto.label.as_str() {
         "Küche" => Faucet::Kitchen,
         "Bad" => Faucet::Bathroom,
-        _ => return StatusCode::BAD_REQUEST,
+        _ => return HttpResponse::BadRequest(),
     };
 
     let value = match dto.value.parse::<f64>() {
         Ok(v) => v / 1000.0,
-        Err(_) => return StatusCode::BAD_REQUEST,
+        Err(_) => return HttpResponse::BadRequest(),
     };
 
     let reading = if dto.is_hot {
@@ -101,10 +88,10 @@ where
 
     tracing::info!("Adding reading {:?}", reading);
 
-    if let Err(e) = state.add_reading.add_energy_reading(reading).await {
+    if let Err(e) = api.add_energy_reading(reading).await {
         tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-        return StatusCode::UNPROCESSABLE_ENTITY;
+        return HttpResponse::UnprocessableEntity();
     }
 
-    StatusCode::NO_CONTENT
+    HttpResponse::NoContent()
 }

@@ -10,7 +10,7 @@ use support::{time::DateTime, DataPoint};
 
 use crate::{
     adapter::grafana::csv_response, port::TimeSeriesAccess,
-    support::timeseries::interpolate::Estimatable,
+    support::timeseries::interpolate::Estimatable, thing::state::DewPoint,
 };
 
 use super::{GrafanaApiError, QueryTimeRange};
@@ -32,19 +32,23 @@ struct TypeAndItem {
 }
 
 fn supported_channels() -> Vec<TypeAndItem> {
-    let mut supported_channels: Vec<Channel> = vec![];
+    let mut supported_channels: Vec<TypeAndItem> = vec![];
     supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.into()));
     supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.into()));
     supported_channels.extend(Temperature::variants().iter().map(|c| c.into()));
     supported_channels.extend(RelativeHumidity::variants().iter().map(|c| c.into()));
+    supported_channels.extend(DewPoint::variants().iter().map(|c| c.into()));
 
     supported_channels
-        .iter()
-        .map(|c| TypeAndItem {
-            type_: c.type_name().to_string(),
-            item: c.item_name().to_string(),
-        })
-        .collect()
+}
+
+impl<T: TypedItem> From<&T> for TypeAndItem {
+    fn from(val: &T) -> Self {
+        TypeAndItem {
+            type_: val.type_name().to_string(),
+            item: val.item_name().to_string(),
+        }
+    }
 }
 
 pub async fn get_types() -> impl Responder {
@@ -77,15 +81,32 @@ where
         + TimeSeriesAccess<Temperature>
         + TimeSeriesAccess<RelativeHumidity>,
 {
-    let channel = Channel::from_type_and_item(&path.0, &path.1)
-        .ok_or_else(|| GrafanaApiError::ChannelNotFound(path.0.to_string(), path.1.to_string()))?;
+    macro_rules! from_type_and_item {
+        ($type:ident) => {
+            get_rows(
+                $type::from_item_name(&path.1).ok_or(GrafanaApiError::ChannelNotFound(
+                    path.0.to_string(),
+                    path.1.to_string(),
+                ))?,
+                api.as_ref(),
+                &time_range,
+            )
+            .await
+        };
+    }
 
-    let mut rows = match channel {
-        Channel::TotalEnergyConsumption(item) => get_rows(api.as_ref(), &item, &time_range).await,
-        Channel::HeatingDemand(item) => get_rows(api.as_ref(), &item, &time_range).await,
-        Channel::Temperature(item) => get_rows(api.as_ref(), &item, &time_range).await,
-        Channel::RelativeHumidity(item) => get_rows(api.as_ref(), &item, &time_range).await,
-        _ => return Err(GrafanaApiError::ChannelUnsupported(channel)),
+    let mut rows = match path.0.as_str() {
+        TotalEnergyConsumption::TYPE_NAME => from_type_and_item!(TotalEnergyConsumption),
+        HeatingDemand::TYPE_NAME => from_type_and_item!(HeatingDemand),
+        Temperature::TYPE_NAME => from_type_and_item!(Temperature),
+        RelativeHumidity::TYPE_NAME => from_type_and_item!(RelativeHumidity),
+        DewPoint::TYPE_NAME => from_type_and_item!(DewPoint),
+        _ => {
+            return Err(GrafanaApiError::ChannelUnsupported(
+                path.0.to_string(),
+                path.1.to_string(),
+            ))
+        }
     }?;
 
     rows.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(Ordering::Equal));
@@ -97,12 +118,12 @@ where
 }
 
 async fn get_rows<T>(
+    item: T,
     api: &impl TimeSeriesAccess<T>,
-    item: &T,
     time_range: &QueryTimeRange,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
-    T: Estimatable + Clone + Into<Channel> + TypedItem,
+    T: Estimatable + Clone + TypedItem,
     T::Type: AsRef<f64>,
 {
     let ts = api

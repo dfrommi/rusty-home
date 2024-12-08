@@ -24,8 +24,8 @@ enum GrafanaApiError {
     #[display("Channel not found: type={_0} / name={_1}")]
     ChannelNotFound(String, String),
 
-    #[display("Channel not supported: {_0:?}")]
-    ChannelUnsupported(#[error(ignore)] Channel),
+    #[display("Channel not supported: type={_0} / name={_1}")]
+    ChannelUnsupported(String, String),
 
     #[display("Error accessing data")]
     DataAccessError(anyhow::Error),
@@ -156,7 +156,7 @@ impl ResponseError for GrafanaApiError {
         use actix_web::http::StatusCode;
         match self {
             GrafanaApiError::ChannelNotFound(_, _) => StatusCode::NOT_FOUND,
-            GrafanaApiError::ChannelUnsupported(_) => StatusCode::BAD_REQUEST,
+            GrafanaApiError::ChannelUnsupported(_, _) => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

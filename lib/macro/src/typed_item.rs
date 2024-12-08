@@ -35,6 +35,8 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
         }
 
         impl #enum_name {
+            pub const TYPE_NAME: &'static str = #type_name;
+
             pub const fn variants() -> &'static [Self] {
                 &#all_variants
             }

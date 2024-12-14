@@ -1,5 +1,6 @@
 mod dehumidify;
 mod heating;
+mod inform_window_open;
 mod keep_user_override;
 mod reduce_noise_at_night;
 mod request_closing_window;
@@ -12,6 +13,8 @@ use api::command::Command;
 use api::command::CommandSource;
 use api::command::CommandTarget;
 
+use api::command::NotificationRecipient;
+use api::command::NotificationTarget;
 use api::command::Thermostat;
 use api::state::ExternalAutoControl;
 use api::state::Powered;
@@ -19,6 +22,7 @@ use api::state::RelativeHumidity;
 use api::state::SetPoint;
 pub use dehumidify::Dehumidify;
 pub use heating::*;
+pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
@@ -30,6 +34,7 @@ use crate::thing::state::*;
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     RequestClosingWindow(RequestClosingWindow),
+    InformWindowOpen(InformWindowOpen),
     NoHeatingDuringVentilation(NoHeatingDuringVentilation),
     NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease),
     KeepUserOverride(KeepUserOverride),
@@ -94,7 +99,8 @@ where
         + DataPointAccess<RelativeHumidity>
         + DataPointAccess<Resident>
         + CommandAccess<Thermostat>
-        + CommandAccess<Command>,
+        + CommandAccess<Command>
+        + CommandAccess<NotificationTarget>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         match self {
@@ -130,6 +136,9 @@ where
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 reduce_noise_at_night.preconditions_fulfilled(api).await
             }
+            HomeAction::InformWindowOpen(inform_window_open) => {
+                inform_window_open.preconditions_fulfilled(api).await
+            }
         }
     }
 
@@ -160,6 +169,9 @@ where
             }
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 reduce_noise_at_night.is_running(api).await
+            }
+            HomeAction::InformWindowOpen(inform_window_open) => {
+                inform_window_open.is_running(api).await
             }
         }
     }
@@ -198,6 +210,9 @@ where
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 <ReduceNoiseAtNight as Action<T>>::start_command(reduce_noise_at_night)
             }
+            HomeAction::InformWindowOpen(inform_window_open) => {
+                <InformWindowOpen as Action<T>>::start_command(inform_window_open)
+            }
         }
     }
 
@@ -235,6 +250,9 @@ where
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 <ReduceNoiseAtNight as Action<T>>::stop_command(reduce_noise_at_night)
             }
+            HomeAction::InformWindowOpen(inform_window_open) => {
+                <InformWindowOpen as Action<T>>::stop_command(inform_window_open)
+            }
         }
     }
 
@@ -271,6 +289,9 @@ where
             }
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 <ReduceNoiseAtNight as Action<T>>::controls_target(reduce_noise_at_night)
+            }
+            HomeAction::InformWindowOpen(inform_window_open) => {
+                <InformWindowOpen as Action<T>>::controls_target(inform_window_open)
             }
         }
     }

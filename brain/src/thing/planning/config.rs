@@ -1,8 +1,8 @@
-use api::command::{PowerToggle, Thermostat};
+use api::command::{NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::thing::planning::action::{HeatingZone, ReduceNoiseAtNight};
+use crate::thing::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight};
 use crate::thing::state::UserControlled;
 
 use super::action::{
@@ -63,7 +63,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::StayInformed,
         vec![
-            RequestClosingWindow.into()
+            RequestClosingWindow.into(),
+            InformWindowOpen::new(NotificationRecipient::Dennis).into(),
+            InformWindowOpen::new(NotificationRecipient::Sabine).into(),
         ],
     ),
     (

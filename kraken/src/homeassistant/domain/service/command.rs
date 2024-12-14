@@ -48,25 +48,21 @@ impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
 
         let ha_target = ha_target.unwrap();
 
-        let payload = serialize::to_message(command, ha_target)?;
+        let request = serialize::to_service_call_request(command, ha_target)?;
 
         self.client
-            .call_service(
-                payload.domain,
-                payload.service,
-                serde_json::to_value(payload.service_data)?,
-            )
+            .call_service(request.domain, request.service, request.payload)
             .await
             .map(|_| true)
     }
 }
 
 mod serialize {
-    use std::collections::HashMap;
-
-    use api::command::{Command, HeatingTargetState, SetHeating, SetPower};
-    use serde::Serialize;
-    use serde_json::{json, Value};
+    use api::command::{
+        Command, HeatingTargetState, Notification, NotificationAction, PushNotify, SetHeating,
+        SetPower,
+    };
+    use serde_json::json;
     use support::time::Duration;
 
     use crate::homeassistant::domain::HaServiceTarget;
@@ -74,11 +70,11 @@ mod serialize {
     pub struct CallServiceRequest {
         pub domain: &'static str,
         pub service: &'static str,
-        pub service_data: HaServiceData,
+        pub payload: serde_json::Value,
     }
 
     //TODO simplify HaMessage struct, maybe use new
-    pub fn to_message(
+    pub fn to_service_call_request(
         command: &Command,
         ha_target: &HaServiceTarget,
     ) -> anyhow::Result<CallServiceRequest> {
@@ -89,20 +85,18 @@ mod serialize {
                 CallServiceRequest {
                     domain: "switch",
                     service: if *power_on { "turn_on" } else { "turn_off" },
-                    service_data: HaServiceData::ForEntities {
-                        ids: vec![id.to_owned()],
-                        extra: HashMap::new(),
-                    },
+                    payload: json!({
+                        "entity_id": vec![id.to_string()],
+                    }),
                 }
             }
             (LightTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
                 CallServiceRequest {
                     domain: "light",
                     service: if *power_on { "turn_on" } else { "turn_off" },
-                    service_data: HaServiceData::ForEntities {
-                        ids: vec![id.to_owned()],
-                        extra: HashMap::new(),
-                    },
+                    payload: json!({
+                        "entity_id": vec![id.to_string()],
+                    }),
                 }
             }
             (
@@ -114,12 +108,11 @@ mod serialize {
             ) => CallServiceRequest {
                 domain: "climate",
                 service: "set_hvac_mode",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::from([("hvac_mode".to_string(), json!("off"))]),
-                },
+                payload: json!({
+                    "entity_id": vec![id.to_string()],
+                    "hvac_mode": "off",
+                }),
             },
-
             (
                 ClimateControl(id),
                 Command::SetHeating(SetHeating {
@@ -129,10 +122,10 @@ mod serialize {
             ) => CallServiceRequest {
                 domain: "climate",
                 service: "set_hvac_mode",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::from([("hvac_mode".to_string(), json!("auto"))]),
-                },
+                payload: json!({
+                    "entity_id": vec![id.to_string()],
+                    "hvac_mode": "auto",
+                }),
             },
             (
                 ClimateControl(id),
@@ -143,33 +136,51 @@ mod serialize {
             ) => CallServiceRequest {
                 domain: "tado",
                 service: "set_climate_timer",
-                service_data: HaServiceData::ForEntities {
-                    ids: vec![id.to_owned()],
-                    extra: HashMap::from([
-                        ("temperature".to_string(), json!(temperature)),
-                        (
-                            "time_period".to_string(),
-                            json!(to_ha_duration_format(Duration::until(until))),
-                        ),
-                    ]),
-                },
+                payload: json!({
+                    "entity_id": vec![id.to_string()],
+                    "temperature": temperature,
+                    "time_period": to_ha_duration_format(Duration::until(until)),
+                }),
+            },
+            (
+                PushNotification(mobile_id),
+                Command::PushNotify(PushNotify {
+                    notification: Notification::WindowOpened,
+                    action: NotificationAction::Notify,
+                    ..
+                }),
+            ) => CallServiceRequest {
+                domain: "notify",
+                service: mobile_id,
+                payload: json!({
+                    "title": "Fenster offen",
+                    "message": "Mindestens ein Fenster ist offen",
+                    "data": {
+                        "tag": "window_opened"
+                    }
+                }),
+            },
+            (
+                PushNotification(mobile_id),
+                Command::PushNotify(PushNotify {
+                    notification: Notification::WindowOpened,
+                    action: NotificationAction::Dismiss,
+                    ..
+                }),
+            ) => CallServiceRequest {
+                domain: "notify",
+                service: mobile_id,
+                payload: json!({
+                    "message": "clear_notification",
+                    "data": {
+                        "tag": "window_opened"
+                    }
+                }),
             },
             conf => return Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         };
 
         Ok(message)
-    }
-
-    #[derive(Serialize, Debug)]
-    #[serde(untagged)]
-    pub enum HaServiceData {
-        ForEntities {
-            #[serde(rename = "entity_id")]
-            ids: Vec<String>,
-
-            #[serde(flatten)]
-            extra: HashMap<String, Value>,
-        },
     }
 
     fn to_ha_duration_format(duration: Duration) -> String {

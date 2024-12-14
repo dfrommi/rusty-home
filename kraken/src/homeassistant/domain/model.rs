@@ -27,9 +27,10 @@ pub enum HaChannel {
 
 #[derive(Debug, Clone)]
 pub enum HaServiceTarget {
-    SwitchTurnOnOff(String),
-    LightTurnOnOff(String),
-    ClimateControl(String),
+    SwitchTurnOnOff(&'static str),
+    LightTurnOnOff(&'static str),
+    ClimateControl(&'static str),
+    PushNotification(&'static str),
 }
 
 //TODO is Serialize necessary?

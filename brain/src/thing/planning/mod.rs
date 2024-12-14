@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use action::HomeAction;
-use api::command::{Command, Thermostat};
+use api::command::{Command, NotificationTarget, Thermostat};
 use api::state::{ExternalAutoControl, RelativeHumidity, SetPoint};
 use goal::{get_active_goals, HomeGoal};
 
@@ -41,6 +41,7 @@ where
         + CommandAccess<Thermostat>
         + CommandAccess<Command>
         + CommandExecutor<Command>
+        + CommandAccess<NotificationTarget>
         + PlanningResultTracer,
 {
     let goals = get_active_goals();

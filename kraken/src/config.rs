@@ -1,4 +1,4 @@
-use api::command::{CommandTarget, Thermostat};
+use api::command::{CommandTarget, Notification, NotificationRecipient, Thermostat};
 
 use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::{
@@ -12,35 +12,49 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![
         (
             PowerToggle::Dehumidifier.into(),
-            HaServiceTarget::SwitchTurnOnOff("switch.dehumidifier".to_owned()),
+            HaServiceTarget::SwitchTurnOnOff("switch.dehumidifier"),
         ),
         (
             PowerToggle::InfaredHeater.into(),
-            HaServiceTarget::SwitchTurnOnOff("switch.irheater".to_owned()),
+            HaServiceTarget::SwitchTurnOnOff("switch.irheater"),
         ),
         (
             PowerToggle::LivingRoomNotificationLight.into(),
-            HaServiceTarget::LightTurnOnOff("light.hue_go".to_owned()),
+            HaServiceTarget::LightTurnOnOff("light.hue_go"),
         ),
         (
             Thermostat::LivingRoom.into(),
-            HaServiceTarget::ClimateControl("climate.wohnzimmer".to_owned()),
+            HaServiceTarget::ClimateControl("climate.wohnzimmer"),
         ),
         (
             Thermostat::Bedroom.into(),
-            HaServiceTarget::ClimateControl("climate.schlafzimmer".to_owned()),
+            HaServiceTarget::ClimateControl("climate.schlafzimmer"),
         ),
         (
             Thermostat::RoomOfRequirements.into(),
-            HaServiceTarget::ClimateControl("climate.arbeitszimmer".to_owned()),
+            HaServiceTarget::ClimateControl("climate.arbeitszimmer"),
         ),
         (
             Thermostat::Kitchen.into(),
-            HaServiceTarget::ClimateControl("climate.kuche".to_owned()),
+            HaServiceTarget::ClimateControl("climate.kuche"),
         ),
         (
             Thermostat::Bathroom.into(),
-            HaServiceTarget::ClimateControl("climate.bad".to_owned()),
+            HaServiceTarget::ClimateControl("climate.bad"),
+        ),
+        (
+            CommandTarget::PushNotify {
+                recipient: NotificationRecipient::Dennis,
+                notification: Notification::WindowOpened,
+            },
+            HaServiceTarget::PushNotification("mobile_app_jarvis"),
+        ),
+        (
+            CommandTarget::PushNotify {
+                recipient: NotificationRecipient::Sabine,
+                notification: Notification::WindowOpened,
+            },
+            HaServiceTarget::PushNotification("mobile_app_simi_2"),
         ),
     ]
 }

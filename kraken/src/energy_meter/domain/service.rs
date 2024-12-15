@@ -98,7 +98,7 @@ impl From<&EnergyReading> for ChannelValue {
                     Radiator::RoomOfRequirements => TotalRadiatorConsumption::RoomOfRequirements,
                     Radiator::Bathroom => TotalRadiatorConsumption::Bathroom,
                 },
-                HeatingUnit(*value * item.factor()),
+                HeatingUnit(*value),
             ),
             EnergyReading::ColdWater(item, value) => ChannelValue::TotalWaterConsumption(
                 match item {

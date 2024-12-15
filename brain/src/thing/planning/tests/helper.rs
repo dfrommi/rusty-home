@@ -11,7 +11,6 @@ use crate::{
 
 pub struct ActionState {
     pub is_fulfilled: bool,
-    pub is_running: bool,
 }
 
 pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
@@ -21,13 +20,9 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
         let api = infrastructure();
 
-        let (is_fulfilled, is_running) =
-            tokio::try_join!(action.preconditions_fulfilled(api), action.is_running(api)).unwrap();
+        let is_fulfilled = action.preconditions_fulfilled(api).await.unwrap();
 
-        ActionState {
-            is_fulfilled,
-            is_running,
-        }
+        ActionState { is_fulfilled }
     }))
 }
 

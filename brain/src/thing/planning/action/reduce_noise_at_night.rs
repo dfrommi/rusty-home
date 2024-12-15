@@ -27,15 +27,6 @@ where
         Ok(self.range.contains(t!(now).time()))
     }
 
-    async fn is_running(&self, api: &T) -> anyhow::Result<bool> {
-        //TODO cover transition at end of range
-        if self.range.contains(t!(now).time()) {
-            api.current(Powered::Dehumidifier).await
-        } else {
-            Ok(false)
-        }
-    }
-
     fn start_command(&self) -> Option<api::command::Command> {
         Some(
             SetPower {

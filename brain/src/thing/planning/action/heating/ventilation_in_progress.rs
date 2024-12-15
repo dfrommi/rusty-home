@@ -5,7 +5,6 @@ use api::{
     command::{Command, SetHeating},
     state::SetPoint,
 };
-use support::unit::DegreeCelsius;
 
 use crate::{
     port::DataPointAccess,
@@ -47,12 +46,6 @@ where
             HeatingZone::Bathroom => ColdAirComingIn::Bedroom,
         })
         .await
-    }
-
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        api.current(self.heating_zone.current_set_point())
-            .await
-            .map(|v| v == DegreeCelsius(0.0))
     }
 
     fn start_command(&self) -> Option<Command> {

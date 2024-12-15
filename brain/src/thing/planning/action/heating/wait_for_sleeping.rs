@@ -83,20 +83,6 @@ where
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    //same as wait_for_ventilation, maybe merge
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        let has_expected_manual_heating = self
-            .heating_zone
-            .is_manual_heating_to(api, self.target_temperature)
-            .await?;
-
-        Ok(has_expected_manual_heating.value
-            && self
-                .time_range
-                .starting_today()
-                .contains(has_expected_manual_heating.timestamp))
-    }
-
     fn start_command(&self) -> Option<Command> {
         Some(
             SetHeating {

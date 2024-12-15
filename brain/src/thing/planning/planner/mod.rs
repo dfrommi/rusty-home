@@ -1,8 +1,10 @@
-pub mod action_ext;
+mod action_execution_state;
+mod command_state;
 mod resource_lock;
 
 use std::fmt::{Debug, Display};
 
+use action_execution_state::ActionExecutionState;
 use api::command::Command;
 use resource_lock::ResourceLock;
 use tabled::{Table, Tabled};
@@ -31,7 +33,7 @@ pub struct ActionResult<'a, A: Display> {
 pub async fn do_plan<G, A, T>(active_goals: &[G], config: &[(G, Vec<A>)], api: &T)
 where
     G: Eq,
-    A: Action<T>,
+    A: Action<T> + ActionExecutionState<T>,
     T: PlanningResultTracer + CommandExecutor<Command>,
 {
     let action_results = find_next_actions(active_goals, config, api).await;
@@ -85,7 +87,7 @@ pub async fn find_next_actions<'a, G, A, T>(
 ) -> Vec<ActionResult<'a, A>>
 where
     G: Eq,
-    A: Action<T>,
+    A: Action<T> + ActionExecutionState<T>,
 {
     let mut resource_lock = ResourceLock::new();
     let mut action_results: Vec<ActionResult<A>> = Vec::new();
@@ -123,19 +125,19 @@ where
                     action,
                     e
                 );
-                false
+                None
             });
 
             result.is_fulfilled = Some(is_fulfilled);
-            result.is_running = Some(is_running);
+            result.is_running = is_running;
 
             if is_goal_active && is_fulfilled {
                 resource_lock.lock(used_resource);
-                result.should_be_started = !is_running;
+                result.should_be_started = is_running == Some(false);
             }
 
             if !is_goal_active || !is_fulfilled {
-                result.should_be_stopped = is_running;
+                result.should_be_stopped = is_running == Some(true);
             }
 
             action_results.push(result);

@@ -14,15 +14,11 @@ where
         }
     }
 
-    pub fn lock(&mut self, resource: Option<R>) {
-        if let Some(resource) = resource {
-            self.resources.push(resource);
-        }
+    pub fn lock(&mut self, resource: R) {
+        self.resources.push(resource);
     }
 
-    pub fn is_locked(&self, resource: &Option<R>) -> bool {
-        resource
-            .as_ref()
-            .map_or(false, |resource| self.resources.contains(resource))
+    pub fn is_locked(&self, resource: &R) -> bool {
+        self.resources.contains(resource)
     }
 }

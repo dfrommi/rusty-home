@@ -4,7 +4,7 @@ use actix_web::{
     web::{self, Query},
     Responder,
 };
-use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
+use api::state::{HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use support::TypedItem;
 use support::{time::DateTime, DataPoint};
 

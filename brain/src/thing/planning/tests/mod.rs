@@ -23,7 +23,6 @@ fn user_override_kept_continuously() {
     let result = get_state_at("2024-11-11T21:12:01+01:00", action);
 
     assert!(!result.is_fulfilled);
-    assert!(!result.is_running);
 }
 
 #[test]

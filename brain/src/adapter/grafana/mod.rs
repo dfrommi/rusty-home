@@ -10,7 +10,7 @@ use actix_web::{
 };
 use anyhow::Context;
 use api::state::{
-    Channel, CurrentPowerUsage, HeatingDemand, RelativeHumidity, Temperature,
+    CurrentPowerUsage, HeatingDemand, RelativeHumidity, Temperature,
     TotalEnergyConsumption,
 };
 use derive_more::derive::{Display, Error};

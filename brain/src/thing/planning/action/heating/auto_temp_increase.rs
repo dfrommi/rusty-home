@@ -77,12 +77,6 @@ where
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        api.current(self.heating_zone.current_set_point())
-            .await
-            .map(|v| v == NO_HEATING_SET_POINT)
-    }
-
     fn start_command(&self) -> Option<Command> {
         Some(
             SetHeating {

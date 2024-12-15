@@ -9,7 +9,6 @@ mod action;
 mod config;
 mod goal;
 mod planner;
-use planner::action_ext::ExecutionAwareAction;
 pub use planner::ActionResult;
 
 #[cfg(test)]
@@ -46,19 +45,5 @@ where
 {
     let goals = get_active_goals();
 
-    //TODO move mapping to static init
-    let config = default_config()
-        .iter()
-        .map(|(goal, actions)| {
-            (
-                goal.clone(),
-                actions
-                    .iter()
-                    .map(|a| ExecutionAwareAction::new(a.clone()))
-                    .collect(),
-            )
-        })
-        .collect::<Vec<_>>();
-
-    planner::do_plan(&goals, &config, api).await;
+    planner::do_plan(&goals, default_config(), api).await;
 }

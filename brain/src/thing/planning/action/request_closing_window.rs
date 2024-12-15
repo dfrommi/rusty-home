@@ -26,10 +26,6 @@ where
         Ok(result?.into_iter().any(|v| v))
     }
 
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        api.current(Powered::LivingRoomNotificationLight).await
-    }
-
     fn start_command(&self) -> Option<Command> {
         Some(
             SetPower {

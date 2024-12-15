@@ -13,7 +13,6 @@ use api::command::Command;
 use api::command::CommandSource;
 use api::command::CommandTarget;
 
-use api::command::NotificationRecipient;
 use api::command::NotificationTarget;
 use api::command::Thermostat;
 use api::state::ExternalAutoControl;
@@ -47,9 +46,6 @@ pub trait Action<T>: Display {
     //action should be started based on current state
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool>;
 
-    //action was just triggered or effect of action is fulfilled based on current state
-    async fn is_running(&self, api: &T) -> Result<bool>;
-
     fn start_command(&self) -> Option<Command>;
 
     fn start_command_source(&self) -> CommandSource {
@@ -62,7 +58,7 @@ pub trait Action<T>: Display {
         CommandSource::System(format!("planning:{}:stop", self))
     }
 
-    fn controls_target(&self) -> Option<CommandTarget> {
+    fn controls_target(&self) -> CommandTarget {
         let start_target = self.start_command().map(|c| CommandTarget::from(&c));
         let stop_target = self.stop_command().map(|c| CommandTarget::from(&c));
 
@@ -75,11 +71,11 @@ pub trait Action<T>: Display {
                     );
                 }
 
-                Some(start)
+                start
             }
-            (Some(start), None) => Some(start),
-            (None, Some(stop)) => Some(stop),
-            (None, None) => None,
+            (Some(start), None) => start,
+            (None, Some(stop)) => stop,
+            (None, None) => panic!("Action {} has no start or stop command and relies on default implementation of controls_target", self),
         }
     }
 }
@@ -138,40 +134,6 @@ where
             }
             HomeAction::InformWindowOpen(inform_window_open) => {
                 inform_window_open.preconditions_fulfilled(api).await
-            }
-        }
-    }
-
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        match self {
-            HomeAction::Dehumidify(dehumidify) => dehumidify.is_running(api).await,
-            HomeAction::RequestClosingWindow(request_closing_window) => {
-                request_closing_window.is_running(api).await
-            }
-            HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
-                no_heating_during_ventilation.is_running(api).await
-            }
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
-                no_heating_during_automatic_temperature_increase,
-            ) => {
-                no_heating_during_automatic_temperature_increase
-                    .is_running(api)
-                    .await
-            }
-            HomeAction::KeepUserOverride(keep_user_override) => {
-                keep_user_override.is_running(api).await
-            }
-            HomeAction::ExtendHeatingUntilSleeping(extend_heating_until_sleeping) => {
-                extend_heating_until_sleeping.is_running(api).await
-            }
-            HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
-                defer_heating_until_ventilation_done.is_running(api).await
-            }
-            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
-                reduce_noise_at_night.is_running(api).await
-            }
-            HomeAction::InformWindowOpen(inform_window_open) => {
-                inform_window_open.is_running(api).await
             }
         }
     }
@@ -256,7 +218,7 @@ where
         }
     }
 
-    fn controls_target(&self) -> Option<CommandTarget> {
+    fn controls_target(&self) -> CommandTarget {
         match self {
             HomeAction::Dehumidify(dehumidify) => {
                 <Dehumidify as Action<T>>::controls_target(dehumidify)

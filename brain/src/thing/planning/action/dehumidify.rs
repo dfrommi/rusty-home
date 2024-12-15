@@ -16,10 +16,6 @@ impl<T: DataPointAccess<RiskOfMould> + DataPointAccess<Powered>> Action<T> for D
         api.current(RiskOfMould::Bathroom).await
     }
 
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        api.current(Powered::Dehumidifier).await
-    }
-
     fn start_command(&self) -> Option<Command> {
         Some(
             SetPower {

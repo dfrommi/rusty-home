@@ -21,11 +21,6 @@ where
         api.current(self.0.clone()).await
     }
 
-    //TODO avoid duplicate call and potential issue around time gap
-    async fn is_running(&self, api: &T) -> Result<bool> {
-        self.preconditions_fulfilled(api).await
-    }
-
     fn start_command(&self) -> Option<Command> {
         tracing::warn!("User controlled action {} should never be started", self);
         None
@@ -36,8 +31,8 @@ where
         None
     }
 
-    fn controls_target(&self) -> Option<CommandTarget> {
-        Some(self.1.clone())
+    fn controls_target(&self) -> CommandTarget {
+        self.1.clone()
     }
 }
 

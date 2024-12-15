@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use api::command::{
-    CommandExecution, Notification, NotificationAction, NotificationRecipient, NotificationTarget,
+    Notification, NotificationAction, NotificationRecipient, NotificationTarget,
     PushNotify,
 };
 use support::{t, time::DateTime, DataPoint};
@@ -29,27 +29,6 @@ where
         match cold_air_coming_in(api).await? {
             Some((_, max_dt)) => Ok(t!(now).elapsed_since(max_dt) > t!(3 minutes)),
             None => Ok(false),
-        }
-    }
-
-    async fn is_running(&self, api: &T) -> anyhow::Result<bool> {
-        let target = NotificationTarget {
-            recipient: self.recipient.clone(),
-            notification: Notification::WindowOpened,
-        };
-
-        let last_executed = api.get_latest_command(target, t!(24 hours ago)).await?;
-
-        match last_executed {
-            Some(CommandExecution {
-                command:
-                    PushNotify {
-                        action: NotificationAction::Notify,
-                        ..
-                    },
-                ..
-            }) => Ok(true),
-            _ => Ok(false),
         }
     }
 

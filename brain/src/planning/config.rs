@@ -2,8 +2,8 @@ use api::command::{NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::thing::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight};
-use crate::thing::state::UserControlled;
+use crate::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight};
+use crate::state::UserControlled;
 
 use super::action::{
     DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,

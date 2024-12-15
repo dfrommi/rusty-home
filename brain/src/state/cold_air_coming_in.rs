@@ -1,8 +1,7 @@
 use api::state::{ChannelTypeInfo, Temperature};
 use support::unit::DegreeCelsius;
 
-use super::DataPointAccess;
-use crate::thing::state::opened::Opened;
+use super::{DataPointAccess, Opened};
 use support::DataPoint;
 
 #[derive(Debug, Clone)]

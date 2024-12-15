@@ -7,11 +7,9 @@ use api::{
 };
 
 use crate::{
+    planning::action::{Action, HeatingZone},
     port::DataPointAccess,
-    thing::{
-        planning::action::{Action, HeatingZone},
-        state::ColdAirComingIn,
-    },
+    state::ColdAirComingIn,
 };
 
 #[derive(Debug, Clone)]

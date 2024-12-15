@@ -5,8 +5,8 @@ use support::time::{DateTime, FIXED_NOW};
 use tokio::runtime::Runtime;
 
 use crate::{
+    planning::action::{Action, HomeAction},
     settings,
-    thing::planning::action::{Action, HomeAction},
 };
 
 pub struct ActionState {

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::thing::state::Powered;
+use crate::state::Powered;
 use anyhow::Result;
 use api::command::{Command, PowerToggle, SetPower};
 

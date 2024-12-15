@@ -9,8 +9,8 @@ use support::TypedItem;
 use support::{time::DateTime, DataPoint};
 
 use crate::{
-    adapter::grafana::csv_response, port::TimeSeriesAccess,
-    support::timeseries::interpolate::Estimatable, thing::state::DewPoint,
+    adapter::grafana::csv_response, port::TimeSeriesAccess, state::DewPoint,
+    support::timeseries::interpolate::Estimatable,
 };
 
 use super::{GrafanaApiError, QueryTimeRange};

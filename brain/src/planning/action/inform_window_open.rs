@@ -1,12 +1,11 @@
 use std::fmt::Display;
 
 use api::command::{
-    Notification, NotificationAction, NotificationRecipient, NotificationTarget,
-    PushNotify,
+    Notification, NotificationAction, NotificationRecipient, NotificationTarget, PushNotify,
 };
 use support::{t, time::DateTime, DataPoint};
 
-use crate::thing::state::ColdAirComingIn;
+use crate::state::ColdAirComingIn;
 
 use super::{Action, CommandAccess, DataPointAccess};
 

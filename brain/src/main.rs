@@ -2,16 +2,17 @@ use std::sync::Arc;
 
 use actix_web::{App, HttpServer};
 use api::DbEventListener;
+use planning::plan_for_home;
 use settings::Settings;
 use sqlx::{postgres::PgListener, PgPool};
-use thing::planning::plan_for_home;
 use tokio::task::JoinSet;
 
 mod adapter;
+mod planning;
 pub mod port;
 mod settings;
+mod state;
 mod support;
-mod thing;
 
 struct Infrastructure {
     db_pool: PgPool,

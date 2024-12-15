@@ -2,7 +2,7 @@ use anyhow::Result;
 use api::command::{Command, CommandSource};
 use support::{t, time::DateTime};
 
-use crate::{port::CommandAccess, thing::planning::action::Action};
+use crate::{planning::action::Action, port::CommandAccess};
 
 use super::command_state::CommandState;
 

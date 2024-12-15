@@ -8,14 +8,12 @@ use api::{
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
+    planning::action::{Action, HeatingZone},
     port::{CommandAccess, DataPointAccess},
-    thing::{
-        planning::action::{Action, HeatingZone},
-        state::Opened,
-    },
+    state::Opened,
 };
 
-use crate::thing::state::AutomaticTemperatureIncrease;
+use crate::state::AutomaticTemperatureIncrease;
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 

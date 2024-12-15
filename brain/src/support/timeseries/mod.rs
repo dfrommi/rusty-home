@@ -277,7 +277,7 @@ mod tests {
 
 #[cfg(test)]
 mod combined {
-    use crate::thing::state::DewPoint;
+    use crate::state::DewPoint;
     use api::state::{RelativeHumidity, Temperature};
     use support::unit::{DegreeCelsius, Percent};
 

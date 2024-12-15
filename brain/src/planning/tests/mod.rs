@@ -4,7 +4,7 @@ use api::command::Thermostat;
 use helper::get_state_at;
 use support::{t, unit::DegreeCelsius};
 
-use crate::thing::{
+use crate::{
     planning::action::{
         HeatingZone, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
     },

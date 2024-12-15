@@ -14,8 +14,8 @@ use support::{
 };
 
 use crate::{
+    planning::ActionResult,
     support::timeseries::{interpolate::Estimatable, TimeSeries},
-    thing::planning::ActionResult,
 };
 
 pub trait DataPointAccess<T: ChannelTypeInfo> {

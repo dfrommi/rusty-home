@@ -19,6 +19,10 @@ impl Time {
         DateTime::now().at(*self).unwrap()
     }
 
+    pub fn yesterday(&self) -> DateTime {
+        DateTime::now().at(*self).unwrap().on_prev_day()
+    }
+
     pub fn at(hour: u32, minute: u32) -> anyhow::Result<Self> {
         Ok(Self {
             delegate: chrono::NaiveTime::from_hms_opt(hour, minute, 0)

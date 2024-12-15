@@ -22,12 +22,10 @@ where
     }
 
     fn start_command(&self) -> Option<Command> {
-        tracing::warn!("User controlled action {} should never be started", self);
         None
     }
 
     fn stop_command(&self) -> Option<Command> {
-        tracing::warn!("User controlled action {} should never be stopped", self);
         None
     }
 

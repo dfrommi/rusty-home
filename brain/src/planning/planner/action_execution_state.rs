@@ -1,5 +1,5 @@
 use anyhow::Result;
-use api::command::{Command, CommandSource};
+use api::command::{Command, CommandSource, CommandTarget};
 use support::{t, time::DateTime};
 
 use crate::{planning::action::Action, port::CommandAccess};
@@ -19,37 +19,47 @@ where
     Command: CommandState<API>,
 {
     async fn start_just_triggered(&self, api: &API) -> Result<bool> {
-        let source = get_last_command_source_since(self, t!(30 seconds ago), api).await?;
+        let source =
+            get_last_command_source_since(self.start_command(), t!(30 seconds ago), api).await?;
         Ok(source == Some(self.start_command_source()))
     }
 
     async fn stop_just_triggered(&self, api: &API) -> Result<bool> {
-        let source = get_last_command_source_since(self, t!(30 seconds ago), api).await?;
-        Ok(source == Some(self.start_command_source()))
+        let source =
+            get_last_command_source_since(self.stop_command(), t!(30 seconds ago), api).await?;
+        Ok(source == Some(self.stop_command_source()))
     }
 
     async fn is_running(&self, api: &API) -> Result<Option<bool>> {
-        if self.start_just_triggered(api).await? {
-            return Ok(Some(true));
-        } else if self.stop_just_triggered(api).await? {
-            return Ok(Some(false));
-        }
-
         match self.start_command() {
-            Some(command) => Ok(Some(command.is_running(api).await?)),
+            Some(command) => {
+                let is_running = command.is_running(api).await?;
+                let last_action_source =
+                    get_last_command_source_since(self.start_command(), t!(48 hours ago), api)
+                        .await?;
+                let started_by_action = Some(self.start_command_source()) == last_action_source;
+
+                Ok(Some(started_by_action && is_running))
+            }
             None => Ok(None),
         }
     }
 }
 
 async fn get_last_command_source_since<T>(
-    action: &impl Action<T>,
+    command: Option<Command>,
     since: DateTime,
     api: &T,
 ) -> Result<Option<CommandSource>>
 where
     T: CommandAccess<Command>,
 {
-    api.get_latest_command_source(action.controls_target(), since)
-        .await
+    Ok(match command {
+        Some(command) => {
+            api.get_latest_command_source(CommandTarget::from(command), since)
+                .await?
+        }
+
+        None => None,
+    })
 }

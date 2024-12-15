@@ -107,8 +107,10 @@ where
                 continue;
             }
 
-            let (is_fulfilled, is_running) =
-                tokio::join!(action.preconditions_fulfilled(api), action.is_running(api),);
+            let (is_fulfilled, is_running) = tokio::join!(
+                is_fulfilled_or_just_triggered(action, api),
+                is_running_or_just_triggered(action, api),
+            );
 
             let is_fulfilled = is_fulfilled.unwrap_or_else(|e| {
                 tracing::warn!(
@@ -158,6 +160,32 @@ where
     }
 
     action_results
+}
+
+async fn is_fulfilled_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<bool>
+where
+    A: Action<T> + ActionExecutionState<T>,
+{
+    if action.start_just_triggered(api).await? {
+        return Ok(true);
+    } else if action.stop_just_triggered(api).await? {
+        return Ok(false);
+    }
+
+    action.preconditions_fulfilled(api).await
+}
+
+async fn is_running_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<Option<bool>>
+where
+    A: ActionExecutionState<T>,
+{
+    if action.start_just_triggered(api).await? {
+        return Ok(Some(true));
+    } else if action.stop_just_triggered(api).await? {
+        return Ok(Some(false));
+    }
+
+    action.is_running(api).await
 }
 
 impl<'a, A: Display> ActionResult<'a, A> {

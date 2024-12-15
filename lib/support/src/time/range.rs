@@ -45,6 +45,7 @@ impl DailyTimeRange {
 
     pub fn starting_today(&self) -> DateTimeRange {
         let now = DateTime::now();
+        //TODO could crash with DST -> fallback to duration between start and end
         let start = now.at(self.start).unwrap();
         let mut end = start.at(self.end).unwrap();
 
@@ -53,6 +54,17 @@ impl DailyTimeRange {
         }
 
         DateTimeRange::new(start, end)
+    }
+
+    pub fn active_or_previous(&self) -> DateTimeRange {
+        let now = t!(now);
+        let dt_range = self.starting_today();
+
+        if dt_range.start <= now {
+            dt_range
+        } else {
+            DateTimeRange::new(dt_range.start.on_prev_day(), dt_range.end.on_prev_day())
+        }
     }
 }
 
@@ -131,6 +143,8 @@ impl Iterator for DateTimeIterator {
 
 #[cfg(test)]
 mod tests {
+    use crate::time::FIXED_NOW;
+
     use super::*;
 
     #[test]
@@ -166,5 +180,41 @@ mod tests {
         assert!(range.contains(t!(23:00)));
         assert!(range.contains(t!(03:00)));
         assert!(!range.contains(t!(03:01)));
+    }
+
+    #[tokio::test]
+    async fn test_active_or_previous_in_future() {
+        FIXED_NOW
+            .scope(t!(10:00).today(), async {
+                let range = t!(13:00 - 15:00).active_or_previous();
+
+                assert_eq!(range.start(), &t!(13:00).yesterday());
+                assert_eq!(range.end(), &t!(15:00).yesterday());
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_active_or_previous_in_past() {
+        FIXED_NOW
+            .scope(t!(15:00).today(), async {
+                let range = t!(10:00 - 12:00).active_or_previous();
+
+                assert_eq!(range.start(), &t!(10:00).today());
+                assert_eq!(range.end(), &t!(12:00).today());
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_active_or_previous_spread_over_days() {
+        FIXED_NOW
+            .scope(t!(10:00).today(), async {
+                let range = t!(22:00 - 03:00).active_or_previous();
+
+                assert_eq!(range.start(), &t!(22:00).yesterday());
+                assert_eq!(range.end(), &t!(03:00).today());
+            })
+            .await;
     }
 }

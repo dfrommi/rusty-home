@@ -31,6 +31,7 @@ pub enum HaServiceTarget {
     LightTurnOnOff(&'static str),
     ClimateControl(&'static str),
     PushNotification(&'static str),
+    LgWebosSmartTv(&'static str),
 }
 
 //TODO is Serialize necessary?

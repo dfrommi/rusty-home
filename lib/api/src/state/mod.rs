@@ -65,6 +65,7 @@ pub enum Powered {
     Dehumidifier,
     LivingRoomNotificationLight,
     InfraredHeater,
+    LivingRoomTv,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]

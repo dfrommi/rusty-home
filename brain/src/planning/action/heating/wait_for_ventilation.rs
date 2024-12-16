@@ -5,7 +5,7 @@ use api::{
     command::{Command, SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
 };
-use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
+use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
     planning::action::{Action, HeatingZone},

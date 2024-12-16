@@ -4,6 +4,7 @@ mod inform_window_open;
 mod keep_user_override;
 mod reduce_noise_at_night;
 mod request_closing_window;
+mod save_tv_energy;
 
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -13,6 +14,7 @@ use api::command::Command;
 use api::command::CommandSource;
 use api::command::CommandTarget;
 
+use api::command::EnergySavingDevice;
 use api::command::NotificationTarget;
 use api::command::Thermostat;
 use api::state::ExternalAutoControl;
@@ -25,9 +27,11 @@ pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
+pub use save_tv_energy::SaveTvEnergy;
 
 use crate::port::*;
 use crate::state::*;
+
 
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]
 pub enum HomeAction {
@@ -40,6 +44,7 @@ pub enum HomeAction {
     ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
+    SaveTvEnergy(SaveTvEnergy),
 }
 
 pub trait Action<T>: Display {
@@ -94,9 +99,10 @@ where
         + DataPointAccess<UserControlled>
         + DataPointAccess<RelativeHumidity>
         + DataPointAccess<Resident>
-        + CommandAccess<Thermostat>
         + CommandAccess<Command>
-        + CommandAccess<NotificationTarget>,
+        + CommandAccess<Thermostat>
+        + CommandAccess<NotificationTarget>
+        + CommandAccess<EnergySavingDevice>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         match self {
@@ -134,6 +140,9 @@ where
             }
             HomeAction::InformWindowOpen(inform_window_open) => {
                 inform_window_open.preconditions_fulfilled(api).await
+            }
+            HomeAction::SaveTvEnergy(save_tv_energy) => {
+                save_tv_energy.preconditions_fulfilled(api).await
             }
         }
     }
@@ -175,6 +184,9 @@ where
             HomeAction::InformWindowOpen(inform_window_open) => {
                 <InformWindowOpen as Action<T>>::start_command(inform_window_open)
             }
+            HomeAction::SaveTvEnergy(save_tv_energy) => {
+                <SaveTvEnergy as Action<T>>::start_command(save_tv_energy)
+            }
         }
     }
 
@@ -215,6 +227,9 @@ where
             HomeAction::InformWindowOpen(inform_window_open) => {
                 <InformWindowOpen as Action<T>>::stop_command(inform_window_open)
             }
+            HomeAction::SaveTvEnergy(save_tv_energy) => {
+                <SaveTvEnergy as Action<T>>::stop_command(save_tv_energy)
+            }
         }
     }
 
@@ -254,6 +269,9 @@ where
             }
             HomeAction::InformWindowOpen(inform_window_open) => {
                 <InformWindowOpen as Action<T>>::controls_target(inform_window_open)
+            }
+            HomeAction::SaveTvEnergy(save_tv_energy) => {
+                <SaveTvEnergy as Action<T>>::controls_target(save_tv_energy)
             }
         }
     }

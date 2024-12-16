@@ -1,14 +1,17 @@
 use anyhow::Result;
 use api::{
     command::{
-        Command, CommandExecution, NotificationTarget, PowerToggle, PushNotify, SetHeating,
-        SetPower, Thermostat,
+        Command, CommandExecution, NotificationTarget, PowerToggle, PushNotify, SetEnergySaving,
+        SetHeating, SetPower, Thermostat,
     },
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 use support::{t, unit::DegreeCelsius};
 
-use crate::port::{CommandAccess, DataPointAccess};
+use crate::{
+    port::{CommandAccess, DataPointAccess},
+    state::EnergySaving,
+};
 
 pub trait CommandState<API> {
     async fn is_running(&self, api: &API) -> Result<bool>;
@@ -19,6 +22,7 @@ where
     API: DataPointAccess<Powered>
         + DataPointAccess<ExternalAutoControl>
         + DataPointAccess<SetPoint>
+        + DataPointAccess<EnergySaving>
         + CommandAccess<NotificationTarget>,
 {
     async fn is_running(&self, api: &API) -> Result<bool> {
@@ -26,6 +30,7 @@ where
             Command::SetPower(command) => command.is_running(api).await,
             Command::SetHeating(command) => command.is_running(api).await,
             Command::PushNotify(command) => command.is_running(api).await,
+            Command::SetEnergySaving(command) => command.is_running(api).await,
         }
     }
 }
@@ -94,5 +99,21 @@ impl<API: CommandAccess<NotificationTarget>> CommandState<API> for PushNotify {
             }) => Ok(action == self.action),
             _ => Ok(false),
         }
+    }
+}
+
+//Energy saving not reflected on HA. Trying to guess from actions
+impl<API> CommandState<API> for SetEnergySaving
+where
+    API: DataPointAccess<EnergySaving>,
+{
+    async fn is_running(&self, api: &API) -> Result<bool> {
+        let state_device = match self.device {
+            api::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
+        };
+
+        let is_energy_saving = api.current(state_device).await?;
+
+        Ok(is_energy_saving == self.on)
     }
 }

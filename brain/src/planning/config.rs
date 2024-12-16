@@ -2,7 +2,7 @@ use api::command::{NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight};
+use crate::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight, SaveTvEnergy};
 use crate::state::UserControlled;
 
 use super::action::{
@@ -76,5 +76,12 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             Dehumidify.into()
         ],
     ),
+    (
+        HomeGoal::SaveEnergy,
+        vec![
+            SaveTvEnergy.into(),
+
+        ]
+    )
     ]
 }

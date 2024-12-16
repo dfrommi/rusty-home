@@ -7,12 +7,14 @@ use std::{
     sync::Mutex,
 };
 
-use action_execution_state::ActionExecutionState;
+pub use action_execution_state::ActionExecutionState;
 use api::command::Command;
+pub use command_state::CommandState;
 use resource_lock::ResourceLock;
+use support::t;
 use tabled::{Table, Tabled};
 
-use crate::port::CommandExecutor;
+use crate::port::{CommandAccess, CommandExecutor};
 
 use super::{action::Action, PlanningResultTracer};
 
@@ -36,8 +38,9 @@ pub struct ActionResult {
 pub async fn do_plan<G, A, T>(active_goals: &[G], config: &[(G, Vec<A>)], api: &T)
 where
     G: Eq,
-    A: Action<T> + ActionExecutionState<T>,
-    T: PlanningResultTracer + CommandExecutor<Command>,
+    A: Action<T>,
+    T: PlanningResultTracer + CommandAccess<Command> + CommandExecutor<Command>,
+    Command: CommandState<T>,
 {
     let next_actions = find_next_actions(active_goals, config, api).await;
     let action_results = next_actions.iter().map(|(_, r)| r).collect::<Vec<_>>();
@@ -92,7 +95,9 @@ pub async fn find_next_actions<'a, G, A, T>(
 ) -> Vec<(&'a A, ActionResult)>
 where
     G: Eq,
-    A: Action<T> + ActionExecutionState<T>,
+    A: Action<T>,
+    T: CommandAccess<Command>,
+    Command: CommandState<T>,
 {
     let mut resource_lock = ResourceLock::new();
     let mut action_results: Vec<(&'a A, ActionResult)> = Vec::new();
@@ -144,7 +149,8 @@ where
             }
 
             if !is_goal_active || !is_fulfilled {
-                result.should_be_stopped = is_running == Some(true);
+                let has_stop_action = action.stop_command().is_some();
+                result.should_be_stopped = (is_running == Some(true)) && has_stop_action;
             }
 
             action_results.push((action, result));
@@ -169,11 +175,18 @@ where
 
 async fn is_fulfilled_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<bool>
 where
-    A: Action<T> + ActionExecutionState<T>,
+    A: Action<T>,
+    T: CommandAccess<Command>,
 {
-    if action.start_just_triggered(api).await? {
+    if action
+        .start_latest_trigger_since(api, t!(30 seconds ago))
+        .await?
+    {
         return Ok(true);
-    } else if action.stop_just_triggered(api).await? {
+    } else if action
+        .stop_latest_trigger_since(api, t!(30 seconds ago))
+        .await?
+    {
         return Ok(false);
     }
 
@@ -183,10 +196,18 @@ where
 async fn is_running_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<Option<bool>>
 where
     A: ActionExecutionState<T>,
+    T: CommandAccess<Command>,
+    Command: CommandState<T>,
 {
-    if action.start_just_triggered(api).await? {
+    if action
+        .start_latest_trigger_since(api, t!(30 seconds ago))
+        .await?
+    {
         return Ok(Some(true));
-    } else if action.stop_just_triggered(api).await? {
+    } else if action
+        .stop_latest_trigger_since(api, t!(30 seconds ago))
+        .await?
+    {
         return Ok(Some(false));
     }
 

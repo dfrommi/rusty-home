@@ -10,6 +10,7 @@ pub enum Command {
     SetPower(SetPower),
     SetHeating(SetHeating),
     PushNotify(PushNotify),
+    SetEnergySaving(SetEnergySaving),
 }
 
 impl CommandId for Command {
@@ -28,6 +29,9 @@ pub enum CommandTarget {
     PushNotify {
         recipient: NotificationRecipient,
         notification: Notification,
+    },
+    SetEnergySaving {
+        device: EnergySavingDevice,
     },
 }
 
@@ -62,6 +66,11 @@ impl From<&Command> for CommandTarget {
                 recipient: recipient.clone(),
                 notification: notification.clone(),
             },
+            Command::SetEnergySaving(SetEnergySaving { device, .. }) => {
+                CommandTarget::SetEnergySaving {
+                    device: device.clone(),
+                }
+            }
         }
     }
 }
@@ -225,6 +234,26 @@ impl From<NotificationTarget> for CommandTarget {
 
 impl CommandId for NotificationTarget {
     type CommandType = PushNotify;
+}
+
+//
+// SET ENERGY SAVING
+//
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SetEnergySaving {
+    pub device: EnergySavingDevice,
+    pub on: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnergySavingDevice {
+    LivingRoomTv,
+}
+
+impl CommandId for EnergySavingDevice {
+    type CommandType = SetEnergySaving;
 }
 
 #[cfg(test)]

@@ -7,39 +7,75 @@ use crate::{planning::action::Action, port::CommandAccess};
 use super::command_state::CommandState;
 
 pub trait ActionExecutionState<API> {
-    async fn start_just_triggered(&self, api: &API) -> Result<bool>;
-    async fn stop_just_triggered(&self, api: &API) -> Result<bool>;
-    async fn is_running(&self, api: &API) -> Result<Option<bool>>;
+    async fn start_latest_trigger_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>;
+
+    async fn stop_latest_trigger_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>;
+
+    async fn was_started_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>;
+
+    async fn is_running(&self, api: &API) -> Result<Option<bool>>
+    where
+        API: CommandAccess<Command>,
+        Command: CommandState<API>;
 }
 
 impl<API, A> ActionExecutionState<API> for A
 where
-    API: CommandAccess<Command>,
     A: Action<API>,
-    Command: CommandState<API>,
 {
-    async fn start_just_triggered(&self, api: &API) -> Result<bool> {
-        let source =
-            get_last_command_source_since(self.start_command(), t!(30 seconds ago), api).await?;
+    async fn start_latest_trigger_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>,
+    {
+        let source = get_last_command_source_since(self.start_command(), since, api).await?;
         Ok(source == Some(self.start_command_source()))
     }
 
-    async fn stop_just_triggered(&self, api: &API) -> Result<bool> {
-        let source =
-            get_last_command_source_since(self.stop_command(), t!(30 seconds ago), api).await?;
+    async fn was_started_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>,
+    {
+        let source = self.start_command_source();
+
+        let result = match self.start_command() {
+            Some(command) => api
+                .get_all_commands(CommandTarget::from(command), since)
+                .await?
+                .iter()
+                .any(|c| c.source == source),
+            None => false,
+        };
+
+        Ok(result)
+    }
+
+    async fn stop_latest_trigger_since(&self, api: &API, since: DateTime) -> Result<bool>
+    where
+        API: CommandAccess<Command>,
+    {
+        let source = get_last_command_source_since(self.stop_command(), since, api).await?;
         Ok(source == Some(self.stop_command_source()))
     }
 
-    async fn is_running(&self, api: &API) -> Result<Option<bool>> {
+    async fn is_running(&self, api: &API) -> Result<Option<bool>>
+    where
+        API: CommandAccess<Command>,
+        Command: CommandState<API>,
+    {
         match self.start_command() {
             Some(command) => {
                 let is_running = command.is_running(api).await?;
-                let last_action_source =
-                    get_last_command_source_since(self.start_command(), t!(48 hours ago), api)
-                        .await?;
-                let started_by_action = Some(self.start_command_source()) == last_action_source;
+                let last_triggered_by_start = self
+                    .start_latest_trigger_since(api, t!(48 hours ago))
+                    .await?;
 
-                Ok(Some(started_by_action && is_running))
+                Ok(Some(last_triggered_by_start && is_running))
             }
             None => Ok(None),
         }

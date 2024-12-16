@@ -60,12 +60,13 @@ impl CallServicePort for HaRestClient {
             serde_json::to_string(&service_data)?
         );
 
-        let response = self.client.post(url).json(&service_data).send().await;
+        let response = self.client.post(url).json(&service_data).send().await?;
+        tracing::info!(
+            "Response: {} - {}",
+            response.status(),
+            response.text().await?
+        );
 
-        tracing::info!("Response: {:?}", response);
-
-        response
-            .with_context(|| format!("Error calling HA service {}/{}", domain, service))
-            .map(|_| ())
+        Ok(())
     }
 }

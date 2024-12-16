@@ -1,4 +1,6 @@
-use api::command::{CommandTarget, Notification, NotificationRecipient, Thermostat};
+use api::command::{
+    CommandTarget, EnergySavingDevice, Notification, NotificationRecipient, Thermostat,
+};
 
 use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::{
@@ -55,6 +57,12 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
                 notification: Notification::WindowOpened,
             },
             HaServiceTarget::PushNotification("mobile_app_simi_2"),
+        ),
+        (
+            CommandTarget::SetEnergySaving {
+                device: EnergySavingDevice::LivingRoomTv,
+            },
+            HaServiceTarget::LgWebosSmartTv("media_player.lg_webos_smart_tv"),
         ),
     ]
 }
@@ -184,6 +192,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "light.hue_go",
             HaChannel::Powered(Powered::LivingRoomNotificationLight),
+        ),
+        (
+            "media_player.lg_webos_smart_tv",
+            HaChannel::Powered(Powered::LivingRoomTv),
         ),
         //
         //POWER CONSUMPTION

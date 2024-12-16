@@ -112,6 +112,9 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
                     ..
                 }),
             ) => self.dismiss_window_opened_notification(mobile_id).await,
+            (LgWebosSmartTv(id), Command::SetEnergySaving(SetEnergySaving { on, .. })) => {
+                self.lg_tv_energy_saving_mode(id, *on).await
+            }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }
     }
@@ -204,6 +207,57 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             )
             .await
     }
+
+    async fn lg_tv_energy_saving_mode(&self, id: &str, energy_saving: bool) -> anyhow::Result<()> {
+        let luna_result = self
+            .client
+            .call_service(
+                "webostv",
+                "command",
+                luna_send_payload(
+                    id,
+                    "com.webos.settingsservice/setSystemSettings",
+                    json!({
+                        "category": "picture",
+                        "settings": {
+                            "energySaving": if energy_saving { "auto" } else { "off" },
+                            "energySavingModified": "true"
+                        }
+                    }),
+                ),
+            )
+            .await;
+
+        if luna_result.is_ok() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            self.client
+                .call_service(
+                    "webostv",
+                    "button",
+                    json!({
+                        "entity_id": vec![id.to_string()],
+                        "button": "ENTER"
+                    }),
+                )
+                .await?;
+
+            if !energy_saving {
+                tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+                self.client
+                    .call_service(
+                        "webostv",
+                        "button",
+                        json!({
+                            "entity_id": vec![id.to_string()],
+                            "button": "ENTER"
+                        }),
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn to_ha_duration_format(duration: Duration) -> String {
@@ -213,4 +267,23 @@ fn to_ha_duration_format(duration: Duration) -> String {
     let ss = total_seconds % 60;
 
     format!("{:02}:{:02}:{:02}", hh, mm, ss)
+}
+
+fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> serde_json::Value {
+    let luna_url = format!("luna://{}", uri);
+
+    json!({
+        "entity_id": vec![entity_id.to_string()],
+        "command": "system.notifications/createAlert",
+        "payload": {
+            "message": " ",
+            "buttons": [{
+                    "label": "",
+                    "onClick": luna_url,
+                    "params": payload,
+            }],
+            "onclose": {"uri": luna_url, "params": payload},
+            "onfail": {"uri": luna_url, "params": payload},
+        }
+    })
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use api::state::{ChannelTypeInfo, Presence};
-use support::{t, DataPoint};
+use support::{t, time::DateTimeRange, DataPoint};
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
@@ -31,14 +31,17 @@ async fn sleeping(
     in_bed: Presence,
     api: &impl TimeSeriesAccess<Presence>,
 ) -> Result<DataPoint<bool>> {
-    let in_bed_full_range = t!(21:00 - 13:00).starting_today();
-    let in_bed_start_range = t!(21:00 - 3:00).starting_today();
-
     let now = t!(now);
+    let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
+    let in_bed_start_range = DateTimeRange::new(
+        *in_bed_full_range.start(),
+        in_bed_full_range.end().at(t!(3:00)).unwrap(),
+    );
+
     if !in_bed_full_range.contains(now) {
         return Ok(DataPoint {
             value: false,
-            timestamp: now,
+            timestamp: *in_bed_full_range.end(),
         });
     }
 

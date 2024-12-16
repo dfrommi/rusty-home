@@ -53,11 +53,10 @@ where
 {
     //Strong overlap with wait_for_ventilation
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
-        let time_range = self.time_range.starting_today();
-
-        if !time_range.contains(t!(now)) {
-            return Ok(false);
-        }
+        let time_range = match self.time_range.active() {
+            Some(range) => range,
+            None => return Ok(false),
+        };
 
         let (dennis, sabine) = tokio::try_join!(
             api.current(Resident::DennisSleeping),
@@ -87,7 +86,7 @@ where
                 device: self.heating_zone.thermostat(),
                 target_state: api::command::HeatingTargetState::Heat {
                     temperature: self.target_temperature,
-                    until: *self.time_range.starting_today().end(),
+                    until: self.time_range.next_end(),
                 },
             }
             .into(),

@@ -1,7 +1,5 @@
 #![allow(async_fn_in_trait)]
 
-use std::fmt::Display;
-
 use anyhow::Result;
 use api::{
     command::{Command, CommandExecution, CommandId, CommandSource, CommandTarget},

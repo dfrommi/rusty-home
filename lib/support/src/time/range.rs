@@ -43,27 +43,45 @@ impl DailyTimeRange {
         }
     }
 
-    pub fn starting_today(&self) -> DateTimeRange {
-        let now = DateTime::now();
+    pub fn next_end(&self) -> DateTime {
+        let now = t!(now);
+        let end = now.at(self.end).unwrap();
+
+        if end >= now {
+            end
+        } else {
+            end.on_next_day()
+        }
+    }
+
+    pub fn active(&self) -> Option<DateTimeRange> {
+        let now = t!(now);
+        let dt_range = self.active_or_previous_at(now);
+
+        if dt_range.contains(now) {
+            Some(dt_range)
+        } else {
+            None
+        }
+    }
+
+    pub fn active_or_previous(&self) -> DateTimeRange {
+        self.active_or_previous_at(t!(now))
+    }
+
+    pub fn active_or_previous_at(&self, reference: DateTime) -> DateTimeRange {
         //TODO could crash with DST -> fallback to duration between start and end
-        let start = now.at(self.start).unwrap();
+        let start = reference.at(self.start).unwrap();
         let mut end = start.at(self.end).unwrap();
 
         if start > end {
             end = end.on_next_day();
         }
 
-        DateTimeRange::new(start, end)
-    }
-
-    pub fn active_or_previous(&self) -> DateTimeRange {
-        let now = t!(now);
-        let dt_range = self.starting_today();
-
-        if dt_range.start <= now {
-            dt_range
+        if start <= reference {
+            DateTimeRange::new(start, end)
         } else {
-            DateTimeRange::new(dt_range.start.on_prev_day(), dt_range.end.on_prev_day())
+            DateTimeRange::new(start.on_prev_day(), end.on_prev_day())
         }
     }
 }
@@ -143,13 +161,11 @@ impl Iterator for DateTimeIterator {
 
 #[cfg(test)]
 mod tests {
-    use crate::time::FIXED_NOW;
-
     use super::*;
 
     #[test]
     fn test_step_by() {
-        let range = t!(10:03 - 10:20).starting_today();
+        let range = t!(10:03 - 10:20).active_or_previous_at(t!(10:10).today());
         let mut iter = range.step_by(Duration::minutes(5));
 
         assert_eq!(iter.next(), Some(t!(10:03).today()));
@@ -182,39 +198,35 @@ mod tests {
         assert!(!range.contains(t!(03:01)));
     }
 
-    #[tokio::test]
-    async fn test_active_or_previous_in_future() {
-        FIXED_NOW
-            .scope(t!(10:00).today(), async {
-                let range = t!(13:00 - 15:00).active_or_previous();
+    #[test]
+    fn test_active_or_previous_in_future() {
+        let range = t!(13:00 - 15:00).active_or_previous_at(t!(10:00).today());
 
-                assert_eq!(range.start(), &t!(13:00).yesterday());
-                assert_eq!(range.end(), &t!(15:00).yesterday());
-            })
-            .await;
+        assert_eq!(range.start(), &t!(13:00).yesterday());
+        assert_eq!(range.end(), &t!(15:00).yesterday());
+    }
+
+    #[test]
+    fn test_active_or_previous_in_past() {
+        let range = t!(10:00 - 12:00).active_or_previous_at(t!(15:00).today());
+
+        assert_eq!(range.start(), &t!(10:00).today());
+        assert_eq!(range.end(), &t!(12:00).today());
+    }
+
+    #[test]
+    fn test_active_or_previous_spread_over_days() {
+        let range = t!(22:00 - 03:00).active_or_previous_at(t!(10:00).today());
+
+        assert_eq!(range.start(), &t!(22:00).yesterday());
+        assert_eq!(range.end(), &t!(03:00).today());
     }
 
     #[tokio::test]
-    async fn test_active_or_previous_in_past() {
-        FIXED_NOW
-            .scope(t!(15:00).today(), async {
-                let range = t!(10:00 - 12:00).active_or_previous();
+    async fn test_active_or_previous_after_midnight() {
+        let range = t!(22:00 - 03:00).active_or_previous_at(t!(01:00).today());
 
-                assert_eq!(range.start(), &t!(10:00).today());
-                assert_eq!(range.end(), &t!(12:00).today());
-            })
-            .await;
-    }
-
-    #[tokio::test]
-    async fn test_active_or_previous_spread_over_days() {
-        FIXED_NOW
-            .scope(t!(10:00).today(), async {
-                let range = t!(22:00 - 03:00).active_or_previous();
-
-                assert_eq!(range.start(), &t!(22:00).yesterday());
-                assert_eq!(range.end(), &t!(03:00).today());
-            })
-            .await;
+        assert_eq!(range.start(), &t!(22:00).yesterday());
+        assert_eq!(range.end(), &t!(03:00).today());
     }
 }

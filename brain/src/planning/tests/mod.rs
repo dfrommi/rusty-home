@@ -11,7 +11,7 @@ use crate::{
     state::UserControlled,
 };
 
-use super::action::DeferHeatingUntilVentilationDone;
+use super::action::{DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping};
 
 #[test]
 fn user_override_kept_continuously() {
@@ -62,4 +62,17 @@ fn no_heating_during_automatic_temperature_increase_toggling() {
         !result.is_fulfilled,
         "Should not toggle. Check if properly blocked if already executed since window opened"
     );
+}
+
+#[test]
+fn heating_before_sleeping_extended_over_midnight() {
+    let action = ExtendHeatingUntilSleeping::new(
+        HeatingZone::LivingRoom,
+        DegreeCelsius(20.0),
+        t!(22:30-2:30),
+    );
+
+    let result = get_state_at("2024-12-16T00:00:10+01:00", action);
+
+    assert!(result.is_fulfilled);
 }

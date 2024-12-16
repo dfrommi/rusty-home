@@ -1,4 +1,9 @@
 use api::command::{Command, CommandTarget};
+use serde_json::json;
+use support::{
+    time::{DateTime, Duration},
+    unit::DegreeCelsius,
+};
 
 use crate::{
     core::CommandExecutor,
@@ -48,56 +53,27 @@ impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
 
         let ha_target = ha_target.unwrap();
 
-        let request = serialize::to_service_call_request(command, ha_target)?;
-
-        self.client
-            .call_service(request.domain, request.service, request.payload)
+        self.dispatch_service_call(command, ha_target)
             .await
             .map(|_| true)
     }
 }
 
-mod serialize {
-    use api::command::{
-        Command, HeatingTargetState, Notification, NotificationAction, PushNotify, SetHeating,
-        SetPower,
-    };
-    use serde_json::json;
-    use support::time::Duration;
-
-    use crate::homeassistant::domain::HaServiceTarget;
-
-    pub struct CallServiceRequest {
-        pub domain: &'static str,
-        pub service: &'static str,
-        pub payload: serde_json::Value,
-    }
-
-    //TODO simplify HaMessage struct, maybe use new
-    pub fn to_service_call_request(
+impl<C: CallServicePort> HaCommandExecutor<C> {
+    async fn dispatch_service_call(
+        &self,
         command: &Command,
         ha_target: &HaServiceTarget,
-    ) -> anyhow::Result<CallServiceRequest> {
+    ) -> anyhow::Result<()> {
+        use api::command::*;
         use HaServiceTarget::*;
 
-        let message = match (ha_target, command) {
+        match (ha_target, command) {
             (SwitchTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
-                CallServiceRequest {
-                    domain: "switch",
-                    service: if *power_on { "turn_on" } else { "turn_off" },
-                    payload: json!({
-                        "entity_id": vec![id.to_string()],
-                    }),
-                }
+                self.switch_turn_on_off(id, *power_on).await
             }
             (LightTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
-                CallServiceRequest {
-                    domain: "light",
-                    service: if *power_on { "turn_on" } else { "turn_off" },
-                    payload: json!({
-                        "entity_id": vec![id.to_string()],
-                    }),
-                }
+                self.light_turn_on_off(id, *power_on).await
             }
             (
                 ClimateControl(id),
@@ -105,43 +81,21 @@ mod serialize {
                     target_state: HeatingTargetState::Off,
                     ..
                 }),
-            ) => CallServiceRequest {
-                domain: "climate",
-                service: "set_hvac_mode",
-                payload: json!({
-                    "entity_id": vec![id.to_string()],
-                    "hvac_mode": "off",
-                }),
-            },
+            ) => self.climate_set_hvac_mode(id, "off").await,
             (
                 ClimateControl(id),
                 Command::SetHeating(SetHeating {
                     target_state: HeatingTargetState::Auto,
                     ..
                 }),
-            ) => CallServiceRequest {
-                domain: "climate",
-                service: "set_hvac_mode",
-                payload: json!({
-                    "entity_id": vec![id.to_string()],
-                    "hvac_mode": "auto",
-                }),
-            },
+            ) => self.climate_set_hvac_mode(id, "auto").await,
             (
                 ClimateControl(id),
                 Command::SetHeating(SetHeating {
                     target_state: HeatingTargetState::Heat { temperature, until },
                     ..
                 }),
-            ) => CallServiceRequest {
-                domain: "tado",
-                service: "set_climate_timer",
-                payload: json!({
-                    "entity_id": vec![id.to_string()],
-                    "temperature": temperature,
-                    "time_period": to_ha_duration_format(Duration::until(until)),
-                }),
-            },
+            ) => self.tado_set_climate_timer(id, temperature, until).await,
             (
                 PushNotification(mobile_id),
                 Command::PushNotify(PushNotify {
@@ -149,17 +103,7 @@ mod serialize {
                     action: NotificationAction::Notify,
                     ..
                 }),
-            ) => CallServiceRequest {
-                domain: "notify",
-                service: mobile_id,
-                payload: json!({
-                    "title": "Fenster offen",
-                    "message": "Mindestens ein Fenster ist offen",
-                    "data": {
-                        "tag": "window_opened"
-                    }
-                }),
-            },
+            ) => self.notify_window_opened(mobile_id).await,
             (
                 PushNotification(mobile_id),
                 Command::PushNotify(PushNotify {
@@ -167,28 +111,106 @@ mod serialize {
                     action: NotificationAction::Dismiss,
                     ..
                 }),
-            ) => CallServiceRequest {
-                domain: "notify",
-                service: mobile_id,
-                payload: json!({
+            ) => self.dismiss_window_opened_notification(mobile_id).await,
+            conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
+        }
+    }
+
+    async fn switch_turn_on_off(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
+        let service = if power_on { "turn_on" } else { "turn_off" };
+        self.client
+            .call_service(
+                "switch",
+                service,
+                json!({
+                    "entity_id": vec![id.to_string()],
+                }),
+            )
+            .await
+    }
+
+    async fn light_turn_on_off(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
+        let service = if power_on { "turn_on" } else { "turn_off" };
+        self.client
+            .call_service(
+                "light",
+                service,
+                json!({
+                    "entity_id": vec![id.to_string()],
+                }),
+            )
+            .await
+    }
+
+    async fn climate_set_hvac_mode(&self, id: &str, mode: &str) -> anyhow::Result<()> {
+        self.client
+            .call_service(
+                "climate",
+                "set_hvac_mode",
+                json!({
+                    "entity_id": vec![id.to_string()],
+                    "hvac_mode": mode,
+                }),
+            )
+            .await
+    }
+
+    async fn tado_set_climate_timer(
+        &self,
+        id: &str,
+        temperature: &DegreeCelsius,
+        until: &DateTime,
+    ) -> anyhow::Result<()> {
+        self.client
+            .call_service(
+                "tado",
+                "set_climate_timer",
+                json!({
+                    "entity_id": vec![id.to_string()],
+                    "temperature": temperature,
+                    "time_period": to_ha_duration_format(Duration::until(until)),
+                }),
+            )
+            .await
+    }
+
+    async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {
+        self.client
+            .call_service(
+                "notify",
+                mobile_id,
+                json!({
+                    "title": "Fenster offen",
+                    "message": "Mindestens ein Fenster ist offen",
+                    "data": {
+                        "tag": "window_opened"
+                    }
+                }),
+            )
+            .await
+    }
+
+    async fn dismiss_window_opened_notification(&self, mobile_id: &str) -> anyhow::Result<()> {
+        self.client
+            .call_service(
+                "notify",
+                mobile_id,
+                json!({
                     "message": "clear_notification",
                     "data": {
                         "tag": "window_opened"
                     }
                 }),
-            },
-            conf => return Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
-        };
-
-        Ok(message)
+            )
+            .await
     }
+}
 
-    fn to_ha_duration_format(duration: Duration) -> String {
-        let total_seconds = duration.as_secs();
-        let hh = total_seconds / 3600;
-        let mm = (total_seconds % 3600) / 60;
-        let ss = total_seconds % 60;
+fn to_ha_duration_format(duration: Duration) -> String {
+    let total_seconds = duration.as_secs();
+    let hh = total_seconds / 3600;
+    let mm = (total_seconds % 3600) / 60;
+    let ss = total_seconds % 60;
 
-        format!("{:02}:{:02}:{:02}", hh, mm, ss)
-    }
+    format!("{:02}:{:02}:{:02}", hh, mm, ss)
 }

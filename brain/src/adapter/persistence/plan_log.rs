@@ -6,10 +6,7 @@ use support::t;
 use crate::{planning::ActionResult, port::PlanningResultTracer};
 
 impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
-    async fn add_planning_trace<'a, A: Display>(
-        &self,
-        results: &[ActionResult<'a, A>],
-    ) -> anyhow::Result<()> {
+    async fn add_planning_trace(&self, results: &[&ActionResult]) -> anyhow::Result<()> {
         let id = sqlx::types::Uuid::from_u128(uuid::Uuid::new_v4().as_u128());
 
         let mut builder = QueryBuilder::new(
@@ -19,7 +16,7 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
         builder.push_values(results.iter().enumerate(), |mut b, (i, result)| {
             b.push_bind(id.to_owned())
                 .push_bind((i + 1) as i32)
-                .push_bind(format!("{}", result.action))
+                .push_bind(result.action.as_str())
                 .push_bind(result.should_be_started)
                 .push_bind(result.should_be_stopped)
                 .push_bind(result.is_goal_active)

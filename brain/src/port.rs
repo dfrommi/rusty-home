@@ -62,8 +62,5 @@ pub trait CommandExecutor<C: Into<Command>> {
 }
 
 pub trait PlanningResultTracer {
-    async fn add_planning_trace<'a, A: Display>(
-        &self,
-        results: &[ActionResult<'a, A>],
-    ) -> anyhow::Result<()>;
+    async fn add_planning_trace(&self, results: &[&ActionResult]) -> anyhow::Result<()>;
 }

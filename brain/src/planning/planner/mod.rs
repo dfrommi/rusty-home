@@ -2,7 +2,10 @@ mod action_execution_state;
 mod command_state;
 mod resource_lock;
 
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Mutex,
+};
 
 use action_execution_state::ActionExecutionState;
 use api::command::Command;
@@ -13,9 +16,9 @@ use crate::port::CommandExecutor;
 
 use super::{action::Action, PlanningResultTracer};
 
-#[derive(Debug, Tabled)]
-pub struct ActionResult<'a, A: Display> {
-    pub action: &'a A,
+#[derive(Clone, Debug, PartialEq, Eq, Tabled)]
+pub struct ActionResult {
+    pub action: String,
     #[tabled(display_with = "display_bool")]
     pub should_be_started: bool,
     #[tabled(display_with = "display_bool")]
@@ -36,21 +39,23 @@ where
     A: Action<T> + ActionExecutionState<T>,
     T: PlanningResultTracer + CommandExecutor<Command>,
 {
-    let action_results = find_next_actions(active_goals, config, api).await;
+    let next_actions = find_next_actions(active_goals, config, api).await;
+    let action_results = next_actions.iter().map(|(_, r)| r).collect::<Vec<_>>();
 
-    tracing::info!(
-        "Planning result:\n{}",
-        Table::new(&action_results).to_string()
-    );
+    if action_result_has_changed(&action_results) {
+        tracing::info!(
+            "Planning result:\n{}",
+            Table::new(&action_results).to_string()
+        );
 
-    /* too much data. Needs to be deduplicated
-    if let Err(e) = api.add_planning_trace(&action_results).await {
-        tracing::error!("Error logging planning result: {:?}", e);
+        if let Err(e) = api.add_planning_trace(&action_results).await {
+            tracing::error!("Error logging planning result: {:?}", e);
+        }
+    } else {
+        tracing::info!("Planning result is unchanged");
     }
-    */
 
-    for result in action_results {
-        let action = result.action;
+    for (action, result) in next_actions {
         if result.should_be_started {
             match action.start_command() {
                 Some(command) => match api.execute(command, action.start_command_source()).await {
@@ -84,13 +89,13 @@ pub async fn find_next_actions<'a, G, A, T>(
     goals: &'a [G],
     config: &'a [(G, Vec<A>)],
     api: &T,
-) -> Vec<ActionResult<'a, A>>
+) -> Vec<(&'a A, ActionResult)>
 where
     G: Eq,
     A: Action<T> + ActionExecutionState<T>,
 {
     let mut resource_lock = ResourceLock::new();
-    let mut action_results: Vec<ActionResult<A>> = Vec::new();
+    let mut action_results: Vec<(&'a A, ActionResult)> = Vec::new();
 
     for (goal, actions) in config.iter() {
         let is_goal_active = goals.contains(goal);
@@ -103,7 +108,7 @@ where
 
             if resource_lock.is_locked(&used_resource) {
                 result.locked = true;
-                action_results.push(result);
+                action_results.push((action, result));
                 continue;
             }
 
@@ -142,13 +147,13 @@ where
                 result.should_be_stopped = is_running == Some(true);
             }
 
-            action_results.push(result);
+            action_results.push((action, result));
         }
     }
 
-    for result in action_results.iter_mut() {
+    for (action, result) in action_results.iter_mut() {
         if result.should_be_stopped {
-            let resource = result.action.controls_target();
+            let resource = action.controls_target();
 
             if resource_lock.is_locked(&resource) {
                 result.should_be_stopped = false;
@@ -188,10 +193,10 @@ where
     action.is_running(api).await
 }
 
-impl<'a, A: Display> ActionResult<'a, A> {
-    fn new(action: &'a A) -> Self {
+impl ActionResult {
+    fn new(action: &impl Display) -> Self {
         Self {
-            action,
+            action: format!("{}", action),
             should_be_started: false,
             should_be_stopped: false,
             is_goal_active: false,
@@ -211,5 +216,29 @@ fn display_option(o: &Option<bool>) -> String {
         Some(true) => "✅".to_string(),
         Some(false) => "❌".to_string(),
         None => "-".to_string(),
+    }
+}
+
+static PREVIOUS_ACTION: Mutex<Vec<ActionResult>> = Mutex::new(vec![]);
+fn action_result_has_changed(current: &[&ActionResult]) -> bool {
+    match PREVIOUS_ACTION.lock() {
+        Ok(mut previous) => {
+            let previous_refs: Vec<&ActionResult> = previous.iter().collect();
+
+            if previous_refs != current {
+                *previous = current.iter().map(|&r| r.clone()).collect();
+                true
+            } else {
+                false
+            }
+        }
+
+        Err(e) => {
+            tracing::error!(
+                "Error locking previous action result, logging impacted: {:?}",
+                e
+            );
+            false
+        }
     }
 }

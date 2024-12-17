@@ -2,11 +2,12 @@ use api::{
     command::{CommandExecution, EnergySavingDevice, SetEnergySaving},
     state::{ChannelTypeInfo, Powered},
 };
+use r#macro::TypedItem;
 use support::DataPoint;
 
 use super::{CommandAccess, DataPointAccess};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypedItem)]
 pub enum EnergySaving {
     LivingRoomTv,
 }

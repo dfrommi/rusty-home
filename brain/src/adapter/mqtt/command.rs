@@ -1,8 +1,13 @@
-use api::command::{Command, CommandSource, PowerToggle, SetPower};
+use api::{
+    command::{Command, CommandSource, PowerToggle, SetEnergySaving, SetPower},
+    state::Powered,
+};
 use support::mqtt::MqttInMessage;
 use tokio::sync::mpsc::Receiver;
 
-use crate::port::CommandExecutor;
+use crate::{port::CommandExecutor, state::EnergySaving};
+
+use super::MqttStateValue;
 
 pub async fn process_commands(
     base_topic: String,
@@ -22,10 +27,10 @@ pub async fn process_commands(
             continue;
         }
 
-        let name = topic_parts[1];
-        let channel = topic_parts[2];
+        let type_name = topic_parts[1];
+        let item_name = topic_parts[2];
 
-        match to_command(name, channel, &msg.payload) {
+        match to_command(type_name, item_name, MqttStateValue(msg.payload)) {
             Ok(command) => {
                 tracing::info!("Executing command received via Mqtt: {:?}", command);
                 if let Err(e) = api
@@ -40,26 +45,34 @@ pub async fn process_commands(
     }
 }
 
-fn to_command(name: &str, channel: &str, payload: &str) -> Result<Command, String> {
-    match (name, channel) {
-        ("dehumidifier", "power") => Ok(SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: try_bool(payload)?,
-        }
-        .into()),
-        ("irheater", "power") => Ok(SetPower {
-            device: PowerToggle::InfaredHeater,
-            power_on: try_bool(payload)?,
-        }
-        .into()),
-        _ => Err(format!("Device {} channel {} not supported", name, channel)),
-    }
-}
-
-fn try_bool(payload: &str) -> Result<bool, String> {
-    match payload {
-        "0" => Ok(false),
-        "1" => Ok(true),
-        _ => Err(format!("Error converting {} to bool", payload)),
+fn to_command(type_name: &str, item_name: &str, value: MqttStateValue) -> anyhow::Result<Command> {
+    match type_name {
+        Powered::TYPE_NAME => match Powered::from_item_name(item_name) {
+            Some(Powered::Dehumidifier) => Ok(SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: value.try_into()?,
+            }
+            .into()),
+            Some(Powered::InfraredHeater) => Ok(SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: value.try_into()?,
+            }
+            .into()),
+            Some(_) => Err(anyhow::anyhow!("Powered-item {} not supported", item_name)),
+            None => Err(anyhow::anyhow!("Powered-item {} not found", item_name)),
+        },
+        EnergySaving::TYPE_NAME => match EnergySaving::from_item_name(item_name) {
+            Some(EnergySaving::LivingRoomTv) => Ok(SetEnergySaving {
+                device: api::command::EnergySavingDevice::LivingRoomTv,
+                on: value.try_into()?,
+            }
+            .into()),
+            None => Err(anyhow::anyhow!("EnergySaving-item {} not found", item_name)),
+        },
+        _ => Err(anyhow::anyhow!(
+            "Device {} channel {} not supported",
+            type_name,
+            item_name
+        )),
     }
 }

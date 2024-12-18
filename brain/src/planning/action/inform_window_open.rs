@@ -5,18 +5,36 @@ use api::command::{
 };
 use support::{t, time::DateTime, DataPoint};
 
-use crate::state::ColdAirComingIn;
+use crate::{planning::planner::ActionExecution, state::ColdAirComingIn};
 
 use super::{Action, CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct InformWindowOpen {
     recipient: NotificationRecipient,
+    execution: ActionExecution,
 }
 
 impl InformWindowOpen {
     pub fn new(recipient: NotificationRecipient) -> Self {
-        Self { recipient }
+        let action_name = format!("InformWindowOpen[{}]", &recipient);
+
+        Self {
+            recipient: recipient.clone(),
+            execution: ActionExecution::from_start_and_stop(
+                action_name.as_str(),
+                PushNotify {
+                    action: NotificationAction::Notify,
+                    notification: Notification::WindowOpened,
+                    recipient: recipient.clone(),
+                },
+                PushNotify {
+                    action: NotificationAction::Dismiss,
+                    notification: Notification::WindowOpened,
+                    recipient: recipient.clone(),
+                },
+            ),
+        }
     }
 }
 
@@ -31,20 +49,8 @@ where
         }
     }
 
-    fn start_command(&self) -> Option<api::command::Command> {
-        Some(api::command::Command::PushNotify(PushNotify {
-            action: NotificationAction::Notify,
-            notification: Notification::WindowOpened,
-            recipient: self.recipient.clone(),
-        }))
-    }
-
-    fn stop_command(&self) -> Option<api::command::Command> {
-        Some(api::command::Command::PushNotify(PushNotify {
-            action: NotificationAction::Dismiss,
-            notification: Notification::WindowOpened,
-            recipient: self.recipient.clone(),
-        }))
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 

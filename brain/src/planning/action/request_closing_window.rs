@@ -1,13 +1,33 @@
 use std::fmt::Display;
 
-use crate::state::Powered;
+use crate::{planning::planner::ActionExecution, state::Powered};
 use anyhow::Result;
-use api::command::{Command, PowerToggle, SetPower};
+use api::command::{PowerToggle, SetPower};
 
 use super::{Action, ColdAirComingIn, DataPointAccess};
 
 #[derive(Debug, Clone)]
-pub struct RequestClosingWindow;
+pub struct RequestClosingWindow {
+    execution: ActionExecution,
+}
+
+impl RequestClosingWindow {
+    pub fn new() -> Self {
+        Self {
+            execution: ActionExecution::from_start_and_stop(
+                "RequestClosingWindow",
+                SetPower {
+                    device: PowerToggle::LivingRoomNotificationLight,
+                    power_on: true,
+                },
+                SetPower {
+                    device: PowerToggle::LivingRoomNotificationLight,
+                    power_on: false,
+                },
+            ),
+        }
+    }
+}
 
 impl<T> Action<T> for RequestClosingWindow
 where
@@ -26,24 +46,8 @@ where
         Ok(result?.into_iter().any(|v| v))
     }
 
-    fn start_command(&self) -> Option<Command> {
-        Some(
-            SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
-            }
-            .into(),
-        )
-    }
-
-    fn stop_command(&self) -> Option<Command> {
-        Some(
-            SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: false,
-            }
-            .into(),
-        )
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 

@@ -13,34 +13,33 @@ use crate::{
     state::EnergySaving,
 };
 
-pub trait CommandState<API> {
-    async fn is_running(&self, api: &API) -> Result<bool>;
+pub trait CommandState<C> {
+    async fn is_reflected_in_state(&self, command: &C) -> Result<bool>;
 }
 
-impl<API> CommandState<API> for Command
+impl<API> CommandState<Command> for API
 where
-    API: DataPointAccess<Powered>
-        + DataPointAccess<ExternalAutoControl>
-        + DataPointAccess<SetPoint>
-        + DataPointAccess<EnergySaving>
-        + CommandAccess<NotificationTarget>,
+    API: CommandState<SetPower>
+        + CommandState<SetHeating>
+        + CommandState<PushNotify>
+        + CommandState<SetEnergySaving>,
 {
-    async fn is_running(&self, api: &API) -> Result<bool> {
-        match self {
-            Command::SetPower(command) => command.is_running(api).await,
-            Command::SetHeating(command) => command.is_running(api).await,
-            Command::PushNotify(command) => command.is_running(api).await,
-            Command::SetEnergySaving(command) => command.is_running(api).await,
+    async fn is_reflected_in_state(&self, command: &Command) -> Result<bool> {
+        match command {
+            Command::SetPower(command) => self.is_reflected_in_state(command).await,
+            Command::SetHeating(command) => self.is_reflected_in_state(command).await,
+            Command::PushNotify(command) => self.is_reflected_in_state(command).await,
+            Command::SetEnergySaving(command) => self.is_reflected_in_state(command).await,
         }
     }
 }
 
-impl<API> CommandState<API> for SetHeating
+impl<API> CommandState<SetHeating> for API
 where
     API: DataPointAccess<SetPoint> + DataPointAccess<ExternalAutoControl>,
 {
-    async fn is_running(&self, api: &API) -> Result<bool> {
-        let (set_point, auto_mode) = match self.device {
+    async fn is_reflected_in_state(&self, command: &SetHeating) -> Result<bool> {
+        let (set_point, auto_mode) = match command.device {
             Thermostat::LivingRoom => (
                 SetPoint::LivingRoom,
                 ExternalAutoControl::LivingRoomThermostat,
@@ -55,9 +54,9 @@ where
         };
 
         let (set_point, auto_mode) =
-            tokio::try_join!(api.current(set_point), api.current(auto_mode))?;
+            tokio::try_join!(self.current(set_point), self.current(auto_mode))?;
 
-        match self.target_state {
+        match command.target_state {
             api::command::HeatingTargetState::Auto => Ok(auto_mode),
             api::command::HeatingTargetState::Off => {
                 Ok(!auto_mode && set_point == DegreeCelsius(0.0))
@@ -69,51 +68,57 @@ where
     }
 }
 
-impl<API: DataPointAccess<Powered>> CommandState<API> for SetPower {
-    async fn is_running(&self, api: &API) -> Result<bool> {
-        let powered_item = match self.device {
+impl<API> CommandState<SetPower> for API
+where
+    API: DataPointAccess<Powered>,
+{
+    async fn is_reflected_in_state(&self, command: &SetPower) -> Result<bool> {
+        let powered_item = match command.device {
             PowerToggle::Dehumidifier => Powered::Dehumidifier,
             PowerToggle::LivingRoomNotificationLight => Powered::LivingRoomNotificationLight,
             PowerToggle::InfraredHeater => Powered::InfraredHeater,
         };
 
-        let powered = api.current(powered_item).await?;
+        let powered = self.current(powered_item).await?;
 
-        Ok(powered == self.power_on)
+        Ok(powered == command.power_on)
     }
 }
 
-impl<API: CommandAccess<NotificationTarget>> CommandState<API> for PushNotify {
-    async fn is_running(&self, api: &API) -> Result<bool> {
+impl<API> CommandState<PushNotify> for API
+where
+    API: CommandAccess<NotificationTarget>,
+{
+    async fn is_reflected_in_state(&self, command: &PushNotify) -> Result<bool> {
         let target = NotificationTarget {
-            recipient: self.recipient.clone(),
-            notification: self.notification.clone(),
+            recipient: command.recipient.clone(),
+            notification: command.notification.clone(),
         };
 
-        let latest_command = api.get_latest_command(target, t!(24 hours ago)).await?;
+        let latest_command = self.get_latest_command(target, t!(24 hours ago)).await?;
 
         match latest_command {
             Some(CommandExecution {
                 command: PushNotify { action, .. },
                 ..
-            }) => Ok(action == self.action),
+            }) => Ok(action == command.action),
             _ => Ok(false),
         }
     }
 }
 
 //Energy saving not reflected on HA. Trying to guess from actions
-impl<API> CommandState<API> for SetEnergySaving
+impl<API> CommandState<SetEnergySaving> for API
 where
     API: DataPointAccess<EnergySaving>,
 {
-    async fn is_running(&self, api: &API) -> Result<bool> {
-        let state_device = match self.device {
+    async fn is_reflected_in_state(&self, command: &SetEnergySaving) -> Result<bool> {
+        let state_device = match command.device {
             api::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
         };
 
-        let is_energy_saving = api.current(state_device).await?;
+        let is_energy_saving = self.current(state_device).await?;
 
-        Ok(is_energy_saving == self.on)
+        Ok(is_energy_saving == command.on)
     }
 }

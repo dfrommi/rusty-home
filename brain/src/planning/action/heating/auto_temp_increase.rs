@@ -2,13 +2,16 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::{
-    command::{Command, SetHeating, Thermostat},
+    command::{SetHeating, Thermostat},
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
-    planning::action::{Action, HeatingZone},
+    planning::{
+        action::{Action, HeatingZone},
+        planner::ActionExecution,
+    },
     port::{CommandAccess, DataPointAccess},
     state::Opened,
 };
@@ -20,11 +23,33 @@ static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringAutomaticTemperatureIncrease {
     heating_zone: HeatingZone,
+    execution: ActionExecution,
 }
 
 impl NoHeatingDuringAutomaticTemperatureIncrease {
     pub fn new(heating_zone: HeatingZone) -> Self {
-        Self { heating_zone }
+        let action_name = format!(
+            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
+            &heating_zone
+        );
+
+        Self {
+            heating_zone: heating_zone.clone(),
+            execution: ActionExecution::from_start_and_stop(
+                action_name.as_str(),
+                SetHeating {
+                    device: heating_zone.thermostat(),
+                    target_state: api::command::HeatingTargetState::Heat {
+                        temperature: NO_HEATING_SET_POINT,
+                        until: t!(in 1 hours),
+                    },
+                },
+                SetHeating {
+                    device: heating_zone.thermostat(),
+                    target_state: api::command::HeatingTargetState::Auto,
+                },
+            ),
+        }
     }
 }
 
@@ -75,27 +100,8 @@ where
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    fn start_command(&self) -> Option<Command> {
-        Some(
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Heat {
-                    temperature: NO_HEATING_SET_POINT,
-                    until: t!(in 1 hours),
-                },
-            }
-            .into(),
-        )
-    }
-
-    fn stop_command(&self) -> Option<Command> {
-        Some(
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Auto,
-            }
-            .into(),
-        )
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 

@@ -1,15 +1,24 @@
 use std::fmt::Display;
 
+use crate::planning::planner::ActionExecution;
+
 use super::{Action, DataPointAccess, UserControlled};
 use anyhow::Result;
-use api::command::{Command, CommandTarget};
+use api::command::CommandTarget;
 
 #[derive(Debug, Clone)]
-pub struct KeepUserOverride(UserControlled, CommandTarget);
+pub struct KeepUserOverride {
+    user_controlled: UserControlled,
+    execution: ActionExecution,
+}
 
 impl KeepUserOverride {
     pub fn new(user_controlled: UserControlled, target: CommandTarget) -> Self {
-        Self(user_controlled, target)
+        let action_name = format!("KeepUserOverride[{}]", &user_controlled);
+        Self {
+            user_controlled,
+            execution: ActionExecution::locking_only(action_name.as_str(), target),
+        }
     }
 }
 
@@ -18,24 +27,16 @@ where
     T: DataPointAccess<UserControlled>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
-        api.current(self.0.clone()).await
+        api.current(self.user_controlled.clone()).await
     }
 
-    fn start_command(&self) -> Option<Command> {
-        None
-    }
-
-    fn stop_command(&self) -> Option<Command> {
-        None
-    }
-
-    fn controls_target(&self) -> CommandTarget {
-        self.1.clone()
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 
 impl Display for KeepUserOverride {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "KeepUserOverride[{}]", self.0)
+        write!(f, "KeepUserOverride[{}]", self.user_controlled)
     }
 }

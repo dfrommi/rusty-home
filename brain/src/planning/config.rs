@@ -30,7 +30,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::Bedroom),
         vec![
-            IrHeaterAutoTurnOff::Bedroom.into(),
+            IrHeaterAutoTurnOff::new().into(),
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
             KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
@@ -66,7 +66,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::StayInformed,
         vec![
-            RequestClosingWindow.into(),
+            RequestClosingWindow::new().into(),
             InformWindowOpen::new(NotificationRecipient::Dennis).into(),
             InformWindowOpen::new(NotificationRecipient::Sabine).into(),
         ],
@@ -76,13 +76,13 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
             ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
-            Dehumidify.into()
+            Dehumidify::new().into()
         ],
     ),
     (
         HomeGoal::SaveEnergy,
         vec![
-            SaveTvEnergy.into(),
+            SaveTvEnergy::new().into(),
 
         ]
     )

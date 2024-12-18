@@ -1,4 +1,4 @@
-mod action_execution_state;
+mod action_execution;
 mod command_state;
 mod resource_lock;
 
@@ -7,16 +7,16 @@ use std::{
     sync::Mutex,
 };
 
-pub use action_execution_state::ActionExecutionState;
-use api::command::Command;
+pub use action_execution::{ActionExecution, ActionExecutionTrigger};
+use api::command::{Command, CommandTarget};
 pub use command_state::CommandState;
 use resource_lock::ResourceLock;
 use support::t;
 use tabled::{Table, Tabled};
 
-use crate::port::{CommandAccess, CommandExecutor};
+use crate::port::{CommandAccess, CommandExecutor, PlanningResultTracer};
 
-use super::{action::Action, PlanningResultTracer};
+use super::action::Action;
 
 #[derive(Clone, Debug, PartialEq, Eq, Tabled)]
 pub struct ActionResult {
@@ -35,14 +35,17 @@ pub struct ActionResult {
     pub is_running: Option<bool>,
 }
 
-pub async fn do_plan<G, A, T>(active_goals: &[G], config: &[(G, Vec<A>)], api: &T)
-where
+pub async fn plan_and_execute<G, A, T>(
+    active_goals: &[G],
+    config: &[(G, Vec<A>)],
+    api: &T,
+    result_tracer: &impl PlanningResultTracer,
+    command_processor: &(impl CommandAccess<Command> + CommandExecutor<Command> + CommandState<Command>),
+) where
     G: Eq,
     A: Action<T>,
-    T: PlanningResultTracer + CommandAccess<Command> + CommandExecutor<Command>,
-    Command: CommandState<T>,
 {
-    let next_actions = find_next_actions(active_goals, config, api).await;
+    let next_actions = find_next_actions(active_goals, config, api, command_processor).await;
     let action_results = next_actions.iter().map(|(_, r)| r).collect::<Vec<_>>();
 
     if action_result_has_changed(&action_results) {
@@ -51,7 +54,7 @@ where
             Table::new(&action_results).to_string()
         );
 
-        if let Err(e) = api.add_planning_trace(&action_results).await {
+        if let Err(e) = result_tracer.add_planning_trace(&action_results).await {
             tracing::error!("Error logging planning result: {:?}", e);
         }
     } else {
@@ -60,28 +63,14 @@ where
 
     for (action, result) in next_actions {
         if result.should_be_started {
-            match action.start_command() {
-                Some(command) => match api.execute(command, action.start_command_source()).await {
-                    Ok(_) => tracing::info!("Action {} started", action),
-                    Err(e) => tracing::error!("Error starting action {}: {:?}", action, e),
-                },
-                None => tracing::info!(
-                    "Action {} should be started, but no command is configured",
-                    action
-                ),
+            if let Err(e) = action.execution().execute_start(command_processor).await {
+                tracing::error!("Error starting action {}: {:?}", action, e);
             }
         }
 
         if result.should_be_stopped {
-            match action.stop_command() {
-                Some(command) => match api.execute(command, action.stop_command_source()).await {
-                    Ok(_) => tracing::info!("Action {} stopped", action),
-                    Err(e) => tracing::error!("Error stopping action {}: {:?}", action, e),
-                },
-                None => tracing::info!(
-                    "Action {} should be stopped, but no command is configured",
-                    action
-                ),
+            if let Err(e) = action.execution().execute_stop(command_processor).await {
+                tracing::error!("Error stopping action {}: {:?}", action, e);
             }
         }
     }
@@ -92,14 +81,13 @@ pub async fn find_next_actions<'a, G, A, T>(
     goals: &'a [G],
     config: &'a [(G, Vec<A>)],
     api: &T,
+    command_processor: &(impl CommandAccess<Command> + CommandState<Command>),
 ) -> Vec<(&'a A, ActionResult)>
 where
     G: Eq,
     A: Action<T>,
-    T: CommandAccess<Command>,
-    Command: CommandState<T>,
 {
-    let mut resource_lock = ResourceLock::new();
+    let mut resource_lock: ResourceLock<CommandTarget> = ResourceLock::new();
     let mut action_results: Vec<(&'a A, ActionResult)> = Vec::new();
 
     for (goal, actions) in config.iter() {
@@ -109,48 +97,31 @@ where
             let mut result = ActionResult::new(action);
             result.is_goal_active = is_goal_active;
 
-            let used_resource = action.controls_target();
+            let action_execution = action.execution();
 
-            if resource_lock.is_locked(&used_resource) {
+            let used_resource = action_execution.controlled_target();
+
+            if resource_lock.is_locked(used_resource) {
                 result.locked = true;
                 action_results.push((action, result));
                 continue;
             }
 
-            let (is_fulfilled, is_running) = tokio::join!(
-                is_fulfilled_or_just_triggered(action, api),
-                is_running_or_just_triggered(action, api),
-            );
-
-            let is_fulfilled = is_fulfilled.unwrap_or_else(|e| {
-                tracing::warn!(
-                    "Error checking preconditions of action {}, assuming not fulfilled: {:?}",
-                    action,
-                    e
-                );
-                false
-            });
-
-            let is_running = is_running.unwrap_or_else(|e| {
-                tracing::warn!(
-                    "Error checking running state of action {}, assuming not running: {:?}",
-                    action,
-                    e
-                );
-                None
-            });
+            let (is_fulfilled, is_running) =
+                get_fulfilled_and_running_state(action, api, command_processor).await;
 
             result.is_fulfilled = Some(is_fulfilled);
             result.is_running = is_running;
 
             if is_goal_active && is_fulfilled {
-                resource_lock.lock(used_resource);
-                result.should_be_started = is_running == Some(false);
+                resource_lock.lock(used_resource.clone());
+                result.should_be_started =
+                    action_execution.can_be_started() && is_running == Some(false);
             }
 
             if !is_goal_active || !is_fulfilled {
-                let has_stop_action = action.stop_command().is_some();
-                result.should_be_stopped = (is_running == Some(true)) && has_stop_action;
+                result.should_be_stopped =
+                    action_execution.can_be_stopped() && (is_running == Some(true));
             }
 
             action_results.push((action, result));
@@ -159,13 +130,13 @@ where
 
     for (action, result) in action_results.iter_mut() {
         if result.should_be_stopped {
-            let resource = action.controls_target();
+            let resource = action.execution().controlled_target();
 
-            if resource_lock.is_locked(&resource) {
+            if resource_lock.is_locked(resource) {
                 result.should_be_stopped = false;
                 result.locked = true;
             } else {
-                resource_lock.lock(resource);
+                resource_lock.lock(resource.clone());
             }
         }
     }
@@ -173,45 +144,60 @@ where
     action_results
 }
 
-async fn is_fulfilled_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<bool>
+async fn get_fulfilled_and_running_state<A, T>(
+    action: &A,
+    api: &T,
+    command_access: &(impl CommandAccess<Command> + CommandState<Command>),
+) -> (bool, Option<bool>)
 where
     A: Action<T>,
-    T: CommandAccess<Command>,
 {
-    if action
-        .start_latest_trigger_since(api, t!(30 seconds ago))
-        .await?
-    {
-        return Ok(true);
-    } else if action
-        .stop_latest_trigger_since(api, t!(30 seconds ago))
-        .await?
-    {
-        return Ok(false);
+    macro_rules! unwrap_or_warn {
+        ($e:expr, $default:expr, $msg:literal) => {
+            $e.unwrap_or_else(|e| {
+                tracing::warn!($msg, action, e);
+                $default
+            })
+        };
     }
 
-    action.preconditions_fulfilled(api).await
-}
+    let action_execution = action.execution();
 
-async fn is_running_or_just_triggered<A, T>(action: &A, api: &T) -> anyhow::Result<Option<bool>>
-where
-    A: ActionExecutionState<T>,
-    T: CommandAccess<Command>,
-    Command: CommandState<T>,
-{
-    if action
-        .start_latest_trigger_since(api, t!(30 seconds ago))
-        .await?
-    {
-        return Ok(Some(true));
-    } else if action
-        .stop_latest_trigger_since(api, t!(30 seconds ago))
-        .await?
-    {
-        return Ok(Some(false));
+    let latest_trigger = unwrap_or_warn!(
+        action_execution
+            .latest_trigger_since(command_access, t!(30 seconds ago))
+            .await,
+        ActionExecutionTrigger::None,
+        "Error getting latest exexcution of action {}, assuming not running: {:?}"
+    );
+
+    if latest_trigger == ActionExecutionTrigger::Start {
+        return (true, Some(true));
+    } else if latest_trigger == ActionExecutionTrigger::Stop {
+        return (false, Some(false));
     }
 
-    action.is_running(api).await
+    let (action_preconditions_fulfilled, execution_started_and_still_reflected) = tokio::join!(
+        action.preconditions_fulfilled(api),
+        action_execution.action_started_and_still_reflected(command_access),
+    );
+
+    let action_preconditions_fulfilled = unwrap_or_warn!(
+        action_preconditions_fulfilled,
+        false,
+        "Error checking preconditions of action {}, assuming not fulfilled: {:?}"
+    );
+
+    let execution_started_and_still_reflected = unwrap_or_warn!(
+        execution_started_and_still_reflected,
+        None,
+        "Error checking running state of action {}, assuming not running: {:?}"
+    );
+
+    (
+        action_preconditions_fulfilled,
+        execution_started_and_still_reflected,
+    )
 }
 
 impl ActionResult {

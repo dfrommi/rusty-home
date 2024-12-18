@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use actix_web::{App, HttpServer};
 use api::DbEventListener;
-use planning::plan_for_home;
 use settings::Settings;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinSet;
@@ -59,6 +58,7 @@ pub async fn main() {
         let api = infrastructure.clone();
         async move {
             let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
+            let api = api.as_ref();
 
             loop {
                 tokio::select! {
@@ -67,7 +67,14 @@ pub async fn main() {
                 }
 
                 tracing::info!("Start planning");
-                plan_for_home(api.as_ref()).await;
+                planning::plan_and_execute(
+                    &planning::get_active_goals(),
+                    planning::default_config(),
+                    api,
+                    api,
+                    api,
+                )
+                .await;
                 tracing::info!("Planning done");
             }
         }

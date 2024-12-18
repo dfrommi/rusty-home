@@ -4,12 +4,28 @@ use api::{
     state::Powered,
 };
 
-use crate::planning::planner::{ActionExecutionState, CommandState};
+use crate::planning::planner::{ActionExecution, ActionExecutionTrigger, CommandState};
 
 use super::{Action, CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone)]
-pub struct SaveTvEnergy;
+pub struct SaveTvEnergy {
+    execution: ActionExecution,
+}
+
+impl SaveTvEnergy {
+    pub fn new() -> Self {
+        Self {
+            execution: ActionExecution::from_start(
+                "SaveTvEnergy",
+                api::command::SetEnergySaving {
+                    device: api::command::EnergySavingDevice::LivingRoomTv,
+                    on: true,
+                },
+            ),
+        }
+    }
+}
 
 impl<API> Action<API> for SaveTvEnergy
 where
@@ -30,25 +46,19 @@ where
         };
 
         let (was_started, is_still_running) = tokio::try_join!(
-            ActionExecutionState::was_started_since(self, api, is_tv_on.timestamp),
-            CommandState::is_running(&command, api),
+            self.execution.any_trigger_since(
+                api,
+                ActionExecutionTrigger::Start,
+                is_tv_on.timestamp
+            ),
+            CommandState::is_reflected_in_state(api, &command),
         )?;
 
         Ok(!was_started || is_still_running)
     }
 
-    fn start_command(&self) -> Option<Command> {
-        Some(
-            SetEnergySaving {
-                device: api::command::EnergySavingDevice::LivingRoomTv,
-                on: true,
-            }
-            .into(),
-        )
-    }
-
-    fn stop_command(&self) -> Option<Command> {
-        None
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 

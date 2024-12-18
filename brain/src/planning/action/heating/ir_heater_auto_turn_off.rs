@@ -4,11 +4,28 @@ use api::{
 };
 use support::t;
 
-use crate::{planning::action::Action, port::DataPointAccess};
+use crate::{
+    planning::{action::Action, planner::ActionExecution},
+    port::DataPointAccess,
+};
 
 #[derive(Debug, Clone)]
-pub enum IrHeaterAutoTurnOff {
-    Bedroom,
+pub struct IrHeaterAutoTurnOff {
+    execution: ActionExecution,
+}
+
+impl IrHeaterAutoTurnOff {
+    pub fn new() -> Self {
+        Self {
+            execution: ActionExecution::from_start(
+                "IrHeaterAutoTurnOff[Bedroom]",
+                SetPower {
+                    device: PowerToggle::InfraredHeater,
+                    power_on: false,
+                },
+            ),
+        }
+    }
 }
 
 impl<API> Action<API> for IrHeaterAutoTurnOff
@@ -16,39 +33,20 @@ where
     API: DataPointAccess<Powered>,
 {
     async fn preconditions_fulfilled(&self, api: &API) -> anyhow::Result<bool> {
-        let device = match self {
-            IrHeaterAutoTurnOff::Bedroom => Powered::InfraredHeater,
-        };
-
+        let device = Powered::InfraredHeater;
         let current = api.current_data_point(device).await?;
 
         //on for at least 1 hour
         Ok(current.value && current.timestamp.elapsed() > t!(1 hours))
     }
 
-    fn start_command(&self) -> Option<api::command::Command> {
-        Some(
-            SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            }
-            .into(),
-        )
-    }
-
-    fn stop_command(&self) -> Option<api::command::Command> {
-        None
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 
 impl std::fmt::Display for IrHeaterAutoTurnOff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "IrHeaterAutoTurnOff[{}]",
-            match self {
-                IrHeaterAutoTurnOff::Bedroom => "Bedroom",
-            }
-        )
+        write!(f, "IrHeaterAutoTurnOff[Bedroom]",)
     }
 }

@@ -6,16 +6,28 @@ use api::{
 };
 use support::{t, time::DailyTimeRange};
 
+use crate::planning::planner::ActionExecution;
+
 use super::{Action, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct ReduceNoiseAtNight {
     range: DailyTimeRange,
+    execution: ActionExecution,
 }
 
 impl ReduceNoiseAtNight {
     pub fn new(range: DailyTimeRange) -> Self {
-        Self { range }
+        Self {
+            range,
+            execution: ActionExecution::from_start(
+                "ReduceNoiseAtNight",
+                SetPower {
+                    device: PowerToggle::Dehumidifier,
+                    power_on: false,
+                },
+            ),
+        }
     }
 }
 
@@ -27,18 +39,8 @@ where
         Ok(self.range.contains(t!(now).time()))
     }
 
-    fn start_command(&self) -> Option<api::command::Command> {
-        Some(
-            SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: false,
-            }
-            .into(),
-        )
-    }
-
-    fn stop_command(&self) -> Option<api::command::Command> {
-        None
+    fn execution(&self) -> &ActionExecution {
+        &self.execution
     }
 }
 

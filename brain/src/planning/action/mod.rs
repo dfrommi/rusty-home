@@ -32,7 +32,6 @@ pub use save_tv_energy::SaveTvEnergy;
 use crate::port::*;
 use crate::state::*;
 
-
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
@@ -40,6 +39,7 @@ pub enum HomeAction {
     InformWindowOpen(InformWindowOpen),
     NoHeatingDuringVentilation(NoHeatingDuringVentilation),
     NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease),
+    IrHeaterAutoTurnOff(IrHeaterAutoTurnOff),
     KeepUserOverride(KeepUserOverride),
     ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
@@ -144,6 +144,9 @@ where
             HomeAction::SaveTvEnergy(save_tv_energy) => {
                 save_tv_energy.preconditions_fulfilled(api).await
             }
+            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
+                ir_heater_auto_turn_off.preconditions_fulfilled(api).await
+            }
         }
     }
 
@@ -186,6 +189,9 @@ where
             }
             HomeAction::SaveTvEnergy(save_tv_energy) => {
                 <SaveTvEnergy as Action<T>>::start_command(save_tv_energy)
+            }
+            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
+                <IrHeaterAutoTurnOff as Action<T>>::start_command(ir_heater_auto_turn_off)
             }
         }
     }
@@ -230,6 +236,9 @@ where
             HomeAction::SaveTvEnergy(save_tv_energy) => {
                 <SaveTvEnergy as Action<T>>::stop_command(save_tv_energy)
             }
+            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
+                <IrHeaterAutoTurnOff as Action<T>>::stop_command(ir_heater_auto_turn_off)
+            }
         }
     }
 
@@ -272,6 +281,9 @@ where
             }
             HomeAction::SaveTvEnergy(save_tv_energy) => {
                 <SaveTvEnergy as Action<T>>::controls_target(save_tv_energy)
+            }
+            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
+                <IrHeaterAutoTurnOff as Action<T>>::controls_target(ir_heater_auto_turn_off)
             }
         }
     }

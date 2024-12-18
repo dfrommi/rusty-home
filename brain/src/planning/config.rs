@@ -2,7 +2,9 @@ use api::command::{NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::planning::action::{HeatingZone, InformWindowOpen, ReduceNoiseAtNight, SaveTvEnergy};
+use crate::planning::action::{
+    HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight, SaveTvEnergy,
+};
 use crate::state::UserControlled;
 
 use super::action::{
@@ -28,6 +30,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::Bedroom),
         vec![
+            IrHeaterAutoTurnOff::Bedroom.into(),
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
             KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),

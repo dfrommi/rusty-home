@@ -74,7 +74,7 @@ impl<API: DataPointAccess<Powered>> CommandState<API> for SetPower {
         let powered_item = match self.device {
             PowerToggle::Dehumidifier => Powered::Dehumidifier,
             PowerToggle::LivingRoomNotificationLight => Powered::LivingRoomNotificationLight,
-            PowerToggle::InfaredHeater => Powered::InfraredHeater,
+            PowerToggle::InfraredHeater => Powered::InfraredHeater,
         };
 
         let powered = api.current(powered_item).await?;

@@ -48,6 +48,10 @@ impl DateTime {
             .unwrap_or_else(|_| chrono::Local::now().into())
     }
 
+    pub fn min() -> Self {
+        Self::new(chrono::DateTime::<chrono::Local>::MIN_UTC)
+    }
+
     pub fn from_iso(iso8601: &str) -> anyhow::Result<Self> {
         Ok(chrono::DateTime::parse_from_rfc3339(iso8601)?.into())
     }

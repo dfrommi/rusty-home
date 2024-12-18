@@ -17,7 +17,7 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             HaServiceTarget::SwitchTurnOnOff("switch.dehumidifier"),
         ),
         (
-            PowerToggle::InfaredHeater.into(),
+            PowerToggle::InfraredHeater.into(),
             HaServiceTarget::SwitchTurnOnOff("switch.irheater"),
         ),
         (

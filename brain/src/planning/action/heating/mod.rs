@@ -1,4 +1,5 @@
 mod auto_temp_increase;
+mod ir_heater_auto_turn_off;
 mod ventilation_in_progress;
 mod wait_for_sleeping;
 mod wait_for_ventilation;
@@ -12,6 +13,7 @@ use api::{
 use support::{ext::ToOk, t, time::DateTime, unit::DegreeCelsius, DataPoint};
 
 pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
+pub use ir_heater_auto_turn_off::IrHeaterAutoTurnOff;
 pub use ventilation_in_progress::NoHeatingDuringVentilation;
 pub use wait_for_sleeping::ExtendHeatingUntilSleeping;
 pub use wait_for_ventilation::DeferHeatingUntilVentilationDone;

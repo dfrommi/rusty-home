@@ -6,9 +6,9 @@ use api::{
     state::Powered,
 };
 
-use crate::planning::planner::ActionExecution;
+use crate::home::state::RiskOfMould;
 
-use super::{Action, DataPointAccess, RiskOfMould};
+use super::{Action, ActionExecution, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct Dehumidify {

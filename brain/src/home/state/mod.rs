@@ -12,6 +12,11 @@ mod risk_of_mould;
 //mod temperature;
 //mod total_energy_consumption;
 mod energy_saving;
+mod heating_demand;
+mod presence;
+mod relative_humidity;
+mod temperature;
+mod total_energy_consumption;
 mod user_controlled;
 
 use api::state::ChannelTypeInfo;

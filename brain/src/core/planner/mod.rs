@@ -7,6 +7,8 @@ use std::{
     sync::Mutex,
 };
 
+use anyhow::Result;
+
 pub use action_execution::{ActionExecution, ActionExecutionTrigger};
 use api::command::{Command, CommandTarget};
 pub use command_state::CommandState;
@@ -16,7 +18,12 @@ use tabled::{Table, Tabled};
 
 use crate::port::{CommandAccess, CommandExecutor, PlanningResultTracer};
 
-use super::action::Action;
+pub trait Action<T>: Display {
+    //action should be started based on current state
+    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool>;
+
+    fn execution(&self) -> &ActionExecution;
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Tabled)]
 pub struct ActionResult {

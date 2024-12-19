@@ -18,7 +18,7 @@ pub use ventilation_in_progress::NoHeatingDuringVentilation;
 pub use wait_for_sleeping::ExtendHeatingUntilSleeping;
 pub use wait_for_ventilation::DeferHeatingUntilVentilationDone;
 
-use super::{CommandAccess, DataPointAccess};
+use super::*;
 
 #[derive(Debug, Clone)]
 pub enum HeatingZone {

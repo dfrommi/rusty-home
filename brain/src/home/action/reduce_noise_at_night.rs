@@ -6,9 +6,7 @@ use api::{
 };
 use support::{t, time::DailyTimeRange};
 
-use crate::planning::planner::ActionExecution;
-
-use super::{Action, DataPointAccess};
+use super::{Action, ActionExecution, DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct ReduceNoiseAtNight {

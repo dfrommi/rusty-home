@@ -2,10 +2,10 @@ use api::command::{NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
-use crate::planning::action::{
+use crate::home::action::{
     HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight, SaveTvEnergy,
 };
-use crate::state::UserControlled;
+use crate::home::state::UserControlled;
 
 use super::action::{
     DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,

@@ -7,10 +7,10 @@ use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinSet;
 
 mod adapter;
-mod planning;
+mod core;
+mod home;
 pub mod port;
 mod settings;
-mod state;
 mod support;
 
 struct Infrastructure {
@@ -67,9 +67,9 @@ pub async fn main() {
                 }
 
                 tracing::info!("Start planning");
-                planning::plan_and_execute(
-                    &planning::get_active_goals(),
-                    planning::default_config(),
+                core::planner::plan_and_execute(
+                    &home::get_active_goals(),
+                    home::default_config(),
                     api,
                     api,
                     api,

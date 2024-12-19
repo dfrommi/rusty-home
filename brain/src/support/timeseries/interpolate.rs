@@ -1,9 +1,4 @@
-use api::state::{HeatingDemand, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::{
-    time::DateTime,
-    unit::{DegreeCelsius, KiloWattHours, Percent},
-    DataPoint,
-};
+use support::{time::DateTime, DataPoint};
 
 pub trait Estimatable
 where
@@ -17,71 +12,6 @@ where
         prev: &DataPoint<Self::Type>,
         next: &DataPoint<Self::Type>,
     ) -> Self::Type;
-}
-
-impl Estimatable for Temperature {
-    type Type = DegreeCelsius;
-
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::linear(at, prev, next)
-    }
-}
-
-impl Estimatable for RelativeHumidity {
-    type Type = Percent;
-
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::linear(at, prev, next)
-    }
-}
-
-impl Estimatable for Presence {
-    type Type = bool;
-
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::last_seen(at, prev, next)
-    }
-}
-
-impl Estimatable for HeatingDemand {
-    type Type = Percent;
-
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::last_seen(at, prev, next)
-    }
-}
-
-impl Estimatable for TotalEnergyConsumption {
-    type Type = KiloWattHours;
-
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::linear(at, prev, next)
-    }
 }
 
 pub mod algo {

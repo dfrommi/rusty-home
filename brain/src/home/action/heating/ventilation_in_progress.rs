@@ -4,13 +4,12 @@ use anyhow::Result;
 use api::{command::SetHeating, state::SetPoint};
 
 use crate::{
-    planning::{
-        action::{Action, HeatingZone},
-        planner::ActionExecution,
-    },
+    home::action::{Action, HeatingZone},
+    home::state::ColdAirComingIn,
     port::DataPointAccess,
-    state::ColdAirComingIn,
 };
+
+use super::ActionExecution;
 
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringVentilation {

@@ -7,7 +7,6 @@ mod request_closing_window;
 mod save_tv_energy;
 
 use std::fmt::Debug;
-use std::fmt::Display;
 
 use anyhow::Result;
 use api::command::Command;
@@ -27,10 +26,9 @@ pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
 pub use save_tv_energy::SaveTvEnergy;
 
+use crate::core::planner::{Action, ActionExecution};
+use crate::home::state::*;
 use crate::port::*;
-use crate::state::*;
-
-use super::planner::ActionExecution;
 
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]
 pub enum HomeAction {
@@ -45,13 +43,6 @@ pub enum HomeAction {
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     SaveTvEnergy(SaveTvEnergy),
-}
-
-pub trait Action<T>: Display {
-    //action should be started based on current state
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool>;
-
-    fn execution(&self) -> &ActionExecution;
 }
 
 //enum_dispatch is not able to implement for a given generic type-value

@@ -9,8 +9,8 @@ use api::{
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
+    home::state::EnergySaving,
     port::{CommandAccess, DataPointAccess},
-    state::EnergySaving,
 };
 
 pub trait CommandState<C> {

@@ -5,10 +5,8 @@ use helper::get_state_at;
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
-    planning::action::{
-        HeatingZone, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
-    },
-    state::UserControlled,
+    home::action::{HeatingZone, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease},
+    home::state::UserControlled,
 };
 
 use super::action::{DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping};

@@ -8,30 +8,29 @@ use api::{
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
-    planning::{
-        action::{Action, HeatingZone},
-        planner::ActionExecution,
-    },
+    home::action::{Action, HeatingZone},
+    home::state::Opened,
     port::{CommandAccess, DataPointAccess},
-    state::Resident,
 };
 
+use super::ActionExecution;
+
 #[derive(Debug, Clone)]
-pub struct ExtendHeatingUntilSleeping {
+pub struct DeferHeatingUntilVentilationDone {
     heating_zone: HeatingZone,
     target_temperature: DegreeCelsius,
     time_range: DailyTimeRange,
     execution: ActionExecution,
 }
 
-impl ExtendHeatingUntilSleeping {
+impl DeferHeatingUntilVentilationDone {
     pub fn new(
         heating_zone: HeatingZone,
         target_temperature: DegreeCelsius,
         time_range: DailyTimeRange,
     ) -> Self {
         let action_name = format!(
-            "ExtendHeatingUntilSleeping[{} -> {} ({})]",
+            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
             &heating_zone, &target_temperature, &time_range
         );
 
@@ -55,38 +54,34 @@ impl ExtendHeatingUntilSleeping {
             ),
         }
     }
-}
 
-impl Display for ExtendHeatingUntilSleeping {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "ExtendHeatingUntilSleeping[{} -> {} ({})]",
-            self.heating_zone, self.target_temperature, self.time_range
-        )
+    fn window(&self) -> Opened {
+        match self.heating_zone {
+            HeatingZone::LivingRoom => Opened::LivingRoomWindowOrDoor,
+            HeatingZone::Bedroom => Opened::BedroomWindow,
+            HeatingZone::Kitchen => Opened::KitchenWindow,
+            HeatingZone::RoomOfRequirements => Opened::LivingRoomWindowOrDoor,
+            HeatingZone::Bathroom => Opened::BedroomWindow,
+        }
     }
 }
 
-impl<T> Action<T> for ExtendHeatingUntilSleeping
+impl<T> Action<T> for DeferHeatingUntilVentilationDone
 where
-    T: DataPointAccess<Resident>
+    T: DataPointAccess<Opened>
         + DataPointAccess<SetPoint>
         + DataPointAccess<ExternalAutoControl>
         + CommandAccess<Thermostat>,
 {
-    //Strong overlap with wait_for_ventilation
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let time_range = match self.time_range.active() {
             Some(range) => range,
             None => return Ok(false),
         };
 
-        let (dennis, sabine) = tokio::try_join!(
-            api.current(Resident::DennisSleeping),
-            api.current(Resident::SabineSleeping),
-        )?;
+        let window_opened = api.current_data_point(self.window()).await?;
 
-        if dennis || sabine {
+        if time_range.contains(window_opened.timestamp) {
             return Ok(false);
         }
 
@@ -105,5 +100,15 @@ where
 
     fn execution(&self) -> &ActionExecution {
         &self.execution
+    }
+}
+
+impl Display for DeferHeatingUntilVentilationDone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
+            self.heating_zone, self.target_temperature, self.time_range
+        )
     }
 }

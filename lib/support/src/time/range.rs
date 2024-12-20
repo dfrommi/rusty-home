@@ -43,6 +43,17 @@ impl DailyTimeRange {
         }
     }
 
+    pub fn duration(&self) -> Duration {
+        let d = if self.end >= self.start {
+            self.end.delegate.signed_duration_since(self.start.delegate)
+        } else {
+            // Add a full day if the end time is earlier than the start time (i.e., passing midnight)
+            self.end.delegate.signed_duration_since(self.start.delegate) + chrono::Duration::days(1)
+        };
+
+        Duration::new(d)
+    }
+
     pub fn next_end(&self) -> DateTime {
         let now = t!(now);
         let end = now.at(self.end).unwrap();
@@ -228,5 +239,19 @@ mod tests {
 
         assert_eq!(range.start(), &t!(22:00).yesterday());
         assert_eq!(range.end(), &t!(03:00).today());
+    }
+
+    #[test]
+    fn test_duration_same_day() {
+        let range = t!(10:00 - 12:00);
+
+        assert_eq!(range.duration(), Duration::hours(2));
+    }
+
+    #[test]
+    fn test_duration_cross_day() {
+        let range = t!(22:00 - 03:00);
+
+        assert_eq!(range.duration(), Duration::hours(5));
     }
 }

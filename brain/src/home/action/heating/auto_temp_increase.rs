@@ -40,7 +40,7 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
                     device: heating_zone.thermostat(),
                     target_state: api::command::HeatingTargetState::Heat {
                         temperature: NO_HEATING_SET_POINT,
-                        until: t!(in 1 hours),
+                        duration: t!(1 hours),
                     },
                 },
                 SetHeating {

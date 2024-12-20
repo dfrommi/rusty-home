@@ -1,9 +1,6 @@
 use api::command::{Command, CommandTarget};
 use serde_json::json;
-use support::{
-    time::{DateTime, Duration},
-    unit::DegreeCelsius,
-};
+use support::{time::Duration, unit::DegreeCelsius};
 
 use crate::{
     core::CommandExecutor,
@@ -92,10 +89,14 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             (
                 ClimateControl(id),
                 Command::SetHeating(SetHeating {
-                    target_state: HeatingTargetState::Heat { temperature, until },
+                    target_state:
+                        HeatingTargetState::Heat {
+                            temperature,
+                            duration,
+                        },
                     ..
                 }),
-            ) => self.tado_set_climate_timer(id, temperature, until).await,
+            ) => self.tado_set_climate_timer(id, temperature, duration).await,
             (
                 PushNotification(mobile_id),
                 Command::PushNotify(PushNotify {
@@ -162,7 +163,7 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
         &self,
         id: &str,
         temperature: &DegreeCelsius,
-        until: &DateTime,
+        duration: &Duration,
     ) -> anyhow::Result<()> {
         self.client
             .call_service(
@@ -171,7 +172,7 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
                 json!({
                     "entity_id": vec![id.to_string()],
                     "temperature": temperature,
-                    "time_period": to_ha_duration_format(Duration::until(until)),
+                    "time_period": to_ha_duration_format(duration),
                 }),
             )
             .await
@@ -260,7 +261,7 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
     }
 }
 
-fn to_ha_duration_format(duration: Duration) -> String {
+fn to_ha_duration_format(duration: &Duration) -> String {
     let total_seconds = duration.as_secs();
     let hh = total_seconds / 3600;
     let mm = (total_seconds % 3600) / 60;

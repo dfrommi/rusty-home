@@ -141,12 +141,15 @@ impl ActionExecution {
 
     pub async fn execute_start(&self, executor: &impl CommandExecutor<Command>) -> Result<()> {
         match &self.start_command {
-            Some(command) => executor
-                .execute(command.clone(), self.start_source.clone())
-                .await
-                .with_context(|| {
-                    format!("Error executing command {:?} via action {}", command, self)
-                }),
+            Some(command) => {
+                tracing::debug!("Executing start command {:?} via action {}", command, self);
+                executor
+                    .execute(command.clone(), self.start_source.clone())
+                    .await
+                    .with_context(|| {
+                        format!("Error executing command {:?} via action {}", command, self)
+                    })
+            }
             None => anyhow::bail!(
                 "Action {} should be started, but no command is configured",
                 self
@@ -156,12 +159,15 @@ impl ActionExecution {
 
     pub async fn execute_stop(&self, executor: &impl CommandExecutor<Command>) -> Result<()> {
         match &self.stop_command {
-            Some(command) => executor
-                .execute(command.clone(), self.stop_source.clone())
-                .await
-                .with_context(|| {
-                    format!("Error executing command {:?} via action {}", command, self)
-                }),
+            Some(command) => {
+                tracing::debug!("Executing stop command {:?} via action {}", command, self);
+                executor
+                    .execute(command.clone(), self.stop_source.clone())
+                    .await
+                    .with_context(|| {
+                        format!("Error executing command {:?} via action {}", command, self)
+                    })
+            }
             None => anyhow::bail!(
                 "Action {} should be stopped, but no command is configured",
                 self

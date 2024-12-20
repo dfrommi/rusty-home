@@ -46,7 +46,7 @@ impl ExtendHeatingUntilSleeping {
                     device: heating_zone.thermostat(),
                     target_state: api::command::HeatingTargetState::Heat {
                         temperature: target_temperature,
-                        until: time_range.next_end(),
+                        duration: time_range.duration(),
                     },
                 },
                 SetHeating {

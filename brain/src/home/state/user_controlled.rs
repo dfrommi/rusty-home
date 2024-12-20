@@ -1,9 +1,12 @@
 use std::fmt::Display;
 
-use support::{t, DataPoint};
+use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint};
 
 use api::{
-    command::{CommandExecution, CommandSource, PowerToggle, SetPower, Thermostat},
+    command::{
+        CommandExecution, CommandSource, HeatingTargetState, PowerToggle, SetHeating, SetPower,
+        Thermostat,
+    },
     state::{ChannelTypeInfo, ExternalAutoControl, Powered, SetPoint},
 };
 
@@ -160,18 +163,48 @@ async fn current_data_point_for_thermostat(
         return Ok(DataPoint::new(triggered_by_user, most_recent_change));
     }
 
-    let is_expired = latest_command
-        .command
-        .get_expiration()
-        .map_or(false, |expiration| expiration < t!(now));
+    let is_expired =
+        get_expiration(&latest_command).map_or(false, |expiration| expiration < t!(now));
 
-    let comand_setting_followed = latest_command
-        .command
-        .matches(auto_mode_on.value, set_point.value);
+    let comand_setting_followed = matches(&latest_command, auto_mode_on.value, set_point.value);
 
     match (is_expired, comand_setting_followed) {
         (true, _) => Ok(DataPoint::new(!auto_mode_on.value, most_recent_change)),
         (false, true) => Ok(DataPoint::new(triggered_by_user, most_recent_change)),
         (false, false) => Ok(DataPoint::new(true, most_recent_change)),
+    }
+}
+
+fn matches(
+    command_execution: &CommandExecution<SetHeating>,
+    auto_mode_enabled: bool,
+    set_point: DegreeCelsius,
+) -> bool {
+    match command_execution.command {
+        SetHeating {
+            target_state: HeatingTargetState::Auto,
+            ..
+        } => auto_mode_enabled,
+        SetHeating {
+            target_state: HeatingTargetState::Heat { temperature, .. },
+            ..
+        } => !auto_mode_enabled && set_point == temperature,
+        SetHeating {
+            target_state: HeatingTargetState::Off,
+            ..
+        } => !auto_mode_enabled && set_point == DegreeCelsius(0.0),
+    }
+}
+
+pub fn get_expiration(command_execution: &CommandExecution<SetHeating>) -> Option<DateTime> {
+    match &command_execution.command {
+        SetHeating {
+            target_state:
+                HeatingTargetState::Heat {
+                    duration: until, ..
+                },
+            ..
+        } => Some(command_execution.created.clone() + until.clone()),
+        _ => None,
     }
 }

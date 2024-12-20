@@ -1,6 +1,9 @@
 use derive_more::derive::{Display, From};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use support::{time::DateTime, unit::DegreeCelsius};
+use support::{
+    time::{DateTime, Duration},
+    unit::DegreeCelsius,
+};
 
 pub mod db;
 
@@ -149,41 +152,12 @@ pub enum HeatingTargetState {
     Off, //TODO support off-timer (not supported via HA)
     Heat {
         temperature: DegreeCelsius,
-        until: DateTime,
+        duration: Duration,
     },
 }
 
 impl CommandId for Thermostat {
     type CommandType = SetHeating;
-}
-
-impl SetHeating {
-    pub fn matches(&self, auto_mode_enabled: bool, set_point: DegreeCelsius) -> bool {
-        match self {
-            SetHeating {
-                target_state: HeatingTargetState::Auto,
-                ..
-            } => auto_mode_enabled,
-            SetHeating {
-                target_state: HeatingTargetState::Heat { temperature, .. },
-                ..
-            } => !auto_mode_enabled && set_point == *temperature,
-            SetHeating {
-                target_state: HeatingTargetState::Off,
-                ..
-            } => !auto_mode_enabled && set_point == DegreeCelsius(0.0),
-        }
-    }
-
-    pub fn get_expiration(&self) -> Option<DateTime> {
-        match self {
-            SetHeating {
-                target_state: HeatingTargetState::Heat { until, .. },
-                ..
-            } => Some(*until),
-            _ => None,
-        }
-    }
 }
 
 //
@@ -260,6 +234,7 @@ impl CommandId for EnergySavingDevice {
 mod test {
     use assert_json_diff::assert_json_eq;
     use serde_json::json;
+    use support::t;
 
     use super::*;
 
@@ -346,7 +321,7 @@ mod test {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
                     temperature: DegreeCelsius::from(22.5),
-                    until: DateTime::from_iso("2024-10-14T13:37:42Z").unwrap()
+                    duration: t!(2 hours),
                 },
             }),
             json!({
@@ -354,7 +329,7 @@ mod test {
                 "device": "room_of_requirements",
                 "mode": "heat",
                 "temperature": 22.5,
-                "until": "2024-10-14T15:37:42+02:00"
+                "duration": "PT2H"
             })
         );
     }

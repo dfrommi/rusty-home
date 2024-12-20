@@ -1,7 +1,9 @@
 use super::DateTime;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct Duration {
+    #[serde(with = "duration_format")]
     pub(super) delegate: chrono::Duration,
 }
 
@@ -48,5 +50,102 @@ impl Duration {
 
     pub fn as_hours(&self) -> i64 {
         self.delegate.num_hours()
+    }
+}
+
+impl std::ops::Add<Duration> for Duration {
+    type Output = Duration;
+
+    fn add(self, rhs: Duration) -> Self::Output {
+        Self {
+            delegate: self.delegate + rhs.delegate,
+        }
+    }
+}
+
+mod duration_format {
+    use iso8601_duration::Duration as Iso8601Duration;
+    use serde::{de::Visitor, Deserializer, Serializer};
+
+    // Serialize `chrono::Duration` to ISO 8601 string format (e.g., "P1DT2H30M")
+    pub fn serialize<S>(duration: &chrono::TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let iso_duration = from_chrono_duration(duration);
+        let iso_string = iso_duration.to_string();
+        serializer.serialize_str(&iso_string)
+    }
+
+    // Deserialize ISO 8601 string format to `chrono::Duration`
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct DurationVisitor;
+
+        impl<'de> Visitor<'de> for DurationVisitor {
+            type Value = chrono::TimeDelta;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("a string representing an ISO 8601 duration (e.g., P1DT2H30M)")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                // Parse the ISO 8601 string into a `iso8601-duration::Duration`
+                let iso_duration = Iso8601Duration::parse(value).map_err(|e| {
+                    E::custom(format!("Error parsing {} to duration: {:?}", value, e))
+                })?;
+
+                match iso_duration.to_chrono() {
+                    Some(duration) => Ok(duration),
+                    None => Err(E::custom(format!(
+                        "Duration too long. Must not contain years and/or months. Received {}",
+                        value
+                    ))),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(DurationVisitor)
+    }
+
+    fn from_chrono_duration(duration: &chrono::Duration) -> Iso8601Duration {
+        let days = duration.num_days();
+        let seconds = duration.num_seconds() - days * 86400; // remove days in seconds
+        let hours = seconds / 3600;
+        let minutes = (seconds % 3600) / 60;
+        let seconds = seconds % 60;
+
+        Iso8601Duration::new(
+            0.0, //years
+            0.0, //months
+            days as f32,
+            hours as f32,
+            minutes as f32,
+            seconds as f32,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::t;
+
+    #[test]
+    fn test_serialize_duration() {
+        let duration = t!(8 hours) + t!(15 minutes);
+        let serialized = serde_json::to_string(&duration).unwrap();
+        assert_eq!(serialized, r#""PT8H15M""#);
+    }
+
+    #[test]
+    fn test_deserialize_duration() {
+        let duration = serde_json::from_str::<Duration>(r#""PT8H15M""#).unwrap();
+        assert_eq!(duration, t!(8 hours) + t!(15 minutes));
     }
 }

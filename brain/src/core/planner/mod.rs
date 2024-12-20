@@ -70,12 +70,14 @@ pub async fn plan_and_execute<G, A, T>(
 
     for (action, result) in next_actions {
         if result.should_be_started {
+            tracing::info!("Starting action {}", action);
             if let Err(e) = action.execution().execute_start(command_processor).await {
                 tracing::error!("Error starting action {}: {:?}", action, e);
             }
         }
 
         if result.should_be_stopped {
+            tracing::info!("Stopping action {}", action);
             if let Err(e) = action.execution().execute_stop(command_processor).await {
                 tracing::error!("Error stopping action {}: {:?}", action, e);
             }

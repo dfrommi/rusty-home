@@ -14,26 +14,12 @@ use super::ActionExecution;
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringVentilation {
     heating_zone: HeatingZone,
-    execution: ActionExecution,
 }
 
 impl NoHeatingDuringVentilation {
     pub fn new(heating_zone: HeatingZone) -> Self {
-        let action_name = format!("NoHeatingDuringVentilation[{}]", &heating_zone);
-
         Self {
             heating_zone: heating_zone.clone(),
-            execution: ActionExecution::from_start_and_stop(
-                action_name.as_str(),
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Off,
-                },
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Auto,
-                },
-            ),
         }
     }
 }
@@ -44,7 +30,7 @@ impl Display for NoHeatingDuringVentilation {
     }
 }
 
-impl<T> Action<T> for NoHeatingDuringVentilation
+impl<T> Action<T, SetHeating> for NoHeatingDuringVentilation
 where
     T: DataPointAccess<ColdAirComingIn>
         + DataPointAccess<ColdAirComingIn>
@@ -61,7 +47,17 @@ where
         .await
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetHeating> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Off,
+            },
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            },
+        )
     }
 }

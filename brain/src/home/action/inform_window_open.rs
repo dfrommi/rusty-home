@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use api::command::{
-    Notification, NotificationAction, NotificationRecipient, NotificationTarget, PushNotify,
-};
+use api::command::{Notification, NotificationAction, NotificationRecipient, PushNotify};
 use support::{t, time::DateTime, DataPoint};
 
 use crate::home::state::ColdAirComingIn;
@@ -12,35 +10,19 @@ use super::{Action, ActionExecution, CommandAccess, DataPointAccess};
 #[derive(Debug, Clone)]
 pub struct InformWindowOpen {
     recipient: NotificationRecipient,
-    execution: ActionExecution,
 }
 
 impl InformWindowOpen {
     pub fn new(recipient: NotificationRecipient) -> Self {
-        let action_name = format!("InformWindowOpen[{}]", &recipient);
-
         Self {
             recipient: recipient.clone(),
-            execution: ActionExecution::from_start_and_stop(
-                action_name.as_str(),
-                PushNotify {
-                    action: NotificationAction::Notify,
-                    notification: Notification::WindowOpened,
-                    recipient: recipient.clone(),
-                },
-                PushNotify {
-                    action: NotificationAction::Dismiss,
-                    notification: Notification::WindowOpened,
-                    recipient: recipient.clone(),
-                },
-            ),
         }
     }
 }
 
-impl<T> Action<T> for InformWindowOpen
+impl<T> Action<T, PushNotify> for InformWindowOpen
 where
-    T: DataPointAccess<ColdAirComingIn> + CommandAccess<NotificationTarget>,
+    T: DataPointAccess<ColdAirComingIn> + CommandAccess<PushNotify>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
         match cold_air_coming_in(api).await? {
@@ -49,8 +31,20 @@ where
         }
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<PushNotify> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            PushNotify {
+                action: NotificationAction::Notify,
+                notification: Notification::WindowOpened,
+                recipient: self.recipient.clone(),
+            },
+            PushNotify {
+                action: NotificationAction::Dismiss,
+                notification: Notification::WindowOpened,
+                recipient: self.recipient.clone(),
+            },
+        )
     }
 }
 

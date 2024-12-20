@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::{
-    command::{SetHeating, Thermostat},
+    command::SetHeating,
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{t, unit::DegreeCelsius};
@@ -22,43 +22,23 @@ static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringAutomaticTemperatureIncrease {
     heating_zone: HeatingZone,
-    execution: ActionExecution,
 }
 
 impl NoHeatingDuringAutomaticTemperatureIncrease {
     pub fn new(heating_zone: HeatingZone) -> Self {
-        let action_name = format!(
-            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
-            &heating_zone
-        );
-
         Self {
             heating_zone: heating_zone.clone(),
-            execution: ActionExecution::from_start_and_stop(
-                action_name.as_str(),
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Heat {
-                        temperature: NO_HEATING_SET_POINT,
-                        duration: t!(1 hours),
-                    },
-                },
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Auto,
-                },
-            ),
         }
     }
 }
 
-impl<T> Action<T> for NoHeatingDuringAutomaticTemperatureIncrease
+impl<T> Action<T, SetHeating> for NoHeatingDuringAutomaticTemperatureIncrease
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<AutomaticTemperatureIncrease>
         + DataPointAccess<SetPoint>
         + DataPointAccess<ExternalAutoControl>
-        + CommandAccess<Thermostat>,
+        + CommandAccess<SetHeating>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
@@ -99,8 +79,21 @@ where
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetHeating> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Heat {
+                    temperature: NO_HEATING_SET_POINT,
+                    duration: t!(1 hours),
+                },
+            },
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            },
+        )
     }
 }
 

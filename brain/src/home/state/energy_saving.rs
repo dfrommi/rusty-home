@@ -18,7 +18,7 @@ impl ChannelTypeInfo for EnergySaving {
 
 impl<T> DataPointAccess<EnergySaving> for T
 where
-    T: CommandAccess<EnergySavingDevice> + DataPointAccess<Powered>,
+    T: CommandAccess<SetEnergySaving> + DataPointAccess<Powered>,
 {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     async fn current_data_point(

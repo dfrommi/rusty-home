@@ -1,35 +1,22 @@
 use anyhow::Result;
-use api::{
-    command::{Command, EnergySavingDevice, SetEnergySaving},
-    state::Powered,
-};
+use api::{command::SetEnergySaving, state::Powered};
 
-use crate::core::planner::{ActionExecutionTrigger, CommandState};
+use crate::core::planner::ActionExecutionTrigger;
 
 use super::{Action, ActionExecution, CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone)]
-pub struct SaveTvEnergy {
-    execution: ActionExecution,
-}
+pub struct SaveTvEnergy;
 
 impl SaveTvEnergy {
     pub fn new() -> Self {
-        Self {
-            execution: ActionExecution::from_start(
-                "SaveTvEnergy",
-                api::command::SetEnergySaving {
-                    device: api::command::EnergySavingDevice::LivingRoomTv,
-                    on: true,
-                },
-            ),
-        }
+        Self {}
     }
 }
 
-impl<API> Action<API> for SaveTvEnergy
+impl<API> Action<API, SetEnergySaving> for SaveTvEnergy
 where
-    API: DataPointAccess<Powered> + CommandAccess<EnergySavingDevice> + CommandAccess<Command>,
+    API: DataPointAccess<Powered> + CommandAccess<SetEnergySaving>,
 {
     async fn preconditions_fulfilled(&self, api: &API) -> Result<bool> {
         let is_tv_on = api
@@ -40,25 +27,23 @@ where
             return Ok(false);
         }
 
-        let command = SetEnergySaving {
-            device: api::command::EnergySavingDevice::LivingRoomTv,
-            on: true,
-        };
-
+        let execution = <Self as Action<API, SetEnergySaving>>::execution(self);
         let (was_started, is_still_running) = tokio::try_join!(
-            self.execution.any_trigger_since(
-                api,
-                ActionExecutionTrigger::Start,
-                is_tv_on.timestamp
-            ),
-            CommandState::is_reflected_in_state(api, &command),
+            execution.any_trigger_since(api, ActionExecutionTrigger::Start, is_tv_on.timestamp),
+            execution.is_reflected_in_state(api),
         )?;
 
         Ok(!was_started || is_still_running)
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetEnergySaving> {
+        ActionExecution::from_start(
+            self.to_string(),
+            api::command::SetEnergySaving {
+                device: api::command::EnergySavingDevice::LivingRoomTv,
+                on: true,
+            },
+        )
     }
 }
 

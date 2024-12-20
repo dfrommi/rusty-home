@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::{Ok, Result};
 use api::{
-    command::{SetHeating, Thermostat},
+    command::SetHeating,
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
@@ -20,7 +20,6 @@ pub struct DeferHeatingUntilVentilationDone {
     heating_zone: HeatingZone,
     target_temperature: DegreeCelsius,
     time_range: DailyTimeRange,
-    execution: ActionExecution,
 }
 
 impl DeferHeatingUntilVentilationDone {
@@ -29,29 +28,10 @@ impl DeferHeatingUntilVentilationDone {
         target_temperature: DegreeCelsius,
         time_range: DailyTimeRange,
     ) -> Self {
-        let action_name = format!(
-            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
-            &heating_zone, &target_temperature, &time_range
-        );
-
         Self {
             heating_zone: heating_zone.clone(),
             target_temperature,
             time_range: time_range.clone(),
-            execution: ActionExecution::from_start_and_stop(
-                action_name.as_str(),
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Heat {
-                        temperature: target_temperature,
-                        duration: time_range.duration(),
-                    },
-                },
-                SetHeating {
-                    device: heating_zone.thermostat(),
-                    target_state: api::command::HeatingTargetState::Auto,
-                },
-            ),
         }
     }
 
@@ -66,12 +46,12 @@ impl DeferHeatingUntilVentilationDone {
     }
 }
 
-impl<T> Action<T> for DeferHeatingUntilVentilationDone
+impl<T> Action<T, SetHeating> for DeferHeatingUntilVentilationDone
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<SetPoint>
         + DataPointAccess<ExternalAutoControl>
-        + CommandAccess<Thermostat>,
+        + CommandAccess<SetHeating>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let time_range = match self.time_range.active() {
@@ -98,8 +78,21 @@ where
         Ok(!already_triggered.value || has_expected_manual_heating.value)
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetHeating> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Heat {
+                    temperature: self.target_temperature,
+                    duration: self.time_range.duration(),
+                },
+            },
+            SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: api::command::HeatingTargetState::Auto,
+            },
+        )
     }
 }
 

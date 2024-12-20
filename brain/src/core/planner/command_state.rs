@@ -87,7 +87,7 @@ where
 
 impl<API> CommandState<PushNotify> for API
 where
-    API: CommandAccess<NotificationTarget>,
+    API: CommandAccess<PushNotify>,
 {
     async fn is_reflected_in_state(&self, command: &PushNotify) -> Result<bool> {
         let target = NotificationTarget {

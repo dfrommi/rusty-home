@@ -45,8 +45,8 @@ where
     T: DataPointAccess<Powered>
         + DataPointAccess<ExternalAutoControl>
         + DataPointAccess<SetPoint>
-        + CommandAccess<PowerToggle>
-        + CommandAccess<Thermostat>,
+        + CommandAccess<SetPower>
+        + CommandAccess<SetHeating>,
 {
     async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
         match item {
@@ -103,7 +103,7 @@ where
 }
 
 async fn current_data_point_for_dehumidifier(
-    api: &(impl DataPointAccess<Powered> + CommandAccess<PowerToggle>),
+    api: &(impl DataPointAccess<Powered> + CommandAccess<SetPower>),
 ) -> anyhow::Result<DataPoint<bool>> {
     let power = api.current_data_point(Powered::Dehumidifier).await?;
 
@@ -137,7 +137,7 @@ async fn current_data_point_for_dehumidifier(
 async fn current_data_point_for_thermostat(
     api: &(impl DataPointAccess<ExternalAutoControl>
           + DataPointAccess<SetPoint>
-          + CommandAccess<Thermostat>),
+          + CommandAccess<SetHeating>),
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,

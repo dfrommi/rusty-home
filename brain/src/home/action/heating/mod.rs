@@ -88,7 +88,7 @@ impl HeatingZone {
         since: DateTime,
     ) -> anyhow::Result<DataPoint<bool>>
     where
-        T: CommandAccess<Thermostat>,
+        T: CommandAccess<SetHeating>,
     {
         let commands = api.get_all_commands(self.thermostat(), since).await?;
 

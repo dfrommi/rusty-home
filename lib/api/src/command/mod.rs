@@ -1,5 +1,5 @@
 use derive_more::derive::{Display, From};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use support::{
     time::{DateTime, Duration},
     unit::DegreeCelsius,
@@ -14,10 +14,6 @@ pub enum Command {
     SetHeating(SetHeating),
     PushNotify(PushNotify),
     SetEnergySaving(SetEnergySaving),
-}
-
-impl CommandId for Command {
-    type CommandType = Command;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize)]
@@ -36,14 +32,6 @@ pub enum CommandTarget {
     SetEnergySaving {
         device: EnergySavingDevice,
     },
-}
-
-pub trait CommandId: Into<CommandTarget> {
-    type CommandType: Into<Command> + DeserializeOwned;
-}
-
-impl CommandId for CommandTarget {
-    type CommandType = Command;
 }
 
 impl From<Command> for CommandTarget {
@@ -120,8 +108,13 @@ pub enum PowerToggle {
     InfraredHeater,
     LivingRoomNotificationLight,
 }
-impl CommandId for PowerToggle {
-    type CommandType = SetPower;
+
+impl From<&SetPower> for CommandTarget {
+    fn from(val: &SetPower) -> Self {
+        CommandTarget::SetPower {
+            device: val.device.clone(),
+        }
+    }
 }
 
 //
@@ -156,8 +149,12 @@ pub enum HeatingTargetState {
     },
 }
 
-impl CommandId for Thermostat {
-    type CommandType = SetHeating;
+impl From<&SetHeating> for CommandTarget {
+    fn from(val: &SetHeating) -> Self {
+        CommandTarget::SetHeating {
+            device: val.device.clone(),
+        }
+    }
 }
 
 //
@@ -206,8 +203,13 @@ impl From<NotificationTarget> for CommandTarget {
     }
 }
 
-impl CommandId for NotificationTarget {
-    type CommandType = PushNotify;
+impl From<&PushNotify> for CommandTarget {
+    fn from(val: &PushNotify) -> Self {
+        CommandTarget::PushNotify {
+            recipient: val.recipient.clone(),
+            notification: val.notification.clone(),
+        }
+    }
 }
 
 //
@@ -226,8 +228,12 @@ pub enum EnergySavingDevice {
     LivingRoomTv,
 }
 
-impl CommandId for EnergySavingDevice {
-    type CommandType = SetEnergySaving;
+impl From<&SetEnergySaving> for CommandTarget {
+    fn from(val: &SetEnergySaving) -> Self {
+        CommandTarget::SetEnergySaving {
+            device: val.device.clone(),
+        }
+    }
 }
 
 #[cfg(test)]

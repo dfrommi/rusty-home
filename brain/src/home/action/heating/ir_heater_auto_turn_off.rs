@@ -9,25 +9,15 @@ use crate::{home::action::Action, port::DataPointAccess};
 use super::ActionExecution;
 
 #[derive(Debug, Clone)]
-pub struct IrHeaterAutoTurnOff {
-    execution: ActionExecution,
-}
+pub struct IrHeaterAutoTurnOff;
 
 impl IrHeaterAutoTurnOff {
     pub fn new() -> Self {
-        Self {
-            execution: ActionExecution::from_start(
-                "IrHeaterAutoTurnOff[Bedroom]",
-                SetPower {
-                    device: PowerToggle::InfraredHeater,
-                    power_on: false,
-                },
-            ),
-        }
+        Self {}
     }
 }
 
-impl<API> Action<API> for IrHeaterAutoTurnOff
+impl<API> Action<API, SetPower> for IrHeaterAutoTurnOff
 where
     API: DataPointAccess<Powered>,
 {
@@ -39,8 +29,14 @@ where
         Ok(current.value && current.timestamp.elapsed() > t!(1 hours))
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetPower> {
+        ActionExecution::from_start(
+            self.to_string(),
+            SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: false,
+            },
+        )
     }
 }
 

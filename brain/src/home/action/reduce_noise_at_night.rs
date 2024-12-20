@@ -11,25 +11,15 @@ use super::{Action, ActionExecution, DataPointAccess};
 #[derive(Debug, Clone)]
 pub struct ReduceNoiseAtNight {
     range: DailyTimeRange,
-    execution: ActionExecution,
 }
 
 impl ReduceNoiseAtNight {
     pub fn new(range: DailyTimeRange) -> Self {
-        Self {
-            range,
-            execution: ActionExecution::from_start(
-                "ReduceNoiseAtNight",
-                SetPower {
-                    device: PowerToggle::Dehumidifier,
-                    power_on: false,
-                },
-            ),
-        }
+        Self { range }
     }
 }
 
-impl<T> Action<T> for ReduceNoiseAtNight
+impl<T> Action<T, SetPower> for ReduceNoiseAtNight
 where
     T: DataPointAccess<Powered>,
 {
@@ -37,8 +27,14 @@ where
         Ok(self.range.contains(t!(now).time()))
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetPower> {
+        ActionExecution::from_start(
+            self.to_string(),
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: false,
+            },
+        )
     }
 }
 

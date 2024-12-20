@@ -4,25 +4,24 @@ use crate::home::state::UserControlled;
 
 use super::{Action, ActionExecution, DataPointAccess};
 use anyhow::Result;
-use api::command::CommandTarget;
+use api::command::{Command, CommandTarget};
 
 #[derive(Debug, Clone)]
 pub struct KeepUserOverride {
     user_controlled: UserControlled,
-    execution: ActionExecution,
+    target: CommandTarget,
 }
 
 impl KeepUserOverride {
     pub fn new(user_controlled: UserControlled, target: CommandTarget) -> Self {
-        let action_name = format!("KeepUserOverride[{}]", &user_controlled);
         Self {
             user_controlled,
-            execution: ActionExecution::locking_only(action_name.as_str(), target),
+            target,
         }
     }
 }
 
-impl<T> Action<T> for KeepUserOverride
+impl<T> Action<T, Command> for KeepUserOverride
 where
     T: DataPointAccess<UserControlled>,
 {
@@ -30,8 +29,8 @@ where
         api.current(self.user_controlled.clone()).await
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<Command> {
+        ActionExecution::locking_only(self.to_string(), self.target.clone())
     }
 }
 

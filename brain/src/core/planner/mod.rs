@@ -18,11 +18,11 @@ use tabled::{Table, Tabled};
 
 use crate::port::{CommandAccess, CommandExecutor, PlanningResultTracer};
 
-pub trait Action<T>: Display {
+pub trait Action<T, C>: Display {
     //action should be started based on current state
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool>;
 
-    fn execution(&self) -> &ActionExecution;
+    fn execution(&self) -> ActionExecution<C>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Tabled)]
@@ -42,15 +42,16 @@ pub struct ActionResult {
     pub is_running: Option<bool>,
 }
 
-pub async fn plan_and_execute<G, A, T>(
+pub async fn plan_and_execute<G, A, T, C>(
     active_goals: &[G],
     config: &[(G, Vec<A>)],
     api: &T,
     result_tracer: &impl PlanningResultTracer,
-    command_processor: &(impl CommandAccess<Command> + CommandExecutor<Command> + CommandState<Command>),
+    command_processor: &(impl CommandAccess<C> + CommandExecutor<C> + CommandState<C>),
 ) where
     G: Eq,
-    A: Action<T>,
+    A: Action<T, C>,
+    C: Into<Command> + Clone + std::fmt::Debug,
 {
     let next_actions = find_next_actions(active_goals, config, api, command_processor).await;
     let action_results = next_actions.iter().map(|(_, r)| r).collect::<Vec<_>>();
@@ -86,15 +87,16 @@ pub async fn plan_and_execute<G, A, T>(
 }
 
 //sorting order of config is important - first come, first serve
-pub async fn find_next_actions<'a, G, A, T>(
+pub async fn find_next_actions<'a, G, A, T, C>(
     goals: &'a [G],
     config: &'a [(G, Vec<A>)],
     api: &T,
-    command_processor: &(impl CommandAccess<Command> + CommandState<Command>),
+    command_processor: &(impl CommandAccess<C> + CommandState<C>),
 ) -> Vec<(&'a A, ActionResult)>
 where
     G: Eq,
-    A: Action<T>,
+    A: Action<T, C>,
+    C: Into<Command>,
 {
     let mut resource_lock: ResourceLock<CommandTarget> = ResourceLock::new();
     let mut action_results: Vec<(&'a A, ActionResult)> = Vec::new();
@@ -139,7 +141,8 @@ where
 
     for (action, result) in action_results.iter_mut() {
         if result.should_be_stopped {
-            let resource = action.execution().controlled_target();
+            let execution = action.execution();
+            let resource = execution.controlled_target();
 
             if resource_lock.is_locked(resource) {
                 result.should_be_stopped = false;
@@ -153,13 +156,14 @@ where
     action_results
 }
 
-async fn get_fulfilled_and_running_state<A, T>(
+async fn get_fulfilled_and_running_state<A, T, C>(
     action: &A,
     api: &T,
-    command_access: &(impl CommandAccess<Command> + CommandState<Command>),
+    command_access: &(impl CommandAccess<C> + CommandState<C>),
 ) -> (bool, Option<bool>)
 where
-    A: Action<T>,
+    A: Action<T, C>,
+    C: Into<Command>,
 {
     macro_rules! unwrap_or_warn {
         ($e:expr, $default:expr, $msg:literal) => {

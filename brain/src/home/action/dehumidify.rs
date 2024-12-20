@@ -11,29 +11,15 @@ use crate::home::state::RiskOfMould;
 use super::{Action, ActionExecution, DataPointAccess};
 
 #[derive(Debug, Clone)]
-pub struct Dehumidify {
-    execution: ActionExecution,
-}
+pub struct Dehumidify;
 
 impl Dehumidify {
     pub fn new() -> Self {
-        Self {
-            execution: ActionExecution::from_start_and_stop(
-                "Dehumidify",
-                SetPower {
-                    device: PowerToggle::Dehumidifier,
-                    power_on: true,
-                },
-                SetPower {
-                    device: PowerToggle::Dehumidifier,
-                    power_on: false,
-                },
-            ),
-        }
+        Self {}
     }
 }
 
-impl<T> Action<T> for Dehumidify
+impl<T> Action<T, SetPower> for Dehumidify
 where
     T: DataPointAccess<RiskOfMould> + DataPointAccess<Powered>,
 {
@@ -41,8 +27,18 @@ where
         api.current(RiskOfMould::Bathroom).await
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetPower> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            },
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: false,
+            },
+        )
     }
 }
 

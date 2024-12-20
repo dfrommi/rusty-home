@@ -7,29 +7,15 @@ use api::command::{PowerToggle, SetPower};
 use super::{Action, ActionExecution, DataPointAccess};
 
 #[derive(Debug, Clone)]
-pub struct RequestClosingWindow {
-    execution: ActionExecution,
-}
+pub struct RequestClosingWindow;
 
 impl RequestClosingWindow {
     pub fn new() -> Self {
-        Self {
-            execution: ActionExecution::from_start_and_stop(
-                "RequestClosingWindow",
-                SetPower {
-                    device: PowerToggle::LivingRoomNotificationLight,
-                    power_on: true,
-                },
-                SetPower {
-                    device: PowerToggle::LivingRoomNotificationLight,
-                    power_on: false,
-                },
-            ),
-        }
+        Self {}
     }
 }
 
-impl<T> Action<T> for RequestClosingWindow
+impl<T> Action<T, SetPower> for RequestClosingWindow
 where
     T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Powered>,
 {
@@ -46,8 +32,18 @@ where
         Ok(result?.into_iter().any(|v| v))
     }
 
-    fn execution(&self) -> &ActionExecution {
-        &self.execution
+    fn execution(&self) -> ActionExecution<SetPower> {
+        ActionExecution::from_start_and_stop(
+            self.to_string(),
+            SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: true,
+            },
+            SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: false,
+            },
+        )
     }
 }
 

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use api::{
-    command::{Command, CommandExecution, CommandId, CommandSource, CommandTarget},
+    command::{Command, CommandExecution, CommandSource, CommandTarget},
     state::ChannelTypeInfo,
 };
 use support::{
@@ -35,18 +35,18 @@ where
     }
 }
 
-pub trait CommandAccess<C: CommandId> {
+pub trait CommandAccess<C: Into<Command>> {
     async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandExecution<C::CommandType>>>;
+    ) -> Result<Option<CommandExecution<C>>>;
 
     async fn get_all_commands(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Vec<CommandExecution<C::CommandType>>>;
+    ) -> Result<Vec<CommandExecution<C>>>;
 
     async fn get_latest_command_source(
         &self,

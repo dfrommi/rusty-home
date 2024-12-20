@@ -1,19 +1,20 @@
 use anyhow::Result;
 use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
-    Command, CommandExecution, CommandId, CommandSource, CommandState, CommandTarget,
+    Command, CommandExecution, CommandSource, CommandState, CommandTarget,
 };
+use serde::de::DeserializeOwned;
 use sqlx::PgPool;
 use support::{t, time::DateTime};
 
 use crate::port::{CommandAccess, CommandExecutor};
 
-impl<DB: AsRef<PgPool>, C: CommandId> CommandAccess<C> for DB {
+impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> for DB {
     async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandExecution<<C as CommandId>::CommandType>>> {
+    ) -> Result<Option<CommandExecution<C>>> {
         let mut all_commands = get_all_commands::<C>(self.as_ref(), target.into(), since).await?;
         Ok(all_commands.pop())
     }
@@ -22,7 +23,7 @@ impl<DB: AsRef<PgPool>, C: CommandId> CommandAccess<C> for DB {
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Vec<CommandExecution<<C as CommandId>::CommandType>>> {
+    ) -> Result<Vec<CommandExecution<C>>> {
         get_all_commands::<C>(self.as_ref(), target.into(), since).await
     }
 
@@ -62,11 +63,11 @@ where
     }
 }
 
-async fn get_all_commands<C: CommandId>(
+async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
     db_pool: &PgPool,
     target: CommandTarget,
     since: DateTime,
-) -> Result<Vec<CommandExecution<<C>::CommandType>>> {
+) -> Result<Vec<CommandExecution<C>>> {
     let db_target = serde_json::json!(target);
 
     let records = sqlx::query!(
@@ -135,7 +136,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands::<PowerToggle>(
+        let result = get_all_commands::<SetPower>(
             &db_pool,
             PowerToggle::Dehumidifier.into(),
             t!(8 minutes ago),
@@ -175,7 +176,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands::<PowerToggle>(
+        let result = get_all_commands::<SetPower>(
             &db_pool,
             PowerToggle::Dehumidifier.into(),
             t!(8 minutes ago),

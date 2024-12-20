@@ -11,9 +11,10 @@ use std::fmt::Debug;
 use anyhow::Result;
 use api::command::Command;
 
-use api::command::EnergySavingDevice;
-use api::command::NotificationTarget;
-use api::command::Thermostat;
+use api::command::PushNotify;
+use api::command::SetEnergySaving;
+use api::command::SetHeating;
+use api::command::SetPower;
 use api::state::ExternalAutoControl;
 use api::state::Powered;
 use api::state::RelativeHumidity;
@@ -47,7 +48,7 @@ pub enum HomeAction {
 
 //enum_dispatch is not able to implement for a given generic type-value
 //TODO macro
-impl<T> Action<T> for HomeAction
+impl<T> Action<T, Command> for HomeAction
 where
     T: DataPointAccess<Powered>
         + DataPointAccess<ExternalAutoControl>
@@ -60,9 +61,9 @@ where
         + DataPointAccess<RelativeHumidity>
         + DataPointAccess<Resident>
         + CommandAccess<Command>
-        + CommandAccess<Thermostat>
-        + CommandAccess<NotificationTarget>
-        + CommandAccess<EnergySavingDevice>,
+        + CommandAccess<SetHeating>
+        + CommandAccess<PushNotify>
+        + CommandAccess<SetEnergySaving>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         match self {
@@ -110,42 +111,54 @@ where
         }
     }
 
-    fn execution(&self) -> &ActionExecution {
+    fn execution(&self) -> ActionExecution<Command> {
         match self {
-            HomeAction::Dehumidify(dehumidify) => <Dehumidify as Action<T>>::execution(dehumidify),
+            HomeAction::Dehumidify(dehumidify) => {
+                <Dehumidify as Action<T, SetPower>>::execution(dehumidify).into()
+            }
             HomeAction::RequestClosingWindow(request_closing_window) => {
-                <RequestClosingWindow as Action<T>>::execution(request_closing_window)
+                <RequestClosingWindow as Action<T, SetPower>>::execution(request_closing_window)
+                    .into()
             }
             HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
-                <NoHeatingDuringVentilation as Action<T>>::execution(no_heating_during_ventilation)
+                <NoHeatingDuringVentilation as Action<T, SetHeating>>::execution(
+                    no_heating_during_ventilation,
+                )
+                .into()
             }
             HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
                 no_heating_during_automatic_temperature_increase,
-            ) => <NoHeatingDuringAutomaticTemperatureIncrease as Action<T>>::execution(
+            ) => <NoHeatingDuringAutomaticTemperatureIncrease as Action<T, SetHeating>>::execution(
                 no_heating_during_automatic_temperature_increase,
-            ),
+            )
+            .into(),
             HomeAction::KeepUserOverride(keep_user_override) => {
-                <KeepUserOverride as Action<T>>::execution(keep_user_override)
+                <KeepUserOverride as Action<T, Command>>::execution(keep_user_override)
             }
             HomeAction::ExtendHeatingUntilSleeping(extend_heating_until_sleeping) => {
-                <ExtendHeatingUntilSleeping as Action<T>>::execution(extend_heating_until_sleeping)
+                <ExtendHeatingUntilSleeping as Action<T, SetHeating>>::execution(
+                    extend_heating_until_sleeping,
+                )
+                .into()
             }
             HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
-                <DeferHeatingUntilVentilationDone as Action<T>>::execution(
+                <DeferHeatingUntilVentilationDone as Action<T, SetHeating>>::execution(
                     defer_heating_until_ventilation_done,
                 )
+                .into()
             }
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
-                <ReduceNoiseAtNight as Action<T>>::execution(reduce_noise_at_night)
+                <ReduceNoiseAtNight as Action<T, SetPower>>::execution(reduce_noise_at_night).into()
             }
             HomeAction::InformWindowOpen(inform_window_open) => {
-                <InformWindowOpen as Action<T>>::execution(inform_window_open)
+                <InformWindowOpen as Action<T, PushNotify>>::execution(inform_window_open).into()
             }
             HomeAction::SaveTvEnergy(save_tv_energy) => {
-                <SaveTvEnergy as Action<T>>::execution(save_tv_energy)
+                <SaveTvEnergy as Action<T, SetEnergySaving>>::execution(save_tv_energy).into()
             }
             HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
-                <IrHeaterAutoTurnOff as Action<T>>::execution(ir_heater_auto_turn_off)
+                <IrHeaterAutoTurnOff as Action<T, SetPower>>::execution(ir_heater_auto_turn_off)
+                    .into()
             }
         }
     }

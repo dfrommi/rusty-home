@@ -28,7 +28,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<SetPower> {
-        ActionExecution::from_start_and_stop(
+        ActionExecution::start_stop(
             self.to_string(),
             SetPower {
                 device: PowerToggle::Dehumidifier,

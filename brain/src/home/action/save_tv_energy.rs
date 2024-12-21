@@ -32,7 +32,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<SetEnergySaving> {
-        ActionExecution::from_start(
+        ActionExecution::trigger(
             self.to_string(),
             api::command::SetEnergySaving {
                 device: api::command::EnergySavingDevice::LivingRoomTv,

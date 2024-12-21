@@ -30,7 +30,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<Command> {
-        ActionExecution::locking_only(self.to_string(), self.target.clone())
+        ActionExecution::locking(self.to_string(), self.target.clone())
     }
 }
 

@@ -80,7 +80,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<SetHeating> {
-        ActionExecution::from_start_and_stop(
+        ActionExecution::start_stop(
             self.to_string(),
             SetHeating {
                 device: self.heating_zone.thermostat(),

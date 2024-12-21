@@ -30,7 +30,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<SetPower> {
-        ActionExecution::from_start(
+        ActionExecution::trigger(
             self.to_string(),
             SetPower {
                 device: PowerToggle::InfraredHeater,

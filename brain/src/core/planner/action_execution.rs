@@ -18,7 +18,7 @@ pub struct ActionExecution<C> {
 
 //CONSTRUCTORS
 impl<C> ActionExecution<C> {
-    pub fn from_start(action_name: String, start_command: C) -> Self
+    pub fn trigger(action_name: String, start_command: C) -> Self
     where
         for<'a> &'a C: Into<CommandTarget>,
     {
@@ -26,7 +26,7 @@ impl<C> ActionExecution<C> {
         Self::from(action_name, Some(start_command), None, target)
     }
 
-    pub fn from_start_and_stop(action_name: String, start_command: C, stop_command: C) -> Self
+    pub fn start_stop(action_name: String, start_command: C, stop_command: C) -> Self
     where
         for<'a> &'a C: Into<CommandTarget>,
     {
@@ -48,7 +48,7 @@ impl<C> ActionExecution<C> {
         )
     }
 
-    pub fn locking_only(action_name: String, target: CommandTarget) -> Self {
+    pub fn locking(action_name: String, target: CommandTarget) -> Self {
         Self::from(action_name, None, None, target)
     }
 

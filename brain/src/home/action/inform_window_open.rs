@@ -32,7 +32,7 @@ where
     }
 
     fn execution(&self) -> ActionExecution<PushNotify> {
-        ActionExecution::from_start_and_stop(
+        ActionExecution::start_stop(
             self.to_string(),
             PushNotify {
                 action: NotificationAction::Notify,

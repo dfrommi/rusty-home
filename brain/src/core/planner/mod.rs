@@ -110,9 +110,7 @@ where
 
             let action_execution = action.execution();
 
-            let used_resource = action_execution.controlled_target();
-
-            if resource_lock.is_locked(used_resource) {
+            if resource_lock.is_locked(&action_execution) {
                 result.locked = true;
                 action_results.push((action, result));
                 continue;
@@ -125,7 +123,7 @@ where
             result.is_running = is_running;
 
             if is_goal_active && is_fulfilled {
-                resource_lock.lock(used_resource.clone());
+                resource_lock.lock(&action_execution);
                 result.should_be_started =
                     action_execution.can_be_started() && is_running == Some(false);
             }
@@ -142,13 +140,12 @@ where
     for (action, result) in action_results.iter_mut() {
         if result.should_be_stopped {
             let execution = action.execution();
-            let resource = execution.controlled_target();
 
-            if resource_lock.is_locked(resource) {
+            if resource_lock.is_locked(&execution) {
                 result.should_be_stopped = false;
                 result.locked = true;
             } else {
-                resource_lock.lock(resource.clone());
+                resource_lock.lock(&execution);
             }
         }
     }

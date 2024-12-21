@@ -4,6 +4,10 @@ pub struct ResourceLock<R> {
     resources: Vec<R>,
 }
 
+pub trait Lockable<R: PartialEq> {
+    fn locking_key(&self) -> R;
+}
+
 impl<R> ResourceLock<R>
 where
     R: PartialEq,
@@ -14,11 +18,11 @@ where
         }
     }
 
-    pub fn lock(&mut self, resource: R) {
-        self.resources.push(resource);
+    pub fn lock(&mut self, resource: &impl Lockable<R>) {
+        self.resources.push(resource.locking_key());
     }
 
-    pub fn is_locked(&self, resource: &R) -> bool {
-        self.resources.contains(resource)
+    pub fn is_locked(&self, resource: &impl Lockable<R>) -> bool {
+        self.resources.contains(&resource.locking_key())
     }
 }

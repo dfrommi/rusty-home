@@ -4,7 +4,7 @@ use support::{t, time::DateTime};
 
 use crate::port::{CommandAccess, CommandExecutor};
 
-use super::command_state::CommandState;
+use super::{command_state::CommandState, resource_lock::Lockable};
 
 #[derive(Debug, Clone)]
 pub struct ActionExecution<C> {
@@ -83,12 +83,14 @@ impl<C> ActionExecution<C> {
     }
 }
 
+impl<C> Lockable<CommandTarget> for ActionExecution<C> {
+    fn locking_key(&self) -> CommandTarget {
+        self.controlled_target.clone()
+    }
+}
+
 //ACCESSORS
 impl<C> ActionExecution<C> {
-    pub fn controlled_target(&self) -> &CommandTarget {
-        &self.controlled_target
-    }
-
     pub fn can_be_started(&self) -> bool {
         self.start_command.is_some()
     }

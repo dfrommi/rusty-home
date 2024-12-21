@@ -53,12 +53,12 @@ where
 {
     let execution = action.execution();
 
-    let (was_started, is_still_running) = tokio::try_join!(
-        execution.any_trigger_since(api, ActionExecutionTrigger::Start, since),
+    let (last_trigger, is_still_running) = tokio::try_join!(
+        execution.last_trigger_since(api, since),
         execution.is_reflected_in_state(api),
     )?;
 
-    Ok(!was_started || is_still_running)
+    Ok(last_trigger != ActionExecutionTrigger::Start || is_still_running.unwrap_or(false))
 }
 
 impl std::fmt::Display for SaveTvEnergy {

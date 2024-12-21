@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use api::command::{Command, CommandSource, CommandTarget};
-use support::{t, time::DateTime};
+use support::time::DateTime;
 
 use crate::port::{CommandAccess, CommandExecutor};
 
@@ -89,17 +89,6 @@ impl<C> Lockable<CommandTarget> for ActionExecution<C> {
     }
 }
 
-//ACCESSORS
-impl<C> ActionExecution<C> {
-    pub fn can_be_started(&self) -> bool {
-        self.start_command.is_some()
-    }
-
-    pub fn can_be_stopped(&self) -> bool {
-        self.stop_command.is_some()
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionExecutionTrigger {
     Start,
@@ -109,7 +98,7 @@ pub enum ActionExecutionTrigger {
 }
 
 impl<C: Into<Command>> ActionExecution<C> {
-    pub async fn latest_trigger_since(
+    pub async fn last_trigger_since(
         &self,
         api: &impl CommandAccess<C>,
         since: DateTime,
@@ -123,46 +112,14 @@ impl<C: Into<Command>> ActionExecution<C> {
         }
     }
 
-    pub async fn any_trigger_since(
-        &self,
-        api: &impl CommandAccess<C>,
-        trigger: ActionExecutionTrigger,
-        since: DateTime,
-    ) -> Result<bool> {
-        let result = api
-            .get_all_commands(self.controlled_target.clone(), since)
-            .await?
-            .iter()
-            .any(|c| self.to_trigger(&c.source) == trigger);
-
-        Ok(result)
-    }
-
-    pub async fn action_started_and_still_reflected(
-        &self,
-        api: &(impl CommandAccess<C> + CommandState<C>),
-    ) -> Result<Option<bool>> {
+    pub async fn is_reflected_in_state(&self, api: &impl CommandState<C>) -> Result<Option<bool>> {
         match &self.start_command {
-            Some(command) => {
-                let is_running = api.is_reflected_in_state(command).await?;
-                let last_trigger = self.latest_trigger_since(api, t!(48 hours ago)).await?;
-
-                Ok(Some(
-                    last_trigger == ActionExecutionTrigger::Start && is_running,
-                ))
-            }
+            Some(command) => Ok(Some(api.is_reflected_in_state(command).await?)),
             None => Ok(None),
         }
     }
 
-    pub async fn is_reflected_in_state(&self, api: &impl CommandState<C>) -> Result<bool> {
-        match &self.start_command {
-            Some(command) => api.is_reflected_in_state(command).await,
-            None => Ok(false),
-        }
-    }
-
-    pub async fn execute_start(&self, executor: &impl CommandExecutor<C>) -> Result<()>
+    pub async fn start(&self, executor: &impl CommandExecutor<C>) -> Result<()>
     where
         C: Into<Command> + Clone + std::fmt::Debug,
     {
@@ -183,7 +140,7 @@ impl<C: Into<Command>> ActionExecution<C> {
         }
     }
 
-    pub async fn execute_stop(&self, executor: &impl CommandExecutor<C>) -> Result<()>
+    pub async fn stop(&self, executor: &impl CommandExecutor<C>) -> Result<()>
     where
         C: Into<Command> + Clone + std::fmt::Debug,
     {

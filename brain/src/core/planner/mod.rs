@@ -72,14 +72,14 @@ pub async fn plan_and_execute<G, A, T, C>(
     for (action, result) in next_actions {
         if result.should_be_started {
             tracing::info!("Starting action {}", action);
-            if let Err(e) = action.execution().execute_start(command_processor).await {
+            if let Err(e) = action.execution().start(command_processor).await {
                 tracing::error!("Error starting action {}: {:?}", action, e);
             }
         }
 
         if result.should_be_stopped {
             tracing::info!("Stopping action {}", action);
-            if let Err(e) = action.execution().execute_stop(command_processor).await {
+            if let Err(e) = action.execution().stop(command_processor).await {
                 tracing::error!("Error stopping action {}: {:?}", action, e);
             }
         }
@@ -124,13 +124,11 @@ where
 
             if is_goal_active && is_fulfilled {
                 resource_lock.lock(&action_execution);
-                result.should_be_started =
-                    action_execution.can_be_started() && is_running == Some(false);
+                result.should_be_started = is_running == Some(false);
             }
 
             if !is_goal_active || !is_fulfilled {
-                result.should_be_stopped =
-                    action_execution.can_be_stopped() && (is_running == Some(true));
+                result.should_be_stopped = is_running == Some(true);
             }
 
             action_results.push((action, result));
@@ -175,7 +173,7 @@ where
 
     let latest_trigger = unwrap_or_warn!(
         action_execution
-            .latest_trigger_since(command_access, t!(30 seconds ago))
+            .last_trigger_since(command_access, t!(30 seconds ago))
             .await,
         ActionExecutionTrigger::None,
         "Error getting latest exexcution of action {}, assuming not running: {:?}"
@@ -187,9 +185,10 @@ where
         return (false, Some(false));
     }
 
-    let (action_preconditions_fulfilled, execution_started_and_still_reflected) = tokio::join!(
+    let (action_preconditions_fulfilled, was_started_last, is_reflected_in_state) = tokio::join!(
         action.preconditions_fulfilled(api),
-        action_execution.action_started_and_still_reflected(command_access),
+        action_execution.last_trigger_since(command_access, t!(48 hours ago)),
+        action_execution.is_reflected_in_state(command_access),
     );
 
     let action_preconditions_fulfilled = unwrap_or_warn!(
@@ -198,15 +197,28 @@ where
         "Error checking preconditions of action {}, assuming not fulfilled: {:?}"
     );
 
-    let execution_started_and_still_reflected = unwrap_or_warn!(
-        execution_started_and_still_reflected,
+    let was_started_last = unwrap_or_warn!(
+        was_started_last,
+        ActionExecutionTrigger::None,
+        "Error checking running state of action {}, assuming not running: {:?}"
+    );
+
+    let is_reflected_in_state = unwrap_or_warn!(
+        is_reflected_in_state,
         None,
         "Error checking running state of action {}, assuming not running: {:?}"
     );
 
+    //actions without start-command have None as is_reflected_in_state to express undecided
+    let was_started_and_still_reflected = match (was_started_last, is_reflected_in_state) {
+        (ActionExecutionTrigger::Start, Some(true)) => Some(true),
+        (_, None) => None,
+        _ => Some(false),
+    };
+
     (
         action_preconditions_fulfilled,
-        execution_started_and_still_reflected,
+        was_started_and_still_reflected,
     )
 }
 

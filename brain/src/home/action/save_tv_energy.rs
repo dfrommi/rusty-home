@@ -1,7 +1,11 @@
 use anyhow::Result;
-use api::{command::SetEnergySaving, state::Powered};
+use api::{
+    command::{Command, SetEnergySaving},
+    state::Powered,
+};
+use support::time::DateTime;
 
-use crate::core::planner::ActionExecutionTrigger;
+use crate::core::planner::{ActionExecutionTrigger, CommandState};
 
 use super::{Action, ActionExecution, CommandAccess, DataPointAccess};
 
@@ -23,17 +27,8 @@ where
             .current_data_point(api::state::Powered::LivingRoomTv)
             .await?;
 
-        if !is_tv_on.value {
-            return Ok(false);
-        }
-
-        let execution = <Self as Action<API, SetEnergySaving>>::execution(self);
-        let (was_started, is_still_running) = tokio::try_join!(
-            execution.any_trigger_since(api, ActionExecutionTrigger::Start, is_tv_on.timestamp),
-            execution.is_reflected_in_state(api),
-        )?;
-
-        Ok(!was_started || is_still_running)
+        Ok(is_tv_on.value
+            && preconditions_for_oneshot_fulfilled(self, is_tv_on.timestamp, api).await?)
     }
 
     fn execution(&self) -> ActionExecution<SetEnergySaving> {
@@ -45,6 +40,25 @@ where
             },
         )
     }
+}
+
+async fn preconditions_for_oneshot_fulfilled<API, C>(
+    action: &impl Action<API, C>,
+    since: DateTime,
+    api: &API,
+) -> Result<bool>
+where
+    C: Into<Command>,
+    API: CommandAccess<C> + CommandState<C>,
+{
+    let execution = action.execution();
+
+    let (was_started, is_still_running) = tokio::try_join!(
+        execution.any_trigger_since(api, ActionExecutionTrigger::Start, since),
+        execution.is_reflected_in_state(api),
+    )?;
+
+    Ok(!was_started || is_still_running)
 }
 
 impl std::fmt::Display for SaveTvEnergy {

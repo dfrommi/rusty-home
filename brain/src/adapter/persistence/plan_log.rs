@@ -4,7 +4,7 @@ use support::t;
 use crate::{core::planner::ActionResult, port::PlanningResultTracer};
 
 impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
-    async fn add_planning_trace(&self, results: &[&ActionResult]) -> anyhow::Result<()> {
+    async fn add_planning_trace(&self, results: &[ActionResult]) -> anyhow::Result<()> {
         let id = sqlx::types::Uuid::from_u128(uuid::Uuid::new_v4().as_u128());
 
         let mut builder = QueryBuilder::new(

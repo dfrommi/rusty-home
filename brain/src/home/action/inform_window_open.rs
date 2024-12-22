@@ -1,11 +1,16 @@
 use std::fmt::Display;
 
-use api::command::{Notification, NotificationAction, NotificationRecipient, PushNotify};
+use api::command::{
+    Command, CommandSource, Notification, NotificationAction, NotificationRecipient, PushNotify,
+};
 use support::{t, time::DateTime, DataPoint};
 
-use crate::home::state::ColdAirComingIn;
+use crate::{
+    core::planner::{CommandAction, ConditionalAction},
+    home::state::ColdAirComingIn,
+};
 
-use super::{Action, ActionExecution, CommandAccess, DataPointAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
 pub struct InformWindowOpen {
@@ -20,37 +25,35 @@ impl InformWindowOpen {
     }
 }
 
-impl<T> Action<T, PushNotify> for InformWindowOpen
+impl Display for InformWindowOpen {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InformWindowOpen[{}]", self.recipient)
+    }
+}
+
+impl CommandAction for InformWindowOpen {
+    fn command(&self) -> Command {
+        Command::PushNotify(PushNotify {
+            action: NotificationAction::Notify,
+            notification: Notification::WindowOpened,
+            recipient: self.recipient.clone(),
+        })
+    }
+
+    fn source(&self) -> CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for InformWindowOpen
 where
-    T: DataPointAccess<ColdAirComingIn> + CommandAccess<PushNotify>,
+    T: DataPointAccess<ColdAirComingIn>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
         match cold_air_coming_in(api).await? {
             Some((_, max_dt)) => Ok(t!(now).elapsed_since(max_dt) > t!(3 minutes)),
             None => Ok(false),
         }
-    }
-
-    fn execution(&self) -> ActionExecution<PushNotify> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            PushNotify {
-                action: NotificationAction::Notify,
-                notification: Notification::WindowOpened,
-                recipient: self.recipient.clone(),
-            },
-            PushNotify {
-                action: NotificationAction::Dismiss,
-                notification: Notification::WindowOpened,
-                recipient: self.recipient.clone(),
-            },
-        )
-    }
-}
-
-impl Display for InformWindowOpen {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InformWindowOpen[{}]", self.recipient)
     }
 }
 

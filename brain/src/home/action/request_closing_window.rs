@@ -1,10 +1,13 @@
 use std::fmt::Display;
 
-use crate::home::state::{ColdAirComingIn, Powered};
+use crate::{
+    core::planner::{CommandAction, ConditionalAction},
+    home::state::{ColdAirComingIn, Powered},
+};
 use anyhow::Result;
-use api::command::{PowerToggle, SetPower};
+use api::command::{Command, PowerToggle, SetPower};
 
-use super::{Action, ActionExecution, DataPointAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
 pub struct RequestClosingWindow;
@@ -15,7 +18,26 @@ impl RequestClosingWindow {
     }
 }
 
-impl<T> Action<T, SetPower> for RequestClosingWindow
+impl Display for RequestClosingWindow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RequestClosingWindow")
+    }
+}
+
+impl CommandAction for RequestClosingWindow {
+    fn command(&self) -> Command {
+        Command::SetPower(SetPower {
+            device: PowerToggle::LivingRoomNotificationLight,
+            power_on: true,
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for RequestClosingWindow
 where
     T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Powered>,
 {
@@ -30,25 +52,5 @@ where
         .collect();
 
         Ok(result?.into_iter().any(|v| v))
-    }
-
-    fn execution(&self) -> ActionExecution<SetPower> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
-            },
-            SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: false,
-            },
-        )
-    }
-}
-
-impl Display for RequestClosingWindow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RequestClosingWindow")
     }
 }

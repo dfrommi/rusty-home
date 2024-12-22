@@ -2,20 +2,19 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::{
-    command::SetHeating,
+    command::{Command, SetHeating},
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
+    core::planner::{CommandAction, ConditionalAction},
     home::{
-        action::{Action, HeatingZone},
+        action::HeatingZone,
         state::{AutomaticTemperatureIncrease, Opened},
     },
     port::{CommandAccess, DataPointAccess},
 };
-
-use super::ActionExecution;
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 
@@ -32,7 +31,33 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
     }
 }
 
-impl<T> Action<T, SetHeating> for NoHeatingDuringAutomaticTemperatureIncrease
+impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
+            self.heating_zone
+        )
+    }
+}
+
+impl CommandAction for NoHeatingDuringAutomaticTemperatureIncrease {
+    fn command(&self) -> Command {
+        Command::SetHeating(SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: NO_HEATING_SET_POINT,
+                duration: t!(1 hours),
+            },
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for NoHeatingDuringAutomaticTemperatureIncrease
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<AutomaticTemperatureIncrease>
@@ -77,32 +102,5 @@ where
         )?;
 
         Ok(!already_triggered.value || has_expected_manual_heating.value)
-    }
-
-    fn execution(&self) -> ActionExecution<SetHeating> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Heat {
-                    temperature: NO_HEATING_SET_POINT,
-                    duration: t!(1 hours),
-                },
-            },
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Auto,
-            },
-        )
-    }
-}
-
-impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
-            self.heating_zone
-        )
     }
 }

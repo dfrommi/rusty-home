@@ -55,10 +55,14 @@ pub trait CommandAccess<C: Into<Command>> {
     ) -> Result<Option<CommandSource>>;
 }
 
+pub enum CommandExecutionResult {
+    Triggered,
+    Skipped,
+}
 pub trait CommandExecutor<C: Into<Command>> {
-    async fn execute(&self, command: C, source: CommandSource) -> Result<()>;
+    async fn execute(&self, command: C, source: CommandSource) -> Result<CommandExecutionResult>;
 }
 
 pub trait PlanningResultTracer {
-    async fn add_planning_trace(&self, results: &[&ActionResult]) -> anyhow::Result<()>;
+    async fn add_planning_trace(&self, results: &[ActionResult]) -> anyhow::Result<()>;
 }

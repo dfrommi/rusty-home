@@ -1,15 +1,16 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::{command::SetHeating, state::SetPoint};
-
-use crate::{
-    home::action::{Action, HeatingZone},
-    home::state::ColdAirComingIn,
-    port::DataPointAccess,
+use api::{
+    command::{Command, SetHeating},
+    state::SetPoint,
 };
 
-use super::ActionExecution;
+use crate::{
+    core::planner::{CommandAction, ConditionalAction},
+    home::{action::HeatingZone, state::ColdAirComingIn},
+    port::DataPointAccess,
+};
 
 #[derive(Debug, Clone)]
 pub struct NoHeatingDuringVentilation {
@@ -30,7 +31,20 @@ impl Display for NoHeatingDuringVentilation {
     }
 }
 
-impl<T> Action<T, SetHeating> for NoHeatingDuringVentilation
+impl CommandAction for NoHeatingDuringVentilation {
+    fn command(&self) -> Command {
+        Command::SetHeating(SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Off,
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for NoHeatingDuringVentilation
 where
     T: DataPointAccess<ColdAirComingIn>
         + DataPointAccess<ColdAirComingIn>
@@ -45,19 +59,5 @@ where
             HeatingZone::Bathroom => ColdAirComingIn::Bedroom,
         })
         .await
-    }
-
-    fn execution(&self) -> ActionExecution<SetHeating> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Off,
-            },
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Auto,
-            },
-        )
     }
 }

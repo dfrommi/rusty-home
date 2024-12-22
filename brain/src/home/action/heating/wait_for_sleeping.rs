@@ -2,20 +2,16 @@ use std::fmt::Display;
 
 use anyhow::{Ok, Result};
 use api::{
-    command::SetHeating,
+    command::{Command, SetHeating},
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
-    home::{
-        action::{Action, HeatingZone},
-        state::Resident,
-    },
+    core::planner::{CommandAction, ConditionalAction},
+    home::{action::HeatingZone, state::Resident},
     port::{CommandAccess, DataPointAccess},
 };
-
-use super::ActionExecution;
 
 #[derive(Debug, Clone)]
 pub struct ExtendHeatingUntilSleeping {
@@ -48,7 +44,23 @@ impl Display for ExtendHeatingUntilSleeping {
     }
 }
 
-impl<T> Action<T, SetHeating> for ExtendHeatingUntilSleeping
+impl CommandAction for ExtendHeatingUntilSleeping {
+    fn command(&self) -> Command {
+        Command::SetHeating(SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: self.target_temperature,
+                duration: self.time_range.duration(),
+            },
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for ExtendHeatingUntilSleeping
 where
     T: DataPointAccess<Resident>
         + DataPointAccess<SetPoint>
@@ -82,22 +94,5 @@ where
         )?;
 
         Ok(!already_triggered.value || has_expected_manual_heating.value)
-    }
-
-    fn execution(&self) -> ActionExecution<SetHeating> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Heat {
-                    temperature: self.target_temperature,
-                    duration: self.time_range.duration(),
-                },
-            },
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Auto,
-            },
-        )
     }
 }

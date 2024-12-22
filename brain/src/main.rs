@@ -67,7 +67,7 @@ pub async fn main() {
                 }
 
                 tracing::info!("Start planning");
-                core::planner::plan_and_execute(
+                core::planner::perform_planning(
                     &home::get_active_goals(),
                     home::default_config(),
                     api,

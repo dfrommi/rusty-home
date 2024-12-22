@@ -2,18 +2,16 @@ use std::fmt::Display;
 
 use anyhow::{Ok, Result};
 use api::{
-    command::SetHeating,
+    command::{Command, SetHeating},
     state::{ExternalAutoControl, SetPoint},
 };
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
-    home::action::{Action, HeatingZone},
-    home::state::Opened,
+    core::planner::{CommandAction, ConditionalAction},
+    home::{action::HeatingZone, state::Opened},
     port::{CommandAccess, DataPointAccess},
 };
-
-use super::ActionExecution;
 
 #[derive(Debug, Clone)]
 pub struct DeferHeatingUntilVentilationDone {
@@ -46,7 +44,33 @@ impl DeferHeatingUntilVentilationDone {
     }
 }
 
-impl<T> Action<T, SetHeating> for DeferHeatingUntilVentilationDone
+impl Display for DeferHeatingUntilVentilationDone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
+            self.heating_zone, self.target_temperature, self.time_range
+        )
+    }
+}
+
+impl CommandAction for DeferHeatingUntilVentilationDone {
+    fn command(&self) -> Command {
+        Command::SetHeating(SetHeating {
+            device: self.heating_zone.thermostat(),
+            target_state: api::command::HeatingTargetState::Heat {
+                temperature: self.target_temperature,
+                duration: self.time_range.duration(),
+            },
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for DeferHeatingUntilVentilationDone
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<SetPoint>
@@ -76,32 +100,5 @@ where
         )?;
 
         Ok(!already_triggered.value || has_expected_manual_heating.value)
-    }
-
-    fn execution(&self) -> ActionExecution<SetHeating> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Heat {
-                    temperature: self.target_temperature,
-                    duration: self.time_range.duration(),
-                },
-            },
-            SetHeating {
-                device: self.heating_zone.thermostat(),
-                target_state: api::command::HeatingTargetState::Auto,
-            },
-        )
-    }
-}
-
-impl Display for DeferHeatingUntilVentilationDone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "DeferHeatingUntilVentilationDone[{} -> {} ({})]",
-            self.heating_zone, self.target_temperature, self.time_range
-        )
     }
 }

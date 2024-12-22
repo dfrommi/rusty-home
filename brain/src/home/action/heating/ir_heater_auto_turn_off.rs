@@ -1,12 +1,13 @@
 use api::{
-    command::{PowerToggle, SetPower},
+    command::{Command, PowerToggle, SetPower},
     state::Powered,
 };
 use support::t;
 
-use crate::{home::action::Action, port::DataPointAccess};
-
-use super::ActionExecution;
+use crate::{
+    core::planner::{CommandAction, ConditionalAction},
+    port::DataPointAccess,
+};
 
 #[derive(Debug, Clone)]
 pub struct IrHeaterAutoTurnOff;
@@ -17,7 +18,26 @@ impl IrHeaterAutoTurnOff {
     }
 }
 
-impl<API> Action<API, SetPower> for IrHeaterAutoTurnOff
+impl std::fmt::Display for IrHeaterAutoTurnOff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IrHeaterAutoTurnOff[Bedroom]",)
+    }
+}
+
+impl CommandAction for IrHeaterAutoTurnOff {
+    fn command(&self) -> Command {
+        Command::SetPower(SetPower {
+            device: PowerToggle::InfraredHeater,
+            power_on: false,
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<API> ConditionalAction<API> for IrHeaterAutoTurnOff
 where
     API: DataPointAccess<Powered>,
 {
@@ -27,21 +47,5 @@ where
 
         //on for at least 1 hour
         Ok(current.value && current.timestamp.elapsed() > t!(1 hours))
-    }
-
-    fn execution(&self) -> ActionExecution<SetPower> {
-        ActionExecution::trigger(
-            self.to_string(),
-            SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            },
-        )
-    }
-}
-
-impl std::fmt::Display for IrHeaterAutoTurnOff {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IrHeaterAutoTurnOff[Bedroom]",)
     }
 }

@@ -2,13 +2,16 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::{
-    command::{PowerToggle, SetPower},
+    command::{Command, PowerToggle, SetPower},
     state::Powered,
 };
 
-use crate::home::state::RiskOfMould;
+use crate::{
+    core::planner::{CommandAction, ConditionalAction},
+    home::state::RiskOfMould,
+};
 
-use super::{Action, ActionExecution, DataPointAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
 pub struct Dehumidify;
@@ -19,31 +22,30 @@ impl Dehumidify {
     }
 }
 
-impl<T> Action<T, SetPower> for Dehumidify
+impl Display for Dehumidify {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Dehumidify")
+    }
+}
+
+impl CommandAction for Dehumidify {
+    fn command(&self) -> Command {
+        Command::SetPower(SetPower {
+            device: PowerToggle::Dehumidifier,
+            power_on: true,
+        })
+    }
+
+    fn source(&self) -> api::command::CommandSource {
+        super::action_source(self)
+    }
+}
+
+impl<T> ConditionalAction<T> for Dehumidify
 where
     T: DataPointAccess<RiskOfMould> + DataPointAccess<Powered>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         api.current(RiskOfMould::Bathroom).await
-    }
-
-    fn execution(&self) -> ActionExecution<SetPower> {
-        ActionExecution::start_stop(
-            self.to_string(),
-            SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            },
-            SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: false,
-            },
-        )
-    }
-}
-
-impl Display for Dehumidify {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Dehumidify")
     }
 }

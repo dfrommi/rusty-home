@@ -1,3 +1,3 @@
 mod command;
-mod plan_log;
+mod planning_trace;
 mod state;

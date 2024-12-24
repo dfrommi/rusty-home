@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 #[allow(clippy::enum_variant_names)]
 pub enum Room {
     LivingRoom,
@@ -8,10 +8,11 @@ pub enum Room {
     Bathroom,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum HomeGoal {
     PreventMouldInBathroom,
     StayInformed,
+    #[display("SmarterHeating[{}]", _0)]
     SmarterHeating(Room),
     SaveEnergy,
     ResetToDefaltSettings,

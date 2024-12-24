@@ -5,27 +5,40 @@ use tabled::{Table, Tabled};
 use crate::port::PlanningResultTracer;
 
 #[derive(Clone, Debug, PartialEq, Eq, Tabled)]
-pub struct ActionResult {
+pub struct PlanningTrace {
     pub action: String,
-    #[tabled(display_with = "display_bool")]
-    pub should_be_started: bool,
-    #[tabled(display_with = "display_bool")]
-    pub should_be_stopped: bool,
+
+    pub goal: String,
+
     #[tabled(display_with = "display_bool")]
     pub is_goal_active: bool,
+
     #[tabled(display_with = "display_bool")]
     pub locked: bool,
     #[tabled(display_with = "display_option")]
     pub is_fulfilled: Option<bool>,
     #[tabled(display_with = "display_option")]
-    pub is_running: Option<bool>,
+    pub was_triggered: Option<bool>,
 }
 
-pub async fn display_action_results(
-    action_results: &[ActionResult],
+impl PlanningTrace {
+    pub fn new(action: &impl Display, goal: &impl Display) -> Self {
+        Self {
+            action: format!("{}", action),
+            goal: format!("{}", goal),
+            is_goal_active: false,
+            locked: false,
+            is_fulfilled: None,
+            was_triggered: None,
+        }
+    }
+}
+
+pub async fn display_planning_trace(
+    action_results: &[PlanningTrace],
     tracer: &impl PlanningResultTracer,
 ) {
-    if action_result_has_changed(action_results) {
+    if planning_trace_has_changed(action_results) {
         tracing::info!(
             "Planning result:\n{}",
             Table::new(action_results).to_string()
@@ -36,20 +49,6 @@ pub async fn display_action_results(
         }
     } else {
         tracing::info!("Planning result is unchanged");
-    }
-}
-
-impl ActionResult {
-    pub fn new(action: &impl Display) -> Self {
-        Self {
-            action: format!("{}", action),
-            should_be_started: false,
-            should_be_stopped: false,
-            is_goal_active: false,
-            locked: false,
-            is_fulfilled: None,
-            is_running: None,
-        }
     }
 }
 
@@ -65,8 +64,8 @@ fn display_option(o: &Option<bool>) -> String {
     }
 }
 
-static PREVIOUS_ACTION: Mutex<Vec<ActionResult>> = Mutex::new(vec![]);
-fn action_result_has_changed(current: &[ActionResult]) -> bool {
+static PREVIOUS_ACTION: Mutex<Vec<PlanningTrace>> = Mutex::new(vec![]);
+fn planning_trace_has_changed(current: &[PlanningTrace]) -> bool {
     match PREVIOUS_ACTION.lock() {
         Ok(mut previous) => {
             if *previous != current {

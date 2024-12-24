@@ -12,7 +12,7 @@ use support::{
 };
 
 use crate::{
-    core::planner::ActionResult,
+    core::planner::PlanningTrace,
     support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
@@ -64,5 +64,5 @@ pub trait CommandExecutor<C: Into<Command>> {
 }
 
 pub trait PlanningResultTracer {
-    async fn add_planning_trace(&self, results: &[ActionResult]) -> anyhow::Result<()>;
+    async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()>;
 }

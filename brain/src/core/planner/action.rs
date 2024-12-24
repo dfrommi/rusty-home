@@ -43,14 +43,22 @@ where
     T: CommandAction + ExecutionAwareAction<E>,
 {
     async fn execute(&self, executor: &E) -> Result<CommandExecutionResult> {
+        //wait until roundtrip is completed. State might not have been updated yet
+        let was_just_executed = self
+            .was_latest_execution_for_target_since(t!(30 seconds ago), executor)
+            .await?;
+
+        if was_just_executed {
+            return Ok(CommandExecutionResult::Skipped);
+        }
+
         let was_latest_execution = self
             .was_latest_execution_for_target_since(t!(48 hours ago), executor)
             .await?;
         let is_reflected_in_state = self.is_reflected_in_state(executor).await?;
 
         if !was_latest_execution || !is_reflected_in_state {
-            executor.execute(self.command(), self.source()).await?;
-            Ok(CommandExecutionResult::Triggered)
+            executor.execute(self.command(), self.source()).await
         } else {
             Ok(CommandExecutionResult::Skipped)
         }

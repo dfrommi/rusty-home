@@ -1,76 +1,45 @@
-mod helper;
+mod action;
+mod planning;
 
-use api::command::Thermostat;
-use helper::get_state_at;
-use support::{t, unit::DegreeCelsius};
+use std::sync::OnceLock;
 
-use crate::{
-    home::action::{HeatingZone, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease},
-    home::state::UserControlled,
-};
+use crate::settings;
+use sqlx::PgPool;
+use tokio::runtime::Runtime;
 
-use super::action::{DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping};
-
-#[test]
-fn user_override_kept_continuously() {
-    let action = KeepUserOverride::new(
-        UserControlled::BedroomThermostat,
-        Thermostat::Bedroom.into(),
-    );
-
-    let result = get_state_at("2024-11-11T21:12:01+01:00", action);
-
-    assert!(!result.is_fulfilled);
+struct TestInfrastructure {
+    runtime: Runtime,
+    db_pool: PgPool,
 }
 
-#[test]
-fn heating_started_before_window_was_opened_in_one_room() {
-    let action = DeferHeatingUntilVentilationDone::new(
-        HeatingZone::Bedroom,
-        DegreeCelsius(18.1),
-        t!(6:12-12:30),
-    );
-
-    let result = get_state_at("2024-11-11T06:12:01+01:00", action);
-
-    assert!(
-            result.is_fulfilled,
-            "Not fulfilled but expected. Check that window-open time is verified against date and time, not only time"
-    );
+impl AsRef<PgPool> for TestInfrastructure {
+    fn as_ref(&self) -> &PgPool {
+        &self.db_pool
+    }
 }
 
-#[test]
-fn defered_heating_after_ventilation_stopped_too_early() {
-    let action = NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom);
-    let result = get_state_at("2024-11-16T16:57:27.8+01:00", action);
+static INFRASTRUCTURE: OnceLock<TestInfrastructure> = OnceLock::new();
 
-    assert!(
-        result.is_fulfilled,
-        "Should be fulfilled. Check handling when too few temperature mearements exist after ventilation stopped"
-    );
+fn runtime() -> &'static Runtime {
+    &infrastructure().runtime
 }
 
-#[test]
-fn no_heating_during_automatic_temperature_increase_toggling() {
-    let action = NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom);
+fn infrastructure() -> &'static TestInfrastructure {
+    INFRASTRUCTURE.get_or_init(|| {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed building the Runtime");
 
-    let result = get_state_at("2024-11-12T19:18:29.738113+01:00", action);
+        let db_pool = runtime.block_on(async {
+            let settings = settings::test::TestSettings::load().unwrap();
+            sqlx::postgres::PgPoolOptions::new()
+                .max_connections(4)
+                .connect(settings.live_database.url.as_str())
+                .await
+                .unwrap()
+        });
 
-    assert!(
-        !result.is_fulfilled,
-        "Should not toggle. Check if properly blocked if already executed since window opened"
-    );
-}
-
-#[test]
-fn heating_before_sleeping_extended_over_midnight() {
-    let action = ExtendHeatingUntilSleeping::new(
-        HeatingZone::LivingRoom,
-        DegreeCelsius(20.0),
-        t!(22:30-2:30),
-    );
-
-    let result = get_state_at("2024-12-16T00:00:10+01:00", action);
-
-    assert!(result.is_fulfilled);
+        TestInfrastructure { runtime, db_pool }
+    })
 }

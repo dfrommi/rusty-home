@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::bail;
-use api::state::ChannelValue;
+use api::{
+    state::ChannelValue,
+    trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
+};
 use support::{
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
@@ -42,7 +45,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
     for HaIncomingDataProcessor<C, L>
 {
     async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
-        let current_dps: Vec<DataPoint<ChannelValue>> = self
+        let current_dps: Vec<IncomingData> = self
             .client
             .get_current_state()
             .await?
@@ -51,7 +54,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
             .collect();
 
         for dp in current_dps {
-            sender.send(IncomingData::StateValue(dp)).await?;
+            sender.send(dp).await?;
         }
 
         loop {
@@ -60,7 +63,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
                     let dps = to_smart_home_events(&event, &self.config);
 
                     for dp in dps {
-                        sender.send(IncomingData::StateValue(dp)).await?;
+                        sender.send(dp).await?;
                     }
                 }
 
@@ -74,7 +77,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
 fn to_smart_home_events(
     new_state: &StateChangedEvent,
     config: &HashMap<String, Vec<HaChannel>>,
-) -> Vec<DataPoint<ChannelValue>> {
+) -> Vec<IncomingData> {
     let entity_id: &str = &new_state.entity_id;
 
     let ha_channels = config.get(entity_id as &str);
@@ -101,7 +104,7 @@ fn to_smart_home_events(
                     );
 
                     match dp_result {
-                        Ok(dp) => Some(dp),
+                        Ok(dp) => dp,
                         Err(e) => {
                             tracing::error!(
                                 "Error processing homeassistant event of {}: {:?}",
@@ -126,29 +129,41 @@ fn to_persistent_data_point(
     ha_value: &str,
     attributes: &HashMap<String, serde_json::Value>,
     timestamp: DateTime,
-) -> anyhow::Result<DataPoint<ChannelValue>> {
-    let dp = match channel {
-        HaChannel::Temperature(channel) => DataPoint::new(
-            ChannelValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
-            timestamp,
+) -> anyhow::Result<Option<IncomingData>> {
+    let dp: Option<IncomingData> = match channel {
+        HaChannel::Temperature(channel) => Some(
+            DataPoint::new(
+                ChannelValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
         ),
-        HaChannel::RelativeHumidity(channel) => DataPoint::new(
-            ChannelValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
-            timestamp,
+        HaChannel::RelativeHumidity(channel) => Some(
+            DataPoint::new(
+                ChannelValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
         ),
         HaChannel::Opened(channel) => {
-            DataPoint::new(ChannelValue::Opened(channel, ha_value == "on"), timestamp)
+            Some(DataPoint::new(ChannelValue::Opened(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::Powered(channel) => {
-            DataPoint::new(ChannelValue::Powered(channel, ha_value == "on"), timestamp)
+            Some(DataPoint::new(ChannelValue::Powered(channel, ha_value == "on"), timestamp).into())
         }
-        HaChannel::CurrentPowerUsage(channel) => DataPoint::new(
-            ChannelValue::CurrentPowerUsage(channel, Watt(ha_value.parse()?)),
-            timestamp,
+        HaChannel::CurrentPowerUsage(channel) => Some(
+            DataPoint::new(
+                ChannelValue::CurrentPowerUsage(channel, Watt(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
         ),
-        HaChannel::TotalEnergyConsumption(channel) => DataPoint::new(
-            ChannelValue::TotalEnergyConsumption(channel, KiloWattHours(ha_value.parse()?)),
-            timestamp,
+        HaChannel::TotalEnergyConsumption(channel) => Some(
+            DataPoint::new(
+                ChannelValue::TotalEnergyConsumption(channel, KiloWattHours(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
         ),
         HaChannel::SetPoint(channel) => {
             let v = match (
@@ -160,29 +175,52 @@ fn to_persistent_data_point(
                 _ => bail!("No temperature found in attributes or not a number"),
             };
 
-            DataPoint::new(
-                ChannelValue::SetPoint(channel, DegreeCelsius::from(v)),
-                timestamp,
+            Some(
+                DataPoint::new(
+                    ChannelValue::SetPoint(channel, DegreeCelsius::from(v)),
+                    timestamp,
+                )
+                .into(),
             )
         }
-        HaChannel::HeatingDemand(channel) => DataPoint::new(
-            ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
-            timestamp,
+        HaChannel::HeatingDemand(channel) => Some(
+            DataPoint::new(
+                ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
         ),
-        HaChannel::ClimateAutoMode(channel) => DataPoint::new(
-            ChannelValue::ExternalAutoControl(channel, ha_value == "auto"),
-            timestamp,
+        HaChannel::ClimateAutoMode(channel) => Some(
+            DataPoint::new(
+                ChannelValue::ExternalAutoControl(channel, ha_value == "auto"),
+                timestamp,
+            )
+            .into(),
         ),
-        HaChannel::PresenceFromLeakSensor(channel) => {
-            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp)
-        }
-        HaChannel::PresenceFromEsp(channel) => {
-            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp)
-        }
-        HaChannel::PresenceFromDeviceTracker(channel) => DataPoint::new(
-            ChannelValue::Presence(channel, ha_value == "home"),
-            timestamp,
+        HaChannel::PresenceFromLeakSensor(channel) => Some(
+            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp).into(),
         ),
+        HaChannel::PresenceFromEsp(channel) => Some(
+            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp).into(),
+        ),
+        HaChannel::PresenceFromDeviceTracker(channel) => Some(
+            DataPoint::new(
+                ChannelValue::Presence(channel, ha_value == "home"),
+                timestamp,
+            )
+            .into(),
+        ),
+        HaChannel::ButtonPress(channel) => match channel {
+            RemoteTarget::BedroomDoor => Some(
+                UserTrigger::Remote(Remote::BedroomDoor(match ha_value {
+                    "on" | "open" => ButtonPress::TopSingle,
+                    "off" | "close" => ButtonPress::BottomSingle,
+                    "" | "unknown" => return Ok(None),
+                    _ => bail!("Unexpected value for button press: {}", ha_value),
+                }))
+                .into(),
+            ),
+        },
     };
 
     Ok(dp)

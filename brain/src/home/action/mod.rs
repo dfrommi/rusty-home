@@ -6,6 +6,7 @@ mod keep_user_override;
 mod reduce_noise_at_night;
 mod request_closing_window;
 mod save_tv_energy;
+mod user_trigger_action;
 
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -27,6 +28,7 @@ pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
 pub use save_tv_energy::SaveTvEnergy;
+pub use user_trigger_action::UserTriggerAction;
 
 use crate::core::planner::Action;
 use crate::core::planner::ActionEvaluationResult;
@@ -52,6 +54,7 @@ pub enum HomeAction {
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     SaveTvEnergy(SaveTvEnergy),
     FollowDefaultSetting(FollowDefaultSetting),
+    UserTriggerAction(UserTriggerAction),
 }
 
 impl<API> Action<API> for HomeAction
@@ -69,7 +72,8 @@ where
         + DataPointAccess<EnergySaving>
         + CommandState<Command>
         + CommandAccess<Command>
-        + CommandAccess<SetHeating>,
+        + CommandAccess<SetHeating>
+        + UserTriggerAccess,
 {
     async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult> {
         match self {
@@ -108,6 +112,9 @@ where
             HomeAction::SaveTvEnergy(save_tv_energy) => save_tv_energy.evaluate(api).await,
             HomeAction::FollowDefaultSetting(follow_default_setting) => {
                 follow_default_setting.evaluate(&()).await
+            }
+            HomeAction::UserTriggerAction(user_trigger_action) => {
+                user_trigger_action.evaluate(api).await
             }
         }
     }

@@ -42,8 +42,6 @@ where
     DB: AsRef<PgPool>,
 {
     async fn save_command(&self, command: Command, source: CommandSource) -> Result<()> {
-        let command: Command = command.into();
-
         let db_command = serde_json::json!(command);
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 

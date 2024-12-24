@@ -1,10 +1,16 @@
 use ::support::time::{DateTime, FIXED_NOW};
-use api::command::{Command, CommandSource};
+use api::{
+    command::{Command, CommandSource, PowerToggle, SetPower},
+    trigger::UserTriggerTarget,
+};
 use support::TestCommandProcessor;
 
 use crate::{
     core::planner::perform_planning,
-    home::{default_config, get_active_goals},
+    home::{
+        action::{HomeAction, UserTriggerAction},
+        default_config, get_active_goals,
+    },
 };
 
 use super::{infrastructure, runtime};
@@ -39,6 +45,25 @@ fn test_planning() {
     }
 
     assert_eq!(actions.len(), 0);
+}
+
+#[test]
+fn test_planning_execution() {
+    let actions = plan_at("2024-12-25T21:45:35Z");
+
+    for (action, source) in actions.iter() {
+        println!("{:?} - {:?}", source, action);
+    }
+
+    assert_eq!(actions.len(), 1);
+    assert_eq!(
+        actions[0].0,
+        SetPower {
+            device: PowerToggle::InfraredHeater,
+            power_on: false,
+        }
+        .into()
+    );
 }
 
 mod support {

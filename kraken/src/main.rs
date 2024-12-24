@@ -79,10 +79,10 @@ pub async fn main() {
     };
 
     let incoming_data_persisting = {
-        let state_storage = infrastructure.database.clone();
+        let storage = infrastructure.database.clone();
 
         async move {
-            core::collect_states(incoming_data_rx, &state_storage)
+            core::collect_states(incoming_data_rx, &storage)
                 .await
                 .expect("Error persisting incoming data");
         }

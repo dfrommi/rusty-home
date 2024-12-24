@@ -4,6 +4,7 @@ use anyhow::Result;
 use api::{
     command::{Command, CommandExecution},
     state::ChannelValue,
+    trigger::UserTrigger,
 };
 use support::time::DateTime;
 use tokio::sync::mpsc;
@@ -27,4 +28,8 @@ pub trait CommandRepository {
 
 pub trait StateStorage {
     async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> anyhow::Result<()>;
+}
+
+pub trait UserTriggerStorage {
+    async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()>;
 }

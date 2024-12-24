@@ -4,6 +4,7 @@ use anyhow::Result;
 use api::{
     command::{Command, CommandExecution, CommandSource, CommandTarget},
     state::ChannelTypeInfo,
+    trigger::{UserTrigger, UserTriggerTarget},
 };
 use support::{
     t,
@@ -74,4 +75,16 @@ pub trait PlanningResultTracer {
 
 pub trait CommandStore {
     async fn save_command(&self, command: Command, source: CommandSource) -> anyhow::Result<()>;
+}
+
+pub trait UserTriggerExecutor {
+    async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()>;
+}
+
+pub trait UserTriggerAccess {
+    async fn latest_since(
+        &self,
+        target: &UserTriggerTarget,
+        since: DateTime,
+    ) -> anyhow::Result<Option<UserTrigger>>;
 }

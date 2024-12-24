@@ -1,5 +1,6 @@
 pub mod command;
 pub mod state;
+pub mod trigger;
 
 use anyhow::Result;
 
@@ -11,6 +12,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 const THING_VALUE_ADDED_EVENT: &str = "thing_values_insert";
 const THING_COMMAND_ADDED_EVENT: &str = "thing_command_insert";
 const ENERGY_READING_INSERT_EVENT: &str = "energy_reading_insert";
+const USER_TRIGGER_INSERT_EVENT: &str = "user_trigger_insert";
 
 #[derive(Debug)]
 pub struct DbEventListener {
@@ -18,6 +20,7 @@ pub struct DbEventListener {
     thing_value_added_tx: Sender<StateValueAddedEvent>,
     thing_command_added_tx: Sender<CommandAddedEvent>,
     energy_reading_insert_tx: Sender<EnergyReadingInsertEvent>,
+    user_trigger_insert_tx: Sender<UserTriggerInsertEvent>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -36,17 +39,24 @@ pub struct EnergyReadingInsertEvent {
     pub id: i64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct UserTriggerInsertEvent {
+    pub id: i64,
+}
+
 impl DbEventListener {
     pub fn new(db_listener: PgListener) -> Self {
         let (thing_value_added_tx, _) = tokio::sync::broadcast::channel(16);
         let (thing_command_added_tx, _) = tokio::sync::broadcast::channel(16);
         let (energy_reading_insert_tx, _) = tokio::sync::broadcast::channel(16);
+        let (user_trigger_insert_tx, _) = tokio::sync::broadcast::channel(16);
 
         Self {
             db_listener,
             thing_value_added_tx,
             thing_command_added_tx,
             energy_reading_insert_tx,
+            user_trigger_insert_tx,
         }
     }
 
@@ -62,6 +72,10 @@ impl DbEventListener {
         self.energy_reading_insert_tx.subscribe()
     }
 
+    pub fn new_user_trigger_added_listener(&self) -> Receiver<UserTriggerInsertEvent> {
+        self.user_trigger_insert_tx.subscribe()
+    }
+
     pub async fn dispatch_events(mut self) -> Result<()> {
         let mut topics = vec![];
         if self.thing_value_added_tx.receiver_count() > 0 {
@@ -74,6 +88,10 @@ impl DbEventListener {
 
         if self.energy_reading_insert_tx.receiver_count() > 0 {
             topics.push(ENERGY_READING_INSERT_EVENT);
+        }
+
+        if self.user_trigger_insert_tx.receiver_count() > 0 {
+            topics.push(USER_TRIGGER_INSERT_EVENT);
         }
 
         if topics.is_empty() {
@@ -94,6 +112,9 @@ impl DbEventListener {
                     }
                     ENERGY_READING_INSERT_EVENT => {
                         self.forward_event(&self.energy_reading_insert_tx, &notification);
+                    }
+                    USER_TRIGGER_INSERT_EVENT => {
+                        self.forward_event(&self.user_trigger_insert_tx, &notification);
                     }
                     topic => {
                         tracing::warn!("Received unsupported event for topic {}", topic);

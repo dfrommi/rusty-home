@@ -53,7 +53,8 @@ pub async fn main() {
 
     let event_listener = DbEventListener::new(db_listener);
 
-    let mut planning_trigger = event_listener.new_state_value_added_listener();
+    let mut planning_state_added_events = event_listener.new_state_value_added_listener();
+    let mut planning_user_trigger_events = event_listener.new_user_trigger_added_listener();
     tasks.spawn({
         let api = infrastructure.clone();
         async move {
@@ -63,7 +64,8 @@ pub async fn main() {
             loop {
                 tokio::select! {
                     _ = timer.tick() => {},
-                    _ = planning_trigger.recv() => {},
+                    _ = planning_state_added_events.recv() => {},
+                    _ = planning_user_trigger_events.recv() => {},
                 }
 
                 tracing::info!("Start planning");

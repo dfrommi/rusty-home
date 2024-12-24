@@ -2,6 +2,7 @@ use ::api::state::{
     CurrentPowerUsage, ExternalAutoControl, HeatingDemand, Opened, Powered, Presence,
     RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
+use api::trigger::RemoteTarget;
 
 use std::collections::HashMap;
 
@@ -23,6 +24,7 @@ pub enum HaChannel {
     PresenceFromLeakSensor(Presence),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
+    ButtonPress(RemoteTarget),
 }
 
 #[derive(Debug, Clone)]

@@ -13,6 +13,7 @@ use crate::{
     port::{CommandAccess, DataPointAccess},
 };
 
+#[allow(async_fn_in_trait)]
 pub trait CommandState<C> {
     async fn is_reflected_in_state(&self, command: &C) -> Result<bool>;
 }

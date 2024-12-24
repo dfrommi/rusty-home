@@ -1,10 +1,11 @@
 use api::command::{CommandTarget, NotificationRecipient, PowerToggle, Thermostat};
+use api::trigger::{HomekitTarget, RemoteTarget};
 use support::t;
 use support::unit::DegreeCelsius;
 
 use crate::home::action::{
     FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,
-    SaveTvEnergy,
+    SaveTvEnergy, UserTriggerAction,
 };
 use crate::home::state::UserControlled;
 
@@ -31,6 +32,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::Bedroom),
         vec![
+            UserTriggerAction::new(HomekitTarget::InfraredHeaterPower.into()).into(),
+            UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
             IrHeaterAutoTurnOff::new().into(),
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
             KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
@@ -75,6 +78,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::PreventMouldInBathroom,
         vec![
+            UserTriggerAction::new(HomekitTarget::DehumidifierPower.into()).into(),
             KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
             ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
             Dehumidify::new().into()
@@ -83,8 +87,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SaveEnergy,
         vec![
+            UserTriggerAction::new(HomekitTarget::LivingRoomTvEnergySaving.into()).into(),
             SaveTvEnergy::new().into(),
-
         ]
     ),
     (

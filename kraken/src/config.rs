@@ -3,6 +3,7 @@ use api::command::{
 };
 
 use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
+use api::trigger::RemoteTarget;
 use api::{
     command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
     state::Temperature,
@@ -434,6 +435,13 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "device_tracker.simi_2",
             HaChannel::PresenceFromDeviceTracker(Presence::AtHomeSabine),
+        ),
+        //
+        // BUTTON PRESS
+        //
+        (
+            "sensor.bedroom_remote_click",
+            HaChannel::ButtonPress(RemoteTarget::BedroomDoor),
         ),
     ]
 }

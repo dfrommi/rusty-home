@@ -16,22 +16,23 @@ pub enum Command {
     SetEnergySaving(SetEnergySaving),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize, derive_more::Display)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandTarget {
-    SetPower {
-        device: PowerToggle,
-    },
-    SetHeating {
-        device: Thermostat,
-    },
+    #[display("SetPower[{}]", device)]
+    SetPower { device: PowerToggle },
+
+    #[display("SetHeating[{}]", device)]
+    SetHeating { device: Thermostat },
+
+    #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {
         recipient: NotificationRecipient,
         notification: Notification,
     },
-    SetEnergySaving {
-        device: EnergySavingDevice,
-    },
+
+    #[display("SetEnergySaving[{}]", device)]
+    SetEnergySaving { device: EnergySavingDevice },
 }
 
 impl From<Command> for CommandTarget {
@@ -101,7 +102,7 @@ pub struct SetPower {
     pub power_on: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
@@ -128,7 +129,7 @@ pub struct SetHeating {
     pub target_state: HeatingTargetState,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
     LivingRoom,
@@ -168,7 +169,7 @@ pub struct PushNotify {
     pub recipient: NotificationRecipient,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Notification {
     WindowOpened,
@@ -222,7 +223,7 @@ pub struct SetEnergySaving {
     pub on: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum EnergySavingDevice {
     LivingRoomTv,

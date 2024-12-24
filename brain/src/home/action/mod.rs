@@ -1,4 +1,5 @@
 mod dehumidify;
+mod follow_default_setting;
 mod heating;
 mod inform_window_open;
 mod keep_user_override;
@@ -20,6 +21,7 @@ use api::state::Powered;
 use api::state::RelativeHumidity;
 use api::state::SetPoint;
 pub use dehumidify::Dehumidify;
+pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
@@ -52,6 +54,7 @@ pub enum HomeAction {
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     SaveTvEnergy(SaveTvEnergy),
+    FollowDefaultSetting(FollowDefaultSetting),
 }
 
 impl<API> ConditionalAction<API> for HomeAction
@@ -113,6 +116,9 @@ where
             HomeAction::SaveTvEnergy(save_tv_energy) => {
                 save_tv_energy.preconditions_fulfilled(api).await
             }
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                follow_default_setting.preconditions_fulfilled(&()).await
+            }
         }
     }
 }
@@ -156,6 +162,9 @@ where
                 reduce_noise_at_night.execute(executor).await
             }
             HomeAction::SaveTvEnergy(save_tv_energy) => save_tv_energy.execute(executor).await,
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                follow_default_setting.execute(executor).await
+            }
         }
     }
 }
@@ -227,6 +236,11 @@ where
                     .was_latest_execution_for_target_since(since, api)
                     .await
             }
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                follow_default_setting
+                    .was_latest_execution_for_target_since(since, api)
+                    .await
+            }
         }
     }
 
@@ -273,6 +287,9 @@ where
             HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
                 ir_heater_auto_turn_off.is_reflected_in_state(api).await
             }
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                follow_default_setting.is_reflected_in_state(api).await
+            }
         }
     }
 }
@@ -305,6 +322,9 @@ impl Lockable<CommandTarget> for HomeAction {
             }
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.locking_key(),
             HomeAction::SaveTvEnergy(save_tv_energy) => save_tv_energy.locking_key(),
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                follow_default_setting.locking_key()
+            }
         }
     }
 }

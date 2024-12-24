@@ -1,9 +1,10 @@
-use api::command::{NotificationRecipient, PowerToggle, Thermostat};
+use api::command::{CommandTarget, NotificationRecipient, PowerToggle, Thermostat};
 use support::t;
 use support::unit::DegreeCelsius;
 
 use crate::home::action::{
-    HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight, SaveTvEnergy,
+    FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,
+    SaveTvEnergy,
 };
 use crate::home::state::UserControlled;
 
@@ -84,6 +85,46 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             SaveTvEnergy::new().into(),
 
+        ]
+    ),
+    (
+        HomeGoal::ResetToDefaltSettings,
+        vec![
+            FollowDefaultSetting::new(CommandTarget::SetPower {
+                device: PowerToggle::Dehumidifier,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetPower {
+                device: PowerToggle::InfraredHeater,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::LivingRoom,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::Bedroom,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::Kitchen,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::Bathroom,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::PushNotify {
+                recipient: NotificationRecipient::Dennis,
+                notification: api::command::Notification::WindowOpened,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::PushNotify {
+                recipient: NotificationRecipient::Sabine,
+                notification: api::command::Notification::WindowOpened,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
+                device: api::command::EnergySavingDevice::LivingRoomTv,
+            }).into(),
         ]
     )
     ]

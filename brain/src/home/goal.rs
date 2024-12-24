@@ -14,6 +14,7 @@ pub enum HomeGoal {
     StayInformed,
     SmarterHeating(Room),
     SaveEnergy,
+    ResetToDefaltSettings,
 }
 
 //TODO select goals based on current state
@@ -27,5 +28,6 @@ pub fn get_active_goals() -> Vec<HomeGoal> {
         HomeGoal::PreventMouldInBathroom,
         HomeGoal::StayInformed,
         HomeGoal::SaveEnergy,
+        HomeGoal::ResetToDefaltSettings,
     ]
 }

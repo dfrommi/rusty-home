@@ -7,9 +7,9 @@ use support::{
     unit::{HeatingUnit, KiloCubicMeter},
     DataPoint,
 };
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::{broadcast::Receiver, mpsc};
 
-use crate::core::StateCollector;
+use crate::core::{IncomingData, IncomingDataProcessor};
 
 use super::{AddEnergyReadingUseCase, EnergyReading, EnergyReadingRepository, Faucet, Radiator};
 
@@ -18,7 +18,7 @@ pub struct EnergyMeterService<R> {
     repo: R,
 }
 
-pub struct EnergyMeterStateCollector<R> {
+pub struct EnergyMeterIncomingDataProcessor<R> {
     repo: R,
     rx: Receiver<EnergyReadingInsertEvent>,
 }
@@ -29,7 +29,7 @@ impl<R> EnergyMeterService<R> {
     }
 }
 
-impl<R> EnergyMeterStateCollector<R> {
+impl<R> EnergyMeterIncomingDataProcessor<R> {
     pub fn new(repo: R, rx: Receiver<EnergyReadingInsertEvent>) -> Self {
         Self { repo, rx }
     }
@@ -46,28 +46,34 @@ where
     }
 }
 
-impl<R> StateCollector for EnergyMeterStateCollector<R>
+impl<R> IncomingDataProcessor for EnergyMeterIncomingDataProcessor<R>
 where
     R: EnergyReadingRepository,
 {
-    async fn get_current_state(&self) -> anyhow::Result<Vec<DataPoint<ChannelValue>>> {
-        let readings = self.repo.get_latest_total_readings().await?;
-
-        let dps: Vec<DataPoint<ChannelValue>> = readings
+    async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
+        let dps: Vec<DataPoint<ChannelValue>> = self
+            .repo
+            .get_latest_total_readings()
+            .await?
             .into_iter()
             .map(|dp| dp.map_value(|v| v.into()))
             .collect();
 
-        Ok(dps)
-    }
+        for dp in dps {
+            sender.send(IncomingData::StateValue(dp)).await?;
+        }
 
-    async fn recv(&mut self) -> anyhow::Result<DataPoint<ChannelValue>> {
         loop {
             match self.rx.recv().await {
                 Ok(EnergyReadingInsertEvent { id }) => {
                     tracing::info!("Received energy reading with id {}", id);
+
                     match self.repo.get_total_reading_by_id(id).await {
-                        Ok(dp) => return Ok(dp.map_value(|v| v.into())),
+                        Ok(dp) => {
+                            let dp = dp.map_value(|v| v.into());
+                            sender.send(IncomingData::StateValue(dp)).await?
+                        }
+
                         Err(e) => {
                             tracing::error!(
                                 "Error getting energy reading with id {} in event handler: {}",

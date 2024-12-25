@@ -2,13 +2,13 @@ use actix_web::App;
 use anyhow::Context;
 use api::{CommandAddedEvent, DbEventListener};
 use config::{default_ha_command_config, default_ha_state_config};
-use core::{CommandExecutor, StateCollector};
+use core::{CommandExecutor, IncomingDataProcessor};
 use homeassistant::new_command_executor;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::env;
 use support::mqtt::MqttInMessage;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::{broadcast::Receiver, mpsc};
 use tracing::info;
 
 use sqlx::PgPool;
@@ -46,28 +46,45 @@ pub async fn main() {
 
     let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 
-    let energy_meter_collector = energy_meter::new(
-        infrastructure.database.clone(),
-        infrastructure
-            .event_listener
-            .new_energy_reading_insert_listener(),
-    )
-    .expect("Error initializing energy meter");
+    let (incoming_data_tx, incoming_data_rx) = mpsc::channel(16);
 
-    let collect_states = {
-        let ha_state_collector = settings
-            .homeassistant
-            .new_state_collector(&mut infrastructure)
-            .await;
-        let state_storage = infrastructure.database.clone();
-
-        let mut multi_state_collector =
-            MultiStateCollector::new(ha_state_collector, energy_meter_collector);
+    let energy_meter_processing = {
+        let mut energy_meter_processor = energy_meter::new(
+            infrastructure.database.clone(),
+            infrastructure
+                .event_listener
+                .new_energy_reading_insert_listener(),
+        );
+        let tx = incoming_data_tx.clone();
 
         async move {
-            core::collect_states(&state_storage, &mut multi_state_collector)
+            energy_meter_processor
+                .process(tx)
                 .await
-                .unwrap();
+                .expect("Error processing energy meter incoming data");
+        }
+    };
+
+    let ha_incoming_data_processing = {
+        let mut ha_incoming_data_processor = settings
+            .homeassistant
+            .new_incoming_data_processor(&mut infrastructure)
+            .await;
+        async move {
+            ha_incoming_data_processor
+                .process(incoming_data_tx.clone())
+                .await
+                .expect("Error processing HA incoming data");
+        }
+    };
+
+    let incoming_data_persisting = {
+        let state_storage = infrastructure.database.clone();
+
+        async move {
+            core::collect_states(incoming_data_rx, &state_storage)
+                .await
+                .expect("Error persisting incoming data");
         }
     };
 
@@ -97,11 +114,13 @@ pub async fn main() {
 
     let process_infrastucture = infrastructure.process();
 
-    tokio::join!(
-        collect_states,
-        execute_commands,
-        process_infrastucture,
-        http_server_exec
+    tokio::select!(
+        _ = energy_meter_processing => {},
+        _ = ha_incoming_data_processing => {},
+        _ = incoming_data_persisting => {},
+        _ = execute_commands => {},
+        _ = http_server_exec => {},
+        _ = process_infrastucture => {},
     );
 }
 
@@ -111,10 +130,10 @@ impl settings::HomeAssitant {
         new_command_executor(http_client, &default_ha_command_config())
     }
 
-    async fn new_state_collector(
+    async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl StateCollector {
+    ) -> impl IncomingDataProcessor {
         let http_client = homeassistant::HaRestClient::new(&self.url, &self.token);
         let mqtt_client = homeassistant::HaMqttClient::new(
             infrastructure
@@ -123,8 +142,12 @@ impl settings::HomeAssitant {
                 .expect("Error subscribing to MQTT topic"),
         );
 
-        homeassistant::new_state_collector(http_client, mqtt_client, &default_ha_state_config())
-            .expect("Error initializing HA state collector")
+        homeassistant::new_incoming_data_processor(
+            http_client,
+            mqtt_client,
+            &default_ha_state_config(),
+        )
+        .expect("Error initializing HA state collector")
     }
 }
 
@@ -174,50 +197,5 @@ impl Infrastructure {
             _ = self.mqtt_client.process() => {},
             _ = self.event_listener.dispatch_events() => {},
         )
-    }
-}
-
-//no dyn and box for traits with async fn
-struct MultiStateCollector<A, B>
-where
-    A: StateCollector,
-    B: StateCollector,
-{
-    state_collector_1: A,
-    state_collector_2: B,
-}
-
-impl<A, B> MultiStateCollector<A, B>
-where
-    A: StateCollector,
-    B: StateCollector,
-{
-    fn new(state_collector_1: A, state_collector_2: B) -> Self {
-        Self {
-            state_collector_1,
-            state_collector_2,
-        }
-    }
-}
-
-impl<A, B> StateCollector for MultiStateCollector<A, B>
-where
-    A: StateCollector,
-    B: StateCollector,
-{
-    async fn get_current_state(
-        &self,
-    ) -> anyhow::Result<Vec<support::DataPoint<api::state::ChannelValue>>> {
-        let mut result = vec![];
-        result.extend(self.state_collector_1.get_current_state().await?);
-        result.extend(self.state_collector_2.get_current_state().await?);
-        Ok(result)
-    }
-
-    async fn recv(&mut self) -> anyhow::Result<support::DataPoint<api::state::ChannelValue>> {
-        tokio::select! {
-            dp = self.state_collector_1.recv() => dp,
-            dp = self.state_collector_2.recv() => dp,
-        }
     }
 }

@@ -8,14 +8,14 @@ pub use domain::HaChannel;
 pub use domain::HaServiceTarget;
 
 use crate::core::CommandExecutor;
-use crate::core::StateCollector;
+use crate::core::IncomingDataProcessor;
 
-pub fn new_state_collector(
+pub fn new_incoming_data_processor(
     client: HaRestClient,
     mqtt_client: HaMqttClient,
     config: &[(&str, HaChannel)],
-) -> anyhow::Result<impl StateCollector> {
-    let collector = domain::HaStateCollector::new(client, mqtt_client, config);
+) -> anyhow::Result<impl IncomingDataProcessor> {
+    let collector = domain::HaIncomingDataProcessor::new(client, mqtt_client, config);
     Ok(collector)
 }
 

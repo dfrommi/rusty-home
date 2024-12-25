@@ -7,22 +7,22 @@ use support::{
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
     DataPoint,
 };
+use tokio::sync::mpsc;
 
 use crate::{
-    core::StateCollector,
+    core::{IncomingData, IncomingDataProcessor},
     homeassistant::domain::{
         GetAllEntityStatesPort, HaChannel, ListenToStateChangesPort, StateChangedEvent, StateValue,
     },
 };
 
-pub struct HaStateCollector<C, L> {
+pub struct HaIncomingDataProcessor<C, L> {
     client: C,
     listener: L,
     config: HashMap<String, Vec<HaChannel>>,
-    pending_events: Vec<DataPoint<ChannelValue>>,
 }
 
-impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> HaStateCollector<C, L> {
+impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> HaIncomingDataProcessor<C, L> {
     pub fn new(client: C, listener: L, config: &[(&str, HaChannel)]) -> Self {
         let mut m: HashMap<String, Vec<HaChannel>> = HashMap::new();
         for (id, channel) in config {
@@ -34,38 +34,33 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> HaStateCollector<C,
             client,
             listener,
             config: m,
-            pending_events: vec![],
         }
     }
 }
 
-impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> StateCollector
-    for HaStateCollector<C, L>
+impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcessor
+    for HaIncomingDataProcessor<C, L>
 {
-    async fn get_current_state(&self) -> anyhow::Result<Vec<DataPoint<ChannelValue>>> {
-        let events = self.client.get_current_state().await?;
-
-        let dps = events
+    async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
+        let current_dps: Vec<DataPoint<ChannelValue>> = self
+            .client
+            .get_current_state()
+            .await?
             .iter()
             .flat_map(|e| to_smart_home_events(e, &self.config))
             .collect();
-        Ok(dps)
-    }
 
-    async fn recv(&mut self) -> anyhow::Result<DataPoint<ChannelValue>> {
-        if !self.pending_events.is_empty() {
-            return Ok(self.pending_events.remove(0));
+        for dp in current_dps {
+            sender.send(IncomingData::StateValue(dp)).await?;
         }
 
         loop {
             match ListenToStateChangesPort::recv(&mut self.listener).await {
                 Ok(event) => {
-                    let mut dps = to_smart_home_events(&event, &self.config);
+                    let dps = to_smart_home_events(&event, &self.config);
 
-                    if !dps.is_empty() {
-                        let dp = dps.remove(0);
-                        self.pending_events.extend(dps);
-                        return Ok(dp);
+                    for dp in dps {
+                        sender.send(IncomingData::StateValue(dp)).await?;
                     }
                 }
 

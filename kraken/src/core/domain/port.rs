@@ -5,16 +5,18 @@ use api::{
     command::{Command, CommandExecution},
     state::ChannelValue,
 };
-use support::{time::DateTime, DataPoint};
+use support::time::DateTime;
+use tokio::sync::mpsc;
+
+use crate::core::IncomingData;
 
 pub trait CommandExecutor {
     //Returns true if command was executed
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
 }
 
-pub trait StateCollector {
-    async fn get_current_state(&self) -> anyhow::Result<Vec<DataPoint<ChannelValue>>>;
-    async fn recv(&mut self) -> anyhow::Result<DataPoint<ChannelValue>>;
+pub trait IncomingDataProcessor {
+    async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()>;
 }
 
 pub trait CommandRepository {

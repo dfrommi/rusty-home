@@ -1,24 +1,26 @@
-use super::port::{StateCollector, StateStorage};
+use tokio::sync::mpsc;
 
-//TODO more generic with Vec of StateCollector, but that's not possible yet because of async fn on
-//trait prevents building an object. async-trait crate might help.
+use crate::core::IncomingData;
+
+use super::port::StateStorage;
+
 pub async fn collect_states(
+    mut incoming_data: mpsc::Receiver<IncomingData>,
     state_storage: &impl StateStorage,
-    state_collector: &mut impl StateCollector,
 ) -> anyhow::Result<()> {
     tracing::info!("Start persisting current states");
 
-    for dp in state_collector.get_current_state().await? {
-        state_storage.add_state(&dp.value, &dp.timestamp).await?;
-    }
-
     loop {
-        match state_collector.recv().await {
-            Ok(dp) => {
-                state_storage.add_state(&dp.value, &dp.timestamp).await?;
+        let data = incoming_data.recv().await;
+        match &data {
+            Some(IncomingData::StateValue(dp)) => {
+                if let Err(e) = state_storage.add_state(&dp.value, &dp.timestamp).await {
+                    tracing::error!("Error processing state {:?}: {:?}", data, e);
+                }
             }
-            Err(e) => {
-                tracing::error!("Error processing state: {:?}", e);
+
+            None => {
+                tracing::debug!("Event receiver closed");
             }
         }
     }

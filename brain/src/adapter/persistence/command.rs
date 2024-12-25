@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use sqlx::PgPool;
 use support::{t, time::DateTime};
 
-use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor};
+use crate::port::{CommandAccess, CommandStore};
 
 impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> for DB {
     async fn get_latest_command(
@@ -37,12 +37,11 @@ impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> fo
     }
 }
 
-impl<DB, C> CommandExecutor<C> for DB
+impl<DB> CommandStore for DB
 where
-    C: Into<Command>,
     DB: AsRef<PgPool>,
 {
-    async fn execute(&self, command: C, source: CommandSource) -> Result<CommandExecutionResult> {
+    async fn save_command(&self, command: Command, source: CommandSource) -> Result<()> {
         let command: Command = command.into();
 
         let db_command = serde_json::json!(command);
@@ -59,7 +58,7 @@ where
         .execute(self.as_ref())
         .await?;
 
-        Ok(CommandExecutionResult::Triggered)
+        Ok(())
     }
 }
 

@@ -6,7 +6,7 @@ use support::{
 };
 
 use crate::{
-    core::planner::ConditionalAction,
+    core::planner::{Action, ActionEvaluationResult},
     home::{
         action::{
             DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping, HeatingZone, HomeAction,
@@ -29,7 +29,9 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
         let api = infrastructure();
 
-        let is_fulfilled = action.preconditions_fulfilled(api).await.unwrap();
+        let result = action.evaluate(api).await.unwrap();
+
+        let is_fulfilled = !matches!(result, ActionEvaluationResult::Skip);
 
         ActionState { is_fulfilled }
     }))

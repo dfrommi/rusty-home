@@ -1,11 +1,19 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 
 use api::command::{Command, CommandSource, CommandTarget};
-use support::{t, time::DateTime};
 
-use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor};
+#[derive(Debug, Clone)]
+pub enum ActionEvaluationResult {
+    Lock(CommandTarget),
+    Execute(Command, CommandSource),
+    Skip,
+}
 
-use super::{CommandState, Lockable};
+pub trait Action<API>: Display {
+    async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult>;
+}
 
 pub trait ConditionalAction<API> {
     async fn preconditions_fulfilled(&self, api: &API) -> Result<bool>;
@@ -16,78 +24,17 @@ pub trait CommandAction {
     fn source(&self) -> CommandSource;
 }
 
-pub trait ExecutableAction<E> {
-    async fn execute(&self, executor: &E) -> Result<CommandExecutionResult>;
-}
+impl<T: CommandAction + ConditionalAction<API> + Display, API> Action<API> for T {
+    async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult> {
+        let preconditions_fulfilled = self.preconditions_fulfilled(api).await?;
 
-pub trait ExecutionAwareAction<API> {
-    async fn was_latest_execution_for_target_since(
-        &self,
-        since: DateTime,
-        api: &API,
-    ) -> Result<bool>;
-
-    async fn is_reflected_in_state(&self, api: &API) -> Result<bool>;
-}
-
-impl<T: CommandAction> Lockable<CommandTarget> for T {
-    fn locking_key(&self) -> CommandTarget {
-        let command = self.command();
-        command.into()
-    }
-}
-
-impl<E, T> ExecutableAction<E> for T
-where
-    E: CommandExecutor<Command> + CommandState<Command> + CommandAccess<Command>,
-    T: CommandAction + ExecutionAwareAction<E>,
-{
-    async fn execute(&self, executor: &E) -> Result<CommandExecutionResult> {
-        //wait until roundtrip is completed. State might not have been updated yet
-        let was_just_executed = self
-            .was_latest_execution_for_target_since(t!(30 seconds ago), executor)
-            .await?;
-
-        if was_just_executed {
-            return Ok(CommandExecutionResult::Skipped);
+        if !preconditions_fulfilled {
+            return Ok(ActionEvaluationResult::Skip);
         }
 
-        let was_latest_execution = self
-            .was_latest_execution_for_target_since(t!(48 hours ago), executor)
-            .await?;
-        let is_reflected_in_state = self.is_reflected_in_state(executor).await?;
-
-        if !was_latest_execution || !is_reflected_in_state {
-            executor.execute(self.command(), self.source()).await
-        } else {
-            Ok(CommandExecutionResult::Skipped)
-        }
-    }
-}
-
-impl<T, API> ExecutionAwareAction<API> for T
-where
-    T: CommandAction,
-    API: CommandState<Command> + CommandAccess<Command>,
-{
-    async fn was_latest_execution_for_target_since(
-        &self,
-        since: DateTime,
-        api: &API,
-    ) -> Result<bool> {
-        let command = self.command();
-        let target = CommandTarget::from(&command);
-        let source = self.source();
-
-        let latest_source = api.get_latest_command_source(target, since).await?;
-
-        Ok(latest_source.map(|s| s == source).unwrap_or(false))
-    }
-
-    async fn is_reflected_in_state(&self, api: &API) -> Result<bool> {
-        let command = self.command();
-        let is_reflected_in_state = api.is_reflected_in_state(&command).await?;
-
-        Ok(is_reflected_in_state)
+        Ok(ActionEvaluationResult::Execute(
+            self.command(),
+            self.source(),
+        ))
     }
 }

@@ -7,7 +7,10 @@ use api::{
 };
 use support::time::DateTime;
 
-use crate::core::planner::{CommandAction, CommandState, ConditionalAction, ExecutionAwareAction};
+use crate::core::{
+    planner::{CommandAction, ConditionalAction},
+    service::CommandState,
+};
 
 use super::{CommandAccess, DataPointAccess};
 
@@ -54,17 +57,20 @@ where
 }
 
 async fn preconditions_for_oneshot_fulfilled<API>(
-    action: &impl ExecutionAwareAction<API>,
+    action: &impl CommandAction,
     since: DateTime,
     api: &API,
 ) -> Result<bool>
 where
     API: CommandAccess<Command> + CommandState<Command>,
 {
-    let (is_last_trigger, is_still_running) = tokio::try_join!(
-        action.was_latest_execution_for_target_since(since, api),
-        action.is_reflected_in_state(api),
+    let this_source = action.source();
+    let this_command = action.command();
+
+    let (last_source, is_reflected) = tokio::try_join!(
+        api.get_latest_command_source(action.command(), since),
+        api.is_reflected_in_state(&this_command),
     )?;
 
-    Ok(!is_last_trigger || is_still_running)
+    Ok(last_source != Some(this_source) || is_reflected)
 }

@@ -59,10 +59,19 @@ pub enum CommandExecutionResult {
     Triggered,
     Skipped,
 }
-pub trait CommandExecutor<C: Into<Command>> {
-    async fn execute(&self, command: C, source: CommandSource) -> Result<CommandExecutionResult>;
+
+pub trait CommandExecutor {
+    async fn execute(
+        &self,
+        command: Command,
+        source: CommandSource,
+    ) -> Result<CommandExecutionResult>;
 }
 
 pub trait PlanningResultTracer {
     async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()>;
+}
+
+pub trait CommandStore {
+    async fn save_command(&self, command: Command, source: CommandSource) -> anyhow::Result<()>;
 }

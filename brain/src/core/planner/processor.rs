@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
-use api::command::{Command, CommandTarget};
+use api::command::CommandTarget;
 
-use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor};
-
-use super::{
-    resource_lock::{Lockable, ResourceLock},
-    CommandState, ConditionalAction, ExecutableAction, PlanningTrace,
+use crate::{
+    core::planner::action::ActionEvaluationResult,
+    port::{CommandExecutionResult, CommandExecutor},
 };
+
+use super::{action::Action, resource_lock::ResourceLock, PlanningTrace};
 
 pub async fn plan_and_execute<G, A, API, EXE>(
     active_goals: &[G],
@@ -17,8 +17,8 @@ pub async fn plan_and_execute<G, A, API, EXE>(
 ) -> Vec<PlanningTrace>
 where
     G: Eq + Display,
-    A: Lockable<CommandTarget> + ConditionalAction<API> + ExecutableAction<EXE> + Display,
-    EXE: CommandExecutor<Command> + CommandState<Command> + CommandAccess<Command>,
+    A: Action<API>,
+    EXE: CommandExecutor,
 {
     let mut resource_lock: ResourceLock<CommandTarget> = ResourceLock::new();
     let mut action_results: Vec<PlanningTrace> = Vec::new();
@@ -35,31 +35,41 @@ where
                 continue;
             }
 
-            //Already locked -> skip
-            if resource_lock.is_locked(action) {
-                trace.locked = true;
-                action_results.push(trace);
-                continue;
+            let evaluation_result = action.evaluate(api).await.unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Error evaluating action {}, assuming not fulfilled: {:?}",
+                    action,
+                    e
+                );
+                ActionEvaluationResult::Skip
+            });
+
+            trace.is_fulfilled = Some(!matches!(evaluation_result, ActionEvaluationResult::Skip));
+
+            //LOCKING
+            let locking_key = match &evaluation_result {
+                ActionEvaluationResult::Lock(target) => Some(target.clone()),
+                ActionEvaluationResult::Execute(command, _) => {
+                    Some(CommandTarget::from(command.clone()))
+                }
+                ActionEvaluationResult::Skip => None,
+            };
+
+            match locking_key {
+                Some(key) if resource_lock.is_locked(&key) => {
+                    trace.locked = true;
+                    action_results.push(trace);
+                    continue;
+                }
+                Some(key) => {
+                    resource_lock.lock(key);
+                }
+                None => {}
             }
 
-            let is_fulfilled = action
-                .preconditions_fulfilled(api)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::warn!(
-                        "Error checking preconditions of action {}, assuming not fulfilled: {:?}",
-                        action,
-                        e
-                    );
-                    false
-                });
-
-            trace.is_fulfilled = Some(is_fulfilled);
-
-            if is_fulfilled {
-                resource_lock.lock(action);
-
-                match action.execute(command_processor).await {
+            //EXECUTION
+            if let ActionEvaluationResult::Execute(command, source) = evaluation_result {
+                match command_processor.execute(command, source).await {
                     Ok(CommandExecutionResult::Triggered) => {
                         tracing::info!("Action {} started", action);
                         trace.was_triggered = Some(true);

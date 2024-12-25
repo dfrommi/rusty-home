@@ -12,7 +12,7 @@ use super::MqttStateValue;
 pub async fn process_commands(
     base_topic: String,
     mut rx: Receiver<MqttInMessage>,
-    api: &impl CommandExecutor<Command>,
+    api: &impl CommandExecutor,
 ) {
     while let Some(msg) = rx.recv().await {
         let topic_parts: Vec<&str> = msg

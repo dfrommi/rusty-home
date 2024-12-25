@@ -49,9 +49,9 @@ mod support {
     use tabled::Table;
 
     use crate::{
-        core::planner::{CommandState, PlanningTrace},
+        core::{planner::PlanningTrace, service::CommandState},
         home::tests::TestInfrastructure,
-        port::{CommandAccess, CommandExecutor, PlanningResultTracer},
+        port::{CommandAccess, CommandStore, PlanningResultTracer},
     };
 
     pub struct TestPlanningResultTracer;
@@ -84,18 +84,18 @@ mod support {
         }
     }
 
-    impl<'a> CommandExecutor<Command> for TestCommandProcessor<'a, TestInfrastructure> {
-        async fn execute(
+    impl CommandStore for TestCommandProcessor<'_, TestInfrastructure> {
+        async fn save_command(
             &self,
             command: Command,
-            source: api::command::CommandSource,
-        ) -> anyhow::Result<crate::port::CommandExecutionResult> {
+            source: CommandSource,
+        ) -> anyhow::Result<()> {
             println!("Executing command: {:?} with source: {:?}", command, source);
 
             let mut executed_actions = self.executed_actions.lock().unwrap();
             executed_actions.push((command, source));
 
-            Ok(crate::port::CommandExecutionResult::Triggered)
+            Ok(())
         }
     }
 

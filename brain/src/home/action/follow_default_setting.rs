@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use api::command::{Command, CommandTarget};
 
-use crate::core::planner::{CommandAction, ConditionalAction};
+use crate::core::planner::{Action, ActionEvaluationResult};
 
 #[derive(Debug, Clone)]
 pub struct FollowDefaultSetting {
@@ -21,15 +21,9 @@ impl Display for FollowDefaultSetting {
     }
 }
 
-impl ConditionalAction<()> for FollowDefaultSetting {
-    async fn preconditions_fulfilled(&self, _: &()) -> anyhow::Result<bool> {
-        Ok(true)
-    }
-}
-
-impl CommandAction for FollowDefaultSetting {
-    fn command(&self) -> Command {
-        match self.target.clone() {
+impl Action<()> for FollowDefaultSetting {
+    async fn evaluate(&self, _: &()) -> anyhow::Result<ActionEvaluationResult> {
+        let command = match self.target.clone() {
             CommandTarget::SetPower { device } => Command::SetPower(api::command::SetPower {
                 device,
                 power_on: false,
@@ -49,10 +43,11 @@ impl CommandAction for FollowDefaultSetting {
             CommandTarget::SetEnergySaving { device } => {
                 Command::SetEnergySaving(api::command::SetEnergySaving { device, on: true })
             }
-        }
-    }
+        };
 
-    fn source(&self) -> api::command::CommandSource {
-        super::action_source(self)
+        Ok(ActionEvaluationResult::Execute(
+            command,
+            super::action_source(self),
+        ))
     }
 }

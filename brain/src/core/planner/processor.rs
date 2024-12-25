@@ -20,72 +20,91 @@ where
     A: Action<API>,
     EXE: CommandExecutor,
 {
+    let evaluated_config = evaluate_actions(active_goals, config, api).await;
+
     let mut resource_lock: ResourceLock<CommandTarget> = ResourceLock::new();
     let mut action_results: Vec<PlanningTrace> = Vec::new();
 
-    for (goal, actions) in config.iter() {
-        let is_goal_active = active_goals.contains(goal);
+    for (goal, action, evaluation_result) in evaluated_config {
+        let mut trace = PlanningTrace::new(action, goal);
+        trace.is_goal_active = active_goals.contains(goal);
+        trace.is_fulfilled = Some(!matches!(evaluation_result, ActionEvaluationResult::Skip));
 
-        for action in actions {
-            let mut trace = PlanningTrace::new(action, goal);
-            trace.is_goal_active = is_goal_active;
+        //LOCKING
+        let locking_key = match &evaluation_result {
+            ActionEvaluationResult::Lock(target) => Some(target.clone()),
+            ActionEvaluationResult::Execute(command, _) => {
+                Some(CommandTarget::from(command.clone()))
+            }
+            ActionEvaluationResult::Skip => None,
+        };
 
-            if !is_goal_active {
+        match locking_key {
+            Some(key) if resource_lock.is_locked(&key) => {
+                trace.locked = true;
                 action_results.push(trace);
                 continue;
             }
-
-            let evaluation_result = action.evaluate(api).await.unwrap_or_else(|e| {
-                tracing::warn!(
-                    "Error evaluating action {}, assuming not fulfilled: {:?}",
-                    action,
-                    e
-                );
-                ActionEvaluationResult::Skip
-            });
-
-            trace.is_fulfilled = Some(!matches!(evaluation_result, ActionEvaluationResult::Skip));
-
-            //LOCKING
-            let locking_key = match &evaluation_result {
-                ActionEvaluationResult::Lock(target) => Some(target.clone()),
-                ActionEvaluationResult::Execute(command, _) => {
-                    Some(CommandTarget::from(command.clone()))
-                }
-                ActionEvaluationResult::Skip => None,
-            };
-
-            match locking_key {
-                Some(key) if resource_lock.is_locked(&key) => {
-                    trace.locked = true;
-                    action_results.push(trace);
-                    continue;
-                }
-                Some(key) => {
-                    resource_lock.lock(key);
-                }
-                None => {}
+            Some(key) => {
+                resource_lock.lock(key);
             }
-
-            //EXECUTION
-            if let ActionEvaluationResult::Execute(command, source) = evaluation_result {
-                match command_processor.execute(command, source).await {
-                    Ok(CommandExecutionResult::Triggered) => {
-                        tracing::info!("Action {} started", action);
-                        trace.was_triggered = Some(true);
-                    }
-                    Ok(CommandExecutionResult::Skipped) => {
-                        trace.was_triggered = Some(false);
-                    }
-                    Err(e) => {
-                        tracing::error!("Error starting action {}: {:?}", action, e);
-                    }
-                }
-            }
-
-            action_results.push(trace);
+            None => {}
         }
+
+        //EXECUTION
+        if let ActionEvaluationResult::Execute(command, source) = evaluation_result {
+            match command_processor.execute(command, source).await {
+                Ok(CommandExecutionResult::Triggered) => {
+                    tracing::info!("Action {} started", action);
+                    trace.was_triggered = Some(true);
+                }
+                Ok(CommandExecutionResult::Skipped) => {
+                    trace.was_triggered = Some(false);
+                }
+                Err(e) => {
+                    tracing::error!("Error starting action {}: {:?}", action, e);
+                }
+            }
+        }
+
+        action_results.push(trace);
     }
 
     action_results
+}
+
+async fn evaluate_actions<'a, G, A, API>(
+    active_goals: &'a [G],
+    config: &'a [(G, Vec<A>)],
+    api: &API,
+) -> Vec<(&'a G, &'a A, ActionEvaluationResult)>
+where
+    G: Eq + Display,
+    A: Action<API>,
+{
+    //Evaluate all actions in parallel for better parallelism/performance
+    let tasks = config.iter().flat_map(|(goal, actions)| {
+        let is_goal_active = active_goals.contains(goal);
+        actions
+            .iter()
+            .map(|action| async move {
+                let result = if is_goal_active {
+                    action.evaluate(api).await.unwrap_or_else(|e| {
+                        tracing::warn!(
+                            "Error evaluating action {}, assuming not fulfilled: {:?}",
+                            action,
+                            e
+                        );
+                        ActionEvaluationResult::Skip
+                    })
+                } else {
+                    ActionEvaluationResult::Skip
+                };
+
+                (goal, action, result)
+            })
+            .collect::<Vec<_>>()
+    });
+
+    futures::future::join_all(tasks).await
 }

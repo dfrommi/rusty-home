@@ -50,7 +50,7 @@ async fn sleeping(
     let ts = api
         .series_since(in_bed, *range_start)
         .await?
-        .with_duration();
+        .with_duration_until_next_dp();
 
     let sleeping_started = ts.iter().find(|dp| {
         in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)

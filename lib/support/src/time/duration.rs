@@ -12,6 +12,10 @@ impl Duration {
         Self { delegate }
     }
 
+    pub fn zero() -> Self {
+        Self::new(chrono::Duration::zero())
+    }
+
     pub fn until(date_time: &DateTime) -> Self {
         Self::new(*date_time.delegate() - DateTime::now().delegate())
     }
@@ -42,6 +46,10 @@ impl Duration {
 
     pub fn as_secs_f64(&self) -> f64 {
         self.delegate.num_milliseconds() as f64 / 1000.0
+    }
+
+    pub fn as_hours_f64(&self) -> f64 {
+        self.delegate.num_milliseconds() as f64 / 1000.0 / 3600.0
     }
 
     pub fn as_minutes(&self) -> i64 {

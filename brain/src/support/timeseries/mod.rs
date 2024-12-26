@@ -74,6 +74,16 @@ impl<T: Estimatable> TimeSeries<T> {
         Self::new(context, dps, range)
     }
 
+    pub fn map(&self, f: impl Fn(&DataPoint<T::Type>) -> T::Type) -> Self
+    where
+        T: Clone,
+    {
+        Self {
+            context: self.context.clone(),
+            values: self.values.map(f),
+        }
+    }
+
     //linear interpolation or last seen
     pub fn at(&self, at: DateTime) -> Option<DataPoint<T::Type>> {
         Self::interpolate_or_guess(&self.context, at, &self.values).map(|v| DataPoint {
@@ -121,12 +131,14 @@ impl<T: Estimatable> TimeSeries<T> {
         self.values.last()
     }
 
-    pub fn with_duration(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
-        self.values.with_duration()
+    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
+        self.values.with_duration_until_next_dp()
     }
 }
 
 //MATH FUNCTIONS
+//TODO handle area in a saver way: use general duration, not just seconds. Also make result
+//interpolatable. Maybe introduce an area type.
 impl<T: Estimatable> TimeSeries<T>
 where
     T::Type: From<f64>,
@@ -144,13 +156,34 @@ where
 
     pub fn area_in_type_hours(&self) -> f64 {
         let (weighted_sum_secs, _) = self.weighted_sum_and_duration_in_type_secs();
-        weighted_sum_secs / 3600.0
+        weighted_sum_secs
     }
 
     //weighted by duration
     fn weighted_sum_and_duration_in_type_secs(&self) -> (f64, f64) {
         let mut weighted_sum = 0.0;
-        let mut total_duration = 0.0; //in milliseconds
+        let mut total_duration_h = 0.0;
+
+        let area_series = self.area_series_in_unit_hours();
+
+        for dp in area_series.iter() {
+            let (value, duration) = (&dp.value.0, &dp.value.1);
+            weighted_sum += value;
+            total_duration_h += duration.as_hours_f64();
+        }
+
+        if total_duration_h == 0.0 {
+            weighted_sum = (&self.values.first().value).into();
+        }
+
+        (weighted_sum, total_duration_h)
+    }
+
+    pub fn area_series_in_unit_hours(&self) -> DataFrame<(f64, Duration)> {
+        let mut datapoints: Vec<DataPoint<(f64, Duration)>> = vec![DataPoint::new(
+            (0.0, Duration::millis(0)),
+            self.values.first().timestamp,
+        )];
 
         let mut iter = self.values.iter().map(|v| v.timestamp).peekable();
         while let Some(current_timestamp) = iter.next() {
@@ -160,23 +193,21 @@ where
                     .expect("Unexpected error. Could not get value in the middle of two existing values")
                     .value;
 
-                let duration: f64 = next_timestamp
-                    .elapsed_since(current_timestamp)
-                    .as_secs_f64();
+                let duration = next_timestamp.elapsed_since(current_timestamp);
+                let duration_h: f64 = duration.as_hours_f64();
 
                 //good enough approximation for mean in range. Correct for linear and last-seen interpolation
                 let midpoint_f64: f64 = (&ref_value).into();
 
-                weighted_sum += midpoint_f64 * duration;
-                total_duration += duration;
+                datapoints.push(DataPoint {
+                    value: (midpoint_f64 * duration_h, duration),
+                    timestamp: *next_timestamp,
+                });
             }
         }
 
-        if total_duration == 0.0 {
-            weighted_sum = (&self.values.first().value).into();
-        }
-
-        (weighted_sum, total_duration)
+        DataFrame::new(datapoints)
+            .expect("Internal error: error creating DataFrame from non-empty datapoints")
     }
 }
 

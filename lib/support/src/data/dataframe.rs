@@ -35,6 +35,15 @@ impl<T: Clone> DataFrame<T> {
         }
     }
 
+    pub fn map<U: Clone>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
+        DataFrame::new(
+            self.data
+                .values()
+                .map(|v| DataPoint::new(f(v), v.timestamp)),
+        )
+        .expect("Internal error: Error creating data frame of non-empty datapoints")
+    }
+
     pub fn insert(&mut self, dp: DataPoint<T>) {
         self.data.insert(dp.timestamp, dp);
     }
@@ -78,7 +87,7 @@ impl<T: Clone> DataFrame<T> {
             .1
     }
 
-    pub fn with_duration(&self) -> Vec<DataPoint<(T, Duration)>> {
+    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T, Duration)>> {
         self.current_and_next()
             .into_iter()
             .map(|(current, next)| {

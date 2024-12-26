@@ -10,8 +10,7 @@ use actix_web::{
 };
 use anyhow::Context;
 use api::state::{
-    CurrentPowerUsage, HeatingDemand, RelativeHumidity, Temperature,
-    TotalEnergyConsumption,
+    CurrentPowerUsage, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption,
 };
 use derive_more::derive::{Display, Error};
 use serde::Deserialize;
@@ -56,6 +55,14 @@ where
         .route(
             "/ds/heating/current",
             web::get().to(energy_monitor::current_heating::<T>),
+        )
+        .route(
+            "/ds/heating/series",
+            web::get().to(energy_monitor::heating_series_aggregated_sum::<T>),
+        )
+        .route(
+            "/ds/heating/series/temperature",
+            web::get().to(energy_monitor::outside_temperature_series::<T>),
         )
         .route(
             "/ds/heating/total",

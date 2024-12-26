@@ -5,7 +5,7 @@ use support::unit::DegreeCelsius;
 
 use crate::home::action::{
     FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,
-    SaveTvEnergy, UserTriggerAction,
+    UserTriggerAction,
 };
 use crate::home::state::UserControlled;
 
@@ -85,10 +85,12 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         ],
     ),
     (
-        HomeGoal::SaveEnergy,
+        HomeGoal::TvControl,
         vec![
             UserTriggerAction::new(HomekitTarget::LivingRoomTvEnergySaving.into()).into(),
-            SaveTvEnergy::new().into(),
+            FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
+                device: api::command::EnergySavingDevice::LivingRoomTv,
+            }).into(),
         ]
     ),
     (
@@ -125,9 +127,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Sabine,
                 notification: api::command::Notification::WindowOpened,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
-                device: api::command::EnergySavingDevice::LivingRoomTv,
             }).into(),
         ]
     )

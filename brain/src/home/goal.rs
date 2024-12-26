@@ -1,3 +1,7 @@
+use api::state::Powered;
+
+use crate::port::DataPointAccess;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 #[allow(clippy::enum_variant_names)]
 pub enum Room {
@@ -14,13 +18,16 @@ pub enum HomeGoal {
     StayInformed,
     #[display("SmarterHeating[{}]", _0)]
     SmarterHeating(Room),
-    SaveEnergy,
+    TvControl,
     ResetToDefaltSettings,
 }
 
 //TODO select goals based on current state
-pub fn get_active_goals() -> Vec<HomeGoal> {
-    vec![
+pub async fn get_active_goals<API>(api: &API) -> Vec<HomeGoal>
+where
+    API: DataPointAccess<Powered>,
+{
+    let mut goals = vec![
         HomeGoal::SmarterHeating(Room::LivingRoom),
         HomeGoal::SmarterHeating(Room::Bedroom),
         HomeGoal::SmarterHeating(Room::Kitchen),
@@ -28,7 +35,12 @@ pub fn get_active_goals() -> Vec<HomeGoal> {
         HomeGoal::SmarterHeating(Room::Bathroom),
         HomeGoal::PreventMouldInBathroom,
         HomeGoal::StayInformed,
-        HomeGoal::SaveEnergy,
         HomeGoal::ResetToDefaltSettings,
-    ]
+    ];
+
+    if api.current(Powered::LivingRoomTv).await.unwrap_or(false) {
+        goals.push(HomeGoal::TvControl);
+    }
+
+    goals
 }

@@ -1,16 +1,10 @@
 use ::support::time::{DateTime, FIXED_NOW};
-use api::{
-    command::{Command, CommandSource, PowerToggle, SetPower},
-    trigger::UserTriggerTarget,
-};
+use api::command::{Command, CommandSource, PowerToggle, SetPower};
 use support::TestCommandProcessor;
 
 use crate::{
     core::planner::perform_planning,
-    home::{
-        action::{HomeAction, UserTriggerAction},
-        default_config, get_active_goals,
-    },
+    home::{default_config, get_active_goals},
 };
 
 use super::{infrastructure, runtime};
@@ -21,11 +15,12 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
     let f = async {
         let tracer = support::TestPlanningResultTracer;
         let command_api = TestCommandProcessor::new(infrastructure());
+        let api = &infrastructure();
 
         perform_planning(
-            &get_active_goals(),
+            &get_active_goals(api).await,
             default_config(),
-            &infrastructure(),
+            api,
             &command_api,
             &tracer,
         )

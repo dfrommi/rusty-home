@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::{
-    command::{Command, SetHeating},
-    state::{ExternalAutoControl, SetPoint},
-};
+use api::command::{Command, SetHeating};
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
@@ -15,6 +12,8 @@ use crate::{
     },
     port::{CommandAccess, DataPointAccess},
 };
+
+use super::{trigger_once_and_keep_running, CommandState};
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 
@@ -61,9 +60,8 @@ impl<T> ConditionalAction<T> for NoHeatingDuringAutomaticTemperatureIncrease
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<AutomaticTemperatureIncrease>
-        + DataPointAccess<SetPoint>
-        + DataPointAccess<ExternalAutoControl>
-        + CommandAccess<SetHeating>,
+        + CommandAccess<Command>
+        + CommandState<Command>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
@@ -90,17 +88,12 @@ where
             return Ok(false);
         }
 
-        //another place very similar to the rest
-        let (already_triggered, has_expected_manual_heating) = tokio::try_join!(
-            self.heating_zone.manual_heating_already_triggrered(
-                api,
-                NO_HEATING_SET_POINT,
-                window_opened.timestamp
-            ),
-            self.heating_zone
-                .is_manual_heating_to(api, NO_HEATING_SET_POINT)
-        )?;
-
-        Ok(!already_triggered.value || has_expected_manual_heating.value)
+        trigger_once_and_keep_running(
+            &self.command(),
+            &self.source(),
+            window_opened.timestamp,
+            api,
+        )
+        .await
     }
 }

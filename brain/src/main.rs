@@ -69,8 +69,10 @@ pub async fn main() {
                 }
 
                 tracing::info!("Start planning");
+                let active_goals = home::get_active_goals(api).await;
+
                 core::planner::perform_planning(
-                    &home::get_active_goals(),
+                    &active_goals,
                     home::default_config(),
                     api,
                     api,

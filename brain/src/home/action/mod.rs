@@ -5,7 +5,6 @@ mod inform_window_open;
 mod keep_user_override;
 mod reduce_noise_at_night;
 mod request_closing_window;
-mod save_tv_energy;
 mod user_trigger_action;
 
 use std::fmt::Debug;
@@ -27,7 +26,8 @@ pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
-pub use save_tv_energy::SaveTvEnergy;
+use support::t;
+use support::time::DateTime;
 pub use user_trigger_action::UserTriggerAction;
 
 use crate::core::planner::Action;
@@ -52,7 +52,6 @@ pub enum HomeAction {
     ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
     DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
-    SaveTvEnergy(SaveTvEnergy),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
 }
@@ -109,7 +108,6 @@ where
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                 reduce_noise_at_night.evaluate(api).await
             }
-            HomeAction::SaveTvEnergy(save_tv_energy) => save_tv_energy.evaluate(api).await,
             HomeAction::FollowDefaultSetting(follow_default_setting) => {
                 follow_default_setting.evaluate(&()).await
             }
@@ -118,4 +116,40 @@ where
             }
         }
     }
+}
+
+//trigger and keep running until something else changes state
+async fn trigger_once_and_keep_running<API>(
+    command: &Command,
+    source: &CommandSource,
+    oneshot_range_start: DateTime,
+    api: &API,
+) -> Result<bool>
+where
+    API: CommandAccess<Command> + CommandState<Command>,
+{
+    let executions = api
+        .get_all_commands(command.clone(), oneshot_range_start)
+        .await?;
+
+    let already_triggered = executions
+        .iter()
+        .any(|e| e.source == *source && e.command == *command);
+
+    //first trigger still pending -> start it
+    if !already_triggered {
+        return Ok(true);
+    }
+
+    //return if something else happened after first trigger -> no longer fulfilled
+    let this_as_last_execution = match executions.iter().last() {
+        Some(e) if e.source == *source && e.command == *command => e,
+        _ => return Ok(false),
+    };
+
+    //cover for delay between sending command and receiving state change -> external change happened
+    let just_triggered = this_as_last_execution.created > t!(30 seconds ago);
+    let is_effectively_reflected = just_triggered || api.is_reflected_in_state(&command).await?;
+
+    Ok(is_effectively_reflected)
 }

@@ -50,6 +50,22 @@ fn user_override_kept_continuously() {
 }
 
 #[test]
+fn heating_started_before_window_was_opened_not_working_in_all_rooms() {
+    let action = DeferHeatingUntilVentilationDone::new(
+        HeatingZone::Bedroom,
+        DegreeCelsius(18.0),
+        t!(6:12-12:30),
+    );
+
+    let result = get_state_at("2024-12-26T05:12:13Z", action);
+
+    assert!(
+            result.is_fulfilled,
+            "Not fulfilled but expected. Check that window-open time is verified against date and time, not only time"
+    );
+}
+
+#[test]
 fn heating_started_before_window_was_opened_in_one_room() {
     let action = DeferHeatingUntilVentilationDone::new(
         HeatingZone::Bedroom,

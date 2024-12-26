@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::{Ok, Result};
-use api::{
-    command::{Command, SetHeating},
-    state::{ExternalAutoControl, SetPoint},
-};
+use api::command::{Command, SetHeating};
 use support::{time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
@@ -12,6 +9,8 @@ use crate::{
     home::{action::HeatingZone, state::Resident},
     port::{CommandAccess, DataPointAccess},
 };
+
+use super::{trigger_once_and_keep_running, CommandState};
 
 #[derive(Debug, Clone)]
 pub struct ExtendHeatingUntilSleeping {
@@ -62,10 +61,7 @@ impl CommandAction for ExtendHeatingUntilSleeping {
 
 impl<T> ConditionalAction<T> for ExtendHeatingUntilSleeping
 where
-    T: DataPointAccess<Resident>
-        + DataPointAccess<SetPoint>
-        + DataPointAccess<ExternalAutoControl>
-        + CommandAccess<SetHeating>,
+    T: DataPointAccess<Resident> + CommandAccess<Command> + CommandState<Command>,
 {
     //Strong overlap with wait_for_ventilation
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
@@ -83,16 +79,7 @@ where
             return Ok(false);
         }
 
-        let (already_triggered, has_expected_manual_heating) = tokio::try_join!(
-            self.heating_zone.manual_heating_already_triggrered(
-                api,
-                self.target_temperature,
-                *time_range.start(),
-            ),
-            self.heating_zone
-                .is_manual_heating_to(api, self.target_temperature)
-        )?;
-
-        Ok(!already_triggered.value || has_expected_manual_heating.value)
+        trigger_once_and_keep_running(&self.command(), &self.source(), *time_range.start(), api)
+            .await
     }
 }

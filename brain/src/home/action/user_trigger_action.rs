@@ -1,12 +1,18 @@
 use api::{
     command::{Command, CommandSource},
-    trigger::{ButtonPress, Homekit, Remote, UserTrigger, UserTriggerTarget},
+    state::Powered,
+    trigger::{
+        ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget,
+    },
 };
-use support::t;
+use support::{t, time::DateTime};
 
-use crate::core::planner::{Action, ActionEvaluationResult};
+use crate::core::{
+    planner::{Action, ActionEvaluationResult},
+    service::CommandState,
+};
 
-use super::UserTriggerAccess;
+use super::{trigger_once_and_keep_running, CommandAccess, DataPointAccess, UserTriggerAccess};
 
 #[derive(Debug, Clone, derive_more::Display)]
 #[display("UserTriggerAction[{}]", target)]
@@ -22,62 +28,106 @@ impl UserTriggerAction {
 
 impl<API> Action<API> for UserTriggerAction
 where
-    API: UserTriggerAccess,
+    API: UserTriggerAccess
+        + CommandAccess<Command>
+        + CommandState<Command>
+        + DataPointAccess<Powered>,
 {
     async fn evaluate(&self, api: &API) -> anyhow::Result<ActionEvaluationResult> {
-        let latest_trigger = api.latest_since(&self.target, t!(15 seconds ago)).await?;
+        let start_of_range = match self.range_start(api).await {
+            Some(duration) => duration,
+            None => return Ok(ActionEvaluationResult::Skip),
+        };
 
-        match latest_trigger {
-            Some(trigger) => Ok(ActionEvaluationResult::Execute(
-                into_command(trigger),
-                CommandSource::User(format!(
-                    "{}:{}",
-                    into_source_group(&self.target),
-                    self.target
-                )),
-            )),
-            None => Ok(ActionEvaluationResult::Skip),
+        let latest_trigger = api.latest_since(&self.target, start_of_range).await?;
+
+        let command = match latest_trigger.and_then(into_command) {
+            Some(c) => c.into(),
+            None => return Ok(ActionEvaluationResult::Skip),
+        };
+
+        let source = self.source();
+
+        let fulfilled =
+            trigger_once_and_keep_running(&command, &source, start_of_range, api).await?;
+
+        if !fulfilled {
+            return Ok(ActionEvaluationResult::Skip);
+        }
+
+        Ok(ActionEvaluationResult::Execute(command, source))
+    }
+}
+
+impl UserTriggerAction {
+    fn source(&self) -> CommandSource {
+        let source_group = match self.target {
+            UserTriggerTarget::Remote(_) => "remote".to_string(),
+            UserTriggerTarget::Homekit(_) => "homekit".to_string(),
+        };
+        CommandSource::User(format!("{}:{}", source_group, self.target))
+    }
+
+    async fn range_start<API>(&self, api: &API) -> Option<DateTime>
+    where
+        API: DataPointAccess<Powered>,
+    {
+        match self.target {
+            UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
+            | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => {
+                Some(t!(30 minutes ago))
+            }
+            UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => {
+                Some(t!(15 minutes ago))
+            }
+            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomTvEnergySaving) => {
+                match api.current_data_point(Powered::LivingRoomTv).await {
+                    Ok(dp) if dp.value => Some(dp.timestamp),
+                    Ok(_) => None,
+                    Err(e) => {
+                        tracing::error!("Error getting current state of living room tv: {:?}", e);
+                        None
+                    }
+                }
+            }
         }
     }
 }
 
-fn into_source_group(target: &UserTriggerTarget) -> String {
-    match target {
-        UserTriggerTarget::Remote(_) => "remote".to_string(),
-        UserTriggerTarget::Homekit(_) => "homekit".to_string(),
-    }
-}
-
-fn into_command(trigger: UserTrigger) -> Command {
+fn into_command(trigger: UserTrigger) -> Option<impl Into<Command>> {
     use api::command::*;
 
     match trigger {
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => {
-            Command::SetPower(SetPower {
+            Some(Command::SetPower(SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on: true,
-            })
+            }))
         }
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::BottomSingle)) => {
-            Command::SetPower(SetPower {
+            Some(Command::SetPower(SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on: false,
-            })
+            }))
         }
-        UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => Command::SetPower(SetPower {
-            device: PowerToggle::InfraredHeater,
-            power_on: on,
-        }),
-        UserTrigger::Homekit(Homekit::DehumidifierPower(on)) => Command::SetPower(SetPower {
+        UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => {
+            Some(Command::SetPower(SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: on,
+            }))
+        }
+        UserTrigger::Homekit(Homekit::DehumidifierPower(on)) => Some(Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: on,
-        }),
-        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) => {
-            Command::SetEnergySaving(SetEnergySaving {
+        })),
+        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) if !on => {
+            Some(Command::SetEnergySaving(SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
-                on,
-            })
+                on: false,
+            }))
         }
+
+        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(_)) => None,
     }
 }
 

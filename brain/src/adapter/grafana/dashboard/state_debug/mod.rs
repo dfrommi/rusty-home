@@ -5,12 +5,8 @@ use actix_web::{
     Responder,
 };
 use api::state::{HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use serde::Deserialize;
-use support::{time::DateTimeRange, TypedItem};
-use support::{
-    time::{DateTime, Duration},
-    DataPoint,
-};
+use support::TypedItem;
+use support::{time::DateTime, DataPoint};
 
 use crate::{
     adapter::grafana::{support::csv_response, GrafanaApiError},
@@ -18,6 +14,8 @@ use crate::{
     port::TimeSeriesAccess,
     support::timeseries::interpolate::Estimatable,
 };
+
+use super::TimeRangeWithIntervalQuery;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
@@ -32,23 +30,6 @@ where
         .route("/{type}", web::get().to(get_items))
         .route("/{type}/{item}", web::get().to(state_ts::<T>))
         .app_data(web::Data::from(api))
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct QueryTimeRange {
-    from: DateTime,
-    to: DateTime,
-    interval_ms: Option<i64>,
-}
-
-impl QueryTimeRange {
-    fn range(&self) -> DateTimeRange {
-        DateTimeRange::new(self.from, self.to)
-    }
-
-    fn interval(&self) -> Option<Duration> {
-        self.interval_ms.map(Duration::millis)
-    }
 }
 
 #[derive(serde::Serialize)]
@@ -109,7 +90,7 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
 async fn state_ts<T>(
     api: web::Data<T>,
     path: web::Path<(String, String)>,
-    time_range: Query<QueryTimeRange>,
+    time_range: Query<TimeRangeWithIntervalQuery>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
     T: TimeSeriesAccess<TotalEnergyConsumption>
@@ -156,7 +137,7 @@ where
 async fn get_rows<T>(
     item: T,
     api: &impl TimeSeriesAccess<T>,
-    time_range: &QueryTimeRange,
+    time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
     T: Estimatable + Clone + TypedItem,
@@ -167,14 +148,10 @@ where
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
-    let dps: Vec<DataPoint<<T>::Type>> = match time_range.interval() {
-        Some(interval) => time_range
-            .range()
-            .step_by(interval)
-            .filter_map(|t| ts.at(t))
-            .collect::<Vec<_>>(),
-        None => ts.inner().iter().cloned().collect(),
-    };
+    let dps: Vec<DataPoint<<T>::Type>> = time_range
+        .iter()
+        .filter_map(|t| ts.at(t))
+        .collect::<Vec<_>>();
 
     let rows: Vec<Row> = dps
         .iter()

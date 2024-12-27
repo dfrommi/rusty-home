@@ -16,7 +16,7 @@ use crate::{
     support::timeseries::TimeSeries,
 };
 
-use super::{heating_factor, Room};
+use super::Room;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
@@ -75,12 +75,7 @@ where
         None => Room::variants().to_vec(),
     };
 
-    let items = rooms
-        .iter()
-        .map(|room| room.heating_demand())
-        .collect::<Vec<_>>();
-
-    let ts = combined_series(api.as_ref(), &items, query.ts_range())
+    let ts = combined_series(api.as_ref(), &rooms, query.ts_range())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -138,25 +133,25 @@ where
 
 async fn combined_series(
     api: &impl TimeSeriesAccess<HeatingDemand>,
-    items: &[HeatingDemand],
+    rooms: &[Room],
     time_range: DateTimeRange,
 ) -> anyhow::Result<TimeSeries<HeatingDemand>> {
-    let items_ts = items.iter().map(|item| async {
-        match api.series(item.clone(), time_range.clone()).await {
-            Ok(ts) => Ok((item.clone(), ts)),
+    let rooms_ts = rooms.iter().map(|room| async {
+        match api.series(room.heating_demand(), time_range.clone()).await {
+            Ok(ts) => Ok((room.clone(), ts)),
             Err(e) => Err(e),
         }
     });
 
-    let items_ts = futures::future::join_all(items_ts)
+    let rooms_ts = futures::future::join_all(rooms_ts)
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut mapped_ts = items_ts
+    let mut mapped_ts = rooms_ts
         .into_iter()
-        .map(|(item, ts)| {
-            let factor = heating_factor(&item);
+        .map(|(room, ts)| {
+            let factor = room.heating_factor();
             ts.map(|dp| {
                 let value: f64 = dp.value.0;
                 Percent(value * factor)

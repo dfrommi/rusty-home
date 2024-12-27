@@ -1,7 +1,17 @@
+use anyhow::Context;
 use api::state::ChannelTypeInfo;
-use support::{t, DataPoint};
+use support::{
+    t,
+    time::{DateTime, DateTimeRange},
+    DataPoint,
+};
 
-use super::DataPointAccess;
+use crate::support::timeseries::{
+    interpolate::{algo, Estimatable},
+    TimeSeries,
+};
+
+use super::{DataPointAccess, TimeSeriesAccess};
 
 #[derive(Debug, Clone)]
 pub enum Opened {
@@ -15,44 +25,32 @@ impl ChannelTypeInfo for Opened {
     type ValueType = bool;
 }
 
+impl Opened {
+    fn api_items(&self) -> Vec<api::state::Opened> {
+        match self {
+            Opened::LivingRoomWindowOrDoor => vec![
+                api::state::Opened::LivingRoomWindowLeft,
+                api::state::Opened::LivingRoomWindowRight,
+                api::state::Opened::LivingRoomWindowSide,
+                api::state::Opened::LivingRoomBalconyDoor,
+            ],
+            Opened::BedroomWindow => vec![api::state::Opened::BedroomWindow],
+            Opened::KitchenWindow => vec![api::state::Opened::KitchenWindow],
+            Opened::RoomOfRequirementsWindow => vec![
+                api::state::Opened::RoomOfRequirementsWindowLeft,
+                api::state::Opened::RoomOfRequirementsWindowRight,
+                api::state::Opened::RoomOfRequirementsWindowSide,
+            ],
+        }
+    }
+}
+
 impl<T> DataPointAccess<Opened> for T
 where
     T: DataPointAccess<api::state::Opened>,
 {
     async fn current_data_point(&self, item: Opened) -> anyhow::Result<DataPoint<bool>> {
-        match item {
-            Opened::LivingRoomWindowOrDoor => {
-                any_of(
-                    self,
-                    vec![
-                        api::state::Opened::LivingRoomWindowLeft,
-                        api::state::Opened::LivingRoomWindowRight,
-                        api::state::Opened::LivingRoomWindowSide,
-                        api::state::Opened::LivingRoomBalconyDoor,
-                    ],
-                )
-                .await
-            }
-            Opened::BedroomWindow => {
-                self.current_data_point(api::state::Opened::BedroomWindow)
-                    .await
-            }
-            Opened::KitchenWindow => {
-                self.current_data_point(api::state::Opened::KitchenWindow)
-                    .await
-            }
-            Opened::RoomOfRequirementsWindow => {
-                any_of(
-                    self,
-                    vec![
-                        api::state::Opened::RoomOfRequirementsWindowLeft,
-                        api::state::Opened::RoomOfRequirementsWindowRight,
-                        api::state::Opened::RoomOfRequirementsWindowSide,
-                    ],
-                )
-                .await
-            }
-        }
+        any_of(self, item.api_items()).await
     }
 }
 
@@ -74,6 +72,65 @@ async fn any_of(
             Ok(DataPoint { value, timestamp })
         }
         Err(e) => Err(e),
+    }
+}
+
+impl<T> TimeSeriesAccess<Opened> for T
+where
+    T: TimeSeriesAccess<api::state::Opened>,
+{
+    async fn series(
+        &self,
+        item: Opened,
+        range: DateTimeRange,
+    ) -> anyhow::Result<TimeSeries<Opened>> {
+        let api_items = item.api_items();
+
+        let futures = api_items
+            .into_iter()
+            .map(|item| self.series(item, range.clone()))
+            .collect::<Vec<_>>();
+
+        let mut all_ts = futures::future::try_join_all(futures).await?;
+        let first_api_ts = all_ts.remove(0);
+        let mut merged: TimeSeries<Opened> = TimeSeries::new(
+            item.clone(),
+            first_api_ts.inner().iter().cloned(),
+            first_api_ts.range(),
+        )?;
+
+        for ts in all_ts {
+            merged = TimeSeries::combined(&merged, &ts, item.clone(), |&a, &b| a || b)
+                .context("Error merging time series")?;
+        }
+
+        Ok(merged)
+    }
+}
+
+impl Estimatable for api::state::Opened {
+    type Type = bool;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
+        algo::last_seen(at, prev, next)
+    }
+}
+
+impl Estimatable for Opened {
+    type Type = bool;
+
+    fn interpolate(
+        &self,
+        at: DateTime,
+        prev: &DataPoint<Self::Type>,
+        next: &DataPoint<Self::Type>,
+    ) -> Self::Type {
+        algo::last_seen(at, prev, next)
     }
 }
 

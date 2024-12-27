@@ -6,30 +6,18 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use api::state::{ChannelTypeInfo, HeatingDemand, TotalEnergyConsumption};
-use support::time::{DateTime, DateTimeRange};
+use support::time::DateTimeRange;
 
 use crate::{
     adapter::grafana::{
-        dashboard::{heating_factor, EURO_PER_KWH},
+        dashboard::{Room, TimeRangeQuery, EURO_PER_KWH},
         DashboardDisplay,
     },
     port::TimeSeriesAccess,
     support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
-#[derive(Clone, Debug, serde::Deserialize)]
-pub struct QueryTimeRange {
-    from: DateTime,
-    to: DateTime,
-}
-
-impl QueryTimeRange {
-    fn range(&self) -> DateTimeRange {
-        DateTimeRange::new(self.from, self.to)
-    }
-}
-
-pub async fn total_power<T>(api: web::Data<T>, time_range: Query<QueryTimeRange>) -> impl Responder
+pub async fn total_power<T>(api: web::Data<T>, time_range: Query<TimeRangeQuery>) -> impl Responder
 where
     T: TimeSeriesAccess<TotalEnergyConsumption>,
 {
@@ -49,7 +37,7 @@ where
 
 pub async fn total_heating<T>(
     api: web::Data<T>,
-    time_range: Query<QueryTimeRange>,
+    time_range: Query<TimeRangeQuery>,
 ) -> impl Responder
 where
     T: TimeSeriesAccess<HeatingDemand>,
@@ -60,7 +48,7 @@ where
         time_range.range(),
         |item, ts| {
             let value = ts.area_in_type_hours();
-            (value, value * heating_factor(item))
+            (value, value * room_of(item).heating_factor())
         },
     )
     .await
@@ -113,4 +101,14 @@ where
     HttpResponse::Ok()
         .append_header(header::ContentType(mime::TEXT_CSV))
         .body(csv)
+}
+
+fn room_of(item: &HeatingDemand) -> Room {
+    match item {
+        HeatingDemand::LivingRoom => Room::LivingRoom,
+        HeatingDemand::Bedroom => Room::Bedroom,
+        HeatingDemand::RoomOfRequirements => Room::RoomOfRequirements,
+        HeatingDemand::Kitchen => Room::Kitchen,
+        HeatingDemand::Bathroom => Room::Bathroom,
+    }
 }

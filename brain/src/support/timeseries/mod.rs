@@ -145,7 +145,7 @@ where
     for<'a> &'a T::Type: Into<f64>,
 {
     pub fn mean(&self) -> T::Type {
-        let (weighted_sum, total_duration) = self.weighted_sum_and_duration_in_type_secs();
+        let (weighted_sum, total_duration) = self.weighted_sum_and_duration_in_type_hours();
 
         if total_duration == 0.0 {
             weighted_sum.into()
@@ -155,12 +155,11 @@ where
     }
 
     pub fn area_in_type_hours(&self) -> f64 {
-        let (weighted_sum_secs, _) = self.weighted_sum_and_duration_in_type_secs();
-        weighted_sum_secs
+        self.weighted_sum_and_duration_in_type_hours().0
     }
 
     //weighted by duration
-    fn weighted_sum_and_duration_in_type_secs(&self) -> (f64, f64) {
+    fn weighted_sum_and_duration_in_type_hours(&self) -> (f64, f64) {
         let mut weighted_sum = 0.0;
         let mut total_duration_h = 0.0;
 

@@ -15,6 +15,7 @@ mod energy_saving;
 mod heating_demand;
 mod presence;
 mod relative_humidity;
+mod set_point;
 mod temperature;
 mod total_energy_consumption;
 mod user_controlled;

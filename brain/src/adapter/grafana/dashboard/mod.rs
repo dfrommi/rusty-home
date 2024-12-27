@@ -1,25 +1,51 @@
 use api::state::HeatingDemand;
+use api::state::SetPoint;
+use api::state::Temperature;
 use serde::{Deserialize, Serialize};
+use support::time::DateTime;
+use support::time::DateTimeRange;
+use support::time::Duration;
+
+use crate::home::state::Opened;
 
 use super::display::DashboardDisplay;
 
 pub mod energy_iq;
 pub mod energy_monitor;
+pub mod heating_details;
 pub mod meta;
 pub mod state_debug;
 
-use super::support::csv_response;
 use super::support::empty_string_as_none;
 
 const EURO_PER_KWH: f64 = 0.349;
 
-fn heating_factor(item: &HeatingDemand) -> f64 {
-    match item {
-        HeatingDemand::LivingRoom => 1.728 + 0.501,
-        HeatingDemand::Bedroom => 1.401,
-        HeatingDemand::RoomOfRequirements => 1.193,
-        HeatingDemand::Kitchen => 1.485,
-        HeatingDemand::Bathroom => 0.496,
+#[derive(Clone, Debug, serde::Deserialize)]
+struct TimeRangeQuery {
+    from: DateTime,
+    to: DateTime,
+}
+
+impl TimeRangeQuery {
+    fn range(&self) -> DateTimeRange {
+        DateTimeRange::new(self.from, self.to).non_future()
+    }
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+struct TimeRangeWithIntervalQuery {
+    from: DateTime,
+    to: DateTime,
+    interval_ms: i64,
+}
+
+impl TimeRangeWithIntervalQuery {
+    fn range(&self) -> DateTimeRange {
+        DateTimeRange::new(self.from, self.to).non_future()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = DateTime> + '_ {
+        self.range().step_by(Duration::millis(self.interval_ms))
     }
 }
 
@@ -77,6 +103,36 @@ impl Room {
             Room::Kitchen => 1.485,
             Room::RoomOfRequirements => 1.193,
             Room::Bathroom => 0.496,
+        }
+    }
+
+    fn inside_temperature(&self) -> Temperature {
+        match self {
+            Room::LivingRoom => Temperature::LivingRoomDoor,
+            Room::Bedroom => Temperature::BedroomDoor,
+            Room::Kitchen => Temperature::KitchenOuterWall,
+            Room::RoomOfRequirements => Temperature::RoomOfRequirementsDoor,
+            Room::Bathroom => Temperature::BathroomShower,
+        }
+    }
+
+    fn set_point(&self) -> SetPoint {
+        match self {
+            Room::LivingRoom => SetPoint::LivingRoom,
+            Room::Bedroom => SetPoint::Bedroom,
+            Room::Kitchen => SetPoint::Kitchen,
+            Room::RoomOfRequirements => SetPoint::RoomOfRequirements,
+            Room::Bathroom => SetPoint::Bathroom,
+        }
+    }
+
+    fn window(&self) -> Opened {
+        match self {
+            Room::LivingRoom => Opened::LivingRoomWindowOrDoor,
+            Room::Bedroom => Opened::BedroomWindow,
+            Room::Kitchen => Opened::KitchenWindow,
+            Room::RoomOfRequirements => Opened::RoomOfRequirementsWindow,
+            Room::Bathroom => Opened::BedroomWindow,
         }
     }
 }

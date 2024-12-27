@@ -1,19 +1,55 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 use actix_web::{
     web::{self, Query},
     Responder,
 };
 use api::state::{HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::TypedItem;
-use support::{time::DateTime, DataPoint};
+use serde::Deserialize;
+use support::{time::DateTimeRange, TypedItem};
+use support::{
+    time::{DateTime, Duration},
+    DataPoint,
+};
 
 use crate::{
-    adapter::grafana::csv_response, home::state::DewPoint, port::TimeSeriesAccess,
+    adapter::grafana::{support::csv_response, GrafanaApiError},
+    home::state::DewPoint,
+    port::TimeSeriesAccess,
     support::timeseries::interpolate::Estimatable,
 };
 
-use super::{GrafanaApiError, QueryTimeRange};
+pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
+where
+    T: TimeSeriesAccess<TotalEnergyConsumption>
+        + TimeSeriesAccess<HeatingDemand>
+        + TimeSeriesAccess<Temperature>
+        + TimeSeriesAccess<RelativeHumidity>
+        + 'static,
+{
+    web::scope("/state")
+        .route("", web::get().to(get_types))
+        .route("/{type}", web::get().to(get_items))
+        .route("/{type}/{item}", web::get().to(state_ts::<T>))
+        .app_data(web::Data::from(api))
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct QueryTimeRange {
+    from: DateTime,
+    to: DateTime,
+    interval_ms: Option<i64>,
+}
+
+impl QueryTimeRange {
+    fn range(&self) -> DateTimeRange {
+        DateTimeRange::new(self.from, self.to)
+    }
+
+    fn interval(&self) -> Option<Duration> {
+        self.interval_ms.map(Duration::millis)
+    }
+}
 
 #[derive(serde::Serialize)]
 struct Row {
@@ -51,11 +87,11 @@ impl<T: TypedItem> From<&T> for TypeAndItem {
     }
 }
 
-pub async fn get_types() -> impl Responder {
+async fn get_types() -> impl Responder {
     csv_response(&supported_channels())
 }
 
-pub async fn get_items(path: web::Path<String>) -> impl Responder {
+async fn get_items(path: web::Path<String>) -> impl Responder {
     let type_ = path.into_inner();
 
     let supported_channels = supported_channels();
@@ -70,7 +106,7 @@ pub async fn get_items(path: web::Path<String>) -> impl Responder {
     csv_response(&items.collect::<Vec<_>>())
 }
 
-pub async fn state_ts<T>(
+async fn state_ts<T>(
     api: web::Data<T>,
     path: web::Path<(String, String)>,
     time_range: Query<QueryTimeRange>,

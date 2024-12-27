@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::{
     web::{self, Query},
     Responder,
@@ -9,17 +11,36 @@ use support::{
 };
 
 use crate::{
-    adapter::grafana::{csv_response, energy_monitor::heating_factor, GrafanaApiError},
+    adapter::grafana::{support::csv_response, GrafanaApiError},
     port::TimeSeriesAccess,
     support::timeseries::TimeSeries,
 };
 
+use super::{heating_factor, Room};
+
+pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
+where
+    T: TimeSeriesAccess<HeatingDemand> + TimeSeriesAccess<Temperature> + 'static,
+{
+    web::scope("/energy_iq")
+        .route(
+            "/consumption/series",
+            web::get().to(heating_series_aggregated_sum::<T>),
+        )
+        .route(
+            "/temperature/delta",
+            web::get().to(outside_temperature_series::<T>),
+        )
+        .app_data(web::Data::from(api))
+}
+
 #[derive(Clone, Debug, serde::Deserialize)]
-pub struct QueryTimeRange {
+struct QueryTimeRange {
     from: DateTime,
     to: DateTime,
     offset: Option<Duration>,
-    room: String,
+    #[serde(deserialize_with = "super::empty_string_as_none")]
+    room: Option<Room>,
 }
 
 impl QueryTimeRange {
@@ -42,28 +63,24 @@ struct Row {
     value: f64,
 }
 
-pub async fn heating_series_aggregated_sum<T>(
+async fn heating_series_aggregated_sum<T>(
     api: web::Data<T>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
     T: TimeSeriesAccess<HeatingDemand>,
 {
-    let items = if query.room == "_all_" {
-        HeatingDemand::variants()
-    } else {
-        match HeatingDemand::from_item_name(&query.room) {
-            Some(item) => &[item],
-            None => {
-                return Err(GrafanaApiError::ChannelNotFound(
-                    HeatingDemand::TYPE_NAME.to_string(),
-                    query.room.to_string(),
-                ))
-            }
-        }
+    let rooms = match &query.room {
+        Some(room) => vec![room.clone()],
+        None => Room::variants().to_vec(),
     };
 
-    let ts = combined_series(api.as_ref(), items, query.ts_range())
+    let items = rooms
+        .iter()
+        .map(|room| room.heating_demand())
+        .collect::<Vec<_>>();
+
+    let ts = combined_series(api.as_ref(), &items, query.ts_range())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -81,10 +98,10 @@ where
         previous = value;
     }
 
-    Ok(csv_response(&rows))
+    csv_response(&rows)
 }
 
-pub async fn outside_temperature_series<T>(
+async fn outside_temperature_series<T>(
     api: web::Data<T>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>

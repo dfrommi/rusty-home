@@ -6,15 +6,28 @@ use actix_web::{
     HttpResponse, Responder,
 };
 use api::state::{ChannelTypeInfo, HeatingDemand, TotalEnergyConsumption};
-use support::time::DateTimeRange;
+use support::time::{DateTime, DateTimeRange};
 
 use crate::{
-    adapter::grafana::{DashboardDisplay, QueryTimeRange},
+    adapter::grafana::{
+        dashboard::{heating_factor, EURO_PER_KWH},
+        DashboardDisplay,
+    },
     port::TimeSeriesAccess,
     support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
-use super::{heating_factor, EURO_PER_KWH};
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct QueryTimeRange {
+    from: DateTime,
+    to: DateTime,
+}
+
+impl QueryTimeRange {
+    fn range(&self) -> DateTimeRange {
+        DateTimeRange::new(self.from, self.to)
+    }
+}
 
 pub async fn total_power<T>(api: web::Data<T>, time_range: Query<QueryTimeRange>) -> impl Responder
 where

@@ -1,4 +1,5 @@
 use config::{Config, ConfigError, File};
+use monitoring::MonitoringConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -7,6 +8,7 @@ pub struct Settings {
     pub database: Database,
     pub mqtt: Mqtt,
     pub http_server: HttpServer,
+    pub monitoring: MonitoringConfig,
 }
 
 #[derive(Debug, Deserialize)]

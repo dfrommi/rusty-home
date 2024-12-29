@@ -22,6 +22,7 @@ actix-web = "4"
 
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }
+monitoring = { path = "../lib/monitoring" }
 
 [dev-dependencies]
 assert-json-diff = "2"

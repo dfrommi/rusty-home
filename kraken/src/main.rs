@@ -4,6 +4,7 @@ use api::{CommandAddedEvent, DbEventListener};
 use config::{default_ha_command_config, default_ha_state_config};
 use core::{CommandExecutor, IncomingDataProcessor};
 use homeassistant::new_command_executor;
+use monitoring::Monitoring;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use std::env;
@@ -38,11 +39,11 @@ impl Database {
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
-    unsafe { env::set_var("RUST_LOG", "warn,kraken=debug") };
-    tracing_subscriber::fmt::init();
-
     let settings = Settings::new().expect("Error reading configuration");
     info!("Starting with settings: {:?}", settings);
+
+    let mut _monitoring =
+        Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");
 
     let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use actix_web::{App, HttpServer};
 use api::DbEventListener;
+use monitoring::Monitoring;
 use settings::Settings;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinSet;
@@ -26,12 +27,10 @@ impl AsRef<PgPool> for Infrastructure {
 #[tokio::main]
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
-
-    //TODO
-    unsafe { std::env::set_var("RUST_LOG", "warn,brain=debug,support=debug") };
-    tracing_subscriber::fmt::init();
-
     let mut tasks = JoinSet::new();
+
+    let mut _monitoring =
+        Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");
 
     let db_pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(4)

@@ -1,4 +1,5 @@
 use config::{Config, ConfigError, File};
+use monitoring::MonitoringConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -8,6 +9,7 @@ pub struct Settings {
     pub mqtt: Mqtt,
     pub homeassistant: HomeAssitant,
     pub http_server: HttpServer,
+    pub monitoring: MonitoringConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]

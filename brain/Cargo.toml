@@ -33,6 +33,7 @@ tabled = "0"
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }
 macro = { path = "../lib/macro" }
+monitoring = { path = "../lib/monitoring" }
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"

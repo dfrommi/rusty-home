@@ -7,10 +7,8 @@ use homeassistant::new_command_executor;
 use monitoring::Monitoring;
 use settings::Settings;
 use sqlx::postgres::PgListener;
-use std::env;
 use support::mqtt::MqttInMessage;
 use tokio::sync::{broadcast::Receiver, mpsc};
-use tracing::info;
 
 use sqlx::PgPool;
 
@@ -40,7 +38,6 @@ impl Database {
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
-    info!("Starting with settings: {:?}", settings);
 
     let mut _monitoring =
         Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");

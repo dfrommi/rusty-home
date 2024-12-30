@@ -88,8 +88,9 @@ where
         actions
             .iter()
             .map(|action| async move {
+                //tracing::debug!("Evaluating action {}", action);
                 let result = if is_goal_active {
-                    action.evaluate(api).await.unwrap_or_else(|e| {
+                    evaluate_action(action, api).await.unwrap_or_else(|e| {
                         tracing::warn!(
                             "Error evaluating action {}, assuming not fulfilled: {:?}",
                             action,
@@ -101,10 +102,20 @@ where
                     ActionEvaluationResult::Skip
                 };
 
+                //tracing::debug!("Action {} evaluated as {:?}", action, result);
+
                 (goal, action, result)
             })
             .collect::<Vec<_>>()
     });
 
     futures::future::join_all(tasks).await
+}
+
+#[tracing::instrument(skip_all, fields(action = action.to_string()))]
+async fn evaluate_action<API, A: Action<API>>(
+    action: &A,
+    api: &API,
+) -> anyhow::Result<ActionEvaluationResult> {
+    action.evaluate(api).await
 }

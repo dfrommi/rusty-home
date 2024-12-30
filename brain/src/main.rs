@@ -67,18 +67,7 @@ pub async fn main() {
                     _ = planning_user_trigger_events.recv() => {},
                 }
 
-                tracing::info!("Start planning");
-                let active_goals = home::get_active_goals(api).await;
-
-                core::planner::perform_planning(
-                    &active_goals,
-                    home::default_config(),
-                    api,
-                    api,
-                    api,
-                )
-                .await;
-                tracing::info!("Planning done");
+                home::plan_for_home(api).await;
             }
         }
     });

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{
     port::{DataPointAccess, TimeSeriesAccess},
     support::timeseries::{interpolate::Estimatable, TimeSeries},
@@ -13,10 +15,11 @@ use support::{t, time::DateTimeRange, DataPoint};
 
 impl<DB, T> DataPointAccess<T> for DB
 where
-    T: Into<Channel> + ChannelTypeInfo,
+    T: Into<Channel> + ChannelTypeInfo + Debug,
     T::ValueType: From<DbValue>,
     DB: AsRef<PgPool>,
 {
+    #[tracing::instrument(skip(self))]
     async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>> {
         let tag_id = get_tag_id(self.as_ref(), item.into(), false).await?;
 
@@ -46,10 +49,11 @@ where
 
 impl<DB, T> TimeSeriesAccess<T> for DB
 where
-    T: Into<Channel> + Estimatable + Clone,
+    T: Into<Channel> + Estimatable + Clone + Debug,
     T::Type: From<DbValue>,
     DB: AsRef<PgPool>,
 {
+    #[tracing::instrument(skip(self))]
     async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
         //TODO no clone, use ref
         let tags_id = get_tag_id(self.as_ref(), item.clone().into(), false).await?;

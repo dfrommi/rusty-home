@@ -29,7 +29,7 @@ where
             })
             .await?;
 
-        if humidity.value < Percent(65.0) {
+        if humidity.value < Percent(70.0) {
             return Ok(DataPoint {
                 timestamp: humidity.timestamp,
                 value: false,

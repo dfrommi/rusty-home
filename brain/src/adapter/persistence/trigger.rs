@@ -6,6 +6,7 @@ use support::{t, time::DateTime};
 use crate::port::{UserTriggerAccess, UserTriggerExecutor};
 
 impl<DB: AsRef<PgPool>> UserTriggerExecutor for DB {
+    #[tracing::instrument(skip(self))]
     async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
@@ -25,6 +26,7 @@ impl<DB> UserTriggerAccess for DB
 where
     DB: AsRef<PgPool>,
 {
+    #[tracing::instrument(name = "get_latest_user_trigger", skip(self))]
     async fn latest_since(
         &self,
         target: &UserTriggerTarget,

@@ -15,11 +15,11 @@ pub async fn get_tag_id(
     db_pool: &PgPool,
     channel: Channel,
     create_if_missing: bool,
-) -> anyhow::Result<i32> {
+) -> anyhow::Result<i64> {
     let channel_name = channel.type_name();
     let device_name = channel.item_name();
 
-    if create_if_missing {
+    let tag_id = if create_if_missing {
         sqlx::query_scalar!(
             r#"WITH thing_value_tag_ins AS (
                 INSERT INTO thing_value_tag (channel, name)
@@ -58,7 +58,9 @@ pub async fn get_tag_id(
         .fetch_one(db_pool)
         .await
         .with_context(|| format!("Error getting tag id for {}/{}", channel_name, device_name))
-    }
+    }?;
+
+    Ok(tag_id as i64)
 }
 
 mod mapper {

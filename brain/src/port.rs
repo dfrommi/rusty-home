@@ -48,12 +48,6 @@ pub trait CommandAccess<C: Into<Command>> {
         target: impl Into<CommandTarget>,
         since: DateTime,
     ) -> Result<Vec<CommandExecution<C>>>;
-
-    async fn get_latest_command_source(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Option<CommandSource>>;
 }
 
 pub enum CommandExecutionResult {

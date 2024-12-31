@@ -25,7 +25,7 @@ impl StateStorage for Database {
             INSERT INTO thing_value (tag_id, value, timestamp)
             SELECT $1, $2, $3
             WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
-            tags_id,
+            tags_id as i32,
             fvalue.as_ref(),
             timestamp.into_db()
         )

@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use ::support::t;
 use actix_web::{App, HttpServer};
+use adapter::persistence::Database;
 use api::DbEventListener;
 use monitoring::Monitoring;
 use settings::Settings;
-use sqlx::{postgres::PgListener, PgPool};
+use sqlx::postgres::PgListener;
 use tokio::task::JoinSet;
 
 mod adapter;
@@ -13,16 +15,6 @@ mod home;
 pub mod port;
 mod settings;
 mod support;
-
-struct Infrastructure {
-    db_pool: PgPool,
-}
-
-impl AsRef<PgPool> for Infrastructure {
-    fn as_ref(&self) -> &PgPool {
-        &self.db_pool
-    }
-}
 
 #[tokio::main]
 pub async fn main() {
@@ -37,6 +29,7 @@ pub async fn main() {
         .connect(&settings.database.url)
         .await
         .expect("Error initializing database");
+    let database = Database::new(db_pool, Some(t!(5 minutes)));
 
     let db_listener = PgListener::connect(&settings.database.url)
         .await
@@ -48,39 +41,45 @@ pub async fn main() {
         &settings.mqtt.client_id,
     );
 
-    let infrastructure = Arc::new(Infrastructure { db_pool });
-
     let event_listener = DbEventListener::new(db_listener);
 
     let mut planning_state_added_events = event_listener.new_state_value_added_listener();
     let mut planning_user_trigger_events = event_listener.new_user_trigger_added_listener();
     tasks.spawn({
-        let api = infrastructure.clone();
+        let api = database.clone();
         async move {
             let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
-            let api = api.as_ref();
 
             loop {
-                tokio::select! {
-                    _ = timer.tick() => {},
-                    _ = planning_state_added_events.recv() => {},
-                    _ = planning_user_trigger_events.recv() => {},
+                let event = tokio::select! {
+                    _ = timer.tick() => None,
+                    e = planning_state_added_events.recv() => Some(e),
+                    _ = planning_user_trigger_events.recv() => None,
+                };
+
+                //make sure cache is invalidated before planning
+                //TODO use separate events for this
+                if let Some(Ok(event)) = event {
+                    api.invalidate_state(&event).await;
                 }
 
-                home::plan_for_home(api).await;
+                while let Ok(event) = planning_state_added_events.try_recv() {
+                    api.invalidate_state(&event).await;
+                }
+
+                home::plan_for_home(&api).await;
             }
         }
     });
 
     tasks.spawn({
-        let mqtt_api = infrastructure.clone();
+        let mqtt_api = database.clone();
         let mqtt_sender = mqtt_client.new_publisher();
         let state_topic = settings.mqtt.base_topic_status.clone();
         let mqtt_trigger = event_listener.new_state_value_added_listener();
 
         async move {
-            adapter::mqtt::export_state(mqtt_api.as_ref(), state_topic, mqtt_sender, mqtt_trigger)
-                .await
+            adapter::mqtt::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await
         }
     });
 
@@ -90,12 +89,12 @@ pub async fn main() {
         .await
         .unwrap();
     tasks.spawn({
-        let api = infrastructure.clone();
+        let api = database.clone();
         async move {
             adapter::mqtt::process_commands(
                 settings.mqtt.base_topic_set,
                 mqtt_command_receiver,
-                api.as_ref(),
+                &api,
             )
             .await
         }
@@ -110,7 +109,7 @@ pub async fn main() {
 
     tasks.spawn(async move { mqtt_client.process().await });
 
-    let http_api = infrastructure.clone();
+    let http_api = Arc::new(database.clone());
     tasks.spawn(async move {
         let http_server = HttpServer::new(move || {
             App::new().service(adapter::grafana::new_routes(http_api.clone()))

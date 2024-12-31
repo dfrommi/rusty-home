@@ -20,6 +20,7 @@ sqlx = { version = "0.8", features = [
   "chrono",
   "uuid",
 ] }
+moka = { version = "0.12", features = ["future"] }
 
 config = "0.14.0"
 serde = { version = "1.0", features = ["derive"] }

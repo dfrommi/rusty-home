@@ -9,19 +9,46 @@ use anyhow::Result;
 use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
+    StateValueAddedEvent,
 };
 use sqlx::PgPool;
 use support::{t, time::DateTimeRange, DataPoint};
 
-impl<DB, T> DataPointAccess<T> for DB
+impl super::Database {
+    pub async fn invalidate_state(&self, event: &StateValueAddedEvent) {
+        let tag_id = event.tag_id;
+        if let Some(cache) = &self.cache {
+            tracing::debug!("Invalidating state cache for tag {}", tag_id);
+            cache.invalidate(&tag_id).await;
+        } else {
+            tracing::debug!(
+                "No state cache configured, cannot invalidate tag {}",
+                tag_id
+            );
+        }
+    }
+}
+
+impl<T> DataPointAccess<T> for super::Database
 where
-    T: Into<Channel> + ChannelTypeInfo + Debug,
+    T: Into<Channel> + ChannelTypeInfo + Debug + Clone,
     T::ValueType: From<DbValue>,
-    DB: AsRef<PgPool>,
 {
     #[tracing::instrument(skip(self))]
-    async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>> {
-        let tag_id = get_tag_id(self.as_ref(), item.into(), false).await?;
+    async fn current_data_point(
+        &self,
+        item: T,
+    ) -> Result<DataPoint<<T as ChannelTypeInfo>::ValueType>> {
+        let channel = item.into();
+        let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
+
+        if let Some(cache) = &self.cache {
+            if let Some(cached) = cache.get(&tag_id).await {
+                return Ok(cached.map_value(|v| v.clone().into()));
+            }
+        }
+
+        tracing::debug!("Cache miss for item {:?}, fetching from database", channel);
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
@@ -31,17 +58,22 @@ where
             AND timestamp <= $2
             ORDER BY timestamp DESC, id DESC
             LIMIT 1"#,
-            tag_id,
+            tag_id as i32,
             t!(now).into_db(), //For timeshift in tests
         )
-        .fetch_optional(self.as_ref())
+        .fetch_optional(&self.pool)
         .await?;
 
         match rec {
-            Some(r) => Ok(DataPoint {
-                value: r.value.into(),
-                timestamp: r.timestamp.into(),
-            }),
+            Some(r) => {
+                if let Some(cache) = &self.cache {
+                    cache
+                        .insert(tag_id, DataPoint::new(r.value.clone(), r.timestamp.into()))
+                        .await;
+                }
+                let dp = DataPoint::new(r.value.into(), r.timestamp.into());
+                Ok(dp)
+            }
             None => anyhow::bail!("No data found"),
         }
     }
@@ -82,7 +114,7 @@ where
               AND timestamp <= $4
               ORDER BY timestamp ASC
               LIMIT 1)"#,
-            tags_id,
+            tags_id as i32,
             range.start().into_db(),
             range.end().into_db(),
             t!(now).into_db(), //For timeshift in tests

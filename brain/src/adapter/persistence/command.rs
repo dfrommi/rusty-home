@@ -10,30 +10,29 @@ use support::{t, time::DateTime};
 use crate::port::{CommandAccess, CommandStore};
 
 impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> for DB {
+    #[tracing::instrument(skip_all, fields(command_target))]
     async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
     ) -> Result<Option<CommandExecution<C>>> {
-        let mut all_commands = get_all_commands::<C>(self.as_ref(), target.into(), since).await?;
+        let target: CommandTarget = target.into();
+        tracing::Span::current().record("command_target", tracing::field::display(&target));
+
+        let mut all_commands = get_all_commands::<C>(self.as_ref(), target, since).await?;
         Ok(all_commands.pop())
     }
 
+    #[tracing::instrument(skip_all, fields(command_target))]
     async fn get_all_commands(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
     ) -> Result<Vec<CommandExecution<C>>> {
-        get_all_commands::<C>(self.as_ref(), target.into(), since).await
-    }
+        let target: CommandTarget = target.into();
+        tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-    async fn get_latest_command_source(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Option<CommandSource>> {
-        let maybe_command = CommandAccess::<C>::get_latest_command(self, target, since).await?;
-        Ok(maybe_command.map(|c| c.source))
+        get_all_commands::<C>(self.as_ref(), target, since).await
     }
 }
 
@@ -41,6 +40,7 @@ impl<DB> CommandStore for DB
 where
     DB: AsRef<PgPool>,
 {
+    #[tracing::instrument(skip(self))]
     async fn save_command(&self, command: Command, source: CommandSource) -> Result<()> {
         let db_command = serde_json::json!(command);
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();

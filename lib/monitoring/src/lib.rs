@@ -1,4 +1,5 @@
 use opentelemetry::trace::TracerProvider;
+use opentelemetry_sdk::metrics::MetricError;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing_opentelemetry::OpenTelemetryLayer;
 
@@ -74,6 +75,9 @@ impl Monitoring {
             let tracing_filter: EnvFilter = config.traces.clone().try_into()?;
             let tracing_layer = OpenTelemetryLayer::new(tracer).with_filter(tracing_filter);
 
+            let metrics = init_metrics(resource.clone())?;
+            opentelemetry::global::set_meter_provider(metrics);
+
             tracing_subscriber::registry()
                 .with(tracing_layer)
                 .with(logging_layer)
@@ -114,19 +118,23 @@ fn init_traces(
     }
 }
 
-/*
 fn init_metrics(
     resource: Resource,
 ) -> Result<opentelemetry_sdk::metrics::SdkMeterProvider, MetricError> {
-    let exporter = MetricExporter::builder().with_tonic().build()?;
-    let reader = PeriodicReader::builder(exporter).build();
+    let exporter = opentelemetry_otlp::MetricExporter::builder()
+        .with_tonic()
+        .build()?;
+    let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
+        exporter,
+        opentelemetry_sdk::runtime::Tokio,
+    )
+    .build();
 
-    Ok(SdkMeterProvider::builder()
+    Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
         .with_reader(reader)
-        .with_resource(RESOURCE.clone())
+        .with_resource(resource)
         .build())
 }
-*/
 
 fn init_logs(
     resource: Resource,

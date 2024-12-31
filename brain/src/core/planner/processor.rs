@@ -112,7 +112,7 @@ where
     futures::future::join_all(tasks).await
 }
 
-#[tracing::instrument(skip_all, fields(action = action.to_string()))]
+#[tracing::instrument(skip_all, fields(action = action.to_string(), otel.name = format!("eval {}", action.to_string())))]
 async fn evaluate_action<API, A: Action<API>>(
     action: &A,
     api: &API,

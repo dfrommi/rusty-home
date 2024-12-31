@@ -14,10 +14,10 @@ pub struct TimeSeries<T: Estimatable> {
     values: DataFrame<T::Type>,
 }
 
-impl<T: Estimatable> TimeSeries<T> {
+impl<C: Estimatable> TimeSeries<C> {
     pub fn new(
-        context: T,
-        data_points: impl IntoIterator<Item = DataPoint<T::Type>>,
+        context: C,
+        data_points: impl IntoIterator<Item = DataPoint<C::Type>>,
         range: DateTimeRange,
     ) -> Result<Self> {
         let mut df = DataFrame::new(data_points)?;
@@ -41,15 +41,15 @@ impl<T: Estimatable> TimeSeries<T> {
     pub fn combined<U, V, F>(
         first_series: &TimeSeries<U>,
         second_series: &TimeSeries<V>,
-        context: T,
+        context: C,
         merge: F,
     ) -> Result<Self>
     where
-        F: Fn(&U::Type, &V::Type) -> T::Type,
+        F: Fn(&U::Type, &V::Type) -> C::Type,
         U: Estimatable,
         V: Estimatable,
     {
-        let mut dps: Vec<DataPoint<T::Type>> = Vec::new();
+        let mut dps: Vec<DataPoint<C::Type>> = Vec::new();
 
         for first_dp in first_series.values.iter() {
             if let Some(second_dp) = second_series.at(first_dp.timestamp) {
@@ -74,9 +74,9 @@ impl<T: Estimatable> TimeSeries<T> {
         Self::new(context, dps, range)
     }
 
-    pub fn map(&self, f: impl Fn(&DataPoint<T::Type>) -> T::Type) -> Self
+    pub fn map(&self, f: impl Fn(&DataPoint<C::Type>) -> C::Type) -> Self
     where
-        T: Clone,
+        C: Clone,
     {
         Self {
             context: self.context.clone(),
@@ -85,7 +85,7 @@ impl<T: Estimatable> TimeSeries<T> {
     }
 
     //linear interpolation or last seen
-    pub fn at(&self, at: DateTime) -> Option<DataPoint<T::Type>> {
+    pub fn at(&self, at: DateTime) -> Option<DataPoint<C::Type>> {
         Self::interpolate_or_guess(&self.context, at, &self.values).map(|v| DataPoint {
             timestamp: at,
             value: v,
@@ -93,19 +93,11 @@ impl<T: Estimatable> TimeSeries<T> {
     }
 
     fn interpolate_or_guess(
-        context: &T,
+        context: &C,
         at: DateTime,
-        data: &DataFrame<T::Type>,
-    ) -> Option<T::Type> {
-        //TODO handle prediction (linear interpolation)
-        match (data.prev_or_at(at), data.next(at)) {
-            (Some(prev), Some(next)) => {
-                let value = context.interpolate(at, prev, next);
-                Some(value)
-            }
-            (Some(prev), None) => Some(prev.value.clone()),
-            _ => None,
-        }
+        data: &DataFrame<C::Type>,
+    ) -> Option<C::Type> {
+        context.interpolate(at, data)
     }
 }
 

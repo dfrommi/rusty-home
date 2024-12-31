@@ -111,26 +111,16 @@ where
 impl Estimatable for api::state::Opened {
     type Type = bool;
 
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::last_seen(at, prev, next)
+    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+        algo::last_seen(at, df)
     }
 }
 
 impl Estimatable for Opened {
     type Type = bool;
 
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        algo::last_seen(at, prev, next)
+    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+        algo::last_seen(at, df)
     }
 }
 

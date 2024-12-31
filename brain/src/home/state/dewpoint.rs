@@ -11,7 +11,7 @@ use r#macro::TypedItem;
 use support::{
     time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
-    DataPoint,
+    DataFrame, DataPoint,
 };
 use tokio::try_join;
 
@@ -51,13 +51,8 @@ impl ChannelTypeInfo for DewPoint {
 impl Estimatable for DewPoint {
     type Type = DegreeCelsius;
 
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type {
-        interpolate::algo::linear(at, prev, next)
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+        interpolate::algo::linear(at, df)
     }
 }
 

@@ -1,4 +1,4 @@
-use support::{time::DateTime, DataPoint};
+use support::{time::DateTime, DataFrame};
 
 pub trait Estimatable
 where
@@ -6,34 +6,34 @@ where
 {
     type Type;
 
-    fn interpolate(
-        &self,
-        at: DateTime,
-        prev: &DataPoint<Self::Type>,
-        next: &DataPoint<Self::Type>,
-    ) -> Self::Type;
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type>;
 }
 
 pub mod algo {
     use super::*;
 
-    pub fn last_seen<T>(_: DateTime, prev: &DataPoint<T>, _: &DataPoint<T>) -> T
+    pub fn last_seen<T>(at: DateTime, df: &DataFrame<T>) -> Option<T>
     where
         T: Clone,
     {
-        prev.value.clone()
+        df.prev_or_at(at).map(|dp| dp.value.clone())
     }
 
     //linear interpolation or last seen
-    pub fn linear<T>(at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> T
+    pub fn linear<T>(at: DateTime, df: &DataFrame<T>) -> Option<T>
     where
         T: From<f64> + Clone,
         for<'a> &'a T: Into<f64>,
     {
+        let (prev, next) = match (df.prev_or_at(at), df.next(at)) {
+            (Some(prev), Some(next)) => (prev, next),
+            _ => return None,
+        };
+
         if prev.timestamp == at {
-            return prev.value.clone();
+            return Some(prev.value.clone());
         } else if next.timestamp == at {
-            return next.value.clone();
+            return Some(next.value.clone());
         }
 
         let prev_time: f64 = prev.timestamp.into();
@@ -46,6 +46,6 @@ pub mod algo {
         let interpolated_value = prev_value
             + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
 
-        interpolated_value.into()
+        Some(interpolated_value.into())
     }
 }

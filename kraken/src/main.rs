@@ -1,8 +1,11 @@
 use actix_web::App;
 use anyhow::Context;
-use api::{CommandAddedEvent, DbEventListener};
+use api::DbEventListener;
 use config::{default_ha_command_config, default_ha_state_config};
-use core::{CommandExecutor, IncomingDataProcessor};
+use core::{
+    event::{AppEventListener, CommandAddedEvent},
+    CommandExecutor, IncomingDataProcessor,
+};
 use homeassistant::new_command_executor;
 use monitoring::Monitoring;
 use settings::Settings;
@@ -20,7 +23,7 @@ mod settings;
 
 struct Infrastructure {
     database: Database,
-    event_listener: DbEventListener,
+    event_listener: AppEventListener,
     mqtt_client: support::mqtt::Mqtt,
 }
 
@@ -51,7 +54,7 @@ pub async fn main() {
             infrastructure.database.clone(),
             infrastructure
                 .event_listener
-                .new_energy_reading_insert_listener(),
+                .new_energy_reading_added_listener(),
         );
         let tx = incoming_data_tx.clone();
 
@@ -152,7 +155,7 @@ impl settings::HomeAssitant {
 impl Infrastructure {
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
         let db_pool = sqlx::postgres::PgPoolOptions::new()
-            .max_connections(2)
+            .max_connections(8)
             .connect(&settings.database.url)
             .await
             .unwrap();
@@ -160,6 +163,7 @@ impl Infrastructure {
         let db_listener = PgListener::connect(&settings.database.url)
             .await
             .expect("Error initializing database listener");
+        let event_listener = AppEventListener::new(DbEventListener::new(db_listener));
 
         let mqtt_client = support::mqtt::Mqtt::connect(
             &settings.mqtt.host,
@@ -172,7 +176,7 @@ impl Infrastructure {
         Ok(Self {
             database,
             mqtt_client,
-            event_listener: DbEventListener::new(db_listener),
+            event_listener,
         })
     }
 

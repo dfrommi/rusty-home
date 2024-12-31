@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 
-use api::{
-    state::{ChannelTypeInfo, Powered},
-    StateValueAddedEvent,
-};
+use api::state::{ChannelTypeInfo, Powered};
 use support::mqtt::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
-use crate::{home::state::EnergySaving, port::DataPointAccess};
+use crate::{core::event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};
 
 use support::TypedItem;
 
@@ -17,7 +14,7 @@ pub async fn export_state<T>(
     api: &T,
     base_topic: String,
     tx: Sender<MqttOutMessage>,
-    mut state_changed: Receiver<StateValueAddedEvent>,
+    mut state_changed: Receiver<StateChangedEvent>,
 ) where
     T: DataPointAccess<Powered> + DataPointAccess<EnergySaving>,
 {

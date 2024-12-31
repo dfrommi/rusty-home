@@ -1,5 +1,7 @@
-use crate::{core::IncomingDataProcessor, Database};
-use api::EnergyReadingInsertEvent;
+use crate::{
+    core::{event::EnergyReadingAddedEvent, IncomingDataProcessor},
+    Database,
+};
 use domain::{EnergyMeterIncomingDataProcessor, EnergyMeterService};
 use tokio::sync::broadcast::Receiver;
 
@@ -8,7 +10,7 @@ mod domain;
 
 pub fn new(
     db: Database,
-    new_reading_rx: Receiver<EnergyReadingInsertEvent>,
+    new_reading_rx: Receiver<EnergyReadingAddedEvent>,
 ) -> impl IncomingDataProcessor {
     EnergyMeterIncomingDataProcessor::new(db.clone(), new_reading_rx)
 }

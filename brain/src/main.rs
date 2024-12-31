@@ -1,3 +1,4 @@
+use core::event::AppEventListener;
 use std::sync::Arc;
 
 use ::support::t;
@@ -25,7 +26,7 @@ pub async fn main() {
         Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");
 
     let db_pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(4)
+        .max_connections(8)
         .connect(&settings.database.url)
         .await
         .expect("Error initializing database");
@@ -34,6 +35,7 @@ pub async fn main() {
     let db_listener = PgListener::connect(&settings.database.url)
         .await
         .expect("Error initializing database listener");
+    let event_listener = AppEventListener::new(DbEventListener::new(db_listener), database.clone());
 
     let mut mqtt_client = ::support::mqtt::Mqtt::connect(
         &settings.mqtt.host,
@@ -41,31 +43,19 @@ pub async fn main() {
         &settings.mqtt.client_id,
     );
 
-    let event_listener = DbEventListener::new(db_listener);
-
-    let mut planning_state_added_events = event_listener.new_state_value_added_listener();
-    let mut planning_user_trigger_events = event_listener.new_user_trigger_added_listener();
     tasks.spawn({
         let api = database.clone();
+        let mut state_changed_events = event_listener.new_state_changed_listener();
+        let mut user_trigger_events = event_listener.new_user_trigger_event_listener();
         async move {
             let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
 
             loop {
-                let event = tokio::select! {
-                    _ = timer.tick() => None,
-                    e = planning_state_added_events.recv() => Some(e),
-                    _ = planning_user_trigger_events.recv() => None,
+                tokio::select! {
+                    _ = timer.tick() => {},
+                    _ = state_changed_events.recv() => {},
+                    _ = user_trigger_events.recv() => {},
                 };
-
-                //make sure cache is invalidated before planning
-                //TODO use separate events for this
-                if let Some(Ok(event)) = event {
-                    api.invalidate_state(&event).await;
-                }
-
-                while let Ok(event) = planning_state_added_events.try_recv() {
-                    api.invalidate_state(&event).await;
-                }
 
                 home::plan_for_home(&api).await;
             }
@@ -76,7 +66,7 @@ pub async fn main() {
         let mqtt_api = database.clone();
         let mqtt_sender = mqtt_client.new_publisher();
         let state_topic = settings.mqtt.base_topic_status.clone();
-        let mqtt_trigger = event_listener.new_state_value_added_listener();
+        let mqtt_trigger = event_listener.new_state_changed_listener();
 
         async move {
             adapter::mqtt::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await
@@ -101,10 +91,11 @@ pub async fn main() {
     });
 
     tasks.spawn(async move {
+        tracing::debug!("Start dispatching events");
         event_listener
             .dispatch_events()
             .await
-            .expect("Error processing home-events")
+            .expect("Error processing events")
     });
 
     tasks.spawn(async move { mqtt_client.process().await });

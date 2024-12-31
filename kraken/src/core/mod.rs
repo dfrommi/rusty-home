@@ -1,5 +1,6 @@
 mod adapter;
 mod domain;
+pub mod event;
 
 use api::state::ChannelValue;
 use api::trigger::UserTrigger;

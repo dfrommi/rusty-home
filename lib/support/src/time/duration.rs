@@ -71,6 +71,13 @@ impl std::ops::Add<Duration> for Duration {
     }
 }
 
+impl From<Duration> for std::time::Duration {
+    fn from(val: Duration) -> Self {
+        let millis = val.delegate.num_milliseconds();
+        std::time::Duration::from_millis(millis as u64)
+    }
+}
+
 mod duration_format {
     use iso8601_duration::Duration as Iso8601Duration;
     use serde::{de::Visitor, Deserializer, Serializer};

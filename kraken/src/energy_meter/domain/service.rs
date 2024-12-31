@@ -1,7 +1,4 @@
-use api::{
-    state::{ChannelValue, TotalRadiatorConsumption, TotalWaterConsumption},
-    EnergyReadingInsertEvent,
-};
+use api::state::{ChannelValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use support::{
     t,
     unit::{HeatingUnit, KiloCubicMeter},
@@ -9,7 +6,7 @@ use support::{
 };
 use tokio::sync::{broadcast::Receiver, mpsc};
 
-use crate::core::{IncomingData, IncomingDataProcessor};
+use crate::core::{event::EnergyReadingAddedEvent, IncomingData, IncomingDataProcessor};
 
 use super::{AddEnergyReadingUseCase, EnergyReading, EnergyReadingRepository, Faucet, Radiator};
 
@@ -20,7 +17,7 @@ pub struct EnergyMeterService<R> {
 
 pub struct EnergyMeterIncomingDataProcessor<R> {
     repo: R,
-    rx: Receiver<EnergyReadingInsertEvent>,
+    rx: Receiver<EnergyReadingAddedEvent>,
 }
 
 impl<R> EnergyMeterService<R> {
@@ -30,7 +27,7 @@ impl<R> EnergyMeterService<R> {
 }
 
 impl<R> EnergyMeterIncomingDataProcessor<R> {
-    pub fn new(repo: R, rx: Receiver<EnergyReadingInsertEvent>) -> Self {
+    pub fn new(repo: R, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
         Self { repo, rx }
     }
 }
@@ -65,7 +62,7 @@ where
 
         loop {
             match self.rx.recv().await {
-                Ok(EnergyReadingInsertEvent { id }) => {
+                Ok(EnergyReadingAddedEvent { id }) => {
                     tracing::info!("Received energy reading with id {}", id);
 
                     match self.repo.get_total_reading_by_id(id).await {

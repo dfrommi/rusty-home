@@ -9,14 +9,12 @@ use anyhow::Result;
 use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelTypeInfo},
-    StateValueAddedEvent,
 };
 use sqlx::PgPool;
 use support::{t, time::DateTimeRange, DataPoint};
 
 impl super::Database {
-    pub async fn invalidate_state(&self, event: &StateValueAddedEvent) {
-        let tag_id = event.tag_id;
+    pub async fn invalidate_state(&self, tag_id: i64) {
         if let Some(cache) = &self.cache {
             tracing::debug!("Invalidating state cache for tag {}", tag_id);
             cache.invalidate(&tag_id).await;

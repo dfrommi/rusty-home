@@ -162,3 +162,16 @@ pub enum TotalWaterConsumption {
     BathroomCold,
     BathroomWarm,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display() {
+        assert_eq!(
+            RelativeHumidity::Outside.to_string(),
+            "RelativeHumidity[Outside]"
+        );
+    }
+}

@@ -1,7 +1,7 @@
 use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident};
+use syn::{parse_macro_input, DeriveInput};
 
 pub fn derive_typed_item(input: TokenStream) -> TokenStream {
     // Parse the input tokens
@@ -9,32 +9,59 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
     let enum_name = input.ident;
     let enum_variants = super::enum_variants(input.data);
 
-    // Generate type_name and item_name implementations
-    let type_name = enum_name.to_string().to_snake_case();
-    let variants = generate_variants_snake_case(&enum_variants);
+    let type_name_snake = enum_name.to_string().to_snake_case();
 
-    let from_item_name_matches = generate_from_item_name_matches(&enum_name, &enum_variants);
+    let mut item_name_impls = Vec::new();
+    let mut from_item_name_matches = Vec::new();
+    let mut display_impls = Vec::new();
+
+    for variant in enum_variants {
+        let variant_name = &variant.ident;
+        let variant_name_snake = variant_name.to_string().to_snake_case();
+
+        item_name_impls.push(quote! {
+            #enum_name::#variant_name => #variant_name_snake
+        });
+
+        from_item_name_matches.push(quote! {
+            #variant_name_snake => Some(#enum_name::#variant_name)
+        });
+
+        //not snake cased
+        let display_name = format!("{}[{}]", enum_name, variant_name);
+        display_impls.push(quote! {
+            #enum_name::#variant_name => write!(f, #display_name)
+        });
+    }
 
     let expanded = quote! {
         impl support::TypedItem for #enum_name {
             fn type_name(&self) -> &'static str {
-                #type_name
+                #type_name_snake
             }
 
             fn item_name(&self) -> &'static str {
                 match self {
-                    #(#variants)*
+                    #(#item_name_impls),*
                 }
             }
         }
 
         impl #enum_name {
-            pub const TYPE_NAME: &'static str = #type_name;
+            pub const TYPE_NAME: &'static str = #type_name_snake;
 
             pub fn from_item_name(name: &str) -> Option<Self> {
                 match name {
-                    #(#from_item_name_matches)*
+                    #(#from_item_name_matches),*,
                     _ => None,
+                }
+            }
+        }
+
+        impl std::fmt::Display for #enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    #(#display_impls),*
                 }
             }
         }
@@ -102,33 +129,4 @@ pub fn derive_typed_item_delegation(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
-}
-
-fn generate_variants_snake_case(enum_variants: &[syn::Variant]) -> Vec<proc_macro2::TokenStream> {
-    enum_variants
-        .iter()
-        .map(|variant| {
-            let variant_name = &variant.ident;
-            let item_name = variant_name.to_string().to_snake_case();
-            quote! {
-                Self::#variant_name => #item_name,
-            }
-        })
-        .collect()
-}
-
-fn generate_from_item_name_matches(
-    enum_name: &Ident,
-    enum_variants: &[syn::Variant],
-) -> Vec<proc_macro2::TokenStream> {
-    enum_variants
-        .iter()
-        .map(|variant| {
-            let variant_name = &variant.ident;
-            let item_name = variant_name.to_string().to_snake_case();
-            quote! {
-                #item_name => Some(#enum_name::#variant_name),
-            }
-        })
-        .collect()
 }

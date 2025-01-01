@@ -4,10 +4,6 @@ macro_rules! t {
         $crate::time::DateTime::now()
     }};
 
-    (ever) => {{
-        $crate::time::DateTime::min()
-    }};
-
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
         $crate::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
     }};

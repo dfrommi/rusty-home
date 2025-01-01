@@ -23,16 +23,13 @@ impl<T: Clone> DataFrame<T> {
         Ok(Self { data })
     }
 
-    //modify data frame in place to contain only values within range, both ends included
-    pub fn retain_range(&self, range: &DateTimeRange) -> Self {
-        Self {
-            data: self
-                .data
+    pub fn retain_range(&self, range: &DateTimeRange) -> anyhow::Result<Self> {
+        Self::new(
+            self.data
                 .iter()
                 .filter(|(k, _)| *k >= range.start() && *k <= range.end())
-                .map(|(k, v)| (*k, v.clone()))
-                .collect(),
-        }
+                .map(|(_, v)| v.clone()),
+        )
     }
 
     pub fn map<U: Clone>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {

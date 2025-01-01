@@ -57,7 +57,7 @@ pub async fn main() {
                     _ = user_trigger_events.recv() => {},
                 };
 
-                home::plan_for_home(&api).await;
+                home::plan_for_home(&api, &api, &api).await;
             }
         }
     });

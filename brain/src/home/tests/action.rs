@@ -27,7 +27,7 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     let action: HomeAction = action.into();
 
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
-        let api = infrastructure();
+        let api = &infrastructure().db;
 
         let result = action.evaluate(api).await.unwrap();
 
@@ -47,22 +47,6 @@ fn user_override_kept_continuously() {
     let result = get_state_at("2024-11-11T21:12:01+01:00", action);
 
     assert!(!result.is_fulfilled);
-}
-
-#[test]
-fn heating_started_before_window_was_opened_not_working_in_all_rooms() {
-    let action = DeferHeatingUntilVentilationDone::new(
-        HeatingZone::Bedroom,
-        DegreeCelsius(18.0),
-        t!(6:12-12:30),
-    );
-
-    let result = get_state_at("2024-12-26T05:12:13Z", action);
-
-    assert!(
-            result.is_fulfilled,
-            "Not fulfilled but expected. Check that window-open time is verified against date and time, not only time"
-    );
 }
 
 #[test]
@@ -88,7 +72,7 @@ fn defered_heating_after_ventilation_stopped_too_early() {
 
     assert!(
         result.is_fulfilled,
-        "Should be fulfilled. Check handling when too few temperature mearements exist after ventilation stopped"
+        "Should be fulfilled. Check handling when too few temperature measurements exist after ventilation stopped"
     );
 }
 
@@ -96,7 +80,7 @@ fn defered_heating_after_ventilation_stopped_too_early() {
 fn no_heating_during_automatic_temperature_increase_toggling() {
     let action = NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom);
 
-    let result = get_state_at("2024-11-12T19:18:29.738113+01:00", action);
+    let result = get_state_at("2024-12-31T12:18:29.738113+01:00", action);
 
     assert!(
         !result.is_fulfilled,

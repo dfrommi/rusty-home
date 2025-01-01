@@ -149,7 +149,7 @@ where
 
     //cover for delay between sending command and receiving state change -> external change happened
     let just_triggered = this_as_last_execution.created > t!(30 seconds ago);
-    let is_effectively_reflected = just_triggered || api.is_reflected_in_state(&command).await?;
+    let is_effectively_reflected = just_triggered || api.is_reflected_in_state(command).await?;
 
     Ok(is_effectively_reflected)
 }

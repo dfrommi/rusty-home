@@ -34,7 +34,7 @@ impl<C: Estimatable> TimeSeries<C> {
 
         Ok(Self {
             context,
-            values: df.retain_range(&range),
+            values: df.retain_range(&range)?,
         })
     }
 
@@ -97,7 +97,10 @@ impl<C: Estimatable> TimeSeries<C> {
         at: DateTime,
         data: &DataFrame<C::Type>,
     ) -> Option<C::Type> {
-        context.interpolate(at, data)
+        context
+            .interpolate(at, data)
+            //reconsider implicit last-seen. Needed to avoid empty time-series in some cases
+            .or_else(|| interpolate::algo::last_seen(at, data))
     }
 }
 

@@ -1,9 +1,9 @@
-use r#macro::{StateChannel, TypedItem};
+use r#macro::{DbMapped, EnumVariants, StateChannel, TypedItem};
 use support::unit::*;
 
 pub mod db;
 
-#[derive(Debug, Clone, StateChannel)]
+#[derive(Debug, Clone, StateChannel, DbMapped)]
 pub enum ChannelValue {
     Temperature(Temperature, DegreeCelsius),
     RelativeHumidity(RelativeHumidity, Percent),
@@ -23,7 +23,8 @@ pub trait ChannelTypeInfo {
     type ValueType;
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+//TODO remove EnumVariants, only for state-debug
 pub enum Temperature {
     Outside,
     LivingRoomDoor,
@@ -35,7 +36,7 @@ pub enum Temperature {
     Dehumidifier,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
 pub enum RelativeHumidity {
     Outside,
     LivingRoomDoor,
@@ -68,7 +69,7 @@ pub enum Powered {
     LivingRoomTv,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
 pub enum CurrentPowerUsage {
     Fridge,
     Dehumidifier,
@@ -89,7 +90,7 @@ pub enum CurrentPowerUsage {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
 pub enum TotalEnergyConsumption {
     Fridge,
     Dehumidifier,
@@ -119,7 +120,7 @@ pub enum SetPoint {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
 pub enum HeatingDemand {
     LivingRoom,
     Bedroom,

@@ -1,7 +1,7 @@
-use api::state::{ChannelTypeInfo, Temperature};
+use api::state::Temperature;
 use support::{t, unit::DegreeCelsius};
 
-use support::DataPoint;
+use support::{DataPoint, ValueObject};
 
 use super::{opened::Opened, DataPointAccess, TimeSeriesAccess};
 
@@ -13,7 +13,7 @@ pub enum AutomaticTemperatureIncrease {
     RoomOfRequirements,
 }
 
-impl ChannelTypeInfo for AutomaticTemperatureIncrease {
+impl ValueObject for AutomaticTemperatureIncrease {
     type ValueType = bool;
 }
 

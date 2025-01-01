@@ -5,8 +5,8 @@ use actix_web::{
     web::{self, Query},
     HttpResponse, Responder,
 };
-use api::state::{ChannelTypeInfo, HeatingDemand, TotalEnergyConsumption};
-use support::time::DateTimeRange;
+use api::state::{HeatingDemand, TotalEnergyConsumption};
+use support::{time::DateTimeRange, ValueObject};
 
 use crate::{
     adapter::grafana::{
@@ -61,7 +61,7 @@ async fn total_values_response<T>(
     value_mapper: impl Fn(&T, TimeSeries<T>) -> (f64, f64),
 ) -> impl Responder
 where
-    T: ChannelTypeInfo + DashboardDisplay + Estimatable + Clone,
+    T: ValueObject + DashboardDisplay + Estimatable + Clone,
     T::ValueType: PartialOrd + AsRef<f64>,
 {
     struct Row {

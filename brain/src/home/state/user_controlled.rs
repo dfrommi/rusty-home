@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
-use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint};
+use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint, ValueObject};
 
 use api::{
     command::{
         CommandExecution, CommandSource, HeatingTargetState, PowerToggle, SetHeating, SetPower,
         Thermostat,
     },
-    state::{ChannelTypeInfo, ExternalAutoControl, Powered, SetPoint},
+    state::{ExternalAutoControl, Powered, SetPoint},
 };
 
 use super::{CommandAccess, DataPointAccess};
@@ -36,7 +36,7 @@ impl Display for UserControlled {
     }
 }
 
-impl ChannelTypeInfo for UserControlled {
+impl ValueObject for UserControlled {
     type ValueType = bool;
 }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use api::state::{ChannelTypeInfo, Powered};
-use support::mqtt::MqttOutMessage;
+use api::state::Powered;
+use support::{mqtt::MqttOutMessage, ValueObject};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::{core::event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};
@@ -50,7 +50,7 @@ impl MqttStateSender {
 
     async fn send<'a, 'b: 'a, API, T>(&'a mut self, state: T, api: &'b API)
     where
-        T: TypedItem + ChannelTypeInfo + Clone,
+        T: TypedItem + ValueObject + Clone,
         T::ValueType: Into<MqttStateValue>,
         API: DataPointAccess<T>,
     {

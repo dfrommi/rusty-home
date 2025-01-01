@@ -1,8 +1,8 @@
-use api::state::{ChannelTypeInfo, RelativeHumidity};
+use api::state::RelativeHumidity;
 use support::{
     t,
     unit::{DegreeCelsius, Percent},
-    DataPoint,
+    DataPoint, ValueObject,
 };
 
 use anyhow::Result;
@@ -14,7 +14,7 @@ pub enum RiskOfMould {
     Bathroom,
 }
 
-impl ChannelTypeInfo for RiskOfMould {
+impl ValueObject for RiskOfMould {
     type ValueType = bool;
 }
 

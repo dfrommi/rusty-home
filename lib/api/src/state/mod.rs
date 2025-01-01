@@ -19,10 +19,6 @@ pub enum ChannelValue {
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
 }
 
-pub trait ChannelTypeInfo {
-    type ValueType;
-}
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
 //TODO remove EnumVariants, only for state-debug
 pub enum Temperature {

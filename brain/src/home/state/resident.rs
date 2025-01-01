@@ -1,6 +1,6 @@
 use anyhow::Result;
-use api::state::{ChannelTypeInfo, Presence};
-use support::{t, time::DateTimeRange, DataPoint};
+use api::state::Presence;
+use support::{t, time::DateTimeRange, DataPoint, ValueObject};
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
@@ -10,7 +10,7 @@ pub enum Resident {
     SabineSleeping,
 }
 
-impl ChannelTypeInfo for Resident {
+impl ValueObject for Resident {
     type ValueType = bool;
 }
 

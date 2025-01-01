@@ -20,7 +20,6 @@ mod temperature;
 mod total_energy_consumption;
 mod user_controlled;
 
-use api::state::ChannelTypeInfo;
 pub use api::state::Powered;
 pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;

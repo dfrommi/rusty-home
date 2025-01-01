@@ -5,8 +5,8 @@ use actix_web::{
     web::{self},
     HttpResponse, Responder,
 };
-use api::state::{ChannelTypeInfo, CurrentPowerUsage, HeatingDemand};
-use support::DataPoint;
+use api::state::{CurrentPowerUsage, HeatingDemand};
+use support::{DataPoint, ValueObject};
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 
@@ -26,7 +26,7 @@ where
 
 async fn current_values_response<T>(api: &impl DataPointAccess<T>, items: &[T]) -> impl Responder
 where
-    T: ChannelTypeInfo + DashboardDisplay + Clone,
+    T: ValueObject + DashboardDisplay + Clone,
     T::ValueType: PartialOrd + AsRef<f64>,
 {
     let values = get_all_states(api, items).await;
@@ -51,7 +51,7 @@ where
 }
 
 //TODO move to repo trait
-async fn get_all_states<T: ChannelTypeInfo + Clone>(
+async fn get_all_states<T: ValueObject + Clone>(
     api: &impl DataPointAccess<T>,
     items: &[T],
 ) -> anyhow::Result<Vec<(T, DataPoint<T::ValueType>)>> {

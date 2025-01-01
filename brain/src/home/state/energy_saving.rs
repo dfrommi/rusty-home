@@ -1,9 +1,9 @@
 use api::{
     command::{CommandExecution, EnergySavingDevice, SetEnergySaving},
-    state::{ChannelTypeInfo, Powered},
+    state::Powered,
 };
 use r#macro::TypedItem;
-use support::DataPoint;
+use support::{DataPoint, ValueObject};
 
 use super::{CommandAccess, DataPointAccess};
 
@@ -12,7 +12,7 @@ pub enum EnergySaving {
     LivingRoomTv,
 }
 
-impl ChannelTypeInfo for EnergySaving {
+impl ValueObject for EnergySaving {
     type ValueType = bool;
 }
 
@@ -24,7 +24,7 @@ where
     async fn current_data_point(
         &self,
         item: EnergySaving,
-    ) -> anyhow::Result<DataPoint<<EnergySaving as ChannelTypeInfo>::ValueType>> {
+    ) -> anyhow::Result<DataPoint<<EnergySaving as ValueObject>::ValueType>> {
         let is_tv_on = match item {
             EnergySaving::LivingRoomTv => self.current_data_point(Powered::LivingRoomTv).await,
         }?;

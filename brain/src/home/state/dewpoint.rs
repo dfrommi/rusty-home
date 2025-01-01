@@ -11,7 +11,7 @@ use r#macro::{EnumVariants, TypedItem};
 use support::{
     time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
-    DataFrame, DataPoint,
+    DataFrame, DataPoint, ValueObject,
 };
 use tokio::try_join;
 
@@ -44,7 +44,7 @@ impl DewPoint {
     }
 }
 
-impl ChannelTypeInfo for DewPoint {
+impl ValueObject for DewPoint {
     type ValueType = DegreeCelsius;
 }
 

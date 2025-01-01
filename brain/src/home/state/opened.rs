@@ -1,9 +1,8 @@
 use anyhow::Context;
-use api::state::ChannelTypeInfo;
 use support::{
     t,
     time::{DateTime, DateTimeRange},
-    DataPoint,
+    DataPoint, ValueObject,
 };
 
 use crate::support::timeseries::{
@@ -21,7 +20,7 @@ pub enum Opened {
     RoomOfRequirementsWindow,
 }
 
-impl ChannelTypeInfo for Opened {
+impl ValueObject for Opened {
     type ValueType = bool;
 }
 

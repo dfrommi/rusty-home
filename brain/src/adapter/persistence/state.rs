@@ -8,10 +8,10 @@ use crate::{
 use anyhow::Result;
 use api::{
     get_tag_id,
-    state::{db::DbValue, Channel, ChannelTypeInfo},
+    state::{db::DbValue, Channel},
 };
 use sqlx::PgPool;
-use support::{t, time::DateTimeRange, DataPoint};
+use support::{t, time::DateTimeRange, DataPoint, ValueObject};
 
 impl super::Database {
     pub async fn invalidate_state(&self, tag_id: i64) {
@@ -29,14 +29,14 @@ impl super::Database {
 
 impl<T> DataPointAccess<T> for super::Database
 where
-    T: Into<Channel> + ChannelTypeInfo + Debug + Clone,
+    T: Into<Channel> + ValueObject + Debug + Clone,
     T::ValueType: From<DbValue>,
 {
     #[tracing::instrument(skip(self))]
     async fn current_data_point(
         &self,
         item: T,
-    ) -> Result<DataPoint<<T as ChannelTypeInfo>::ValueType>> {
+    ) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
         let channel = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 

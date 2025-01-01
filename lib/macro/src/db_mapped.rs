@@ -20,7 +20,7 @@ pub fn db_mapped(input: TokenStream) -> TokenStream {
 
             // Generate the ChannelTypeInfo implementation
             type_info_impls.push(quote! {
-                impl ChannelTypeInfo for #item_type {
+                impl support::ValueObject for #item_type {
                     type ValueType = #value_type;
                 }
             });

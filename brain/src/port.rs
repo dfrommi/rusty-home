@@ -3,13 +3,12 @@
 use anyhow::Result;
 use api::{
     command::{Command, CommandExecution, CommandSource, CommandTarget},
-    state::ChannelTypeInfo,
     trigger::{UserTrigger, UserTriggerTarget},
 };
 use support::{
     t,
     time::{DateTime, DateTimeRange},
-    DataPoint,
+    DataPoint, ValueObject,
 };
 
 use crate::{
@@ -17,7 +16,7 @@ use crate::{
     support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
-pub trait DataPointAccess<T: ChannelTypeInfo> {
+pub trait DataPointAccess<T: ValueObject> {
     async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>>;
 
     async fn current(&self, item: T) -> Result<T::ValueType> {

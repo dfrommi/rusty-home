@@ -1,5 +1,5 @@
-use api::state::{ChannelTypeInfo, Temperature};
-use support::unit::DegreeCelsius;
+use api::state::Temperature;
+use support::{unit::DegreeCelsius, ValueObject};
 
 use super::{DataPointAccess, Opened};
 use support::DataPoint;
@@ -12,7 +12,7 @@ pub enum ColdAirComingIn {
     RoomOfRequirements,
 }
 
-impl ChannelTypeInfo for ColdAirComingIn {
+impl ValueObject for ColdAirComingIn {
     type ValueType = bool;
 }
 

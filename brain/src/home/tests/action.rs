@@ -2,7 +2,6 @@ use api::command::Thermostat;
 use support::{
     t,
     time::{DateTime, FIXED_NOW},
-    unit::DegreeCelsius,
 };
 
 use crate::{
@@ -51,11 +50,7 @@ fn user_override_kept_continuously() {
 
 #[test]
 fn heating_started_before_window_was_opened_in_one_room() {
-    let action = DeferHeatingUntilVentilationDone::new(
-        HeatingZone::Bedroom,
-        DegreeCelsius(18.1),
-        t!(6:12-12:30),
-    );
+    let action = DeferHeatingUntilVentilationDone::Bedroom;
 
     let result = get_state_at("2024-11-11T06:12:01+01:00", action);
 
@@ -90,11 +85,7 @@ fn no_heating_during_automatic_temperature_increase_toggling() {
 
 #[test]
 fn heating_before_sleeping_extended_over_midnight() {
-    let action = ExtendHeatingUntilSleeping::new(
-        HeatingZone::LivingRoom,
-        DegreeCelsius(20.0),
-        t!(22:30-2:30),
-    );
+    let action = ExtendHeatingUntilSleeping::LivingRoom;
 
     let result = get_state_at("2024-12-16T00:00:10+01:00", action);
 

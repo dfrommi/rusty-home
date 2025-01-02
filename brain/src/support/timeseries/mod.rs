@@ -7,7 +7,7 @@ use support::{
     DataPoint,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 pub struct TimeSeries<T: Estimatable> {
     context: T,
@@ -32,10 +32,14 @@ impl<C: Estimatable> TimeSeries<C> {
             df.insert(DataPoint::new(interpolated, end_at));
         }
 
-        Ok(Self {
+        Ok(Self::from_data_frame(context, df))
+    }
+
+    fn from_data_frame(context: C, df: DataFrame<C::Type>) -> Self {
+        Self {
             context,
-            values: df.retain_range(&range)?,
-        })
+            values: df,
+        }
     }
 
     pub fn combined<U, V, F>(
@@ -74,14 +78,38 @@ impl<C: Estimatable> TimeSeries<C> {
         Self::new(context, dps, range)
     }
 
-    pub fn map(&self, f: impl Fn(&DataPoint<C::Type>) -> C::Type) -> Self
+    pub fn reduce<F>(context: C, all_series: Vec<TimeSeries<C>>, reduce: F) -> Result<TimeSeries<C>>
+    where
+        F: Fn(&C::Type, &C::Type) -> C::Type,
+        C: Clone,
+    {
+        if all_series.is_empty() {
+            bail!("No series to reduce");
+        }
+
+        let mut all_series = all_series;
+        let mut merged = all_series.remove(0);
+
+        for ts in all_series {
+            merged = TimeSeries::combined(&merged, &ts, context.clone(), |a, b| reduce(a, b))?
+        }
+
+        Ok(merged)
+    }
+
+    pub fn map<T: Estimatable, F>(self, context: T, f: F) -> TimeSeries<T>
+    where
+        F: Fn(DataPoint<C::Type>) -> T::Type,
+        C: Clone,
+    {
+        TimeSeries::from_data_frame(context, self.values.map(f))
+    }
+
+    pub fn context(&self) -> C
     where
         C: Clone,
     {
-        Self {
-            context: self.context.clone(),
-            values: self.values.map(f),
-        }
+        self.context.clone()
     }
 
     //linear interpolation or last seen

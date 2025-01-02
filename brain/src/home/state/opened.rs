@@ -84,26 +84,18 @@ where
         range: DateTimeRange,
     ) -> anyhow::Result<TimeSeries<Opened>> {
         let api_items = item.api_items();
+        let context: api::state::Opened = api_items[0].clone();
 
         let futures = api_items
             .into_iter()
             .map(|item| self.series(item, range.clone()))
             .collect::<Vec<_>>();
 
-        let mut all_ts = futures::future::try_join_all(futures).await?;
-        let first_api_ts = all_ts.remove(0);
-        let mut merged: TimeSeries<Opened> = TimeSeries::new(
-            item.clone(),
-            first_api_ts.inner().iter().cloned(),
-            first_api_ts.range(),
-        )?;
+        let all_ts = futures::future::try_join_all(futures).await?;
+        let merged = TimeSeries::reduce(context, all_ts, |&a, &b| a || b)?;
 
-        for ts in all_ts {
-            merged = TimeSeries::combined(&merged, &ts, item.clone(), |&a, &b| a || b)
-                .context("Error merging time series")?;
-        }
-
-        Ok(merged)
+        //from API-opened into this opened type
+        Ok(merged.map(item, |dp| dp.value))
     }
 }
 

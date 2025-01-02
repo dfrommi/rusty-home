@@ -32,13 +32,14 @@ impl<T: Clone> DataFrame<T> {
         )
     }
 
-    pub fn map<U: Clone>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
-        DataFrame::new(
-            self.data
-                .values()
-                .map(|v| DataPoint::new(f(v), v.timestamp)),
-        )
-        .expect("Internal error: Error creating data frame of non-empty datapoints")
+    pub fn map<U: Clone>(self, f: impl Fn(DataPoint<T>) -> U) -> DataFrame<U> {
+        let values = self.data.into_values().map(|dp| {
+            let ts = dp.timestamp;
+            DataPoint::new(f(dp), ts)
+        });
+
+        DataFrame::new(values)
+            .expect("Internal error: Error creating data frame of non-empty datapoints")
     }
 
     pub fn insert(&mut self, dp: DataPoint<T>) {

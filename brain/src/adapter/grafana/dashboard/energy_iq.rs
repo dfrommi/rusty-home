@@ -152,7 +152,8 @@ async fn combined_series(
         .into_iter()
         .map(|(room, ts)| {
             let factor = room.heating_factor();
-            ts.map(|dp| {
+            let context = ts.context();
+            ts.map(context, |dp| {
                 let value: f64 = dp.value.0;
                 Percent(value * factor)
             })

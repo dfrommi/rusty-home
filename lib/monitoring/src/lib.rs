@@ -1,3 +1,5 @@
+pub mod meter;
+
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_sdk::metrics::MetricError;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
@@ -75,7 +77,7 @@ impl Monitoring {
             let tracing_filter: EnvFilter = config.traces.clone().try_into()?;
             let tracing_layer = OpenTelemetryLayer::new(tracer).with_filter(tracing_filter);
 
-            let metrics = init_metrics(resource.clone())?;
+            let metrics = init_metrics(resource.clone(), otlp_config.url.clone())?;
             opentelemetry::global::set_meter_provider(metrics);
 
             tracing_subscriber::registry()
@@ -120,15 +122,28 @@ fn init_traces(
 
 fn init_metrics(
     resource: Resource,
+    url: Option<String>,
 ) -> Result<opentelemetry_sdk::metrics::SdkMeterProvider, MetricError> {
-    let exporter = opentelemetry_otlp::MetricExporter::builder()
-        .with_tonic()
-        .build()?;
-    let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
-        exporter,
-        opentelemetry_sdk::runtime::Tokio,
-    )
-    .build();
+    let reader = match url {
+        Some(url) => {
+            let exporter = opentelemetry_otlp::MetricExporter::builder()
+                .with_tonic()
+                .with_endpoint(url)
+                .build()?;
+            opentelemetry_sdk::metrics::PeriodicReader::builder(
+                exporter,
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .with_interval(std::time::Duration::from_secs(5))
+            .build()
+        }
+        None => opentelemetry_sdk::metrics::PeriodicReader::builder(
+            opentelemetry_stdout::MetricExporter::default(),
+            opentelemetry_sdk::runtime::Tokio,
+        )
+        .with_interval(std::time::Duration::from_secs(5))
+        .build(),
+    };
 
     Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
         .with_reader(reader)

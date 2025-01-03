@@ -2,7 +2,10 @@ use std::fmt::Debug;
 
 use crate::{
     port::{DataPointAccess, TimeSeriesAccess},
-    support::timeseries::{interpolate::Estimatable, TimeSeries},
+    support::{
+        metrics,
+        timeseries::{interpolate::Estimatable, TimeSeries},
+    },
 };
 
 use anyhow::Result;
@@ -37,16 +40,21 @@ where
         &self,
         item: T,
     ) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
-        let channel = item.into();
+        let channel: Channel = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
         if let Some(cache) = &self.cache {
             if let Some(cached) = cache.get(&tag_id).await {
+                metrics::cache_hit_data_point_access(&channel);
                 return Ok(cached.map_value(|v| v.clone().into()));
             }
         }
 
-        tracing::debug!("Cache miss for item {:?}, fetching from database", channel);
+        tracing::debug!(
+            channel = ?channel,
+            "Cache miss, fetching value from database",
+        );
+        metrics::cache_miss_data_point_access(&channel);
 
         //TODO rewrite to max query
         let rec = sqlx::query!(
@@ -69,8 +77,7 @@ where
                         .insert(tag_id, DataPoint::new(r.value.clone(), r.timestamp.into()))
                         .await;
                 }
-                let dp = DataPoint::new(r.value.into(), r.timestamp.into());
-                Ok(dp)
+                Ok(DataPoint::new(r.value.into(), r.timestamp.into()))
             }
             None => anyhow::bail!("No data found"),
         }

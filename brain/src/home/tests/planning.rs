@@ -74,6 +74,20 @@ mod support {
             //nothing to do
             Ok(())
         }
+
+        async fn get_latest_planning_trace(
+            &self,
+            _: DateTime,
+        ) -> anyhow::Result<Vec<PlanningTrace>> {
+            Ok(vec![])
+        }
+
+        async fn get_last_executions(
+            &self,
+            _: DateTime,
+        ) -> anyhow::Result<Vec<(String, DateTime)>> {
+            Ok(vec![])
+        }
     }
 
     pub struct TestCommandProcessor {
@@ -127,12 +141,23 @@ mod support {
             infrastructure().db.get_latest_command(target, since).await
         }
 
-        async fn get_all_commands(
+        async fn get_all_commands_for_target(
             &self,
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
         ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
-            infrastructure().db.get_all_commands(target, since).await
+            infrastructure()
+                .db
+                .get_all_commands_for_target(target, since)
+                .await
+        }
+
+        async fn get_all_commands(
+            &self,
+            from: DateTime,
+            until: DateTime,
+        ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
+            infrastructure().db.get_all_commands(from, until).await
         }
     }
 }

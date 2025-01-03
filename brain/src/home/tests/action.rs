@@ -1,8 +1,5 @@
 use api::command::Thermostat;
-use support::{
-    t,
-    time::{DateTime, FIXED_NOW},
-};
+use support::time::{DateTime, FIXED_NOW};
 
 use crate::{
     core::planner::{Action, ActionEvaluationResult},

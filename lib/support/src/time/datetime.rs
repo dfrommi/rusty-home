@@ -52,6 +52,10 @@ impl DateTime {
         Ok(chrono::DateTime::parse_from_rfc3339(iso8601)?.into())
     }
 
+    pub fn to_human_readable(&self) -> String {
+        chrono_humanize::HumanTime::from(self.delegate).to_string()
+    }
+
     pub fn time(&self) -> Time {
         Time::new(self.delegate.time())
     }

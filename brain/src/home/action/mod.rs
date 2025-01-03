@@ -129,7 +129,7 @@ where
     API: CommandAccess<Command> + CommandState<Command>,
 {
     let executions = api
-        .get_all_commands(command.clone(), oneshot_range_start)
+        .get_all_commands_for_target(command.clone(), oneshot_range_start)
         .await?;
 
     let already_triggered = executions

@@ -42,10 +42,16 @@ pub trait CommandAccess<C: Into<Command>> {
         since: DateTime,
     ) -> Result<Option<CommandExecution<C>>>;
 
-    async fn get_all_commands(
+    async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
+    ) -> Result<Vec<CommandExecution<C>>>;
+
+    async fn get_all_commands(
+        &self,
+        from: DateTime,
+        until: DateTime,
     ) -> Result<Vec<CommandExecution<C>>>;
 }
 
@@ -64,6 +70,14 @@ pub trait CommandExecutor {
 
 pub trait PlanningResultTracer {
     async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()>;
+    async fn get_latest_planning_trace(
+        &self,
+        before: DateTime,
+    ) -> anyhow::Result<Vec<PlanningTrace>>;
+    async fn get_last_executions(
+        &self,
+        before: DateTime,
+    ) -> anyhow::Result<Vec<(String, DateTime)>>;
 }
 
 pub trait CommandStore {

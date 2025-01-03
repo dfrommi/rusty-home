@@ -9,7 +9,11 @@ use support::{t, time::DateTime};
 
 use crate::port::{CommandAccess, CommandStore};
 
-impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> for DB {
+impl<DB, C> CommandAccess<C> for DB
+where
+    DB: AsRef<PgPool>,
+    C: Into<Command> + DeserializeOwned,
+{
     #[tracing::instrument(skip_all, fields(command_target))]
     async fn get_latest_command(
         &self,
@@ -19,12 +23,13 @@ impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> fo
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        let mut all_commands = get_all_commands::<C>(self.as_ref(), target, since).await?;
+        let mut all_commands =
+            get_all_commands::<C>(self.as_ref(), Some(target), since, t!(now)).await?;
         Ok(all_commands.pop())
     }
 
     #[tracing::instrument(skip_all, fields(command_target))]
-    async fn get_all_commands(
+    async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -32,7 +37,15 @@ impl<DB: AsRef<PgPool>, C: Into<Command> + DeserializeOwned> CommandAccess<C> fo
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        get_all_commands::<C>(self.as_ref(), target, since).await
+        get_all_commands::<C>(self.as_ref(), Some(target), since, t!(now)).await
+    }
+
+    async fn get_all_commands(
+        &self,
+        from: DateTime,
+        until: DateTime,
+    ) -> Result<Vec<CommandExecution<C>>> {
+        get_all_commands::<C>(self.as_ref(), None, from, until).await
     }
 }
 
@@ -62,21 +75,22 @@ where
 
 async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
     db_pool: &PgPool,
-    target: CommandTarget,
-    since: DateTime,
+    target: Option<CommandTarget>,
+    from: DateTime,
+    until: DateTime,
 ) -> Result<Vec<CommandExecution<C>>> {
-    let db_target = serde_json::json!(target);
+    let db_target = target.map(|j| serde_json::json!(j));
 
     let records = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
                 from THING_COMMAND 
-                where command @> $1 
+                where (command @> $1 or $1 is null)
                 and created >= $2
                 and created <= $3
                 order by created asc"#,
             db_target,
-            since.into_db(),
-            t!(now).into_db(), //For timeshift in tests
+            from.into_db(),
+            until.into_db(),
         )
         .fetch_all(db_pool)
         .await?;
@@ -135,8 +149,9 @@ mod get_all_commands_since {
         //WHEN
         let result = get_all_commands::<SetPower>(
             &db_pool,
-            PowerToggle::Dehumidifier.into(),
+            Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),
+            t!(now),
         )
         .await
         .unwrap();
@@ -160,6 +175,38 @@ mod get_all_commands_since {
     }
 
     #[sqlx::test(migrations = "../migrations")]
+    async fn test_command_without_target_filter(db_pool: PgPool) {
+        //GIVEN
+        insert_command(
+            &db_pool,
+            &SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on: true,
+            },
+            t!(2 minutes ago),
+        )
+        .await;
+
+        insert_command(
+            &db_pool,
+            &SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            },
+            t!(4 minutes ago),
+        )
+        .await;
+
+        //WHEN
+        let result = get_all_commands::<Command>(&db_pool, None, t!(1 hours ago), t!(now))
+            .await
+            .unwrap();
+
+        //THEN
+        assert_eq!(result.len(), 2);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
     async fn test_no_command(db_pool: PgPool) {
         //GIVEN
         insert_command(
@@ -175,8 +222,9 @@ mod get_all_commands_since {
         //WHEN
         let result = get_all_commands::<SetPower>(
             &db_pool,
-            PowerToggle::Dehumidifier.into(),
+            Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),
+            t!(now),
         )
         .await
         .unwrap();

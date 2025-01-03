@@ -19,7 +19,7 @@ where
     }
 }
 
-pub fn csv_response<S: serde::Serialize>(rows: &[S]) -> GrafanaResponse {
+pub fn csv_response<S: serde::Serialize>(rows: impl IntoIterator<Item = S>) -> GrafanaResponse {
     let mut writer = csv::Writer::from_writer(vec![]);
 
     for row in rows {

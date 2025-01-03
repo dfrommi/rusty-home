@@ -8,15 +8,18 @@ use actix_web::{
     web::{self},
     HttpResponse, ResponseError,
 };
-use api::state::{
-    CurrentPowerUsage, HeatingDemand, RelativeHumidity, SetPoint, Temperature,
-    TotalEnergyConsumption,
+use api::{
+    command::Command,
+    state::{
+        CurrentPowerUsage, HeatingDemand, RelativeHumidity, SetPoint, Temperature,
+        TotalEnergyConsumption,
+    },
 };
 use derive_more::derive::{Display, Error};
 
 use crate::{
     home::state::Opened,
-    port::{DataPointAccess, TimeSeriesAccess},
+    port::{CommandAccess, DataPointAccess, PlanningResultTracer, TimeSeriesAccess},
 };
 
 use display::DashboardDisplay;
@@ -31,6 +34,8 @@ where
         + TimeSeriesAccess<RelativeHumidity>
         + TimeSeriesAccess<SetPoint>
         + TimeSeriesAccess<Opened>
+        + CommandAccess<Command>
+        + PlanningResultTracer
         + 'static,
 {
     web::scope("/grafana")
@@ -38,6 +43,7 @@ where
         .service(dashboard::energy_monitor::routes(api.clone()))
         .service(dashboard::state_debug::routes(api.clone()))
         .service(dashboard::heating_details::routes(api.clone()))
+        .service(dashboard::smart_home_overview::routes(api.clone()))
         .service(dashboard::meta::routes())
 }
 

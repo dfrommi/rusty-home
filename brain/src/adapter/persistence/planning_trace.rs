@@ -9,8 +9,10 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
         let id = sqlx::types::Uuid::from_u128(uuid::Uuid::new_v4().as_u128());
         let now = t!(now);
 
+        let correlation_id = monitoring::TraceContext::current_correlation_id();
+
         let mut builder = QueryBuilder::new(
-            "INSERT INTO planning_trace (run_id, seq, action, goal, goal_active, locked, fulfilled, triggered, timestamp) "
+            "INSERT INTO planning_trace (run_id, seq, action, goal, goal_active, locked, fulfilled, triggered, timestamp, correlation_id) "
         );
 
         builder.push_values(results.iter().enumerate(), |mut b, (i, result)| {
@@ -22,7 +24,8 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
                 .push_bind(result.locked)
                 .push_bind(result.is_fulfilled)
                 .push_bind(result.was_triggered)
-                .push_bind(now.into_db());
+                .push_bind(now.into_db())
+                .push_bind(correlation_id.clone());
         });
 
         builder.build().execute(self.as_ref()).await?;

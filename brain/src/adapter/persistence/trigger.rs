@@ -11,9 +11,10 @@ impl<DB: AsRef<PgPool>> UserTriggerExecutor for DB {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
         sqlx::query!(
-            r#"INSERT INTO user_trigger (trigger, timestamp) VALUES ($1, $2)"#,
+            r#"INSERT INTO user_trigger (trigger, timestamp, correlation_id) VALUES ($1, $2, $3)"#,
             trigger,
             t!(now).into_db(),
+            monitoring::TraceContext::current_correlation_id(),
         )
         .execute(self.as_ref())
         .await

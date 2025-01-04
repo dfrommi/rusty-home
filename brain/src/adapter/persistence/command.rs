@@ -59,12 +59,13 @@ where
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
             db_command,
             t!(now).into_db(),
             DbCommandState::Pending as DbCommandState,
             db_source_type as DbCommandSource,
-            db_source_id
+            db_source_id,
+            monitoring::TraceContext::current_correlation_id(),
         )
         .execute(self.as_ref())
         .await?;

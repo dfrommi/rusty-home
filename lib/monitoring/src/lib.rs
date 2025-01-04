@@ -1,4 +1,5 @@
 pub mod meter;
+mod trace;
 
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_sdk::metrics::MetricError;
@@ -17,6 +18,8 @@ use opentelemetry_sdk::{trace as sdktrace, Resource};
 use std::error::Error;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
+
+pub use trace::TraceContext;
 
 pub struct Monitoring {}
 
@@ -61,9 +64,9 @@ impl Monitoring {
             KeyValue::new("app.name", config.app_name.clone()),
         ]);
 
-        if let Some(otlp_config) = &config.otlp {
-            opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
+        opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
 
+        if let Some(otlp_config) = &config.otlp {
             let fmt_filter: EnvFilter = config.logs.clone().try_into()?;
             let fmt_layer = tracing_subscriber::fmt::layer().with_filter(fmt_filter);
 

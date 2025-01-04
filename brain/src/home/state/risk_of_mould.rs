@@ -1,15 +1,16 @@
 use api::state::RelativeHumidity;
+use r#macro::TypedItem;
 use support::{
     t,
     unit::{DegreeCelsius, Percent},
-    DataPoint, ValueObject,
+    DataPoint, TypedItem as _, ValueObject,
 };
 
 use anyhow::Result;
 
 use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, TypedItem)]
 pub enum RiskOfMould {
     Bathroom,
 }
@@ -30,6 +31,14 @@ where
             .await?;
 
         if humidity.value < Percent(70.0) {
+            tracing::trace!(
+                item_type = %item.type_name(),
+                item_name = %item.item_name(),
+                humidity = %humidity.value,
+                result = false,
+                "Humidity of shower-sensor is below 70%, no risk of mould"
+            );
+
             return Ok(DataPoint {
                 timestamp: humidity.timestamp,
                 value: false,
@@ -45,6 +54,18 @@ where
         let ref_dp = item.get_reference_dewpoint(self).await?;
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
+
+        tracing::trace!(
+            item_type = %item.type_name(),
+            item_name = %item.item_name(),
+            result = risk,
+            humidity = %humidity.value,
+            dewpoint_item = %this_dp.value,
+            dewpoint_reference = %ref_dp,
+            "Risk of mould in {} is {}",
+            item,
+            if risk { "high" } else { "low" }
+        );
 
         Ok(DataPoint {
             timestamp: this_dp.timestamp,

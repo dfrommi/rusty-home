@@ -6,9 +6,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Debug, Clone)]
 pub struct TraceContext {
-    trace_id: String,
-    span_id: String,
-    traceparent: String,
+    otel_ctx: opentelemetry::Context,
 }
 
 impl TraceContext {
@@ -18,17 +16,7 @@ impl TraceContext {
         let span_context = span.span_context();
 
         if span_context.is_valid() {
-            let mut headers: HashMap<String, String> = HashMap::new();
-            opentelemetry::global::get_text_map_propagator(|propagator| {
-                propagator.inject_context(&ctx, &mut headers)
-            });
-            let traceparent = headers.get("traceparent").cloned();
-
-            Some(Self {
-                trace_id: span_context.trace_id().to_string(),
-                span_id: span_context.span_id().to_string(),
-                traceparent: traceparent.unwrap_or_default(),
-            })
+            Some(Self { otel_ctx: ctx })
         } else {
             None
         }
@@ -40,29 +28,42 @@ impl TraceContext {
 
         let otel_ctx =
             opentelemetry::global::get_text_map_propagator(|propagator| propagator.extract(&ctx));
-        let otel_span = otel_ctx.span();
-        let span_context = otel_span.span_context();
 
-        Self {
-            trace_id: span_context.trace_id().to_string(),
-            span_id: span_context.span_id().to_string(),
-            traceparent: correlation_id.to_string(),
+        Self { otel_ctx }
+    }
+
+    pub fn continue_from(correlation_id: Option<String>) {
+        if let Some(id) = correlation_id {
+            Self::from_correlation_id(id.as_str()).make_parent();
         }
     }
 
+    pub fn make_parent(&self) {
+        tracing::Span::current().set_parent(self.otel_ctx.clone());
+    }
+
     pub fn current_correlation_id() -> Option<String> {
-        Self::current().map(|c| c.correlation_id().to_owned())
+        Self::current().map(|c| c.correlation_id())
     }
 
-    pub fn correlation_id(&self) -> &str {
-        &self.traceparent
+    pub fn correlation_id(&self) -> String {
+        let mut headers: HashMap<String, String> = HashMap::new();
+        opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.inject_context(&self.otel_ctx, &mut headers)
+        });
+
+        headers
+            .get("traceparent")
+            .cloned()
+            .unwrap_or_default()
+            .to_string()
     }
 
-    pub fn trace_id(&self) -> &str {
-        &self.trace_id
+    pub fn trace_id(&self) -> String {
+        self.otel_ctx.span().span_context().trace_id().to_string()
     }
 
-    pub fn span_id(&self) -> &str {
-        &self.span_id
+    pub fn span_id(&self) -> String {
+        self.otel_ctx.span().span_context().span_id().to_string()
     }
 }

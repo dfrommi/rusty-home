@@ -3,6 +3,7 @@ use crate::core::event::CommandAddedEvent;
 use super::port::{CommandExecutor, CommandRepository};
 
 use anyhow::Result;
+use api::command::{Command, CommandExecution};
 use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(
@@ -27,11 +28,7 @@ pub async fn execute_commands(
         match command {
             Ok(Some(cmd)) => {
                 got_cmd = true;
-
-                let res = executor.execute_command(&cmd.command).await;
-                //TODO loop over executors and check bool result
-
-                handle_execution_result(cmd.id, res, repo).await;
+                process_command(cmd, repo, executor).await;
             }
             Ok(None) => {
                 got_cmd = false;
@@ -42,6 +39,21 @@ pub async fn execute_commands(
             }
         }
     }
+}
+
+#[tracing::instrument(skip_all, fields(command = ?cmd.command))]
+async fn process_command(
+    cmd: CommandExecution<Command>,
+    repo: &impl CommandRepository,
+    executor: &impl CommandExecutor,
+) {
+    if let Some(id) = cmd.correlation_id {
+        monitoring::TraceContext::from_correlation_id(id.as_str()).make_parent();
+    }
+
+    let res = executor.execute_command(&cmd.command).await;
+    //TODO loop over executors and check bool result
+    handle_execution_result(cmd.id, res, repo).await;
 }
 
 async fn handle_execution_result(

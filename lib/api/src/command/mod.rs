@@ -74,6 +74,7 @@ pub struct CommandExecution<C: Into<Command>> {
     pub state: CommandState,
     pub created: DateTime,
     pub source: CommandSource,
+    pub correlation_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

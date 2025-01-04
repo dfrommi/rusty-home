@@ -83,7 +83,7 @@ async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
     let db_target = target.map(|j| serde_json::json!(j));
 
     let records = sqlx::query!(
-            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id, correlation_id
                 from THING_COMMAND 
                 where (command @> $1 or $1 is null)
                 and created >= $2
@@ -106,6 +106,7 @@ async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
                 state: CommandState::from((row.status, row.error)),
                 created: row.created.into(),
                 source,
+                correlation_id: row.correlation_id,
             })
         })
         .collect()

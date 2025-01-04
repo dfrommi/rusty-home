@@ -13,7 +13,7 @@ impl CommandRepository for Database {
         let mut tx = self.db_pool.begin().await?;
 
         let maybe_rec = sqlx::query!(
-            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id, correlation_id
                 from THING_COMMAND
                 where status = $1
                 order by created DESC
@@ -52,6 +52,7 @@ impl CommandRepository for Database {
                             state: CommandState::InProgress,
                             created: rec.created.into(),
                             source,
+                            correlation_id: rec.correlation_id,
                         })
                     }
                     Err(e) => {

@@ -23,7 +23,7 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
     let action: HomeAction = action.into();
 
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
-        let api = &infrastructure().db;
+        let api = &infrastructure().api();
 
         let result = action.evaluate(api).await.unwrap();
 

@@ -15,31 +15,28 @@ pub struct TimeSeries<T: Estimatable> {
 }
 
 impl<C: Estimatable> TimeSeries<C> {
-    pub fn new(
-        context: C,
-        data_points: impl IntoIterator<Item = DataPoint<C::Type>>,
-        range: DateTimeRange,
-    ) -> Result<Self> {
-        let mut df = DataFrame::new(data_points)?;
+    pub fn new(context: C, df: &DataFrame<C::Type>, range: DateTimeRange) -> Result<Self> {
+        //not using retain_range as it could lead to empty dataframe before interpolation
+        let mut dps_in_range = df
+            .iter()
+            .filter(|dp| range.contains(dp.timestamp))
+            .cloned()
+            .collect::<Vec<_>>();
 
         let start_at = *range.start();
-        if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, &df) {
-            df.insert(DataPoint::new(interpolated, start_at));
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, df) {
+            dps_in_range.push(DataPoint::new(interpolated, start_at));
         }
 
         let end_at = *range.end();
-        if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, &df) {
-            df.insert(DataPoint::new(interpolated, end_at));
+        if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, df) {
+            dps_in_range.push(DataPoint::new(interpolated, end_at));
         }
 
-        Ok(Self::from_data_frame(context, df))
-    }
-
-    fn from_data_frame(context: C, df: DataFrame<C::Type>) -> Self {
-        Self {
+        Ok(Self {
             context,
-            values: df,
-        }
+            values: DataFrame::new(dps_in_range)?,
+        })
     }
 
     pub fn combined<U, V, F>(
@@ -75,7 +72,9 @@ impl<C: Estimatable> TimeSeries<C> {
             .range()
             .intersection_with(&second_series.range());
 
-        Self::new(context, dps, range)
+        let df = DataFrame::new(dps)?;
+
+        Self::new(context, &df, range)
     }
 
     pub fn reduce<F>(context: C, all_series: Vec<TimeSeries<C>>, reduce: F) -> Result<TimeSeries<C>>
@@ -99,10 +98,11 @@ impl<C: Estimatable> TimeSeries<C> {
 
     pub fn map<T: Estimatable, F>(self, context: T, f: F) -> TimeSeries<T>
     where
-        F: Fn(DataPoint<C::Type>) -> T::Type,
+        F: Fn(&DataPoint<C::Type>) -> T::Type,
         C: Clone,
     {
-        TimeSeries::from_data_frame(context, self.values.map(f))
+        TimeSeries::new(context, &self.values.map(f), self.range())
+            .expect("Internal error: Error creating data frame from non-empty datapoints")
     }
 
     pub fn context(&self) -> C
@@ -305,7 +305,7 @@ mod tests {
     fn test_series() -> TimeSeries<Temperature> {
         TimeSeries::new(
             Temperature::Outside,
-            vec![
+            &DataFrame::new(vec![
                 DataPoint {
                     timestamp: DateTime::from_iso("2024-09-10T14:00:00Z").unwrap(),
                     value: DegreeCelsius(10.0),
@@ -318,7 +318,8 @@ mod tests {
                     timestamp: DateTime::from_iso("2024-09-10T16:00:00Z").unwrap(),
                     value: DegreeCelsius(20.0),
                 },
-            ],
+            ])
+            .unwrap(),
             DateTimeRange::new(
                 DateTime::from_iso("2024-09-10T13:00:00Z").unwrap(),
                 DateTime::from_iso("2024-09-10T19:00:00Z").unwrap(),
@@ -340,20 +341,22 @@ mod combined {
     fn single_item_per_series_out_of_range() {
         let t_series = TimeSeries::new(
             Temperature::LivingRoomDoor,
-            vec![DataPoint {
+            &DataFrame::new(vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:46Z").unwrap(),
                 value: DegreeCelsius(19.93),
-            }],
+            }])
+            .unwrap(),
             DateTimeRange::since(DateTime::from_iso("2024-11-04T05:10:09Z").unwrap()),
         )
         .unwrap();
 
         let h_series = TimeSeries::new(
             RelativeHumidity::LivingRoomDoor,
-            vec![DataPoint {
+            &DataFrame::new(vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:47Z").unwrap(),
                 value: Percent(61.1),
-            }],
+            }])
+            .unwrap(),
             DateTimeRange::since(DateTime::from_iso("2024-11-04T05:10:09Z").unwrap()),
         )
         .unwrap();

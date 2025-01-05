@@ -61,13 +61,13 @@ mod tests {
     use api::trigger::*;
     use support::t;
 
-    use crate::adapter::persistence::TestDb;
+    use crate::adapter::persistence::Database;
 
     use super::*;
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_read_write(pool: sqlx::PgPool) {
-        let db = TestDb { pool };
+        let db = Database::new(pool);
         db.add_user_trigger(UserTrigger::Homekit(Homekit::InfraredHeaterPower(true)))
             .await
             .unwrap();

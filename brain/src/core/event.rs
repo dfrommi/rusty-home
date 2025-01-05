@@ -39,6 +39,7 @@ impl AppEventListener {
     //consume as much as possible before triggering app event to debounce planning etc
     pub async fn dispatch_events(mut self) -> anyhow::Result<()> {
         self.db_listener.start_listening().await?;
+        self.database.preload_cache().await?;
 
         loop {
             let events = match self.db_listener.recv_multi(Duration::millis(5)).await {
@@ -55,7 +56,7 @@ impl AppEventListener {
             for event in events {
                 match event {
                     api::DbEvent::StateValueAdded { tag_id, .. } => {
-                        self.database.invalidate_state(tag_id).await;
+                        self.database.invalidate_cache(tag_id).await;
                         state_changed = true;
                     }
                     api::DbEvent::UserTriggerInsert { .. } => {

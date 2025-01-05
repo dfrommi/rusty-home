@@ -1,33 +1,29 @@
+use std::sync::Arc;
+
 use api::state::db::DbValue;
 use moka::future::Cache;
-use support::{time::Duration, DataPoint};
+use support::{t, time::Duration, DataFrame};
 
 mod command;
 mod planning_trace;
 mod state;
 mod trigger;
 
-#[cfg(test)]
-#[derive(derive_more::AsRef)]
-struct TestDb {
-    pool: sqlx::PgPool,
-}
-
 #[derive(Clone, derive_more::AsRef)]
 pub struct Database {
     pool: sqlx::PgPool,
-    cache: Option<Cache<i64, DataPoint<DbValue>>>,
+    ts_cache_duration: Duration,
+    ts_cache: Cache<i64, Arc<DataFrame<DbValue>>>,
 }
 
 impl Database {
-    pub fn new(pool: sqlx::PgPool, cache_duration: Option<Duration>) -> Self {
-        let cache = cache_duration.map(|duration| {
-            Cache::builder()
-                .max_capacity(10_000)
-                .time_to_live(std::time::Duration::from_secs(duration.as_secs() as u64))
-                .build()
-        });
-
-        Self { pool, cache }
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self {
+            pool,
+            ts_cache_duration: t!(48 hours),
+            ts_cache: Cache::builder()
+                .time_to_live(std::time::Duration::from_secs(48 * 60 * 60))
+                .build(),
+        }
     }
 }

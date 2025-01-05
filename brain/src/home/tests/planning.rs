@@ -12,7 +12,7 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
     let f = async {
         let tracer = support::TestPlanningResultTracer;
         let command_api = TestCommandProcessor::new();
-        let api = &infrastructure().db;
+        let api = &infrastructure().api();
 
         plan_for_home(api, &command_api, &tracer).await;
 
@@ -128,7 +128,7 @@ mod support {
 
     impl CommandState<Command> for TestCommandProcessor {
         async fn is_reflected_in_state(&self, command: &Command) -> anyhow::Result<bool> {
-            infrastructure().db.is_reflected_in_state(command).await
+            infrastructure().api().is_reflected_in_state(command).await
         }
     }
 
@@ -138,7 +138,10 @@ mod support {
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
         ) -> anyhow::Result<Option<api::command::CommandExecution<Command>>> {
-            infrastructure().db.get_latest_command(target, since).await
+            infrastructure()
+                .api()
+                .get_latest_command(target, since)
+                .await
         }
 
         async fn get_all_commands_for_target(
@@ -147,7 +150,7 @@ mod support {
             since: DateTime,
         ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
             infrastructure()
-                .db
+                .api()
                 .get_all_commands_for_target(target, since)
                 .await
         }
@@ -157,7 +160,7 @@ mod support {
             from: DateTime,
             until: DateTime,
         ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
-            infrastructure().db.get_all_commands(from, until).await
+            infrastructure().api().get_all_commands(from, until).await
         }
     }
 }

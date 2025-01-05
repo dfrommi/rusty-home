@@ -1,7 +1,6 @@
 use core::event::AppEventListener;
 use std::sync::Arc;
 
-use ::support::t;
 use actix_web::{App, HttpServer};
 use adapter::persistence::Database;
 use api::DbEventListener;
@@ -30,7 +29,7 @@ pub async fn main() {
         .connect(&settings.database.url)
         .await
         .expect("Error initializing database");
-    let database = Database::new(db_pool, Some(t!(5 minutes)));
+    let database = Database::new(db_pool);
 
     let db_listener = PgListener::connect(&settings.database.url)
         .await
@@ -42,6 +41,13 @@ pub async fn main() {
         settings.mqtt.port,
         &settings.mqtt.client_id,
     );
+
+    //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
+    //in between preloading and actual use)
+    database
+        .preload_cache()
+        .await
+        .expect("Error preloading cache");
 
     tasks.spawn({
         let api = database.clone();

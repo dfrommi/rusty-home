@@ -11,7 +11,7 @@ pub struct DataFrame<T> {
     data: BTreeMap<DateTime, DataPoint<T>>,
 }
 
-impl<T: Clone> DataFrame<T> {
+impl<T> DataFrame<T> {
     pub fn new(values: impl IntoIterator<Item = DataPoint<T>>) -> anyhow::Result<Self> {
         let mut data: BTreeMap<DateTime, DataPoint<T>> = BTreeMap::new();
         for dp in values {
@@ -23,7 +23,10 @@ impl<T: Clone> DataFrame<T> {
         Ok(Self { data })
     }
 
-    pub fn retain_range(&self, range: &DateTimeRange) -> anyhow::Result<Self> {
+    pub fn retain_range(&self, range: &DateTimeRange) -> anyhow::Result<Self>
+    where
+        T: Clone,
+    {
         Self::new(
             self.data
                 .iter()
@@ -32,8 +35,8 @@ impl<T: Clone> DataFrame<T> {
         )
     }
 
-    pub fn map<U: Clone>(self, f: impl Fn(DataPoint<T>) -> U) -> DataFrame<U> {
-        let values = self.data.into_values().map(|dp| {
+    pub fn map<U>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
+        let values = self.data.values().map(|dp| {
             let ts = dp.timestamp;
             DataPoint::new(f(dp), ts)
         });
@@ -85,7 +88,10 @@ impl<T: Clone> DataFrame<T> {
             .1
     }
 
-    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T, Duration)>> {
+    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T, Duration)>>
+    where
+        T: Clone,
+    {
         self.current_and_next()
             .into_iter()
             .map(|(current, next)| {
@@ -114,5 +120,14 @@ impl<T: Clone> DataFrame<T> {
 
     pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
         self.data.values()
+    }
+}
+
+impl<T, U> From<&DataFrame<T>> for DataFrame<U>
+where
+    T: Clone + Into<U>,
+{
+    fn from(val: &DataFrame<T>) -> Self {
+        val.map(|dp| dp.value.clone().into())
     }
 }

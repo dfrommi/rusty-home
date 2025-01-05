@@ -4,17 +4,17 @@ mod planning;
 use std::sync::OnceLock;
 
 use crate::{adapter::persistence::Database, settings};
-use sqlx::PgPool;
 use tokio::runtime::Runtime;
 
 struct TestInfrastructure {
     runtime: Runtime,
-    db: Database,
+    pool: sqlx::PgPool,
 }
 
-impl AsRef<PgPool> for TestInfrastructure {
-    fn as_ref(&self) -> &PgPool {
-        &self.db.as_ref()
+impl TestInfrastructure {
+    pub fn api(&self) -> Database {
+        //new instance to avoid caching
+        Database::new(self.pool.clone())
     }
 }
 
@@ -42,7 +42,7 @@ fn infrastructure() -> &'static TestInfrastructure {
 
         TestInfrastructure {
             runtime,
-            db: Database::new(db_pool, None),
+            pool: db_pool,
         }
     })
 }

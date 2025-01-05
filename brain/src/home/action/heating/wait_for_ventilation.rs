@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::{Ok, Result};
-use api::command::{Command, SetHeating};
+use api::command::Command;
 use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
@@ -65,13 +65,13 @@ impl Display for DeferHeatingUntilVentilationDone {
 
 impl CommandAction for DeferHeatingUntilVentilationDone {
     fn command(&self) -> Command {
-        Command::SetHeating(SetHeating {
+        Command::SetHeating {
             device: self.heating_zone().thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature(),
                 duration: self.time_range().duration(),
             },
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {
@@ -81,7 +81,7 @@ impl CommandAction for DeferHeatingUntilVentilationDone {
 
 impl<T> ConditionalAction<T> for DeferHeatingUntilVentilationDone
 where
-    T: DataPointAccess<Opened> + CommandAccess<Command> + CommandState<Command>,
+    T: DataPointAccess<Opened> + CommandAccess + CommandState,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let time_range = match self.time_range().active() {

@@ -5,7 +5,7 @@ use crate::{
     home::state::{ColdAirComingIn, Powered},
 };
 use anyhow::Result;
-use api::command::{Command, PowerToggle, SetPower};
+use api::command::{Command, PowerToggle};
 
 use super::DataPointAccess;
 
@@ -26,10 +26,10 @@ impl Display for RequestClosingWindow {
 
 impl CommandAction for RequestClosingWindow {
     fn command(&self) -> Command {
-        Command::SetPower(SetPower {
+        Command::SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
             power_on: true,
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
-use api::command::{Command, CommandSource, PushNotify, SetEnergySaving, SetHeating, SetPower};
+use api::command::{Command, CommandSource};
 
 use crate::{
     adapter::grafana::{support::csv_response, GrafanaApiError, GrafanaResponse},
@@ -13,7 +13,7 @@ use super::TimeRangeQuery;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: PlanningResultTracer + CommandAccess<Command> + 'static,
+    T: PlanningResultTracer + CommandAccess + 'static,
 {
     web::scope("/smart_home_overview")
         .route("/trace", web::get().to(get_trace::<T>))
@@ -82,7 +82,7 @@ async fn get_commands<T>(
     time_range: web::Query<TimeRangeQuery>,
 ) -> GrafanaResponse
 where
-    T: CommandAccess<Command>,
+    T: CommandAccess,
 {
     #[derive(serde::Serialize)]
     struct Row {
@@ -121,15 +121,15 @@ where
 
 fn command_as_string(command: &Command) -> (&str, String, String) {
     match command {
-        Command::SetPower(SetPower { device, power_on }) => (
+        Command::SetPower { device, power_on } => (
             "SetPower",
             device.to_string(),
             if *power_on { "on" } else { "off" }.to_string(),
         ),
-        Command::SetHeating(SetHeating {
+        Command::SetHeating {
             device,
             target_state,
-        }) => (
+        } => (
             "SetHeating",
             device.to_string(),
             match target_state {
@@ -140,16 +140,16 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
                 }
             },
         ),
-        Command::PushNotify(PushNotify {
+        Command::PushNotify {
             action,
             notification,
             recipient,
-        }) => (
+        } => (
             "PushNotify",
             format!("{} @ {}", notification, recipient),
             action.to_string(),
         ),
-        Command::SetEnergySaving(SetEnergySaving { device, on }) => (
+        Command::SetEnergySaving { device, on } => (
             "SetEnergySaving",
             device.to_string(),
             if *on { "on" } else { "off" }.to_string(),

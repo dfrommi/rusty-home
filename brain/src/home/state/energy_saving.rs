@@ -1,5 +1,5 @@
 use api::{
-    command::{CommandExecution, EnergySavingDevice, SetEnergySaving},
+    command::{Command, CommandExecution, EnergySavingDevice},
     state::Powered,
 };
 use r#macro::TypedItem;
@@ -18,7 +18,7 @@ impl ValueObject for EnergySaving {
 
 impl<T> DataPointAccess<EnergySaving> for T
 where
-    T: CommandAccess<SetEnergySaving> + DataPointAccess<Powered>,
+    T: CommandAccess + DataPointAccess<Powered>,
 {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     async fn current_data_point(
@@ -42,7 +42,7 @@ where
 
         match latest_command {
             Some(CommandExecution {
-                command: SetEnergySaving { on, .. },
+                command: Command::SetEnergySaving { on, .. },
                 created,
                 ..
             }) => Ok(DataPoint::new(on, created)),

@@ -21,7 +21,7 @@ pub trait IncomingDataProcessor {
 }
 
 pub trait CommandRepository {
-    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution<Command>>>;
+    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>>;
     async fn set_command_state_success(&self, command_id: i64) -> Result<()>;
     async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()>;
 }

@@ -8,12 +8,9 @@ use actix_web::{
     web::{self},
     HttpResponse, ResponseError,
 };
-use api::{
-    command::Command,
-    state::{
-        CurrentPowerUsage, HeatingDemand, RelativeHumidity, SetPoint, Temperature,
-        TotalEnergyConsumption,
-    },
+use api::state::{
+    CurrentPowerUsage, HeatingDemand, RelativeHumidity, SetPoint, Temperature,
+    TotalEnergyConsumption,
 };
 use derive_more::derive::{Display, Error};
 
@@ -34,7 +31,7 @@ where
         + TimeSeriesAccess<RelativeHumidity>
         + TimeSeriesAccess<SetPoint>
         + TimeSeriesAccess<Opened>
-        + CommandAccess<Command>
+        + CommandAccess
         + PlanningResultTracer
         + 'static,
 {

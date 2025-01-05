@@ -14,7 +14,6 @@ use anyhow::Result;
 use api::command::Command;
 
 use api::command::CommandSource;
-use api::command::SetHeating;
 use api::state::ExternalAutoControl;
 use api::state::Powered;
 use api::state::RelativeHumidity;
@@ -69,9 +68,8 @@ where
         + DataPointAccess<RelativeHumidity>
         + DataPointAccess<Resident>
         + DataPointAccess<EnergySaving>
-        + CommandState<Command>
-        + CommandAccess<Command>
-        + CommandAccess<SetHeating>
+        + CommandState
+        + CommandAccess
         + UserTriggerAccess,
 {
     async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult> {
@@ -126,7 +124,7 @@ async fn trigger_once_and_keep_running<API>(
     api: &API,
 ) -> Result<bool>
 where
-    API: CommandAccess<Command> + CommandState<Command>,
+    API: CommandAccess + CommandState,
 {
     let executions = api
         .get_all_commands_for_target(command.clone(), oneshot_range_start)

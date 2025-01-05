@@ -1,5 +1,5 @@
 use api::{
-    command::{Command, PowerToggle, SetPower},
+    command::{Command, PowerToggle},
     state::Powered,
 };
 use support::t;
@@ -26,10 +26,10 @@ impl std::fmt::Display for IrHeaterAutoTurnOff {
 
 impl CommandAction for IrHeaterAutoTurnOff {
     fn command(&self) -> Command {
-        Command::SetPower(SetPower {
+        Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: false,
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::{
-    command::{Command, PowerToggle, SetPower},
+    command::{Command, PowerToggle},
     state::Powered,
 };
 
@@ -30,10 +30,10 @@ impl Display for Dehumidify {
 
 impl CommandAction for Dehumidify {
     fn command(&self) -> Command {
-        Command::SetPower(SetPower {
+        Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {

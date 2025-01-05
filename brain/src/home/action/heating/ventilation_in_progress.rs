@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::{
-    command::{Command, SetHeating},
-    state::SetPoint,
-};
+use api::{command::Command, state::SetPoint};
 
 use crate::{
     core::planner::{CommandAction, ConditionalAction},
@@ -33,10 +30,10 @@ impl Display for NoHeatingDuringVentilation {
 
 impl CommandAction for NoHeatingDuringVentilation {
     fn command(&self) -> Command {
-        Command::SetHeating(SetHeating {
+        Command::SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Off,
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {

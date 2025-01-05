@@ -7,7 +7,7 @@ use super::CommandState;
 
 impl<T> CommandExecutor for T
 where
-    T: CommandStore + CommandState<Command> + CommandAccess<Command>,
+    T: CommandStore + CommandState + CommandAccess,
 {
     async fn execute(
         &self,

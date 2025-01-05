@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use api::command::{
-    Command, CommandSource, Notification, NotificationAction, NotificationRecipient, PushNotify,
+    Command, CommandSource, Notification, NotificationAction, NotificationRecipient,
 };
 use support::{t, time::DateTime, DataPoint};
 
@@ -33,11 +33,11 @@ impl Display for InformWindowOpen {
 
 impl CommandAction for InformWindowOpen {
     fn command(&self) -> Command {
-        Command::PushNotify(PushNotify {
+        Command::PushNotify {
             action: NotificationAction::Notify,
             notification: Notification::WindowOpened,
             recipient: self.recipient.clone(),
-        })
+        }
     }
 
     fn source(&self) -> CommandSource {

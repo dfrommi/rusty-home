@@ -35,24 +35,24 @@ where
     }
 }
 
-pub trait CommandAccess<C: Into<Command>> {
+pub trait CommandAccess {
     async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandExecution<C>>>;
+    ) -> Result<Option<CommandExecution>>;
 
     async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Vec<CommandExecution<C>>>;
+    ) -> Result<Vec<CommandExecution>>;
 
     async fn get_all_commands(
         &self,
         from: DateTime,
         until: DateTime,
-    ) -> Result<Vec<CommandExecution<C>>>;
+    ) -> Result<Vec<CommandExecution>>;
 }
 
 pub enum CommandExecutionResult {

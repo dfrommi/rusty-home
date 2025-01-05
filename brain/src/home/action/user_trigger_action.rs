@@ -28,10 +28,7 @@ impl UserTriggerAction {
 
 impl<API> Action<API> for UserTriggerAction
 where
-    API: UserTriggerAccess
-        + CommandAccess<Command>
-        + CommandState<Command>
-        + DataPointAccess<Powered>,
+    API: UserTriggerAccess + CommandAccess + CommandState + DataPointAccess<Powered>,
 {
     async fn evaluate(&self, api: &API) -> anyhow::Result<ActionEvaluationResult> {
         let start_of_range = match self.range_start(api).await {
@@ -94,37 +91,35 @@ impl UserTriggerAction {
     }
 }
 
-fn into_command(trigger: UserTrigger) -> Option<impl Into<Command>> {
+fn into_command(trigger: UserTrigger) -> Option<Command> {
     use api::command::*;
 
     match trigger {
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => {
-            Some(Command::SetPower(SetPower {
+            Some(Command::SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on: true,
-            }))
+            })
         }
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::BottomSingle)) => {
-            Some(Command::SetPower(SetPower {
+            Some(Command::SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on: false,
-            }))
+            })
         }
-        UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => {
-            Some(Command::SetPower(SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: on,
-            }))
-        }
-        UserTrigger::Homekit(Homekit::DehumidifierPower(on)) => Some(Command::SetPower(SetPower {
+        UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => Some(Command::SetPower {
+            device: PowerToggle::InfraredHeater,
+            power_on: on,
+        }),
+        UserTrigger::Homekit(Homekit::DehumidifierPower(on)) => Some(Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: on,
-        })),
+        }),
         UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) if !on => {
-            Some(Command::SetEnergySaving(SetEnergySaving {
+            Some(Command::SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
                 on: false,
-            }))
+            })
         }
 
         UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(_)) => None,

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use api::{
-    command::{Command, PowerToggle, SetPower},
+    command::{Command, PowerToggle},
     state::Powered,
 };
 use support::{t, time::DailyTimeRange};
@@ -29,10 +29,10 @@ impl Display for ReduceNoiseAtNight {
 
 impl CommandAction for ReduceNoiseAtNight {
     fn command(&self) -> Command {
-        Command::SetPower(SetPower {
+        Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: false,
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {

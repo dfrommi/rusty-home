@@ -3,7 +3,7 @@ use crate::core::event::CommandAddedEvent;
 use super::port::{CommandExecutor, CommandRepository};
 
 use anyhow::Result;
-use api::command::{Command, CommandExecution};
+use api::command::CommandExecution;
 use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(
@@ -43,7 +43,7 @@ pub async fn execute_commands(
 
 #[tracing::instrument(skip_all, fields(command = ?cmd.command))]
 async fn process_command(
-    cmd: CommandExecution<Command>,
+    cmd: CommandExecution,
     repo: &impl CommandRepository,
     executor: &impl CommandExecutor,
 ) {

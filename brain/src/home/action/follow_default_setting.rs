@@ -24,24 +24,24 @@ impl Display for FollowDefaultSetting {
 impl Action<()> for FollowDefaultSetting {
     async fn evaluate(&self, _: &()) -> anyhow::Result<ActionEvaluationResult> {
         let command = match self.target.clone() {
-            CommandTarget::SetPower { device } => Command::SetPower(api::command::SetPower {
+            CommandTarget::SetPower { device } => Command::SetPower {
                 device,
                 power_on: false,
-            }),
-            CommandTarget::SetHeating { device } => Command::SetHeating(api::command::SetHeating {
+            },
+            CommandTarget::SetHeating { device } => Command::SetHeating {
                 device,
                 target_state: api::command::HeatingTargetState::Auto,
-            }),
+            },
             CommandTarget::PushNotify {
                 recipient,
                 notification,
-            } => Command::PushNotify(api::command::PushNotify {
+            } => Command::PushNotify {
                 action: api::command::NotificationAction::Dismiss,
                 notification,
                 recipient,
-            }),
+            },
             CommandTarget::SetEnergySaving { device } => {
-                Command::SetEnergySaving(api::command::SetEnergySaving { device, on: true })
+                Command::SetEnergySaving { device, on: true }
             }
         };
 

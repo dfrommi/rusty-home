@@ -66,54 +66,54 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
         use HaServiceTarget::*;
 
         match (ha_target, command) {
-            (SwitchTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
+            (SwitchTurnOnOff(id), Command::SetPower { power_on, .. }) => {
                 self.switch_turn_on_off(id, *power_on).await
             }
-            (LightTurnOnOff(id), Command::SetPower(SetPower { power_on, .. })) => {
+            (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => {
                 self.light_turn_on_off(id, *power_on).await
             }
             (
                 ClimateControl(id),
-                Command::SetHeating(SetHeating {
+                Command::SetHeating {
                     target_state: HeatingTargetState::Off,
                     ..
-                }),
+                },
             ) => self.climate_set_hvac_mode(id, "off").await,
             (
                 ClimateControl(id),
-                Command::SetHeating(SetHeating {
+                Command::SetHeating {
                     target_state: HeatingTargetState::Auto,
                     ..
-                }),
+                },
             ) => self.climate_set_hvac_mode(id, "auto").await,
             (
                 ClimateControl(id),
-                Command::SetHeating(SetHeating {
+                Command::SetHeating {
                     target_state:
                         HeatingTargetState::Heat {
                             temperature,
                             duration,
                         },
                     ..
-                }),
+                },
             ) => self.tado_set_climate_timer(id, temperature, duration).await,
             (
                 PushNotification(mobile_id),
-                Command::PushNotify(PushNotify {
+                Command::PushNotify {
                     notification: Notification::WindowOpened,
                     action: NotificationAction::Notify,
                     ..
-                }),
+                },
             ) => self.notify_window_opened(mobile_id).await,
             (
                 PushNotification(mobile_id),
-                Command::PushNotify(PushNotify {
+                Command::PushNotify {
                     notification: Notification::WindowOpened,
                     action: NotificationAction::Dismiss,
                     ..
-                }),
+                },
             ) => self.dismiss_window_opened_notification(mobile_id).await,
-            (LgWebosSmartTv(id), Command::SetEnergySaving(SetEnergySaving { on, .. })) => {
+            (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => {
                 self.lg_tv_energy_saving_mode(id, *on).await
             }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),

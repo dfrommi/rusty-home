@@ -1,5 +1,5 @@
 use ::support::time::{DateTime, FIXED_NOW};
-use api::command::{Command, CommandSource, PowerToggle, SetPower};
+use api::command::{Command, CommandSource, PowerToggle};
 use support::TestCommandProcessor;
 
 use crate::home::plan_for_home;
@@ -45,11 +45,10 @@ fn test_planning_execution() {
     assert_eq!(actions.len(), 1);
     assert_eq!(
         actions[0].0,
-        SetPower {
+        Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
         }
-        .into()
     );
 }
 
@@ -126,18 +125,18 @@ mod support {
         }
     }
 
-    impl CommandState<Command> for TestCommandProcessor {
+    impl CommandState for TestCommandProcessor {
         async fn is_reflected_in_state(&self, command: &Command) -> anyhow::Result<bool> {
             infrastructure().api().is_reflected_in_state(command).await
         }
     }
 
-    impl CommandAccess<Command> for TestCommandProcessor {
+    impl CommandAccess for TestCommandProcessor {
         async fn get_latest_command(
             &self,
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
-        ) -> anyhow::Result<Option<api::command::CommandExecution<Command>>> {
+        ) -> anyhow::Result<Option<api::command::CommandExecution>> {
             infrastructure()
                 .api()
                 .get_latest_command(target, since)
@@ -148,7 +147,7 @@ mod support {
             &self,
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
-        ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
+        ) -> anyhow::Result<Vec<api::command::CommandExecution>> {
             infrastructure()
                 .api()
                 .get_all_commands_for_target(target, since)
@@ -159,7 +158,7 @@ mod support {
             &self,
             from: DateTime,
             until: DateTime,
-        ) -> anyhow::Result<Vec<api::command::CommandExecution<Command>>> {
+        ) -> anyhow::Result<Vec<api::command::CommandExecution>> {
             infrastructure().api().get_all_commands(from, until).await
         }
     }

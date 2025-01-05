@@ -10,10 +10,24 @@ pub mod db;
 #[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
-    SetPower(SetPower),
-    SetHeating(SetHeating),
-    PushNotify(PushNotify),
-    SetEnergySaving(SetEnergySaving),
+    SetPower {
+        device: PowerToggle,
+        power_on: bool,
+    },
+    SetHeating {
+        device: Thermostat,
+        #[serde(flatten)]
+        target_state: HeatingTargetState,
+    },
+    PushNotify {
+        action: NotificationAction,
+        notification: Notification,
+        recipient: NotificationRecipient,
+    },
+    SetEnergySaving {
+        device: EnergySavingDevice,
+        on: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize, derive_more::Display)]
@@ -44,33 +58,31 @@ impl From<Command> for CommandTarget {
 impl From<&Command> for CommandTarget {
     fn from(val: &Command) -> Self {
         match val {
-            Command::SetPower(SetPower { device, .. }) => CommandTarget::SetPower {
+            Command::SetPower { device, .. } => CommandTarget::SetPower {
                 device: device.clone(),
             },
-            Command::SetHeating(SetHeating { device, .. }) => CommandTarget::SetHeating {
+            Command::SetHeating { device, .. } => CommandTarget::SetHeating {
                 device: device.clone(),
             },
-            Command::PushNotify(PushNotify {
+            Command::PushNotify {
                 recipient,
                 notification,
                 ..
-            }) => CommandTarget::PushNotify {
+            } => CommandTarget::PushNotify {
                 recipient: recipient.clone(),
                 notification: notification.clone(),
             },
-            Command::SetEnergySaving(SetEnergySaving { device, .. }) => {
-                CommandTarget::SetEnergySaving {
-                    device: device.clone(),
-                }
-            }
+            Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving {
+                device: device.clone(),
+            },
         }
     }
 }
 
 #[derive(Debug)]
-pub struct CommandExecution<C: Into<Command>> {
+pub struct CommandExecution {
     pub id: i64,
-    pub command: C,
+    pub command: Command,
     pub state: CommandState,
     pub created: DateTime,
     pub source: CommandSource,
@@ -96,13 +108,6 @@ pub enum CommandSource {
 //
 // SET POWER
 //
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct SetPower {
-    pub device: PowerToggle,
-    pub power_on: bool,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
@@ -111,25 +116,9 @@ pub enum PowerToggle {
     LivingRoomNotificationLight,
 }
 
-impl From<&SetPower> for CommandTarget {
-    fn from(val: &SetPower) -> Self {
-        CommandTarget::SetPower {
-            device: val.device.clone(),
-        }
-    }
-}
-
 //
 // SET HEATING
 //
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct SetHeating {
-    pub device: Thermostat,
-    #[serde(flatten)]
-    pub target_state: HeatingTargetState,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
@@ -151,25 +140,9 @@ pub enum HeatingTargetState {
     },
 }
 
-impl From<&SetHeating> for CommandTarget {
-    fn from(val: &SetHeating) -> Self {
-        CommandTarget::SetHeating {
-            device: val.device.clone(),
-        }
-    }
-}
-
 //
 // SEND NOTIFICATION
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PushNotify {
-    pub action: NotificationAction,
-    pub notification: Notification,
-    pub recipient: NotificationRecipient,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Notification {
@@ -205,37 +178,13 @@ impl From<NotificationTarget> for CommandTarget {
     }
 }
 
-impl From<&PushNotify> for CommandTarget {
-    fn from(val: &PushNotify) -> Self {
-        CommandTarget::PushNotify {
-            recipient: val.recipient.clone(),
-            notification: val.notification.clone(),
-        }
-    }
-}
-
 //
 // SET ENERGY SAVING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct SetEnergySaving {
-    pub device: EnergySavingDevice,
-    pub on: bool,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum EnergySavingDevice {
     LivingRoomTv,
-}
-
-impl From<&SetEnergySaving> for CommandTarget {
-    fn from(val: &SetEnergySaving) -> Self {
-        CommandTarget::SetEnergySaving {
-            device: val.device.clone(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -249,10 +198,10 @@ mod test {
     #[test]
     fn set_power() {
         assert_json_eq!(
-            Command::SetPower(SetPower {
+            Command::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
-            }),
+            },
             json!({
                 "type": "set_power",
                 "device": "living_room_notification_light",
@@ -286,10 +235,10 @@ mod test {
     #[test]
     fn set_heating_auto() {
         assert_json_eq!(
-            Command::SetHeating(SetHeating {
+            Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Auto,
-            }),
+            },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
@@ -310,10 +259,10 @@ mod test {
     #[test]
     fn set_heating_off() {
         assert_json_eq!(
-            Command::SetHeating(SetHeating {
+            Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Off
-            }),
+            },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
@@ -325,13 +274,13 @@ mod test {
     #[test]
     fn set_heating_temperature() {
         assert_json_eq!(
-            Command::SetHeating(SetHeating {
+            Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
                     temperature: DegreeCelsius::from(22.5),
                     duration: t!(2 hours),
                 },
-            }),
+            },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
@@ -358,11 +307,11 @@ mod test {
     #[test]
     fn push_notify() {
         assert_json_eq!(
-            Command::PushNotify(PushNotify {
+            Command::PushNotify {
                 action: NotificationAction::Notify,
                 notification: Notification::WindowOpened,
                 recipient: NotificationRecipient::Dennis,
-            }),
+            },
             json!({
                 "type": "push_notify",
                 "action": "notify",
@@ -390,11 +339,11 @@ mod test {
     #[test]
     fn send_notification() {
         assert_json_eq!(
-            Command::PushNotify(PushNotify {
+            Command::PushNotify {
                 action: NotificationAction::Notify,
                 notification: Notification::WindowOpened,
                 recipient: NotificationRecipient::Dennis,
-            }),
+            },
             json!({
                 "type": "push_notify",
                 "action": "notify",

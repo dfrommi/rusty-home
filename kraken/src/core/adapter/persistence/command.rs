@@ -9,7 +9,7 @@ use crate::{core::domain::CommandRepository, Database};
 
 impl CommandRepository for Database {
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
-    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution<Command>>> {
+    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.db_pool.begin().await?;
 
         let maybe_rec = sqlx::query!(

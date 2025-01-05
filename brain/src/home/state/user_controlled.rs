@@ -4,8 +4,7 @@ use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint, ValueObject};
 
 use api::{
     command::{
-        CommandExecution, CommandSource, HeatingTargetState, PowerToggle, SetHeating, SetPower,
-        Thermostat,
+        Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat,
     },
     state::{ExternalAutoControl, Powered, SetPoint},
 };
@@ -45,8 +44,7 @@ where
     T: DataPointAccess<Powered>
         + DataPointAccess<ExternalAutoControl>
         + DataPointAccess<SetPoint>
-        + CommandAccess<SetPower>
-        + CommandAccess<SetHeating>,
+        + CommandAccess,
 {
     async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
         match item {
@@ -103,7 +101,7 @@ where
 }
 
 async fn current_data_point_for_dehumidifier(
-    api: &(impl DataPointAccess<Powered> + CommandAccess<SetPower>),
+    api: &(impl DataPointAccess<Powered> + CommandAccess),
 ) -> anyhow::Result<DataPoint<bool>> {
     let power = api.current_data_point(Powered::Dehumidifier).await?;
 
@@ -121,7 +119,7 @@ async fn current_data_point_for_dehumidifier(
 
     let was_triggered_by_system = match last_command {
         Some(CommandExecution {
-            command: SetPower { power_on, .. },
+            command: Command::SetPower { power_on, .. },
             source: CommandSource::System(_),
             ..
         }) => power_on == power.value,
@@ -135,9 +133,7 @@ async fn current_data_point_for_dehumidifier(
 }
 
 async fn current_data_point_for_thermostat(
-    api: &(impl DataPointAccess<ExternalAutoControl>
-          + DataPointAccess<SetPoint>
-          + CommandAccess<SetHeating>),
+    api: &(impl DataPointAccess<ExternalAutoControl> + DataPointAccess<SetPoint> + CommandAccess),
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,
@@ -176,29 +172,30 @@ async fn current_data_point_for_thermostat(
 }
 
 fn matches(
-    command_execution: &CommandExecution<SetHeating>,
+    command_execution: &CommandExecution,
     auto_mode_enabled: bool,
     set_point: DegreeCelsius,
 ) -> bool {
     match command_execution.command {
-        SetHeating {
+        Command::SetHeating {
             target_state: HeatingTargetState::Auto,
             ..
         } => auto_mode_enabled,
-        SetHeating {
+        Command::SetHeating {
             target_state: HeatingTargetState::Heat { temperature, .. },
             ..
         } => !auto_mode_enabled && set_point == temperature,
-        SetHeating {
+        Command::SetHeating {
             target_state: HeatingTargetState::Off,
             ..
         } => !auto_mode_enabled && set_point == DegreeCelsius(0.0),
+        _ => false,
     }
 }
 
-pub fn get_expiration(command_execution: &CommandExecution<SetHeating>) -> Option<DateTime> {
+pub fn get_expiration(command_execution: &CommandExecution) -> Option<DateTime> {
     match &command_execution.command {
-        SetHeating {
+        Command::SetHeating {
             target_state:
                 HeatingTargetState::Heat {
                     duration: until, ..

@@ -3,28 +3,26 @@ use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandSource, CommandState, CommandTarget,
 };
-use serde::de::DeserializeOwned;
 use sqlx::PgPool;
 use support::{t, time::DateTime};
 
 use crate::port::{CommandAccess, CommandStore};
 
-impl<DB, C> CommandAccess<C> for DB
+impl<DB> CommandAccess for DB
 where
     DB: AsRef<PgPool>,
-    C: Into<Command> + DeserializeOwned,
 {
     #[tracing::instrument(skip_all, fields(command_target))]
     async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Option<CommandExecution<C>>> {
+    ) -> Result<Option<CommandExecution>> {
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
         let mut all_commands =
-            get_all_commands::<C>(self.as_ref(), Some(target), since, t!(now)).await?;
+            get_all_commands(self.as_ref(), Some(target), since, t!(now)).await?;
         Ok(all_commands.pop())
     }
 
@@ -33,19 +31,19 @@ where
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
-    ) -> Result<Vec<CommandExecution<C>>> {
+    ) -> Result<Vec<CommandExecution>> {
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        get_all_commands::<C>(self.as_ref(), Some(target), since, t!(now)).await
+        get_all_commands(self.as_ref(), Some(target), since, t!(now)).await
     }
 
     async fn get_all_commands(
         &self,
         from: DateTime,
         until: DateTime,
-    ) -> Result<Vec<CommandExecution<C>>> {
-        get_all_commands::<C>(self.as_ref(), None, from, until).await
+    ) -> Result<Vec<CommandExecution>> {
+        get_all_commands(self.as_ref(), None, from, until).await
     }
 }
 
@@ -74,12 +72,12 @@ where
     }
 }
 
-async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
+async fn get_all_commands(
     db_pool: &PgPool,
     target: Option<CommandTarget>,
     from: DateTime,
     until: DateTime,
-) -> Result<Vec<CommandExecution<C>>> {
+) -> Result<Vec<CommandExecution>> {
     let db_target = target.map(|j| serde_json::json!(j));
 
     let records = sqlx::query!(
@@ -115,7 +113,7 @@ async fn get_all_commands<C: Into<Command> + DeserializeOwned>(
 #[cfg(test)]
 mod get_all_commands_since {
     use super::*;
-    use api::command::{PowerToggle, SetPower};
+    use api::command::PowerToggle;
     use sqlx::PgPool;
     use support::t;
 
@@ -129,7 +127,7 @@ mod get_all_commands_since {
         ] {
             insert_command(
                 &db_pool,
-                &SetPower {
+                &Command::SetPower {
                     device: PowerToggle::Dehumidifier,
                     power_on,
                 },
@@ -140,7 +138,7 @@ mod get_all_commands_since {
 
         insert_command(
             &db_pool,
-            &SetPower {
+            &Command::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
             },
@@ -149,7 +147,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands::<SetPower>(
+        let result = get_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),
@@ -162,14 +160,14 @@ mod get_all_commands_since {
         assert_eq!(result.len(), 2);
         assert_eq!(
             result[0].command,
-            SetPower {
+            Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: false,
             }
         );
         assert_eq!(
             result[1].command,
-            SetPower {
+            Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
             }
@@ -181,7 +179,7 @@ mod get_all_commands_since {
         //GIVEN
         insert_command(
             &db_pool,
-            &SetPower {
+            &Command::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
             },
@@ -191,7 +189,7 @@ mod get_all_commands_since {
 
         insert_command(
             &db_pool,
-            &SetPower {
+            &Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
             },
@@ -200,7 +198,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands::<Command>(&db_pool, None, t!(1 hours ago), t!(now))
+        let result = get_all_commands(&db_pool, None, t!(1 hours ago), t!(now))
             .await
             .unwrap();
 
@@ -213,7 +211,7 @@ mod get_all_commands_since {
         //GIVEN
         insert_command(
             &db_pool,
-            &SetPower {
+            &Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
             },
@@ -222,7 +220,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands::<SetPower>(
+        let result = get_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),
@@ -235,9 +233,7 @@ mod get_all_commands_since {
         assert_eq!(result.len(), 0);
     }
 
-    async fn insert_command<C: Into<Command> + Clone>(db_pool: &PgPool, command: &C, at: DateTime) {
-        let command: Command = command.clone().into();
-
+    async fn insert_command(db_pool: &PgPool, command: &Command, at: DateTime) {
         sqlx::query!(
             r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             serde_json::to_value(command).unwrap(),

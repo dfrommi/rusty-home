@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, SetHeating};
+use api::command::Command;
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
@@ -42,13 +42,13 @@ impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
 
 impl CommandAction for NoHeatingDuringAutomaticTemperatureIncrease {
     fn command(&self) -> Command {
-        Command::SetHeating(SetHeating {
+        Command::SetHeating {
             device: self.heating_zone.thermostat(),
             target_state: api::command::HeatingTargetState::Heat {
                 temperature: NO_HEATING_SET_POINT,
                 duration: t!(1 hours),
             },
-        })
+        }
     }
 
     fn source(&self) -> api::command::CommandSource {
@@ -60,8 +60,8 @@ impl<T> ConditionalAction<T> for NoHeatingDuringAutomaticTemperatureIncrease
 where
     T: DataPointAccess<Opened>
         + DataPointAccess<AutomaticTemperatureIncrease>
-        + CommandAccess<Command>
-        + CommandState<Command>,
+        + CommandAccess
+        + CommandState,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {

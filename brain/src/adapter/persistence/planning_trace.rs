@@ -1,9 +1,9 @@
-use sqlx::{PgPool, QueryBuilder};
+use sqlx::QueryBuilder;
 use support::t;
 
 use crate::{core::planner::PlanningTrace, port::PlanningResultTracer};
 
-impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
+impl PlanningResultTracer for super::Database {
     #[tracing::instrument(skip_all, fields(planning_traces = results.len()))]
     async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()> {
         let id = sqlx::types::Uuid::from_u128(uuid::Uuid::new_v4().as_u128());
@@ -28,7 +28,7 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
                 .push_bind(correlation_id.clone());
         });
 
-        builder.build().execute(self.as_ref()).await?;
+        builder.build().execute(&self.pool).await?;
         Ok(())
     }
 
@@ -42,7 +42,7 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
                 ORDER BY seq ASC"#,
             before.into_db()
         )
-        .fetch_all(self.as_ref())
+        .fetch_all(&self.pool)
         .await?;
 
         let result = recs
@@ -72,7 +72,7 @@ impl<DB: AsRef<PgPool>> PlanningResultTracer for DB {
                 ORDER BY action, timestamp DESC"#,
             before.into_db()
         )
-        .fetch_all(self.as_ref())
+        .fetch_all(&self.pool)
         .await?;
 
         let result = recs

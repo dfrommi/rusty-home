@@ -8,10 +8,7 @@ use support::{t, time::DateTime};
 
 use crate::port::{CommandAccess, CommandStore};
 
-impl<DB> CommandAccess for DB
-where
-    DB: AsRef<PgPool>,
-{
+impl CommandAccess for super::Database {
     #[tracing::instrument(skip_all, fields(command_target))]
     async fn get_latest_command(
         &self,
@@ -21,8 +18,7 @@ where
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        let mut all_commands =
-            get_all_commands(self.as_ref(), Some(target), since, t!(now)).await?;
+        let mut all_commands = get_all_commands(&self.pool, Some(target), since, t!(now)).await?;
         Ok(all_commands.pop())
     }
 
@@ -35,7 +31,7 @@ where
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        get_all_commands(self.as_ref(), Some(target), since, t!(now)).await
+        get_all_commands(&self.pool, Some(target), since, t!(now)).await
     }
 
     async fn get_all_commands(
@@ -43,14 +39,11 @@ where
         from: DateTime,
         until: DateTime,
     ) -> Result<Vec<CommandExecution>> {
-        get_all_commands(self.as_ref(), None, from, until).await
+        get_all_commands(&self.pool, None, from, until).await
     }
 }
 
-impl<DB> CommandStore for DB
-where
-    DB: AsRef<PgPool>,
-{
+impl CommandStore for super::Database {
     #[tracing::instrument(skip(self))]
     async fn save_command(&self, command: Command, source: CommandSource) -> Result<()> {
         let db_command = serde_json::json!(command);
@@ -65,7 +58,7 @@ where
             db_source_id,
             monitoring::TraceContext::current_correlation_id(),
         )
-        .execute(self.as_ref())
+        .execute(&self.pool)
         .await?;
 
         Ok(())

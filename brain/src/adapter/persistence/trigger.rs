@@ -5,7 +5,7 @@ use support::{t, time::DateTime};
 
 use crate::port::{UserTriggerAccess, UserTriggerExecutor};
 
-impl<DB: AsRef<PgPool>> UserTriggerExecutor for DB {
+impl UserTriggerExecutor for super::Database {
     #[tracing::instrument(skip(self))]
     async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
@@ -16,17 +16,14 @@ impl<DB: AsRef<PgPool>> UserTriggerExecutor for DB {
             t!(now).into_db(),
             monitoring::TraceContext::current_correlation_id(),
         )
-        .execute(self.as_ref())
+        .execute(&self.pool)
         .await
         .map(|_| ())
         .context("Error adding user trigger")
     }
 }
 
-impl<DB> UserTriggerAccess for DB
-where
-    DB: AsRef<PgPool>,
-{
+impl UserTriggerAccess for super::Database {
     #[tracing::instrument(name = "get_latest_user_trigger", skip(self))]
     async fn latest_since(
         &self,
@@ -46,7 +43,7 @@ where
             since.into_db(),
             t!(now).into_db(), //For timeshift in tests
         )
-        .fetch_optional(self.as_ref())
+        .fetch_optional(&self.pool)
         .await?;
 
         match rec {

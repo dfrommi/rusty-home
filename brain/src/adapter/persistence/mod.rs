@@ -9,7 +9,7 @@ mod planning_trace;
 mod state;
 mod trigger;
 
-#[derive(Clone, derive_more::AsRef)]
+#[derive(Clone)]
 pub struct Database {
     pool: sqlx::PgPool,
     ts_cache_duration: Duration,

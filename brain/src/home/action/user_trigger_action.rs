@@ -33,14 +33,20 @@ where
     async fn evaluate(&self, api: &API) -> anyhow::Result<ActionEvaluationResult> {
         let start_of_range = match self.range_start(api).await {
             Some(duration) => duration,
-            None => return Ok(ActionEvaluationResult::Skip),
+            None => {
+                tracing::trace!("User-trigger action currently disabled, skipping");
+                return Ok(ActionEvaluationResult::Skip);
+            }
         };
 
         let latest_trigger = api.latest_since(&self.target, start_of_range).await?;
 
         let command = match latest_trigger.and_then(into_command) {
-            Some(c) => c.into(),
-            None => return Ok(ActionEvaluationResult::Skip),
+            Some(c) => c,
+            None => {
+                tracing::trace!("No user-trigger found, skipping");
+                return Ok(ActionEvaluationResult::Skip);
+            }
         };
 
         let source = self.source();
@@ -49,8 +55,15 @@ where
             trigger_once_and_keep_running(&command, &source, start_of_range, api).await?;
 
         if !fulfilled {
+            tracing::trace!("User-trigger action skipped due to one-shot conditions");
             return Ok(ActionEvaluationResult::Skip);
         }
+
+        tracing::trace!(
+            ?command,
+            ?source,
+            "User-trigger action ready to be executed"
+        );
 
         Ok(ActionEvaluationResult::Execute(command, source))
     }

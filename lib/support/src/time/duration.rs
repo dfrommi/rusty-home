@@ -59,6 +59,10 @@ impl Duration {
     pub fn as_hours(&self) -> i64 {
         self.delegate.num_hours()
     }
+
+    pub fn to_iso_string(&self) -> String {
+        from_chrono_duration(&self.delegate).to_string()
+    }
 }
 
 impl std::ops::Add<Duration> for Duration {
@@ -87,7 +91,7 @@ mod duration_format {
     where
         S: Serializer,
     {
-        let iso_duration = from_chrono_duration(duration);
+        let iso_duration = super::from_chrono_duration(duration);
         let iso_string = iso_duration.to_string();
         serializer.serialize_str(&iso_string)
     }
@@ -99,7 +103,7 @@ mod duration_format {
     {
         struct DurationVisitor;
 
-        impl<'de> Visitor<'de> for DurationVisitor {
+        impl Visitor<'_> for DurationVisitor {
             type Value = chrono::TimeDelta;
 
             fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -127,23 +131,23 @@ mod duration_format {
 
         deserializer.deserialize_str(DurationVisitor)
     }
+}
 
-    fn from_chrono_duration(duration: &chrono::Duration) -> Iso8601Duration {
-        let days = duration.num_days();
-        let seconds = duration.num_seconds() - days * 86400; // remove days in seconds
-        let hours = seconds / 3600;
-        let minutes = (seconds % 3600) / 60;
-        let seconds = seconds % 60;
+fn from_chrono_duration(duration: &chrono::Duration) -> iso8601_duration::Duration {
+    let days = duration.num_days();
+    let seconds = duration.num_seconds() - days * 86400; // remove days in seconds
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let seconds = seconds % 60;
 
-        Iso8601Duration::new(
-            0.0, //years
-            0.0, //months
-            days as f32,
-            hours as f32,
-            minutes as f32,
-            seconds as f32,
-        )
-    }
+    iso8601_duration::Duration::new(
+        0.0, //years
+        0.0, //months
+        days as f32,
+        hours as f32,
+        minutes as f32,
+        seconds as f32,
+    )
 }
 
 #[cfg(test)]

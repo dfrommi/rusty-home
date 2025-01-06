@@ -15,7 +15,7 @@ use support::{t, time::DateTimeRange, DataFrame, DataPoint, ValueObject};
 impl super::Database {
     fn caching_range(&self) -> DateTimeRange {
         let now = t!(now);
-        DateTimeRange::new(now - self.ts_cache_duration.clone(), now)
+        DateTimeRange::new(now - self.cache_duration.clone(), now)
     }
 
     pub async fn preload_cache(&self) -> anyhow::Result<()> {

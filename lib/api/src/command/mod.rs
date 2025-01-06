@@ -30,7 +30,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, From, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, From, Serialize, Deserialize, derive_more::Display)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandTarget {
     #[display("SetPower[{}]", device)]
@@ -79,7 +79,7 @@ impl From<&Command> for CommandTarget {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandExecution {
     pub id: i64,
     pub command: Command,
@@ -108,7 +108,7 @@ pub enum CommandSource {
 //
 // SET POWER
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
@@ -119,7 +119,7 @@ pub enum PowerToggle {
 //
 // SET HEATING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
     LivingRoom,
@@ -143,13 +143,13 @@ pub enum HeatingTargetState {
 //
 // SEND NOTIFICATION
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Notification {
     WindowOpened,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationRecipient {
     Dennis,
@@ -181,7 +181,7 @@ impl From<NotificationTarget> for CommandTarget {
 //
 // SET ENERGY SAVING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum EnergySavingDevice {
     LivingRoomTv,

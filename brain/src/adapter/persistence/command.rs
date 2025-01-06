@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use api::command::{
     db::schema::{DbCommandSource, DbCommandState},
@@ -18,7 +20,8 @@ impl CommandAccess for super::Database {
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        let mut all_commands = get_all_commands(&self.pool, Some(target), since, t!(now)).await?;
+        //This is inefficient and modifies and copies data too often. Needs to be optimized
+        let mut all_commands = self.get_commands_using_cache(&target, since).await?;
         Ok(all_commands.pop())
     }
 
@@ -31,7 +34,7 @@ impl CommandAccess for super::Database {
         let target: CommandTarget = target.into();
         tracing::Span::current().record("command_target", tracing::field::display(&target));
 
-        get_all_commands(&self.pool, Some(target), since, t!(now)).await
+        self.get_commands_using_cache(&target, since).await
     }
 
     async fn get_all_commands(
@@ -39,7 +42,8 @@ impl CommandAccess for super::Database {
         from: DateTime,
         until: DateTime,
     ) -> Result<Vec<CommandExecution>> {
-        get_all_commands(&self.pool, None, from, until).await
+        //no cache, just used from dashboard
+        query_all_commands(&self.pool, None, from, until).await
     }
 }
 
@@ -61,11 +65,62 @@ impl CommandStore for super::Database {
         .execute(&self.pool)
         .await?;
 
+        self.invalidate_command_cache(&command.into()).await;
+
         Ok(())
     }
 }
 
-async fn get_all_commands(
+impl super::Database {
+    pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
+        tracing::debug!("Invalidating command cache for target {:?}", target);
+        self.cmd_cache.invalidate(target).await;
+    }
+
+    pub async fn get_commands_using_cache(
+        &self,
+        target: &CommandTarget,
+        since: DateTime,
+    ) -> Result<Vec<CommandExecution>> {
+        let cached = self
+            .cmd_cache
+            .try_get_with(target.clone(), async {
+                tracing::debug!("No command-cache entry found for target {:?}", target);
+
+                query_all_commands(&self.pool, Some(target.clone()), since, t!(now))
+                    .await
+                    .map(|cmds| Arc::new((since, cmds)))
+            })
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Error initializing command cache for target {:?}: {:?}",
+                    target,
+                    e
+                )
+            })?;
+
+        if since < cached.0 {
+            tracing::info!(
+                ?since,
+                offset = %since.elapsed().to_iso_string(),
+                "Requested time range is before cached commands, querying database"
+            );
+            return query_all_commands(&self.pool, Some(target.clone()), since, t!(now)).await;
+        }
+
+        let commands: Vec<CommandExecution> = cached
+            .1
+            .iter()
+            .filter(|&cmd| cmd.created >= since)
+            .cloned()
+            .collect();
+
+        Ok(commands)
+    }
+}
+
+async fn query_all_commands(
     db_pool: &PgPool,
     target: Option<CommandTarget>,
     from: DateTime,
@@ -140,7 +195,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands(
+        let result = query_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),
@@ -191,7 +246,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands(&db_pool, None, t!(1 hours ago), t!(now))
+        let result = query_all_commands(&db_pool, None, t!(1 hours ago), t!(now))
             .await
             .unwrap();
 
@@ -213,7 +268,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = get_all_commands(
+        let result = query_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
             t!(8 minutes ago),

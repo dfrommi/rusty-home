@@ -136,18 +136,52 @@ where
 
     //first trigger still pending -> start it
     if !already_triggered {
+        tracing::trace!(
+            ?command,
+            since = ?oneshot_range_start,
+            result = true,
+            "Command was not triggered yet, starting it"
+        );
         return Ok(true);
     }
 
     //return if something else happened after first trigger -> no longer fulfilled
     let this_as_last_execution = match executions.iter().last() {
         Some(e) if e.source == *source && e.command == *command => e,
-        _ => return Ok(false),
+        Some(other) => {
+            tracing::trace!(
+                ?command,
+                ?other,
+                since = ?oneshot_range_start,
+                result = false,
+                "Superseded by other command, no longer fulfilled"
+            );
+            return Ok(false);
+        }
+        None => {
+            tracing::warn!(
+                ?command,
+                result = false,
+                "Logical error: no last execution found for command, but case should have been covered before"
+            );
+            return Ok(false);
+        }
     };
 
     //cover for delay between sending command and receiving state change -> external change happened
     let just_triggered = this_as_last_execution.created > t!(30 seconds ago);
-    let is_effectively_reflected = just_triggered || api.is_reflected_in_state(command).await?;
+    let is_reflected_in_state = api.is_reflected_in_state(command).await?;
+    let is_effectively_reflected = just_triggered || is_reflected_in_state;
+
+    tracing::trace!(
+        ?command,
+        %just_triggered,
+        %is_reflected_in_state,
+        since = ?oneshot_range_start,
+        result = %is_effectively_reflected,
+        "Command {}",
+        if is_effectively_reflected { "is effectively reflected" } else { "not effectively reflected" },
+    );
 
     Ok(is_effectively_reflected)
 }

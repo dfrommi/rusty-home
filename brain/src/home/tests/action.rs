@@ -1,4 +1,7 @@
-use api::command::Thermostat;
+use api::{
+    command::Thermostat,
+    trigger::{HomekitTarget, UserTriggerTarget},
+};
 use support::time::{DateTime, FIXED_NOW};
 
 use crate::{
@@ -6,7 +9,7 @@ use crate::{
     home::{
         action::{
             DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping, HeatingZone, HomeAction,
-            KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
+            KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, UserTriggerAction,
         },
         state::UserControlled,
     },
@@ -85,6 +88,16 @@ fn heating_before_sleeping_extended_over_midnight() {
     let action = ExtendHeatingUntilSleeping::LivingRoom;
 
     let result = get_state_at("2024-12-16T00:00:10+01:00", action);
+
+    assert!(result.is_fulfilled);
+}
+
+#[test]
+fn user_trigger_not_started() {
+    let action =
+        UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower));
+
+    let result = get_state_at("2025-01-05T21:05:00.584641+01:00", action);
 
     assert!(result.is_fulfilled);
 }

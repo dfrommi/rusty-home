@@ -63,6 +63,7 @@ impl AppEventListener {
                         user_trigger = true;
                     }
 
+                    //TODO invalidate command cache, but target is not easily available
                     _ => {}
                 }
             }

@@ -13,12 +13,12 @@ use api::{
 use support::{t, time::DateTimeRange, DataFrame, DataPoint, ValueObject};
 
 impl super::Database {
-    fn caching_range(&self) -> DateTimeRange {
+    fn ts_caching_range(&self) -> DateTimeRange {
         let now = t!(now);
-        DateTimeRange::new(now - self.cache_duration.clone(), now)
+        DateTimeRange::new(now - self.ts_cache_duration.clone(), now)
     }
 
-    pub async fn preload_cache(&self) -> anyhow::Result<()> {
+    pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
         tracing::debug!("Start preloading cache");
 
         let tag_ids = get_all_tag_ids(&self.pool).await?;
@@ -37,18 +37,9 @@ impl super::Database {
         Ok(())
     }
 
-    pub async fn invalidate_cache(&self, tag_id: i64) {
+    pub async fn invalidate_ts_cache(&self, tag_id: i64) {
         tracing::debug!("Invalidating timeseries cache for tag {}", tag_id);
-
         self.ts_cache.invalidate(&tag_id).await;
-
-        if let Err(e) = self.get_default_dataframe::<DbValue>(tag_id).await {
-            tracing::error!(
-                "Error refreshing timeseries cache for tag {}: {:?}",
-                tag_id,
-                e
-            );
-        }
     }
 }
 
@@ -115,7 +106,7 @@ impl super::Database {
                     tag_id
                 );
 
-                query_dataframe(&self.pool, tag_id, &self.caching_range())
+                query_dataframe(&self.pool, tag_id, &self.ts_caching_range())
                     .await
                     .map(Arc::new)
             })

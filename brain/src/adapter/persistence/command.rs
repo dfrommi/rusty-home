@@ -6,7 +6,10 @@ use api::command::{
     Command, CommandExecution, CommandSource, CommandState, CommandTarget,
 };
 use sqlx::PgPool;
-use support::{t, time::DateTime};
+use support::{
+    t,
+    time::{DateTime, DateTimeRange},
+};
 
 use crate::port::{CommandAccess, CommandStore};
 
@@ -43,7 +46,7 @@ impl CommandAccess for super::Database {
         until: DateTime,
     ) -> Result<Vec<CommandExecution>> {
         //no cache, just used from dashboard
-        query_all_commands(&self.pool, None, from, until).await
+        query_all_commands(&self.pool, None, &from, &until).await
     }
 }
 
@@ -72,6 +75,11 @@ impl CommandStore for super::Database {
 }
 
 impl super::Database {
+    fn cmd_caching_range(&self) -> DateTimeRange {
+        let now = t!(now);
+        DateTimeRange::new(now - self.cmd_cache_duration.clone(), now)
+    }
+
     pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
         tracing::debug!("Invalidating command cache for target {:?}", target);
         self.cmd_cache.invalidate(target).await;
@@ -86,10 +94,11 @@ impl super::Database {
             .cmd_cache
             .try_get_with(target.clone(), async {
                 tracing::debug!("No command-cache entry found for target {:?}", target);
+                let range = self.cmd_caching_range();
 
-                query_all_commands(&self.pool, Some(target.clone()), since, t!(now))
+                query_all_commands(&self.pool, Some(target.clone()), range.start(), range.end())
                     .await
-                    .map(|cmds| Arc::new((since, cmds)))
+                    .map(|cmds| Arc::new((range.start().clone(), cmds)))
             })
             .await
             .map_err(|e| {
@@ -104,9 +113,10 @@ impl super::Database {
             tracing::info!(
                 ?since,
                 offset = %since.elapsed().to_iso_string(),
+                cache_start = %cached.0,
                 "Requested time range is before cached commands, querying database"
             );
-            return query_all_commands(&self.pool, Some(target.clone()), since, t!(now)).await;
+            return query_all_commands(&self.pool, Some(target.clone()), &since, &t!(now)).await;
         }
 
         let commands: Vec<CommandExecution> = cached
@@ -123,8 +133,8 @@ impl super::Database {
 async fn query_all_commands(
     db_pool: &PgPool,
     target: Option<CommandTarget>,
-    from: DateTime,
-    until: DateTime,
+    from: &DateTime,
+    until: &DateTime,
 ) -> Result<Vec<CommandExecution>> {
     let db_target = target.map(|j| serde_json::json!(j));
 
@@ -198,8 +208,8 @@ mod get_all_commands_since {
         let result = query_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
-            t!(8 minutes ago),
-            t!(now),
+            &t!(8 minutes ago),
+            &t!(now),
         )
         .await
         .unwrap();
@@ -246,7 +256,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(&db_pool, None, t!(1 hours ago), t!(now))
+        let result = query_all_commands(&db_pool, None, &t!(1 hours ago), &t!(now))
             .await
             .unwrap();
 
@@ -271,8 +281,8 @@ mod get_all_commands_since {
         let result = query_all_commands(
             &db_pool,
             Some(PowerToggle::Dehumidifier.into()),
-            t!(8 minutes ago),
-            t!(now),
+            &t!(8 minutes ago),
+            &t!(now),
         )
         .await
         .unwrap();

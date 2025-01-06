@@ -29,7 +29,7 @@ pub async fn plan_for_home(
 ) {
     info!("Start planning");
     let active_goals = get_active_goals(api).await;
-    crate::core::planner::perform_planning(
+    let res = crate::core::planner::perform_planning(
         &active_goals,
         default_config(),
         api,
@@ -37,5 +37,9 @@ pub async fn plan_for_home(
         result_tracer,
     )
     .await;
-    info!("Planning done");
+
+    match res {
+        Ok(_) => info!("Planning done"),
+        Err(e) => tracing::error!("Error during planning: {:?}", e),
+    }
 }

@@ -45,7 +45,7 @@ pub async fn main() {
     //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
     //in between preloading and actual use)
     database
-        .preload_cache()
+        .preload_ts_cache()
         .await
         .expect("Error preloading cache");
 

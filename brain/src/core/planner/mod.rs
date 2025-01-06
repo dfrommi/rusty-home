@@ -1,4 +1,5 @@
 mod action;
+mod context;
 mod processor;
 mod resource_lock;
 mod trace;
@@ -18,11 +19,13 @@ pub async fn perform_planning<G, A, API, EXE>(
     api: &API,
     command_processor: &EXE,
     result_tracer: &impl PlanningResultTracer,
-) where
+) -> anyhow::Result<()>
+where
     G: Eq + Display,
     A: Action<API>,
     EXE: CommandExecutor,
 {
-    let results = processor::plan_and_execute(active_goals, config, api, command_processor).await;
+    let results = processor::plan_and_execute(active_goals, config, api, command_processor).await?;
     display_planning_trace(&results, result_tracer).await;
+    Ok(())
 }

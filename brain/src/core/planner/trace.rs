@@ -1,23 +1,16 @@
 use std::{fmt::Display, sync::Mutex};
 
-use tabled::{Table, Tabled};
-
 use crate::port::PlanningResultTracer;
 
-#[derive(Clone, Debug, PartialEq, Eq, Tabled)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanningTrace {
     pub action: String,
 
     pub goal: String,
 
-    #[tabled(display_with = "display_bool")]
     pub is_goal_active: bool,
-
-    #[tabled(display_with = "display_bool")]
     pub locked: bool,
-    #[tabled(display_with = "display_option")]
     pub is_fulfilled: Option<bool>,
-    #[tabled(display_with = "display_option")]
     pub was_triggered: Option<bool>,
 }
 
@@ -39,28 +32,13 @@ pub async fn display_planning_trace(
     tracer: &impl PlanningResultTracer,
 ) {
     if planning_trace_has_changed(action_results) {
-        tracing::info!(
-            "Planning result:\n{}",
-            Table::new(action_results).to_string()
-        );
+        tracing::info!("Planning result:\n{:?}", action_results);
 
         if let Err(e) = tracer.add_planning_trace(action_results).await {
             tracing::error!("Error logging planning result: {:?}", e);
         }
     } else {
         tracing::info!("Planning result is unchanged");
-    }
-}
-
-fn display_bool(b: &bool) -> String {
-    display_option(&Some(*b))
-}
-
-fn display_option(o: &Option<bool>) -> String {
-    match o {
-        Some(true) => "✅".to_string(),
-        Some(false) => "❌".to_string(),
-        None => "-".to_string(),
     }
 }
 

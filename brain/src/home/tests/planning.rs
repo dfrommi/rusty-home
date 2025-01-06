@@ -57,7 +57,6 @@ mod support {
 
     use api::command::{Command, CommandSource};
     use support::time::DateTime;
-    use tabled::Table;
 
     use crate::{
         core::{planner::PlanningTrace, service::CommandState},
@@ -69,7 +68,7 @@ mod support {
 
     impl PlanningResultTracer for TestPlanningResultTracer {
         async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()> {
-            println!("{}", Table::new(results));
+            println!("{:?}", results);
             //nothing to do
             Ok(())
         }

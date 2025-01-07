@@ -12,6 +12,8 @@ pub struct PlanningTrace {
     pub locked: bool,
     pub is_fulfilled: Option<bool>,
     pub was_triggered: Option<bool>,
+
+    pub correlation_id: Option<String>,
 }
 
 impl PlanningTrace {
@@ -23,6 +25,7 @@ impl PlanningTrace {
             locked: false,
             is_fulfilled: None,
             was_triggered: None,
+            correlation_id: None,
         }
     }
 }

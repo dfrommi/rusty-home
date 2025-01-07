@@ -9,8 +9,6 @@ impl PlanningResultTracer for super::Database {
         let id = sqlx::types::Uuid::from_u128(uuid::Uuid::new_v4().as_u128());
         let now = t!(now);
 
-        let correlation_id = monitoring::TraceContext::current_correlation_id();
-
         let mut builder = QueryBuilder::new(
             "INSERT INTO planning_trace (run_id, seq, action, goal, goal_active, locked, fulfilled, triggered, timestamp, correlation_id) "
         );
@@ -25,7 +23,7 @@ impl PlanningResultTracer for super::Database {
                 .push_bind(result.is_fulfilled)
                 .push_bind(result.was_triggered)
                 .push_bind(now.into_db())
-                .push_bind(correlation_id.clone());
+                .push_bind(result.correlation_id.clone());
         });
 
         builder.build().execute(&self.pool).await?;
@@ -54,6 +52,7 @@ impl PlanningResultTracer for super::Database {
                 locked: rec.locked,
                 is_fulfilled: rec.fulfilled,
                 was_triggered: rec.triggered,
+                correlation_id: rec.correlation_id,
             })
             .collect();
 

@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::command::{Command, CommandSource, CommandTarget};
+use monitoring::TraceContext;
 use tokio::sync::oneshot;
 
 use crate::{
@@ -64,6 +65,8 @@ where
     A: Action<API>,
     EXE: CommandExecutor,
 {
+    context.trace.correlation_id = TraceContext::current_correlation_id();
+
     //EVALUATION
     let evaluation_result = evaluate_action(&mut context, api).await;
 

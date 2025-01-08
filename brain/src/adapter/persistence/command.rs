@@ -52,7 +52,12 @@ impl CommandAccess for super::Database {
 
 impl CommandStore for super::Database {
     #[tracing::instrument(skip(self))]
-    async fn save_command(&self, command: Command, source: CommandSource) -> Result<()> {
+    async fn save_command(
+        &self,
+        command: Command,
+        source: CommandSource,
+        correlation_id: Option<String>,
+    ) -> Result<()> {
         let db_command = serde_json::json!(command);
         let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
@@ -63,7 +68,7 @@ impl CommandStore for super::Database {
             DbCommandState::Pending as DbCommandState,
             db_source_type as DbCommandSource,
             db_source_id,
-            monitoring::TraceContext::current_correlation_id(),
+            correlation_id
         )
         .execute(&self.pool)
         .await?;

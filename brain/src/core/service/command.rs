@@ -1,4 +1,5 @@
 use api::command::{Command, CommandTarget};
+use monitoring::TraceContext;
 use support::t;
 
 use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor, CommandStore};
@@ -32,7 +33,8 @@ where
         let is_reflected_in_state = self.is_reflected_in_state(&command).await?;
 
         if !was_latest_execution || !is_reflected_in_state {
-            self.save_command(command, source).await?;
+            self.save_command(command, source, TraceContext::current_correlation_id())
+                .await?;
             Ok(CommandExecutionResult::Triggered)
         } else {
             Ok(CommandExecutionResult::Skipped)

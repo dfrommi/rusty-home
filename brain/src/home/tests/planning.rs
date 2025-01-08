@@ -56,7 +56,7 @@ mod support {
     use std::sync::Mutex;
 
     use api::command::{Command, CommandSource};
-    use support::time::DateTime;
+    use support::time::{DateTime, DateTimeRange};
 
     use crate::{
         core::{planner::PlanningTrace, service::CommandState},
@@ -86,6 +86,17 @@ mod support {
         ) -> anyhow::Result<Vec<(String, DateTime)>> {
             Ok(vec![])
         }
+
+        async fn get_planning_traces_by_trace_id(
+            &self,
+            _: &str,
+        ) -> anyhow::Result<Vec<PlanningTrace>> {
+            Ok(vec![])
+        }
+
+        async fn get_trace_ids(&self, _: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
+            Ok(vec![])
+        }
     }
 
     pub struct TestCommandProcessor {
@@ -111,6 +122,7 @@ mod support {
             &self,
             command: Command,
             source: CommandSource,
+            _: Option<String>,
         ) -> anyhow::Result<()> {
             println!(
                 "Pretend executing command in test: {:?} with source: {:?}",

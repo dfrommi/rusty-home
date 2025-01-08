@@ -40,7 +40,7 @@ where
         .service(dashboard::energy_monitor::routes(api.clone()))
         .service(dashboard::state_debug::routes(api.clone()))
         .service(dashboard::heating_details::routes(api.clone()))
-        .service(dashboard::smart_home_overview::routes(api.clone()))
+        .service(dashboard::smart_home::routes(api.clone()))
         .service(dashboard::meta::routes())
 }
 

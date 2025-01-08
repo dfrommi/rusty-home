@@ -2,20 +2,22 @@ use std::sync::Arc;
 
 use actix_web::web;
 use api::command::{Command, CommandSource};
+use monitoring::TraceContext;
 
 use crate::{
-    adapter::grafana::{support::csv_response, GrafanaApiError, GrafanaResponse},
-    core::planner::PlanningTrace,
+    adapter::grafana::{
+        dashboard::TimeRangeQuery, support::csv_response, GrafanaApiError, GrafanaResponse,
+    },
     port::{CommandAccess, PlanningResultTracer},
 };
 
-use super::TimeRangeQuery;
+use super::TraceView;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
     T: PlanningResultTracer + CommandAccess + 'static,
 {
-    web::scope("/smart_home_overview")
+    web::scope("/overview")
         .route("/trace", web::get().to(get_trace::<T>))
         .route("/commands", web::get().to(get_commands::<T>))
         .app_data(web::Data::from(api))
@@ -27,9 +29,10 @@ where
 {
     #[derive(serde::Serialize)]
     struct Row {
-        action: String,
-        last_execution: Option<String>,
         state: String,
+        name: String,
+        target: Option<String>,
+        last_triggered: Option<String>,
     }
 
     let until = *time_range.range().end();
@@ -37,44 +40,36 @@ where
     let traces = api
         .get_latest_planning_trace(until)
         .await
-        .map_err(GrafanaApiError::DataAccessError)?;
+        .map_err(GrafanaApiError::DataAccessError)?
+        .into_iter()
+        .map(|t| t.into())
+        .collect::<Vec<TraceView>>();
 
     let last_executions = api
         .get_last_executions(until)
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
-    let rows = traces.into_iter().map(|trace| {
+    let rows = traces.into_iter().filter_map(|trace| {
         let last_execution = last_executions
             .iter()
             .find(|(a, _)| a == &trace.action)
             .map(|(_, timestamp)| *timestamp);
         let last_execution = last_execution.map(|dt| dt.to_human_readable());
-        let state = trace_state(&trace);
 
-        Row {
-            action: trace.action,
-            state,
-            last_execution,
+        match trace.state.as_str() {
+            "DISABLED" | "UNFULFILLED" => None,
+
+            _ => Some(Row {
+                state: trace.state,
+                name: trace.name,
+                target: trace.target,
+                last_triggered: last_execution,
+            }),
         }
     });
 
     csv_response(rows)
-}
-
-fn trace_state(trace: &PlanningTrace) -> String {
-    if !trace.is_goal_active {
-        "DISABLED"
-    } else if trace.was_triggered == Some(true) {
-        "TRIGGERED"
-    } else if trace.locked {
-        "LOCKED"
-    } else if trace.is_fulfilled == Some(true) {
-        "FULFILLED"
-    } else {
-        "UNFULFILLED"
-    }
-    .to_string()
 }
 
 async fn get_commands<T>(
@@ -92,6 +87,7 @@ where
         target: String,
         state: String,
         source: String,
+        trace_id: Option<String>,
     }
 
     let range = time_range.range();
@@ -106,6 +102,10 @@ where
         let (command_type, target, state) = command_as_string(&cmd.command);
         let (icon, source) = source_as_string(&cmd.source);
 
+        let trace_id = cmd
+            .correlation_id
+            .map(|id| TraceContext::from_correlation_id(&id).trace_id());
+
         Row {
             icon: icon.to_string(),
             timestamp: cmd.created.to_human_readable(),
@@ -113,6 +113,7 @@ where
             target,
             state,
             source,
+            trace_id,
         }
     });
 
@@ -159,7 +160,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
 
 fn source_as_string(source: &CommandSource) -> (&str, String) {
     match source {
-        CommandSource::System(id) => ("🖥️", id.to_owned()),
-        CommandSource::User(id) => ("🥸", id.to_owned()),
+        CommandSource::System(id) => ("SYSTEM", id.to_owned()),
+        CommandSource::User(id) => ("USER", id.to_owned()),
     }
 }

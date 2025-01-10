@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use actix_web::web;
+use actix_web::{http::header, web, HttpResponse};
+use anyhow::Context;
 use api::command::{Command, CommandSource};
 use monitoring::TraceContext;
 
@@ -19,6 +20,7 @@ where
 {
     web::scope("/overview")
         .route("/trace", web::get().to(get_trace::<T>))
+        .route("/trace/states", web::get().to(get_trace_states::<T>))
         .route("/commands", web::get().to(get_commands::<T>))
         .app_data(web::Data::from(api))
 }
@@ -32,44 +34,76 @@ where
         state: String,
         name: String,
         target: Option<String>,
-        last_triggered: Option<String>,
     }
 
     let until = *time_range.range().end();
 
-    let traces = api
+    let traces: Vec<TraceView> = api
         .get_latest_planning_trace(until)
         .await
         .map_err(GrafanaApiError::DataAccessError)?
+        .into();
+
+    let rows = traces
         .into_iter()
-        .map(|t| t.into())
-        .collect::<Vec<TraceView>>();
-
-    let last_executions = api
-        .get_last_executions(until)
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?;
-
-    let rows = traces.into_iter().filter_map(|trace| {
-        let last_execution = last_executions
-            .iter()
-            .find(|(a, _)| a == &trace.action)
-            .map(|(_, timestamp)| *timestamp);
-        let last_execution = last_execution.map(|dt| dt.to_human_readable());
-
-        match trace.state.as_str() {
+        .filter_map(|trace| match trace.state.as_str() {
             "DISABLED" | "UNFULFILLED" => None,
 
             _ => Some(Row {
                 state: trace.state,
                 name: trace.name,
                 target: trace.target,
-                last_triggered: last_execution,
             }),
-        }
-    });
+        });
 
     csv_response(rows)
+}
+
+async fn get_trace_states<T>(
+    api: web::Data<T>,
+    time_range: web::Query<TimeRangeQuery>,
+) -> GrafanaResponse
+where
+    T: PlanningResultTracer,
+{
+    let traces = api
+        .get_planning_traces_in_range(time_range.range())
+        .await
+        .map_err(GrafanaApiError::DataAccessError)?;
+
+    let header_trace = match traces.first() {
+        Some(trace) => trace,
+        None => return Err(GrafanaApiError::NotFound),
+    };
+
+    let mut csv = csv::Writer::from_writer(vec![]);
+    let mut header: Vec<String> = vec!["timestamp".to_string()];
+    for step in header_trace.steps.iter() {
+        header.push(step.action.clone());
+    }
+    csv.serialize(&header)
+        .with_context(|| "Error serializing row")
+        .map_err(GrafanaApiError::InternalError)?;
+
+    for trace in traces {
+        let mut row: Vec<String> = vec![trace.timestamp.to_iso_string()];
+
+        for step in trace.steps {
+            row.push(super::trace_state(&step));
+        }
+
+        csv.serialize(&row)
+            .with_context(|| "Error serializing row")
+            .map_err(GrafanaApiError::InternalError)?;
+    }
+
+    Ok(HttpResponse::Ok()
+        .append_header(header::ContentType(mime::TEXT_CSV))
+        .body(
+            csv.into_inner()
+                .with_context(|| "Error creating CSV")
+                .map_err(GrafanaApiError::InternalError)?,
+        ))
 }
 
 async fn get_commands<T>(

@@ -3,12 +3,12 @@ use std::fmt::Display;
 use api::command::CommandTarget;
 use tokio::sync::oneshot;
 
-use super::{resource_lock::ResourceLock, PlanningTrace};
+use super::{resource_lock::ResourceLock, trace::PlanningTraceStep};
 
 pub struct Context<'a, A> {
     pub action: &'a A,
     pub goal_active: bool,
-    pub trace: PlanningTrace,
+    pub trace: PlanningTraceStep,
     lock_rx: oneshot::Receiver<ResourceLock<CommandTarget>>,
     lock_tx: Option<oneshot::Sender<ResourceLock<CommandTarget>>>,
 }
@@ -21,8 +21,8 @@ impl<'a, A: Display> Context<'a, A> {
         lock_rx: oneshot::Receiver<ResourceLock<CommandTarget>>,
         lock_tx: oneshot::Sender<ResourceLock<CommandTarget>>,
     ) -> Self {
-        let mut trace = PlanningTrace::new(action, goal);
-        trace.is_goal_active = goal_active;
+        let mut trace = PlanningTraceStep::new(action, goal);
+        trace.goal_active = goal_active;
 
         Self {
             action,

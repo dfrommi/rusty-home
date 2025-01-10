@@ -1,43 +1,80 @@
 use std::{fmt::Display, sync::Mutex};
 
+use monitoring::TraceContext;
+use support::{t, time::DateTime};
+
 use crate::port::PlanningResultTracer;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanningTrace {
-    pub action: String,
+    pub timestamp: DateTime,
+    pub trace_id: Option<String>,
+    pub steps: Vec<PlanningTraceStep>,
+}
 
+#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PlanningTraceStep {
+    pub action: String,
     pub goal: String,
 
-    pub is_goal_active: bool,
+    pub goal_active: bool,
     pub locked: bool,
-    pub is_fulfilled: Option<bool>,
-    pub was_triggered: Option<bool>,
+    pub fulfilled: Option<bool>,
+    pub triggered: Option<bool>,
 
     pub correlation_id: Option<String>,
 }
 
+//Ignore correlation_id
+impl PartialEq for PlanningTraceStep {
+    fn eq(&self, other: &Self) -> bool {
+        self.action == other.action
+            && self.goal == other.goal
+            && self.goal_active == other.goal_active
+            && self.locked == other.locked
+            && self.fulfilled == other.fulfilled
+            && self.triggered == other.triggered
+    }
+}
+
 impl PlanningTrace {
+    pub fn new(
+        timestamp: DateTime,
+        trace_id: Option<String>,
+        steps: Vec<PlanningTraceStep>,
+    ) -> Self {
+        Self {
+            timestamp,
+            trace_id,
+            steps,
+        }
+    }
+
+    pub fn current(steps: Vec<PlanningTraceStep>) -> Self {
+        let trace_id = TraceContext::current().map(|c| c.trace_id().to_string());
+        Self::new(t!(now), trace_id, steps)
+    }
+}
+
+impl PlanningTraceStep {
     pub fn new(action: &impl Display, goal: &impl Display) -> Self {
         Self {
             action: format!("{}", action),
             goal: format!("{}", goal),
-            is_goal_active: false,
+            goal_active: false,
             locked: false,
-            is_fulfilled: None,
-            was_triggered: None,
+            fulfilled: None,
+            triggered: None,
             correlation_id: None,
         }
     }
 }
 
-pub async fn display_planning_trace(
-    action_results: &[PlanningTrace],
-    tracer: &impl PlanningResultTracer,
-) {
-    if planning_trace_has_changed(action_results) {
-        tracing::info!("Planning result:\n{:?}", action_results);
+pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &impl PlanningResultTracer) {
+    if planning_trace_has_changed(trace) {
+        tracing::info!("Planning result:\n{:?}", trace);
 
-        if let Err(e) = tracer.add_planning_trace(action_results).await {
+        if let Err(e) = tracer.add_planning_trace(trace).await {
             tracing::error!("Error logging planning result: {:?}", e);
         }
     } else {
@@ -45,12 +82,13 @@ pub async fn display_planning_trace(
     }
 }
 
-static PREVIOUS_ACTION: Mutex<Vec<PlanningTrace>> = Mutex::new(vec![]);
-fn planning_trace_has_changed(current: &[PlanningTrace]) -> bool {
+static PREVIOUS_ACTION: Mutex<Option<PlanningTrace>> = Mutex::new(None);
+fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
     match PREVIOUS_ACTION.lock() {
         Ok(mut previous) => {
-            if *previous != current {
-                *previous = current.to_vec();
+            let current = Some(current.clone());
+            if &*previous != &current {
+                *previous = current;
                 true
             } else {
                 false

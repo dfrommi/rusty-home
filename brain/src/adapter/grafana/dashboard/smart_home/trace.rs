@@ -6,10 +6,9 @@ use crate::{
     adapter::grafana::{
         dashboard::TimeRangeQuery, support::csv_response, GrafanaApiError, GrafanaResponse,
     },
+    core::planner::PlanningTrace,
     port::PlanningResultTracer,
 };
-
-use super::TraceView;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct ByTraceId {
@@ -62,15 +61,17 @@ where
         action: String,
     }
 
-    let traces = api
+    let trace: Option<PlanningTrace> = api
         .get_planning_traces_by_trace_id(&query.trace_id)
         .await
-        .map_err(GrafanaApiError::DataAccessError)?
-        .into_iter()
-        .map(|t| t.into())
-        .collect::<Vec<TraceView>>();
+        .map_err(GrafanaApiError::DataAccessError)?;
 
-    let rows = traces.into_iter().map(|trace| Row {
+    let views = match trace {
+        Some(trace) => trace.into(),
+        None => vec![],
+    };
+
+    let rows = views.into_iter().map(|trace| Row {
         state: trace.state,
         action: trace.action,
     });

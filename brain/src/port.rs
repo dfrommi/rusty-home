@@ -69,22 +69,19 @@ pub trait CommandExecutor {
 }
 
 pub trait PlanningResultTracer {
-    async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()>;
+    async fn add_planning_trace(&self, results: &PlanningTrace) -> anyhow::Result<()>;
 
-    async fn get_latest_planning_trace(
+    async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace>;
+
+    async fn get_planning_traces_in_range(
         &self,
-        before: DateTime,
+        range: DateTimeRange,
     ) -> anyhow::Result<Vec<PlanningTrace>>;
-
-    async fn get_last_executions(
-        &self,
-        before: DateTime,
-    ) -> anyhow::Result<Vec<(String, DateTime)>>;
 
     async fn get_planning_traces_by_trace_id(
         &self,
         trace_id: &str,
-    ) -> anyhow::Result<Vec<PlanningTrace>>;
+    ) -> anyhow::Result<Option<PlanningTrace>>;
 
     async fn get_trace_ids(&self, range: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>>;
 }

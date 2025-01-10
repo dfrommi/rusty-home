@@ -59,6 +59,9 @@ enum GrafanaApiError {
 
     #[display("Internal error")]
     InternalError(anyhow::Error),
+
+    #[display("Not found")]
+    NotFound,
 }
 
 impl ResponseError for GrafanaApiError {
@@ -69,6 +72,7 @@ impl ResponseError for GrafanaApiError {
 
         match self {
             GrafanaApiError::ChannelNotFound(_, _) => StatusCode::NOT_FOUND,
+            GrafanaApiError::NotFound => StatusCode::NOT_FOUND,
             GrafanaApiError::ChannelUnsupported(_, _) => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }

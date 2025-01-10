@@ -67,31 +67,27 @@ mod support {
     pub struct TestPlanningResultTracer;
 
     impl PlanningResultTracer for TestPlanningResultTracer {
-        async fn add_planning_trace(&self, results: &[PlanningTrace]) -> anyhow::Result<()> {
+        async fn add_planning_trace(&self, results: &PlanningTrace) -> anyhow::Result<()> {
             println!("{:?}", results);
-            //nothing to do
             Ok(())
         }
 
-        async fn get_latest_planning_trace(
-            &self,
-            _: DateTime,
-        ) -> anyhow::Result<Vec<PlanningTrace>> {
-            Ok(vec![])
+        async fn get_latest_planning_trace(&self, _: DateTime) -> anyhow::Result<PlanningTrace> {
+            Ok(PlanningTrace::current(vec![]))
         }
 
-        async fn get_last_executions(
+        async fn get_planning_traces_in_range(
             &self,
-            _: DateTime,
-        ) -> anyhow::Result<Vec<(String, DateTime)>> {
+            _: DateTimeRange,
+        ) -> anyhow::Result<Vec<PlanningTrace>> {
             Ok(vec![])
         }
 
         async fn get_planning_traces_by_trace_id(
             &self,
             _: &str,
-        ) -> anyhow::Result<Vec<PlanningTrace>> {
-            Ok(vec![])
+        ) -> anyhow::Result<Option<PlanningTrace>> {
+            Ok(None)
         }
 
         async fn get_trace_ids(&self, _: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {

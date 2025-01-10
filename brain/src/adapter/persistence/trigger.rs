@@ -1,6 +1,5 @@
 use anyhow::Context;
 use api::trigger::{UserTrigger, UserTriggerTarget};
-use sqlx::PgPool;
 use support::{t, time::DateTime};
 
 use crate::port::{UserTriggerAccess, UserTriggerExecutor};

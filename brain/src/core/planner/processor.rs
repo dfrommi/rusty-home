@@ -17,7 +17,7 @@ pub async fn plan_and_execute<G, A, API, EXE>(
     config: &[(G, Vec<A>)],
     api: &API,
     command_processor: &EXE,
-) -> Result<Vec<PlanningTrace>>
+) -> Result<PlanningTrace>
 where
     G: Eq + Display,
     A: Action<API>,
@@ -49,7 +49,8 @@ where
     let results: Result<Vec<Context<A>>> =
         futures::future::join_all(tasks).await.into_iter().collect();
 
-    results.map(|results| results.into_iter().map(|r| r.trace).collect())
+    let steps = results?.into_iter().map(|r| r.trace).collect();
+    Ok(PlanningTrace::current(steps))
 }
 
 #[tracing::instrument(
@@ -104,7 +105,7 @@ where
         ActionEvaluationResult::Skip
     };
 
-    context.trace.is_fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
+    context.trace.fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
 
     result
 }
@@ -148,10 +149,10 @@ async fn execute_action<'a, A, API, EXE>(
     match command_processor.execute(command, source).await {
         Ok(CommandExecutionResult::Triggered) => {
             tracing::info!("Action {} started", context.action);
-            context.trace.was_triggered = Some(true);
+            context.trace.triggered = Some(true);
         }
         Ok(CommandExecutionResult::Skipped) => {
-            context.trace.was_triggered = Some(false);
+            context.trace.triggered = Some(false);
         }
         Err(e) => {
             tracing::error!("Error starting action {}: {:?}", context.action, e);

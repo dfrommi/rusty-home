@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 
 use crate::{
-    core::planner::PlanningTrace,
+    core::planner::{PlanningTrace, PlanningTraceStep},
     port::{CommandAccess, PlanningResultTracer},
 };
 
@@ -26,8 +26,14 @@ struct TraceView {
     state: String,
 }
 
-impl From<PlanningTrace> for TraceView {
+impl From<PlanningTrace> for Vec<TraceView> {
     fn from(val: PlanningTrace) -> Self {
+        val.steps.into_iter().map(Into::into).collect()
+    }
+}
+
+impl From<PlanningTraceStep> for TraceView {
+    fn from(val: PlanningTraceStep) -> Self {
         let (name, target) = split_action(&val.action);
 
         TraceView {
@@ -39,14 +45,14 @@ impl From<PlanningTrace> for TraceView {
     }
 }
 
-fn trace_state(trace: &PlanningTrace) -> String {
-    if !trace.is_goal_active {
+fn trace_state(trace: &PlanningTraceStep) -> String {
+    if !trace.goal_active {
         "DISABLED"
-    } else if trace.was_triggered == Some(true) {
+    } else if trace.triggered == Some(true) {
         "TRIGGERED"
     } else if trace.locked {
         "LOCKED"
-    } else if trace.is_fulfilled == Some(true) {
+    } else if trace.fulfilled == Some(true) {
         "FULFILLED"
     } else {
         "UNFULFILLED"

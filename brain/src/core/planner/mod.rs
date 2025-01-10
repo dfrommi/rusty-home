@@ -11,7 +11,7 @@ use trace::display_planning_trace;
 use crate::port::{CommandExecutor, PlanningResultTracer};
 
 pub use action::{Action, ActionEvaluationResult, CommandAction, ConditionalAction};
-pub use trace::PlanningTrace;
+pub use trace::{PlanningTrace, PlanningTraceStep};
 
 pub async fn perform_planning<G, A, API, EXE>(
     active_goals: &[G],

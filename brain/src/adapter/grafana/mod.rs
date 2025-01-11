@@ -16,7 +16,9 @@ use derive_more::derive::{Display, Error};
 
 use crate::{
     home::state::Opened,
-    port::{CommandAccess, DataPointAccess, PlanningResultTracer, TimeSeriesAccess},
+    port::{
+        CommandAccess, DataPointAccess, DataPointStore, PlanningResultTracer, TimeSeriesAccess,
+    },
 };
 
 use display::DashboardDisplay;
@@ -33,6 +35,7 @@ where
         + TimeSeriesAccess<Opened>
         + CommandAccess
         + PlanningResultTracer
+        + DataPointStore
         + 'static,
 {
     web::scope("/grafana")

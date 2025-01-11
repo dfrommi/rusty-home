@@ -1,14 +1,14 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    port::{DataPointAccess, TimeSeriesAccess},
+    port::{DataPointAccess, DataPointStore, TimeSeriesAccess},
     support::timeseries::{interpolate::Estimatable, TimeSeries},
 };
 
 use anyhow::{bail, Result};
 use api::{
     get_tag_id,
-    state::{db::DbValue, Channel},
+    state::{db::DbValue, Channel, ChannelValue},
 };
 use support::{t, time::DateTimeRange, DataFrame, DataPoint, ValueObject};
 
@@ -89,6 +89,50 @@ where
         }
 
         TimeSeries::new(item, &df, range)
+    }
+}
+
+impl DataPointStore for super::Database {
+    async fn get_all_data_points_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<DataPoint<ChannelValue>>> {
+        let recs = sqlx::query!(
+            r#"SELECT 
+                THING_VALUE.value as "value!: DbValue", 
+                THING_VALUE.timestamp, 
+                THING_VALUE_TAG.channel, 
+                THING_VALUE_TAG.name
+            FROM THING_VALUE
+            JOIN THING_VALUE_TAG ON THING_VALUE_TAG.id = THING_VALUE.tag_id
+            WHERE THING_VALUE.timestamp >= $1
+            AND THING_VALUE.timestamp <= $2
+            ORDER BY THING_VALUE.timestamp ASC"#,
+            range.start().into_db(),
+            range.end().into_db(),
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let dps: Vec<DataPoint<ChannelValue>> = recs
+            .into_iter()
+            .filter_map(|row| {
+                let target = Channel::from_type_and_item(row.channel.as_str(), row.name.as_str());
+
+                match target {
+                    Some(target) => Some(DataPoint {
+                        value: ChannelValue::from((target, row.value)),
+                        timestamp: row.timestamp.into(),
+                    }),
+                    None => {
+                        tracing::warn!("Received unsupported channel {}/{}", row.channel, row.name);
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        Ok(dps)
     }
 }
 

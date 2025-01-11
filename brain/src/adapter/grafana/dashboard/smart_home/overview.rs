@@ -2,26 +2,31 @@ use std::sync::Arc;
 
 use actix_web::{http::header, web, HttpResponse};
 use anyhow::Context;
-use api::command::{Command, CommandSource};
+use api::{
+    command::{Command, CommandSource},
+    state::Channel,
+};
 use monitoring::TraceContext;
+use support::TypedItem;
 
 use crate::{
     adapter::grafana::{
         dashboard::TimeRangeQuery, support::csv_response, GrafanaApiError, GrafanaResponse,
     },
-    port::{CommandAccess, PlanningResultTracer},
+    port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
 
 use super::TraceView;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: PlanningResultTracer + CommandAccess + 'static,
+    T: PlanningResultTracer + CommandAccess + DataPointStore + 'static,
 {
     web::scope("/overview")
         .route("/trace", web::get().to(get_trace::<T>))
         .route("/trace/states", web::get().to(get_trace_states::<T>))
         .route("/commands", web::get().to(get_commands::<T>))
+        .route("/states", web::get().to(get_states::<T>))
         .app_data(web::Data::from(api))
 }
 
@@ -190,6 +195,41 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             if *on { "on" } else { "off" }.to_string(),
         ),
     }
+}
+
+async fn get_states<T>(api: web::Data<T>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse
+where
+    T: DataPointStore,
+{
+    #[derive(serde::Serialize)]
+    struct Row {
+        timestamp: String,
+        #[serde(rename = "type")]
+        type_: String,
+        item: String,
+        value: String,
+    }
+
+    let range = time_range.range();
+    let mut states = api
+        .get_all_data_points_in_range(range.clone())
+        .await
+        .map_err(GrafanaApiError::DataAccessError)?;
+
+    states.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    let rows = states.into_iter().map(|dp| {
+        let target = Channel::from(&dp.value);
+
+        Row {
+            timestamp: dp.timestamp.to_human_readable(),
+            type_: target.type_name().to_string(),
+            item: target.item_name().to_string(),
+            value: dp.value.value_to_string(),
+        }
+    });
+
+    csv_response(rows)
 }
 
 fn source_as_string(source: &CommandSource) -> (&str, String) {

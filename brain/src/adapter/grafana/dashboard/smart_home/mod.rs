@@ -4,7 +4,7 @@ use actix_web::web;
 
 use crate::{
     core::planner::{PlanningTrace, PlanningTraceStep},
-    port::{CommandAccess, PlanningResultTracer},
+    port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
 
 mod overview;
@@ -12,7 +12,7 @@ mod trace;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: PlanningResultTracer + CommandAccess + 'static,
+    T: PlanningResultTracer + CommandAccess + DataPointStore + 'static,
 {
     web::scope("/smart_home")
         .service(overview::routes(api.clone()))

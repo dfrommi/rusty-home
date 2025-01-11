@@ -3,6 +3,7 @@
 use anyhow::Result;
 use api::{
     command::{Command, CommandExecution, CommandSource, CommandTarget},
+    state::ChannelValue,
     trigger::{UserTrigger, UserTriggerTarget},
 };
 use support::{
@@ -33,6 +34,13 @@ where
     async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T>> {
         self.series(item, DateTimeRange::new(since, t!(now))).await
     }
+}
+
+pub trait DataPointStore {
+    async fn get_all_data_points_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<DataPoint<ChannelValue>>>;
 }
 
 pub trait CommandAccess {

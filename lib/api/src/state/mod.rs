@@ -1,3 +1,6 @@
+use std::fmt::Display;
+
+use db::DbValue;
 use r#macro::{DbMapped, EnumVariants, StateChannel, TypedItem};
 use support::unit::*;
 
@@ -17,6 +20,54 @@ pub enum ChannelValue {
     Presence(Presence, bool),
     TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
+}
+
+impl ChannelValue {
+    pub fn value_to_string(&self) -> String {
+        match self {
+            ChannelValue::Temperature(_, value) => value.to_string(),
+            ChannelValue::RelativeHumidity(_, value) => value.to_string(),
+            ChannelValue::Opened(_, value) => value.to_string(),
+            ChannelValue::Powered(_, value) => value.to_string(),
+            ChannelValue::CurrentPowerUsage(_, value) => value.to_string(),
+            ChannelValue::TotalEnergyConsumption(_, value) => value.to_string(),
+            ChannelValue::SetPoint(_, value) => value.to_string(),
+            ChannelValue::HeatingDemand(_, value) => value.to_string(),
+            ChannelValue::ExternalAutoControl(_, value) => value.to_string(),
+            ChannelValue::Presence(_, value) => value.to_string(),
+            ChannelValue::TotalRadiatorConsumption(_, value) => value.to_string(),
+            ChannelValue::TotalWaterConsumption(_, value) => value.to_string(),
+        }
+    }
+}
+
+//TODO macro
+impl From<(Channel, DbValue)> for ChannelValue {
+    fn from(val: (Channel, DbValue)) -> Self {
+        let (channel, value) = val;
+        match channel {
+            Channel::Temperature(item) => ChannelValue::Temperature(item, value.into()),
+            Channel::RelativeHumidity(item) => ChannelValue::RelativeHumidity(item, value.into()),
+            Channel::Opened(item) => ChannelValue::Opened(item, value.into()),
+            Channel::Powered(item) => ChannelValue::Powered(item, value.into()),
+            Channel::CurrentPowerUsage(item) => ChannelValue::CurrentPowerUsage(item, value.into()),
+            Channel::TotalEnergyConsumption(item) => {
+                ChannelValue::TotalEnergyConsumption(item, value.into())
+            }
+            Channel::SetPoint(item) => ChannelValue::SetPoint(item, value.into()),
+            Channel::HeatingDemand(item) => ChannelValue::HeatingDemand(item, value.into()),
+            Channel::ExternalAutoControl(item) => {
+                ChannelValue::ExternalAutoControl(item, value.into())
+            }
+            Channel::Presence(item) => ChannelValue::Presence(item, value.into()),
+            Channel::TotalRadiatorConsumption(item) => {
+                ChannelValue::TotalRadiatorConsumption(item, value.into())
+            }
+            Channel::TotalWaterConsumption(item) => {
+                ChannelValue::TotalWaterConsumption(item, value.into())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]

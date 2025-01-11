@@ -48,6 +48,7 @@ impl Mqtt {
 
         let mut connect_props = ConnectProperties::new();
         connect_props.session_expiry_interval = 60.into();
+        connect_props.max_packet_size = Some(1024 * 1024);
         mqttoptions.set_connect_properties(connect_props);
 
         let (client, event_loop) = AsyncClient::new(mqttoptions, 10);

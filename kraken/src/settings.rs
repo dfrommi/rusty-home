@@ -8,6 +8,7 @@ pub struct Settings {
     pub database: Database,
     pub mqtt: Mqtt,
     pub homeassistant: HomeAssitant,
+    pub z2m: Zigbee2Mqtt,
     pub http_server: HttpServer,
     pub monitoring: MonitoringConfig,
 }
@@ -38,6 +39,12 @@ pub struct HomeAssitant {
     pub topic_event: String,
     pub url: String,
     pub token: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct Zigbee2Mqtt {
+    pub event_topic: String,
 }
 
 impl Settings {

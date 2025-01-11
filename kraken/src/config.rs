@@ -10,6 +10,7 @@ use api::{
 };
 
 use crate::homeassistant::{HaChannel, HaServiceTarget};
+use crate::z2m::Z2mChannel;
 
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![
@@ -74,18 +75,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // TEMPERATURE
         //
         (
-            "sensor.bathroom_temp_sensor_temperature",
-            HaChannel::Temperature(Temperature::BathroomShower),
-        ),
-        (
-            "sensor.kitchen_temp_sensor_temperature",
-            HaChannel::Temperature(Temperature::KitchenOuterWall),
-        ),
-        (
-            "sensor.bedroom_outer_wall_temperature",
-            HaChannel::Temperature(Temperature::BedroomOuterWall),
-        ),
-        (
             "sensor.wohnzimmer_temperature",
             HaChannel::Temperature(Temperature::LivingRoomDoor),
         ),
@@ -101,25 +90,9 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "sensor.home_temperature",
             HaChannel::Temperature(Temperature::Outside),
         ),
-        (
-            "sensor.bathroom_dehumidifier_temperature",
-            HaChannel::Temperature(Temperature::Dehumidifier),
-        ),
         //
         // HUMIDITY
         //
-        (
-            "sensor.bathroom_temp_sensor_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::BathroomShower),
-        ),
-        (
-            "sensor.kitchen_temp_sensor_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::KitchenOuterWall),
-        ),
-        (
-            "sensor.bedroom_outer_wall_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::BedroomOuterWall),
-        ),
         (
             "sensor.wohnzimmer_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::LivingRoomDoor),
@@ -135,49 +108,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
-        ),
-        (
-            "sensor.bathroom_dehumidifier_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::Dehumidifier),
-        ),
-        //
-        // WINDOW CONTACTS
-        //
-        (
-            "binary_sensor.bedroom_window_contact",
-            HaChannel::Opened(Opened::BedroomWindow),
-        ),
-        (
-            "binary_sensor.kitchen_window_contact",
-            HaChannel::Opened(Opened::KitchenWindow),
-        ),
-        (
-            "binary_sensor.living_room_balcony_door_contact",
-            HaChannel::Opened(Opened::LivingRoomBalconyDoor),
-        ),
-        (
-            "binary_sensor.living_room_window_side_contact",
-            HaChannel::Opened(Opened::LivingRoomWindowSide),
-        ),
-        (
-            "binary_sensor.living_room_window_left_contact",
-            HaChannel::Opened(Opened::LivingRoomWindowLeft),
-        ),
-        (
-            "binary_sensor.living_room_window_right_contact",
-            HaChannel::Opened(Opened::LivingRoomWindowRight),
-        ),
-        (
-            "binary_sensor.room_of_requirements_window_side_contact",
-            HaChannel::Opened(Opened::RoomOfRequirementsWindowSide),
-        ),
-        (
-            "binary_sensor.room_of_requirements_window_left_contact",
-            HaChannel::Opened(Opened::RoomOfRequirementsWindowLeft),
-        ),
-        (
-            "binary_sensor.room_of_requirements_window_right_contact",
-            HaChannel::Opened(Opened::RoomOfRequirementsWindowRight),
         ),
         //
         //POWERED STATE
@@ -257,18 +187,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "sensor.irheater_energy_power",
             HaChannel::CurrentPowerUsage(CurrentPowerUsage::InfraredHeater),
         ),
-        (
-            "sensor.kitchen_multiplug_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::KitchenMultiPlug),
-        ),
-        (
-            "sensor.living_room_couch_plug_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::CouchPlug),
-        ),
-        (
-            "sensor.room_of_requirements_makerspace_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::RoomOfRequirementsDesk),
-        ),
         //
         //ENERGY USAGE
         //
@@ -327,18 +245,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "sensor.irheater_energy_total",
             HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::InfraredHeater),
-        ),
-        (
-            "sensor.kitchen_multiplug_energy",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::KitchenMultiPlug),
-        ),
-        (
-            "sensor.living_room_couch_plug_energy",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::CouchPlug),
-        ),
-        (
-            "sensor.room_of_requirements_makerspace_energy",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::RoomOfRequirementsDesk),
         ),
         //
         // HEATING DEMAND
@@ -442,6 +348,102 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "sensor.bedroom_remote_click",
             HaChannel::ButtonPress(RemoteTarget::BedroomDoor),
+        ),
+    ]
+}
+
+pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
+    vec![
+        //
+        // CLIMATE SENSORS
+        //
+        (
+            "bathroom/temp_sensor",
+            Z2mChannel::ClimateSensor(
+                Temperature::BathroomShower,
+                RelativeHumidity::BathroomShower,
+            ),
+        ),
+        (
+            "kitchen/temp_sensor",
+            Z2mChannel::ClimateSensor(
+                Temperature::KitchenOuterWall,
+                RelativeHumidity::KitchenOuterWall,
+            ),
+        ),
+        (
+            "bedroom/outer_wall",
+            Z2mChannel::ClimateSensor(
+                Temperature::BedroomOuterWall,
+                RelativeHumidity::BedroomOuterWall,
+            ),
+        ),
+        (
+            "bathroom/dehumidifier",
+            Z2mChannel::ClimateSensor(Temperature::Dehumidifier, RelativeHumidity::Dehumidifier),
+        ),
+        //
+        // WINDOW CONTACTS
+        //
+        (
+            "bedroom/window",
+            Z2mChannel::ContactSensor(Opened::BedroomWindow),
+        ),
+        (
+            "living_room/balcony_door",
+            Z2mChannel::ContactSensor(Opened::LivingRoomBalconyDoor),
+        ),
+        (
+            "living_room/window_left",
+            Z2mChannel::ContactSensor(Opened::LivingRoomWindowLeft),
+        ),
+        (
+            "living_room/window_right",
+            Z2mChannel::ContactSensor(Opened::LivingRoomWindowRight),
+        ),
+        (
+            "living_room/window_side",
+            Z2mChannel::ContactSensor(Opened::LivingRoomWindowSide),
+        ),
+        (
+            "kitchen/window",
+            Z2mChannel::ContactSensor(Opened::KitchenWindow),
+        ),
+        (
+            "room_of_requirements/window_left",
+            Z2mChannel::ContactSensor(Opened::RoomOfRequirementsWindowLeft),
+        ),
+        (
+            "room_of_requirements/window_right",
+            Z2mChannel::ContactSensor(Opened::RoomOfRequirementsWindowRight),
+        ),
+        (
+            "room_of_requirements/window_side",
+            Z2mChannel::ContactSensor(Opened::RoomOfRequirementsWindowSide),
+        ),
+        //
+        // POWER PLUGS
+        //
+        (
+            "kitchen/multiplug",
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::KitchenMultiPlug,
+                TotalEnergyConsumption::KitchenMultiPlug,
+            ),
+        ),
+        (
+            "living_room/couch_plug",
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::CouchPlug,
+                TotalEnergyConsumption::CouchPlug,
+            ),
+        ),
+        (
+            "room_of_requirements/makerspace",
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::RoomOfRequirementsDesk,
+                TotalEnergyConsumption::RoomOfRequirementsDesk,
+            ),
         ),
     ]
 }

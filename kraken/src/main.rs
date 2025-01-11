@@ -1,7 +1,7 @@
 use actix_web::App;
 use anyhow::Context;
 use api::DbEventListener;
-use config::{default_ha_command_config, default_ha_state_config};
+use config::{default_ha_command_config, default_ha_state_config, default_z2m_state_config};
 use core::{
     event::{AppEventListener, CommandAddedEvent},
     CommandExecutor, IncomingDataProcessor,
@@ -20,6 +20,7 @@ mod core;
 mod energy_meter;
 mod homeassistant;
 mod settings;
+mod z2m;
 
 struct Infrastructure {
     database: Database,
@@ -71,11 +72,26 @@ pub async fn main() {
             .homeassistant
             .new_incoming_data_processor(&mut infrastructure)
             .await;
+        let tx = incoming_data_tx.clone();
         async move {
             ha_incoming_data_processor
-                .process(incoming_data_tx.clone())
+                .process(tx.clone())
                 .await
                 .expect("Error processing HA incoming data");
+        }
+    };
+
+    let z2m_incoming_data_processing = {
+        let mut z2m_incoming_data_processor = settings
+            .z2m
+            .new_incoming_data_processor(&mut infrastructure)
+            .await;
+        let tx = incoming_data_tx.clone();
+        async move {
+            z2m_incoming_data_processor
+                .process(tx)
+                .await
+                .expect("Error processing Z2M incoming data");
         }
     };
 
@@ -118,6 +134,7 @@ pub async fn main() {
     tokio::select!(
         _ = energy_meter_processing => {},
         _ = ha_incoming_data_processing => {},
+        _ = z2m_incoming_data_processing => {},
         _ = incoming_data_persisting => {},
         _ = execute_commands => {},
         _ = http_server_exec => {},
@@ -149,6 +166,24 @@ impl settings::HomeAssitant {
             &default_ha_state_config(),
         )
         .expect("Error initializing HA state collector")
+    }
+}
+
+impl settings::Zigbee2Mqtt {
+    async fn new_incoming_data_processor(
+        &self,
+        infrastructure: &mut Infrastructure,
+    ) -> impl IncomingDataProcessor {
+        let event_rx = infrastructure
+            .subscribe_to_mqtt(format!("{}/#", &self.event_topic).as_str())
+            .await
+            .expect("Error subscribing to MQTT topic");
+
+        z2m::Z2mStateCollector::new(
+            self.event_topic.clone(),
+            event_rx,
+            &default_z2m_state_config(),
+        )
     }
 }
 

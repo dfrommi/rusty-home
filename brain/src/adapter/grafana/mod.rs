@@ -1,5 +1,6 @@
 mod dashboard;
 mod display;
+mod port;
 mod support;
 
 use std::sync::Arc;
@@ -23,6 +24,8 @@ use crate::{
 
 use display::DashboardDisplay;
 
+pub use port::*;
+
 pub fn new_routes<T>(api: Arc<T>) -> actix_web::Scope
 where
     T: DataPointAccess<CurrentPowerUsage>
@@ -36,6 +39,7 @@ where
         + CommandAccess
         + PlanningResultTracer
         + DataPointStore
+        + ItemAvailabilitySupportStorage
         + 'static,
 {
     web::scope("/grafana")

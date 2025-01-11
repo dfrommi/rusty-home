@@ -9,7 +9,7 @@ use api::{
 use support::time::DateTime;
 use tokio::sync::mpsc;
 
-use crate::core::IncomingData;
+use crate::core::{IncomingData, ItemAvailability};
 
 pub trait CommandExecutor {
     //Returns true if command was executed
@@ -32,4 +32,8 @@ pub trait StateStorage {
 
 pub trait UserTriggerStorage {
     async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()>;
+}
+
+pub trait ItemAvailabilityStorage {
+    async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()>;
 }

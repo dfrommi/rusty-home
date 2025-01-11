@@ -11,6 +11,7 @@ use support::{
     DataFrame,
 };
 
+mod availability;
 mod command;
 mod planning_trace;
 mod state;

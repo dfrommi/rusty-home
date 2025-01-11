@@ -6,7 +6,7 @@ use api::trigger::RemoteTarget;
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use support::time::DateTime;
 
@@ -36,8 +36,7 @@ pub enum HaServiceTarget {
     LgWebosSmartTv(&'static str),
 }
 
-//TODO is Serialize necessary?
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct StateChangedEvent {
     pub entity_id: String,
     pub state: StateValue,
@@ -52,7 +51,7 @@ pub enum StateValue {
     Unavailable,
 }
 
-//TODO can deserialization of even be in the adapter?
+//TODO can deserialization of event be in the adapter?
 impl<'de> Deserialize<'de> for StateValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -62,18 +61,6 @@ impl<'de> Deserialize<'de> for StateValue {
         match value.as_str() {
             "unavailable" => Ok(StateValue::Unavailable),
             _ => Ok(StateValue::Available(value)),
-        }
-    }
-}
-
-impl Serialize for StateValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            StateValue::Available(v) => serializer.serialize_str(v),
-            StateValue::Unavailable => serializer.serialize_str("unavailable"),
         }
     }
 }

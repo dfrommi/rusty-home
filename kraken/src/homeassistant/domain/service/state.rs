@@ -13,7 +13,7 @@ use support::{
 use tokio::sync::mpsc;
 
 use crate::{
-    core::{IncomingData, IncomingDataProcessor},
+    core::{IncomingData, IncomingDataProcessor, ItemAvailability},
     homeassistant::domain::{
         GetAllEntityStatesPort, HaChannel, ListenToStateChangesPort, StateChangedEvent, StateValue,
     },
@@ -89,7 +89,7 @@ fn to_smart_home_events(
 
     let ha_channels = ha_channels.unwrap();
 
-    match &new_state.state {
+    let mut result = match &new_state.state {
         StateValue::Available(state_value) => {
             tracing::info!("Received supported event {}", entity_id);
 
@@ -121,7 +121,11 @@ fn to_smart_home_events(
             tracing::warn!("Value of {} is not available", entity_id);
             vec![]
         }
-    }
+    };
+
+    result.push(to_item_availability(new_state));
+
+    result
 }
 
 fn to_persistent_data_point(
@@ -224,4 +228,16 @@ fn to_persistent_data_point(
     };
 
     Ok(dp)
+}
+
+fn to_item_availability(new_state: &StateChangedEvent) -> IncomingData {
+    let entity_id: &str = &new_state.entity_id;
+
+    ItemAvailability {
+        source: "HA".to_string(),
+        item: entity_id.to_string(),
+        last_seen: new_state.last_updated,
+        marked_offline: matches!(new_state.state, StateValue::Unavailable),
+    }
+    .into()
 }

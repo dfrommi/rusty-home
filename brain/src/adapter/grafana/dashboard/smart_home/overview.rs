@@ -12,6 +12,7 @@ use support::TypedItem;
 use crate::{
     adapter::grafana::{
         dashboard::TimeRangeQuery, support::csv_response, GrafanaApiError, GrafanaResponse,
+        ItemAvailabilitySupportStorage,
     },
     port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
@@ -20,13 +21,18 @@ use super::TraceView;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: PlanningResultTracer + CommandAccess + DataPointStore + 'static,
+    T: PlanningResultTracer
+        + CommandAccess
+        + DataPointStore
+        + ItemAvailabilitySupportStorage
+        + 'static,
 {
     web::scope("/overview")
         .route("/trace", web::get().to(get_trace::<T>))
         .route("/trace/states", web::get().to(get_trace_states::<T>))
         .route("/commands", web::get().to(get_commands::<T>))
         .route("/states", web::get().to(get_states::<T>))
+        .route("/offline", web::get().to(get_offline_items::<T>))
         .app_data(web::Data::from(api))
 }
 
@@ -227,6 +233,29 @@ where
             item: target.item_name().to_string(),
             value: dp.value.value_to_string(),
         }
+    });
+
+    csv_response(rows)
+}
+
+async fn get_offline_items<T>(api: web::Data<T>) -> GrafanaResponse
+where
+    T: ItemAvailabilitySupportStorage,
+{
+    #[derive(serde::Serialize)]
+    struct Row {
+        source: String,
+        item: String,
+    }
+
+    let offline_items = api
+        .get_offline_items()
+        .await
+        .map_err(GrafanaApiError::DataAccessError)?;
+
+    let rows = offline_items.into_iter().map(|item| Row {
+        source: item.source,
+        item: item.item,
     });
 
     csv_response(rows)

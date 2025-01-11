@@ -3,6 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 
 use crate::{
+    adapter::grafana::ItemAvailabilitySupportStorage,
     core::planner::{PlanningTrace, PlanningTraceStep},
     port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
@@ -12,7 +13,11 @@ mod trace;
 
 pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
 where
-    T: PlanningResultTracer + CommandAccess + DataPointStore + 'static,
+    T: PlanningResultTracer
+        + CommandAccess
+        + DataPointStore
+        + ItemAvailabilitySupportStorage
+        + 'static,
 {
     web::scope("/smart_home")
         .service(overview::routes(api.clone()))

@@ -16,7 +16,12 @@ reqwest = { version = "*", features = ["json"] }
 
 config = { version = "0.14.0", features = ["toml"] }
 
-sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros"] }
+sqlx = { version = "0.8", features = [
+  "postgres",
+  "runtime-tokio",
+  "macros",
+  "chrono",
+] }
 derive_more = { version = "1", features = ["from"] }
 actix-web = "4"
 

@@ -20,6 +20,8 @@ sqlx = { version = "0.8", features = [
   "chrono",
   "uuid",
 ] }
+#Only for compatibility with sqlx-mapping
+chrono = { version = "0.4", features = ["serde"] }
 moka = { version = "0.12", features = ["future"] }
 
 config = "0.14.0"

@@ -63,6 +63,10 @@ impl Duration {
     pub fn to_iso_string(&self) -> String {
         from_chrono_duration(&self.delegate).to_string()
     }
+
+    pub fn into_db(&self) -> chrono::Duration {
+        self.delegate
+    }
 }
 
 impl std::ops::Add<Duration> for Duration {

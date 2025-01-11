@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use support::mqtt::MqttInMessage;
 
 use crate::homeassistant::domain::{ListenToStateChangesPort, StateChangedEvent};
@@ -40,8 +40,9 @@ impl ListenToStateChangesPort for HaMqttClient {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "event_type", content = "event_data")]
+#[allow(dead_code)]
 pub enum HaEvent {
     #[serde(rename = "state_changed")]
     StateChanged {

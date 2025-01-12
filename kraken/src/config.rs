@@ -10,6 +10,7 @@ use api::{
 };
 
 use crate::homeassistant::{HaChannel, HaServiceTarget};
+use crate::tasmota::TasmotaChannel;
 use crate::z2m::Z2mChannel;
 
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
@@ -127,124 +128,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "media_player.lg_webos_smart_tv",
             HaChannel::Powered(Powered::LivingRoomTv),
-        ),
-        //
-        //POWER CONSUMPTION
-        //
-        (
-            "sensor.fridge_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Fridge),
-        ),
-        (
-            "sensor.dehumidifier_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Dehumidifier),
-        ),
-        (
-            "sensor.appletv_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::AppleTv),
-        ),
-        (
-            "sensor.tv_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Tv),
-        ),
-        (
-            "sensor.airpurifier_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::AirPurifier),
-        ),
-        (
-            "sensor.couchlight_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::CouchLight),
-        ),
-        (
-            "sensor.dishwasher_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Dishwasher),
-        ),
-        (
-            "sensor.kettle_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Kettle),
-        ),
-        (
-            "sensor.washer_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::WashingMachine),
-        ),
-        (
-            "sensor.nuc_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::Nuc),
-        ),
-        (
-            "sensor.dslmodem_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::DslModem),
-        ),
-        (
-            "sensor.unifi_usg_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::InternetGateway),
-        ),
-        (
-            "sensor.unifi_switch_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::NetworkSwitch),
-        ),
-        (
-            "sensor.irheater_energy_power",
-            HaChannel::CurrentPowerUsage(CurrentPowerUsage::InfraredHeater),
-        ),
-        //
-        //ENERGY USAGE
-        //
-        (
-            "sensor.fridge_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Fridge),
-        ),
-        (
-            "sensor.dehumidifier_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Dehumidifier),
-        ),
-        (
-            "sensor.appletv_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::AppleTv),
-        ),
-        (
-            "sensor.tv_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Tv),
-        ),
-        (
-            "sensor.airpurifier_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::AirPurifier),
-        ),
-        (
-            "sensor.couchlight_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::CouchLight),
-        ),
-        (
-            "sensor.dishwasher_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Dishwasher),
-        ),
-        (
-            "sensor.kettle_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Kettle),
-        ),
-        (
-            "sensor.washer_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::WashingMachine),
-        ),
-        (
-            "sensor.nuc_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::Nuc),
-        ),
-        (
-            "sensor.dslmodem_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::DslModem),
-        ),
-        (
-            "sensor.unifi_usg_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::InternetGateway),
-        ),
-        (
-            "sensor.unifi_switch_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::NetworkSwitch),
-        ),
-        (
-            "sensor.irheater_energy_total",
-            HaChannel::TotalEnergyConsumption(TotalEnergyConsumption::InfraredHeater),
         ),
         //
         // HEATING DEMAND
@@ -443,6 +326,97 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             Z2mChannel::PowerPlug(
                 CurrentPowerUsage::RoomOfRequirementsDesk,
                 TotalEnergyConsumption::RoomOfRequirementsDesk,
+            ),
+        ),
+    ]
+}
+
+pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
+    vec![
+        //
+        // POWER PLUGS
+        //
+        (
+            "appletv",
+            TasmotaChannel::PowerPlug(CurrentPowerUsage::AppleTv, TotalEnergyConsumption::AppleTv),
+        ),
+        (
+            "tv",
+            TasmotaChannel::PowerPlug(CurrentPowerUsage::Tv, TotalEnergyConsumption::Tv),
+        ),
+        (
+            "fridge",
+            TasmotaChannel::PowerPlug(CurrentPowerUsage::Fridge, TotalEnergyConsumption::Fridge),
+        ),
+        (
+            "dehumidifier",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::Dehumidifier,
+                TotalEnergyConsumption::Dehumidifier,
+            ),
+        ),
+        (
+            "airpurifier",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::AirPurifier,
+                TotalEnergyConsumption::AirPurifier,
+            ),
+        ),
+        (
+            "kettle",
+            TasmotaChannel::PowerPlug(CurrentPowerUsage::Kettle, TotalEnergyConsumption::Kettle),
+        ),
+        (
+            "washer",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::WashingMachine,
+                TotalEnergyConsumption::WashingMachine,
+            ),
+        ),
+        (
+            "couchlight",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::CouchLight,
+                TotalEnergyConsumption::CouchLight,
+            ),
+        ),
+        (
+            "dishwasher",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::Dishwasher,
+                TotalEnergyConsumption::Dishwasher,
+            ),
+        ),
+        (
+            "nuc",
+            TasmotaChannel::PowerPlug(CurrentPowerUsage::Nuc, TotalEnergyConsumption::Nuc),
+        ),
+        (
+            "dslmodem",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::DslModem,
+                TotalEnergyConsumption::DslModem,
+            ),
+        ),
+        (
+            "unifi-usg",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::InternetGateway,
+                TotalEnergyConsumption::InternetGateway,
+            ),
+        ),
+        (
+            "unifi-switch",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::NetworkSwitch,
+                TotalEnergyConsumption::NetworkSwitch,
+            ),
+        ),
+        (
+            "irheater",
+            TasmotaChannel::PowerPlug(
+                CurrentPowerUsage::InfraredHeater,
+                TotalEnergyConsumption::InfraredHeater,
             ),
         ),
     ]

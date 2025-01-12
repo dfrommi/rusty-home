@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use api::state::{
     ChannelValue, CurrentPowerUsage, Opened, RelativeHumidity, Temperature, TotalEnergyConsumption,
 };
@@ -10,7 +8,7 @@ use support::{
     DataPoint,
 };
 
-use crate::core::{IncomingData, IncomingDataProcessor, ItemAvailability};
+use crate::core::{IncomingData, IncomingMqttEventParser, ItemAvailability};
 
 #[derive(Debug, Clone)]
 pub enum Z2mChannel {
@@ -19,153 +17,96 @@ pub enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
 }
 
-pub struct Z2mStateCollector {
+pub struct Z2mMqttParser {
     base_topic: String,
-    rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
-    config: HashMap<String, Vec<Z2mChannel>>,
 }
 
-impl Z2mStateCollector {
-    pub fn new(
-        base_topic: String,
-        rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
-        config: &[(&str, Z2mChannel)],
-    ) -> Self {
-        let mut m: HashMap<String, Vec<Z2mChannel>> = HashMap::new();
-        for (id, channel) in config {
-            let id = id.to_string();
-            m.entry(id).or_default().push(channel.clone());
-        }
-
-        let base_topic = if !base_topic.ends_with('/') {
-            format!("{}/", base_topic)
-        } else {
-            base_topic
-        };
-
+impl Z2mMqttParser {
+    pub fn new(base_topic: String) -> Self {
         Self {
-            base_topic,
-            rx,
-            config: m,
+            base_topic: base_topic.trim_matches('/').to_owned(),
         }
     }
 }
 
-impl IncomingDataProcessor for Z2mStateCollector {
-    async fn process(
-        &mut self,
-        sender: tokio::sync::mpsc::Sender<IncomingData>,
-    ) -> anyhow::Result<()> {
-        loop {
-            let msg = match self.rx.recv().await {
-                Some(msg) => msg,
-                None => {
-                    anyhow::bail!("Event receiver closed");
-                }
-            };
-
-            for event in self.get_events(&msg) {
-                if let Err(e) = sender.send(event.clone()).await {
-                    tracing::error!("Error sending event {:?}: {:?}", event, e);
-                }
-            }
-        }
+impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
+    fn topic_pattern(&self) -> String {
+        format!("{}/#", &self.base_topic)
     }
-}
 
-impl Z2mStateCollector {
-    fn get_friendly_name(&self, topic: &str) -> String {
+    fn device_id(&self, msg: &MqttInMessage) -> String {
+        let topic = &msg.topic;
+
         topic
             .strip_prefix(&self.base_topic)
             .unwrap_or(topic)
+            .trim_matches('/')
             .to_owned()
     }
 
-    fn get_events(&self, msg: &MqttInMessage) -> Vec<IncomingData> {
-        let friendly_name = self.get_friendly_name(&msg.topic);
-        let channels = match self.config.get(&friendly_name) {
-            Some(channels) => channels,
-            None => return vec![],
+    fn get_events(
+        &self,
+        device_id: &str,
+        channel: &Z2mChannel,
+        payload: &str,
+    ) -> anyhow::Result<Vec<IncomingData>> {
+        let result: Vec<IncomingData> = match channel {
+            Z2mChannel::ClimateSensor(t, h) => {
+                let payload: ClimateSensor = serde_json::from_str(payload)?;
+
+                vec![
+                    DataPoint::new(
+                        ChannelValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        ChannelValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                ]
+            }
+
+            Z2mChannel::ContactSensor(opened) => {
+                let payload: ContactSensor = serde_json::from_str(payload)?;
+                vec![
+                    DataPoint::new(
+                        ChannelValue::Opened(opened.clone(), !payload.contact),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                ]
+            }
+
+            Z2mChannel::PowerPlug(power, energy) => {
+                let payload: PowerPlug = serde_json::from_str(payload)?;
+                vec![
+                    DataPoint::new(
+                        ChannelValue::CurrentPowerUsage(
+                            power.clone(),
+                            Watt(payload.current_power_w),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        ChannelValue::TotalEnergyConsumption(
+                            energy.clone(),
+                            KiloWattHours(payload.total_energy_kwh),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                ]
+            }
         };
 
-        channels
-            .iter()
-            .flat_map(
-                |c| match to_data_events(c.clone(), &msg.payload, &friendly_name) {
-                    Ok(events) => events,
-                    Err(e) => {
-                        tracing::error!(
-                            "Error parsing MQTT message: {} for channel {:?}: {:?}",
-                            msg.topic,
-                            c,
-                            e
-                        );
-                        vec![]
-                    }
-                },
-            )
-            .collect()
+        Ok(result)
     }
-}
-
-fn to_data_events(
-    channel: Z2mChannel,
-    payload: &str,
-    friendly_name: &str,
-) -> anyhow::Result<Vec<IncomingData>> {
-    let result: Vec<IncomingData> = match channel {
-        Z2mChannel::ClimateSensor(t, h) => {
-            let payload: ClimateSensor = serde_json::from_str(payload)?;
-
-            vec![
-                DataPoint::new(
-                    ChannelValue::Temperature(t, DegreeCelsius(payload.temperature)),
-                    payload.last_seen,
-                )
-                .into(),
-                DataPoint::new(
-                    ChannelValue::RelativeHumidity(h, Percent(payload.humidity)),
-                    payload.last_seen,
-                )
-                .into(),
-                availability(friendly_name, payload.last_seen),
-            ]
-        }
-
-        Z2mChannel::ContactSensor(opened) => {
-            let payload: ContactSensor = serde_json::from_str(payload)?;
-            vec![
-                DataPoint::new(
-                    ChannelValue::Opened(opened, !payload.contact),
-                    payload.last_seen,
-                )
-                .into(),
-                availability(friendly_name, payload.last_seen),
-            ]
-        }
-
-        Z2mChannel::PowerPlug(power, energy) => {
-            let payload: PowerPlug = serde_json::from_str(payload)?;
-            vec![
-                DataPoint::new(
-                    ChannelValue::CurrentPowerUsage(power, Watt(payload.current_power_w)),
-                    payload.last_seen,
-                )
-                .into(),
-                DataPoint::new(
-                    ChannelValue::TotalEnergyConsumption(
-                        energy,
-                        KiloWattHours(payload.total_energy_kwh),
-                    ),
-                    payload.last_seen,
-                )
-                .into(),
-                availability(friendly_name, payload.last_seen),
-            ]
-        }
-    };
-
-    Ok(result)
 }
 
 fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {

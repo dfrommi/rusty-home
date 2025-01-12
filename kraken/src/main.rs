@@ -1,10 +1,13 @@
 use actix_web::App;
 use anyhow::Context;
 use api::DbEventListener;
-use config::{default_ha_command_config, default_ha_state_config, default_z2m_state_config};
+use config::{
+    default_ha_command_config, default_ha_state_config, default_tasmota_state_config,
+    default_z2m_state_config,
+};
 use core::{
     event::{AppEventListener, CommandAddedEvent},
-    CommandExecutor, IncomingDataProcessor,
+    CommandExecutor, IncomingDataProcessor, IncomingMqttDataProcessor,
 };
 use homeassistant::new_command_executor;
 use monitoring::Monitoring;
@@ -20,6 +23,7 @@ mod core;
 mod energy_meter;
 mod homeassistant;
 mod settings;
+mod tasmota;
 mod z2m;
 
 struct Infrastructure {
@@ -95,6 +99,20 @@ pub async fn main() {
         }
     };
 
+    let tasmota_incoming_data_processing = {
+        let mut tasmota_incoming_data_processor = settings
+            .tasmota
+            .new_incoming_data_processor(&mut infrastructure)
+            .await;
+        let tx = incoming_data_tx.clone();
+        async move {
+            tasmota_incoming_data_processor
+                .process(tx)
+                .await
+                .expect("Error processing Tasmota incoming data");
+        }
+    };
+
     let incoming_data_persisting = {
         let storage = infrastructure.database.clone();
 
@@ -135,6 +153,7 @@ pub async fn main() {
         _ = energy_meter_processing => {},
         _ = ha_incoming_data_processing => {},
         _ = z2m_incoming_data_processing => {},
+        _ = tasmota_incoming_data_processing => {},
         _ = incoming_data_persisting => {},
         _ = execute_commands => {},
         _ = http_server_exec => {},
@@ -174,16 +193,32 @@ impl settings::Zigbee2Mqtt {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl IncomingDataProcessor {
-        let event_rx = infrastructure
-            .subscribe_to_mqtt(format!("{}/#", &self.event_topic).as_str())
-            .await
-            .expect("Error subscribing to MQTT topic");
+        let parser = z2m::Z2mMqttParser::new(self.event_topic.clone());
 
-        z2m::Z2mStateCollector::new(
-            self.event_topic.clone(),
-            event_rx,
+        IncomingMqttDataProcessor::new(
+            parser,
             &default_z2m_state_config(),
+            &mut infrastructure.mqtt_client,
         )
+        .await
+        .expect("Error initializing Z2M state collector")
+    }
+}
+
+impl settings::Tasmota2Mqtt {
+    async fn new_incoming_data_processor(
+        &self,
+        infrastructure: &mut Infrastructure,
+    ) -> impl IncomingDataProcessor {
+        let parser = tasmota::TasmotaMqttParser::new(self.event_topic.clone());
+
+        IncomingMqttDataProcessor::new(
+            parser,
+            &default_tasmota_state_config(),
+            &mut infrastructure.mqtt_client,
+        )
+        .await
+        .expect("Error initializing Tasmota state collector")
     }
 }
 

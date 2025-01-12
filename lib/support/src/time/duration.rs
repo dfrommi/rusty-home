@@ -1,6 +1,6 @@
 use super::DateTime;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct Duration {
     #[serde(with = "duration_format")]

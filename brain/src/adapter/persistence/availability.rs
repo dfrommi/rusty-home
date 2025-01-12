@@ -17,16 +17,16 @@ impl ItemAvailabilitySupportStorage for super::Database {
         for rec in recs.iter() {
             let considered_offline_after =
                 convert_pginterval_to_duration(&rec.considered_offline_after);
-            let last_seen_duration = t!(now).elapsed_since(rec.last_seen.into());
-            let last_updated_duration = t!(now).elapsed_since(rec.entry_updated.into());
+            let duration = std::cmp::max(
+                t!(now).elapsed_since(rec.last_seen.into()),
+                t!(now).elapsed_since(rec.entry_updated.into()),
+            );
 
-            if rec.marked_offline
-                || considered_offline_after < last_seen_duration
-                || considered_offline_after < last_updated_duration
-            {
+            if rec.marked_offline || duration > considered_offline_after {
                 offline_items.push(OfflineItem {
                     source: rec.source.clone(),
                     item: rec.item.clone(),
+                    duration,
                 });
             }
         }

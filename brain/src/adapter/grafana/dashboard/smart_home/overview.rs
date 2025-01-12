@@ -7,7 +7,7 @@ use api::{
     state::Channel,
 };
 use monitoring::TraceContext;
-use support::TypedItem;
+use support::{time::Duration, TypedItem};
 
 use crate::{
     adapter::grafana::{
@@ -246,6 +246,7 @@ where
     struct Row {
         source: String,
         item: String,
+        duration: Duration,
     }
 
     let offline_items = api
@@ -256,6 +257,7 @@ where
     let rows = offline_items.into_iter().map(|item| Row {
         source: item.source,
         item: item.item,
+        duration: item.duration,
     });
 
     csv_response(rows)

@@ -1,6 +1,9 @@
+use support::time::Duration;
+
 pub struct OfflineItem {
     pub source: String,
     pub item: String,
+    pub duration: Duration,
 }
 
 pub trait ItemAvailabilitySupportStorage {

@@ -1,19 +1,20 @@
 use actix_web::App;
 use anyhow::Context;
-use api::DbEventListener;
+use api::{command::Command, DbEventListener};
 use config::{
-    default_ha_command_config, default_ha_state_config, default_tasmota_state_config,
-    default_z2m_state_config,
+    default_ha_command_config, default_ha_state_config, default_tasmota_command_config,
+    default_tasmota_state_config, default_z2m_state_config,
 };
 use core::{
     event::{AppEventListener, CommandAddedEvent},
     CommandExecutor, IncomingDataProcessor, IncomingMqttDataProcessor,
 };
-use homeassistant::new_command_executor;
+use homeassistant::HaCommandExecutor;
 use monitoring::Monitoring;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use support::mqtt::MqttInMessage;
+use tasmota::TasmotaCommandExecutor;
 use tokio::sync::{broadcast::Receiver, mpsc};
 
 use sqlx::PgPool;
@@ -127,9 +128,15 @@ pub async fn main() {
         let command_repo = infrastructure.database.clone();
         let new_cmd_available = infrastructure.new_command_available_listener();
         let ha_cmd_executor = settings.homeassistant.new_command_executor();
+        let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
+
+        let cmd_executor = MultiCommandExecutor {
+            primary: ha_cmd_executor,
+            secondary: tasmota_cmd_executor,
+        };
 
         async move {
-            core::execute_commands(&command_repo, &ha_cmd_executor, new_cmd_available).await;
+            core::execute_commands(&command_repo, &cmd_executor, new_cmd_available).await;
         }
     };
 
@@ -164,7 +171,7 @@ pub async fn main() {
 impl settings::HomeAssitant {
     fn new_command_executor(&self) -> impl CommandExecutor {
         let http_client = homeassistant::HaRestClient::new(&self.url, &self.token);
-        new_command_executor(http_client, &default_ha_command_config())
+        HaCommandExecutor::new(http_client, &default_ha_command_config())
     }
 
     async fn new_incoming_data_processor(
@@ -219,6 +226,35 @@ impl settings::Tasmota2Mqtt {
         )
         .await
         .expect("Error initializing Tasmota state collector")
+    }
+
+    fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor {
+        let tx = infrastructure.mqtt_client.new_publisher();
+        let config = default_tasmota_command_config();
+        TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
+    }
+}
+
+struct MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    primary: A,
+    secondary: B,
+}
+
+impl<A, B> CommandExecutor for MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
+        match self.primary.execute_command(command).await {
+            Ok(true) => Ok(true),
+            Ok(false) => self.secondary.execute_command(command).await,
+            Err(e) => Err(e),
+        }
     }
 }
 

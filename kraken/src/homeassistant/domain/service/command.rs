@@ -41,10 +41,6 @@ impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
         });
 
         if ha_target.is_none() {
-            tracing::debug!(
-                "No HA service configured for command target {:?}",
-                command_target
-            );
             return Ok(false);
         }
 

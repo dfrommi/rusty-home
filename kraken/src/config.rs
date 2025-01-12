@@ -10,19 +10,11 @@ use api::{
 };
 
 use crate::homeassistant::{HaChannel, HaServiceTarget};
-use crate::tasmota::TasmotaChannel;
+use crate::tasmota::{TasmotaChannel, TasmotaCommandTarget};
 use crate::z2m::Z2mChannel;
 
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![
-        (
-            PowerToggle::Dehumidifier.into(),
-            HaServiceTarget::SwitchTurnOnOff("switch.dehumidifier"),
-        ),
-        (
-            PowerToggle::InfraredHeater.into(),
-            HaServiceTarget::SwitchTurnOnOff("switch.irheater"),
-        ),
         (
             PowerToggle::LivingRoomNotificationLight.into(),
             HaServiceTarget::LightTurnOnOff("light.hue_go"),
@@ -66,6 +58,23 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
                 device: EnergySavingDevice::LivingRoomTv,
             },
             HaServiceTarget::LgWebosSmartTv("media_player.lg_webos_smart_tv"),
+        ),
+    ]
+}
+
+pub fn default_tasmota_command_config() -> Vec<(CommandTarget, TasmotaCommandTarget)> {
+    vec![
+        (
+            CommandTarget::SetPower {
+                device: PowerToggle::Dehumidifier,
+            },
+            TasmotaCommandTarget::PowerSwitch("dehumidifier"),
+        ),
+        (
+            CommandTarget::SetPower {
+                device: PowerToggle::InfraredHeater,
+            },
+            TasmotaCommandTarget::PowerSwitch("irheater"),
         ),
     ]
 }

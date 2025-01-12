@@ -52,7 +52,7 @@ async fn process_command(
     }
 
     let res = executor.execute_command(&cmd.command).await;
-    //TODO loop over executors and check bool result
+
     handle_execution_result(cmd.id, res, repo).await;
 }
 
@@ -63,7 +63,11 @@ async fn handle_execution_result(
 ) {
     let set_state_res = match res {
         Ok(true) => repo.set_command_state_success(command_id).await,
-        Ok(false) => Ok(()),
+        Ok(false) => {
+            tracing::error!("No command executor configured for command {}", command_id);
+            repo.set_command_state_error(command_id, "No command executor configured")
+                .await
+        }
         Err(e) => {
             tracing::error!("Command {} failed: {:?}", command_id, e);
             repo.set_command_state_error(command_id, &e.to_string())

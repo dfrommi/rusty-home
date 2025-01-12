@@ -226,13 +226,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "device_tracker.simi_2",
             HaChannel::PresenceFromDeviceTracker(Presence::AtHomeSabine),
         ),
-        //
-        // BUTTON PRESS
-        //
-        (
-            "sensor.bedroom_remote_click",
-            HaChannel::ButtonPress(RemoteTarget::BedroomDoor),
-        ),
     ]
 }
 
@@ -339,6 +332,13 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         (
             "bedroom/bed_sabine_occupancy",
             Z2mChannel::PresenceFromLeakSensor(Presence::BedSabine),
+        ),
+        //
+        // BUTTON PRESS
+        //
+        (
+            "bedroom/remote",
+            Z2mChannel::RemoteClick(RemoteTarget::BedroomDoor),
         ),
     ]
 }

@@ -1,6 +1,9 @@
-use api::state::{
-    ChannelValue, CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature,
-    TotalEnergyConsumption,
+use api::{
+    state::{
+        ChannelValue, CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature,
+        TotalEnergyConsumption,
+    },
+    trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
 };
 use support::{
     mqtt::MqttInMessage,
@@ -17,6 +20,7 @@ pub enum Z2mChannel {
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
     PresenceFromLeakSensor(Presence),
+    RemoteClick(RemoteTarget),
 }
 
 pub struct Z2mMqttParser {
@@ -117,6 +121,28 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
                     availability(device_id, payload.last_seen),
                 ]
             }
+
+            Z2mChannel::RemoteClick(target) => {
+                let payload: RemoteControl = serde_json::from_str(payload)?;
+                let mut events = vec![availability(device_id, payload.last_seen)];
+
+                let button_press = match payload.click.as_deref() {
+                    Some("on") => Some(ButtonPress::TopSingle),
+                    Some("off") => Some(ButtonPress::BottomSingle),
+                    _ => None,
+                };
+
+                if let Some(button_press) = button_press {
+                    events.push(
+                        UserTrigger::Remote(match target {
+                            RemoteTarget::BedroomDoor => Remote::BedroomDoor(button_press),
+                        })
+                        .into(),
+                    );
+                }
+
+                events
+            }
         };
 
         Ok(result)
@@ -158,5 +184,11 @@ struct PowerPlug {
 #[derive(Debug, Clone, serde::Deserialize)]
 struct WaterLeakSensor {
     water_leak: bool,
+    last_seen: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct RemoteControl {
+    click: Option<String>,
     last_seen: DateTime,
 }

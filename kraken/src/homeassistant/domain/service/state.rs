@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::bail;
-use api::{
-    state::ChannelValue,
-    trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
-};
+use api::state::ChannelValue;
 use support::{
     time::DateTime,
-    unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
+    unit::{DegreeCelsius, Percent},
     DataPoint,
 };
 use tokio::sync::mpsc;
@@ -149,26 +146,9 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::Opened(channel) => {
-            Some(DataPoint::new(ChannelValue::Opened(channel, ha_value == "on"), timestamp).into())
-        }
         HaChannel::Powered(channel) => {
             Some(DataPoint::new(ChannelValue::Powered(channel, ha_value == "on"), timestamp).into())
         }
-        HaChannel::CurrentPowerUsage(channel) => Some(
-            DataPoint::new(
-                ChannelValue::CurrentPowerUsage(channel, Watt(ha_value.parse()?)),
-                timestamp,
-            )
-            .into(),
-        ),
-        HaChannel::TotalEnergyConsumption(channel) => Some(
-            DataPoint::new(
-                ChannelValue::TotalEnergyConsumption(channel, KiloWattHours(ha_value.parse()?)),
-                timestamp,
-            )
-            .into(),
-        ),
         HaChannel::SetPoint(channel) => {
             let v = match (
                 ha_value,
@@ -201,9 +181,6 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::PresenceFromLeakSensor(channel) => Some(
-            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp).into(),
-        ),
         HaChannel::PresenceFromEsp(channel) => Some(
             DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp).into(),
         ),
@@ -214,17 +191,6 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::ButtonPress(channel) => match channel {
-            RemoteTarget::BedroomDoor => Some(
-                UserTrigger::Remote(Remote::BedroomDoor(match ha_value {
-                    "on" | "open" => ButtonPress::TopSingle,
-                    "off" | "close" => ButtonPress::BottomSingle,
-                    "" | "unknown" => return Ok(None),
-                    _ => bail!("Unexpected value for button press: {}", ha_value),
-                }))
-                .into(),
-            ),
-        },
     };
 
     Ok(dp)

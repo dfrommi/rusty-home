@@ -62,9 +62,6 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
         use HaServiceTarget::*;
 
         match (ha_target, command) {
-            (SwitchTurnOnOff(id), Command::SetPower { power_on, .. }) => {
-                self.switch_turn_on_off(id, *power_on).await
-            }
             (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => {
                 self.light_turn_on_off(id, *power_on).await
             }
@@ -114,19 +111,6 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }
-    }
-
-    async fn switch_turn_on_off(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
-        let service = if power_on { "turn_on" } else { "turn_off" };
-        self.client
-            .call_service(
-                "switch",
-                service,
-                json!({
-                    "entity_id": vec![id.to_string()],
-                }),
-            )
-            .await
     }
 
     async fn light_turn_on_off(&self, id: &str, power_on: bool) -> anyhow::Result<()> {

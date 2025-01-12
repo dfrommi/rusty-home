@@ -1,8 +1,6 @@
 use ::api::state::{
-    CurrentPowerUsage, ExternalAutoControl, HeatingDemand, Opened, Powered, Presence,
-    RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
+    ExternalAutoControl, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
 };
-use api::trigger::RemoteTarget;
 
 use std::collections::HashMap;
 
@@ -14,22 +12,16 @@ use support::time::DateTime;
 pub enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
-    Opened(Opened),
     Powered(Powered),
-    CurrentPowerUsage(CurrentPowerUsage),
-    TotalEnergyConsumption(TotalEnergyConsumption),
     SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
     ClimateAutoMode(ExternalAutoControl),
-    PresenceFromLeakSensor(Presence),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
-    ButtonPress(RemoteTarget),
 }
 
 #[derive(Debug, Clone)]
 pub enum HaServiceTarget {
-    SwitchTurnOnOff(&'static str),
     LightTurnOnOff(&'static str),
     ClimateControl(&'static str),
     PushNotification(&'static str),

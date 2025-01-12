@@ -1,5 +1,6 @@
 use api::state::{
-    ChannelValue, CurrentPowerUsage, Opened, RelativeHumidity, Temperature, TotalEnergyConsumption,
+    ChannelValue, CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature,
+    TotalEnergyConsumption,
 };
 use support::{
     mqtt::MqttInMessage,
@@ -15,6 +16,7 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
+    PresenceFromLeakSensor(Presence),
 }
 
 pub struct Z2mMqttParser {
@@ -103,6 +105,18 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
                     availability(device_id, payload.last_seen),
                 ]
             }
+
+            Z2mChannel::PresenceFromLeakSensor(presence) => {
+                let payload: WaterLeakSensor = serde_json::from_str(payload)?;
+                vec![
+                    DataPoint::new(
+                        ChannelValue::Presence(presence.clone(), payload.water_leak),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                ]
+            }
         };
 
         Ok(result)
@@ -138,5 +152,11 @@ struct PowerPlug {
     current_power_w: f64,
     #[serde(rename = "energy")]
     total_energy_kwh: f64,
+    last_seen: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct WaterLeakSensor {
+    water_leak: bool,
     last_seen: DateTime,
 }

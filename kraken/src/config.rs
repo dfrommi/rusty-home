@@ -207,14 +207,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // PRESENCE
         //
         (
-            "binary_sensor.bedroom_bed_dennis_occupancy_water_leak",
-            HaChannel::PresenceFromLeakSensor(Presence::BedDennis),
-        ),
-        (
-            "binary_sensor.bedroom_bed_sabine_occupancy_water_leak",
-            HaChannel::PresenceFromLeakSensor(Presence::BedSabine),
-        ),
-        (
             "binary_sensor.esphome_couch_couch_left",
             HaChannel::PresenceFromEsp(Presence::CouchLeft),
         ),
@@ -336,6 +328,17 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 CurrentPowerUsage::RoomOfRequirementsDesk,
                 TotalEnergyConsumption::RoomOfRequirementsDesk,
             ),
+        ),
+        //
+        // PRESENCE
+        //
+        (
+            "bedroom/bed_dennis_occupancy",
+            Z2mChannel::PresenceFromLeakSensor(Presence::BedDennis),
+        ),
+        (
+            "bedroom/bed_sabine_occupancy",
+            Z2mChannel::PresenceFromLeakSensor(Presence::BedSabine),
         ),
     ]
 }

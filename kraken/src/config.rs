@@ -123,14 +123,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //POWERED STATE
         //
         (
-            "switch.dehumidifier",
-            HaChannel::Powered(Powered::Dehumidifier),
-        ),
-        (
-            "switch.irheater",
-            HaChannel::Powered(Powered::InfraredHeater),
-        ),
-        (
             "light.hue_go",
             HaChannel::Powered(Powered::LivingRoomNotificationLight),
         ),
@@ -350,86 +342,97 @@ pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
         //
         (
             "appletv",
-            TasmotaChannel::PowerPlug(CurrentPowerUsage::AppleTv, TotalEnergyConsumption::AppleTv),
+            TasmotaChannel::EnergyMeter(
+                CurrentPowerUsage::AppleTv,
+                TotalEnergyConsumption::AppleTv,
+            ),
         ),
         (
             "tv",
-            TasmotaChannel::PowerPlug(CurrentPowerUsage::Tv, TotalEnergyConsumption::Tv),
+            TasmotaChannel::EnergyMeter(CurrentPowerUsage::Tv, TotalEnergyConsumption::Tv),
         ),
         (
             "fridge",
-            TasmotaChannel::PowerPlug(CurrentPowerUsage::Fridge, TotalEnergyConsumption::Fridge),
+            TasmotaChannel::EnergyMeter(CurrentPowerUsage::Fridge, TotalEnergyConsumption::Fridge),
         ),
         (
             "dehumidifier",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::Dehumidifier,
                 TotalEnergyConsumption::Dehumidifier,
             ),
         ),
         (
+            "dehumidifier",
+            TasmotaChannel::PowerToggle(Powered::Dehumidifier),
+        ),
+        (
             "airpurifier",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::AirPurifier,
                 TotalEnergyConsumption::AirPurifier,
             ),
         ),
         (
             "kettle",
-            TasmotaChannel::PowerPlug(CurrentPowerUsage::Kettle, TotalEnergyConsumption::Kettle),
+            TasmotaChannel::EnergyMeter(CurrentPowerUsage::Kettle, TotalEnergyConsumption::Kettle),
         ),
         (
             "washer",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::WashingMachine,
                 TotalEnergyConsumption::WashingMachine,
             ),
         ),
         (
             "couchlight",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::CouchLight,
                 TotalEnergyConsumption::CouchLight,
             ),
         ),
         (
             "dishwasher",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::Dishwasher,
                 TotalEnergyConsumption::Dishwasher,
             ),
         ),
         (
             "nuc",
-            TasmotaChannel::PowerPlug(CurrentPowerUsage::Nuc, TotalEnergyConsumption::Nuc),
+            TasmotaChannel::EnergyMeter(CurrentPowerUsage::Nuc, TotalEnergyConsumption::Nuc),
         ),
         (
             "dslmodem",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::DslModem,
                 TotalEnergyConsumption::DslModem,
             ),
         ),
         (
             "unifi-usg",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::InternetGateway,
                 TotalEnergyConsumption::InternetGateway,
             ),
         ),
         (
             "unifi-switch",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::NetworkSwitch,
                 TotalEnergyConsumption::NetworkSwitch,
             ),
         ),
         (
             "irheater",
-            TasmotaChannel::PowerPlug(
+            TasmotaChannel::EnergyMeter(
                 CurrentPowerUsage::InfraredHeater,
                 TotalEnergyConsumption::InfraredHeater,
             ),
+        ),
+        (
+            "irheater",
+            TasmotaChannel::PowerToggle(Powered::InfraredHeater),
         ),
     ]
 }

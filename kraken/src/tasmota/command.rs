@@ -26,6 +26,7 @@ impl TasmotaCommandExecutor {
 }
 
 impl CommandExecutor for TasmotaCommandExecutor {
+    #[tracing::instrument(ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let cmd_target: CommandTarget = command.into();
         let tasmota_target = self.config.iter().find_map(|(cmd, tasmota)| {

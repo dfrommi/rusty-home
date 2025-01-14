@@ -31,9 +31,7 @@ where
             m.entry(id).or_default().push(channel.clone());
         }
 
-        let rx = mqtt_client
-            .subscribe(parser.topic_pattern().as_str())
-            .await?;
+        let rx = mqtt_client.subscribe_all(&parser.topic_patterns()).await?;
 
         Ok(Self {
             inner: parser,
@@ -60,11 +58,14 @@ where
                 }
             };
 
-            let device_id = self.inner.device_id(&msg);
+            let device_id = match self.inner.device_id(&msg) {
+                Some(device_id) => device_id,
+                None => continue,
+            };
 
             let channels = match self.config.get(&device_id) {
                 Some(channels) => {
-                    tracing::debug!("Received event for device {}", device_id,);
+                    tracing::debug!("Received event for device {}: {:?}", device_id, channels);
                     channels
                 }
                 None => continue,

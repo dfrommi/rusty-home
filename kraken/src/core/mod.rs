@@ -30,8 +30,8 @@ pub struct ItemAvailability {
 }
 
 pub trait IncomingMqttEventParser<C> {
-    fn topic_pattern(&self) -> String;
-    fn device_id(&self, msg: &MqttInMessage) -> String;
+    fn topic_patterns(&self) -> Vec<String>;
+    fn device_id(&self, msg: &MqttInMessage) -> Option<String>;
     fn get_events(
         &self,
         device_id: &str,

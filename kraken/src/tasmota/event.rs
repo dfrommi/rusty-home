@@ -1,6 +1,8 @@
+use anyhow::bail;
 use api::state::ChannelValue;
 use support::{
     mqtt::MqttInMessage,
+    t,
     time::DateTime,
     unit::{KiloWattHours, Watt},
     DataPoint,
@@ -12,30 +14,43 @@ use super::TasmotaChannel;
 
 pub struct TasmotaMqttParser {
     tele_base_topic: String,
+    stat_base_topic: String,
 }
 
 impl TasmotaMqttParser {
     pub fn new(base_topic: String) -> Self {
-        let tele_base_topic = format!("{}/tele", base_topic.trim_matches('/'));
-        Self { tele_base_topic }
+        let base_topic = base_topic.trim_matches('/');
+
+        Self {
+            tele_base_topic: format!("{}/tele", base_topic),
+            stat_base_topic: format!("{}/stat", base_topic),
+        }
     }
 }
 
 impl IncomingMqttEventParser<TasmotaChannel> for TasmotaMqttParser {
-    fn topic_pattern(&self) -> String {
-        format!("{}/+/SENSOR", &self.tele_base_topic)
+    fn topic_patterns(&self) -> Vec<String> {
+        vec![
+            format!("{}/+/SENSOR", &self.tele_base_topic),
+            format!("{}/+/POWER", &self.stat_base_topic),
+        ]
     }
 
-    fn device_id(&self, msg: &MqttInMessage) -> String {
+    fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
         let topic = &msg.topic;
 
-        topic
-            .strip_prefix(&self.tele_base_topic)
-            .unwrap_or(topic)
-            .strip_suffix("/SENSOR")
-            .unwrap_or(topic)
-            .trim_matches('/')
-            .to_owned()
+        if topic.starts_with(self.tele_base_topic.as_str()) {
+            topic
+                .strip_prefix(&self.tele_base_topic)
+                .and_then(|topic| topic.strip_suffix("/SENSOR"))
+        } else if topic.starts_with(self.stat_base_topic.as_str()) {
+            topic
+                .strip_prefix(&self.stat_base_topic)
+                .and_then(|topic| topic.strip_suffix("/POWER"))
+        } else {
+            None
+        }
+        .map(|topic| topic.trim_matches('/').to_owned())
     }
 
     fn get_events(
@@ -44,36 +59,59 @@ impl IncomingMqttEventParser<TasmotaChannel> for TasmotaMqttParser {
         channel: &TasmotaChannel,
         payload: &str,
     ) -> anyhow::Result<Vec<IncomingData>> {
-        let tele_message: TeleMessage = serde_json::from_str(payload)?;
+        match channel {
+            TasmotaChannel::EnergyMeter(power, energy) => {
+                let tele_message: TeleMessage = serde_json::from_str(payload)?;
 
-        match (channel, &tele_message.payload) {
-            (
-                TasmotaChannel::PowerPlug(power, energy),
-                TeleMessagePayload::EnergyReport(energy_report),
-            ) => Ok(vec![
-                DataPoint::new(
-                    ChannelValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
-                    tele_message.time,
-                )
-                .into(),
-                DataPoint::new(
-                    ChannelValue::TotalEnergyConsumption(
-                        energy.clone(),
-                        KiloWattHours(energy_report.total),
-                    ),
-                    tele_message.time,
-                )
-                .into(),
-                ItemAvailability {
-                    source: "Tasmota".to_string(),
-                    item: device_id.to_string(),
-                    last_seen: tele_message.time,
-                    marked_offline: false,
+                match &tele_message.payload {
+                    TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
+                        DataPoint::new(
+                            ChannelValue::CurrentPowerUsage(
+                                power.clone(),
+                                Watt(energy_report.power),
+                            ),
+                            tele_message.time,
+                        )
+                        .into(),
+                        DataPoint::new(
+                            ChannelValue::TotalEnergyConsumption(
+                                energy.clone(),
+                                KiloWattHours(energy_report.total),
+                            ),
+                            tele_message.time,
+                        )
+                        .into(),
+                        ItemAvailability {
+                            source: "Tasmota".to_string(),
+                            item: device_id.to_string(),
+                            last_seen: tele_message.time,
+                            marked_offline: false,
+                        }
+                        .into(),
+                    ]),
+
+                    _ => Ok(vec![]),
                 }
-                .into(),
-            ]),
+            }
 
-            _ => Ok(vec![]),
+            //No timestamp available in Tasmota. TODO: trigger update of state on startup
+            TasmotaChannel::PowerToggle(powered) => match payload {
+                "ON" => Ok(vec![DataPoint::new(
+                    ChannelValue::Powered(powered.clone(), true),
+                    t!(now),
+                )
+                .into()]),
+                "OFF" => Ok(vec![DataPoint::new(
+                    ChannelValue::Powered(powered.clone(), false),
+                    t!(now),
+                )
+                .into()]),
+                _ => bail!(
+                    "Unexpected payload for PowerToggle {}: {}",
+                    device_id,
+                    payload
+                ),
+            },
         }
     }
 }

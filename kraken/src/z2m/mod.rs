@@ -36,18 +36,16 @@ impl Z2mMqttParser {
 }
 
 impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
-    fn topic_pattern(&self) -> String {
-        format!("{}/#", &self.base_topic)
+    fn topic_patterns(&self) -> Vec<String> {
+        vec![format!("{}/#", &self.base_topic)]
     }
 
-    fn device_id(&self, msg: &MqttInMessage) -> String {
+    fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
         let topic = &msg.topic;
 
         topic
             .strip_prefix(&self.base_topic)
-            .unwrap_or(topic)
-            .trim_matches('/')
-            .to_owned()
+            .map(|topic| topic.trim_matches('/').to_owned())
     }
 
     fn get_events(

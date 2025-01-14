@@ -1,14 +1,15 @@
 mod command;
 mod event;
 
-use api::state::{CurrentPowerUsage, TotalEnergyConsumption};
+use api::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption};
 
 pub use command::TasmotaCommandExecutor;
 pub use event::TasmotaMqttParser;
 
 #[derive(Debug, Clone)]
 pub enum TasmotaChannel {
-    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
+    EnergyMeter(CurrentPowerUsage, TotalEnergyConsumption),
+    PowerToggle(Powered),
 }
 
 #[derive(Debug, Clone)]

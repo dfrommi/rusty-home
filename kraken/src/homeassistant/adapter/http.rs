@@ -46,6 +46,7 @@ impl GetAllEntityStatesPort for HaRestClient {
 }
 
 impl CallServicePort for HaRestClient {
+    #[tracing::instrument(skip(self))]
     async fn call_service(
         &self,
         domain: &str,

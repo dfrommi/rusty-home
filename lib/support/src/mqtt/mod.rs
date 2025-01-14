@@ -67,23 +67,31 @@ impl Mqtt {
         &mut self,
         topic: impl Into<String>,
     ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
-        let topic = topic.into();
+        self.subscribe_all(&[topic.into()]).await
+    }
 
-        tracing::info!("Subscribing to topic: {:?}", &topic);
-
+    pub async fn subscribe_all(
+        &mut self,
+        topic: &[String],
+    ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
-        self.subsciptions.push(tx);
 
-        self.client
-            .subscribe_with_properties(
-                topic,
-                QoS::AtLeastOnce,
-                SubscribeProperties {
-                    id: Some(self.subsciptions.len()), //must be > 0
-                    user_properties: vec![],
-                },
-            )
-            .await?;
+        for topic in topic {
+            tracing::info!("Subscribing to topic: {:?}", &topic);
+
+            self.subsciptions.push(tx.clone());
+
+            self.client
+                .subscribe_with_properties(
+                    topic,
+                    QoS::AtLeastOnce,
+                    SubscribeProperties {
+                        id: Some(self.subsciptions.len()), //must be > 0
+                        user_properties: vec![],
+                    },
+                )
+                .await?;
+        }
 
         Ok(rx)
     }
@@ -160,6 +168,8 @@ impl Mqtt {
 
         tasks.spawn(async move {
             while let Some(cmd) = self.publisher_rx.recv().await {
+                tracing::debug!("Publishing MQTT message to {}: {:?}", cmd.topic, cmd);
+
                 if let Err(e) = client
                     .publish(cmd.topic.clone(), QoS::ExactlyOnce, cmd.retain, cmd.payload)
                     .await

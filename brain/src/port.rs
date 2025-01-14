@@ -112,5 +112,5 @@ pub trait UserTriggerAccess {
         &self,
         target: &UserTriggerTarget,
         since: DateTime,
-    ) -> anyhow::Result<Option<UserTrigger>>;
+    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>>;
 }

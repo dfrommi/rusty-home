@@ -39,20 +39,26 @@ where
             }
         };
 
-        let latest_trigger = api.latest_since(&self.target, start_of_range).await?;
+        let (latest_trigger, trigger_time) =
+            match api.latest_since(&self.target, start_of_range).await? {
+                Some(dp) => (dp.value, dp.timestamp),
+                None => {
+                    tracing::trace!("No user-trigger found, skipping");
+                    return Ok(ActionEvaluationResult::Skip);
+                }
+            };
 
-        let command = match latest_trigger.and_then(into_command) {
+        let command = match into_command(latest_trigger) {
             Some(c) => c,
             None => {
-                tracing::trace!("No user-trigger found, skipping");
+                tracing::trace!("Trigger not handled by this action, skipping");
                 return Ok(ActionEvaluationResult::Skip);
             }
         };
 
         let source = self.source();
 
-        let fulfilled =
-            trigger_once_and_keep_running(&command, &source, start_of_range, api).await?;
+        let fulfilled = trigger_once_and_keep_running(&command, &source, trigger_time, api).await?;
 
         if !fulfilled {
             tracing::trace!("User-trigger action skipped due to one-shot conditions");

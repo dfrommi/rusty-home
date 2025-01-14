@@ -1,6 +1,6 @@
 use anyhow::Context;
 use api::trigger::{UserTrigger, UserTriggerTarget};
-use support::{t, time::DateTime};
+use support::{t, time::DateTime, DataPoint};
 
 use crate::port::{UserTriggerAccess, UserTriggerExecutor};
 
@@ -28,11 +28,11 @@ impl UserTriggerAccess for super::Database {
         &self,
         target: &UserTriggerTarget,
         since: DateTime,
-    ) -> anyhow::Result<Option<UserTrigger>> {
+    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
         let db_target = serde_json::json!(target);
 
         let rec = sqlx::query!(
-            r#"SELECT trigger FROM user_trigger
+            r#"SELECT trigger, timestamp FROM user_trigger
                 WHERE trigger @> $1
                 AND timestamp >= $2
                 AND timestamp <= $3
@@ -45,10 +45,15 @@ impl UserTriggerAccess for super::Database {
         .fetch_optional(&self.pool)
         .await?;
 
-        match rec {
-            Some(row) => Ok(Some(serde_json::from_value(row.trigger)?)),
-            None => Ok(None),
-        }
+        let result = match rec {
+            Some(row) => Some(DataPoint::new(
+                serde_json::from_value(row.trigger)?,
+                row.timestamp.into(),
+            )),
+            None => None,
+        };
+
+        Ok(result)
     }
 }
 
@@ -84,7 +89,10 @@ mod tests {
 
         assert!(matches!(
             latest_trigger,
-            Some(UserTrigger::Homekit(Homekit::InfraredHeaterPower(false)))
+            Some(DataPoint {
+                value: UserTrigger::Homekit(Homekit::InfraredHeaterPower(false)),
+                ..
+            })
         ));
     }
 }

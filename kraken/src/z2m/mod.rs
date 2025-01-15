@@ -124,7 +124,7 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
                 let payload: RemoteControl = serde_json::from_str(payload)?;
                 let mut events = vec![availability(device_id, payload.last_seen)];
 
-                let button_press = match payload.click.as_deref() {
+                let button_press = match payload.action.as_deref() {
                     Some("on") => Some(ButtonPress::TopSingle),
                     Some("off") => Some(ButtonPress::BottomSingle),
                     _ => None,
@@ -187,6 +187,6 @@ struct WaterLeakSensor {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct RemoteControl {
-    click: Option<String>,
+    action: Option<String>,
     last_seen: DateTime,
 }

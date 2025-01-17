@@ -5,6 +5,7 @@ mod support;
 
 use std::sync::Arc;
 
+use ::support::ExternalId;
 use actix_web::{
     web::{self},
     HttpResponse, ResponseError,
@@ -55,11 +56,11 @@ type GrafanaResponse = Result<HttpResponse, GrafanaApiError>;
 
 #[derive(Debug, Error, Display)]
 enum GrafanaApiError {
-    #[display("Channel not found: type={_0} / name={_1}")]
-    ChannelNotFound(String, String),
+    #[display("Channel not found: {_0}")]
+    ChannelNotFound(#[error(not(source))] ExternalId),
 
-    #[display("Channel not supported: type={_0} / name={_1}")]
-    ChannelUnsupported(String, String),
+    #[display("Channel not supported: {_0}")]
+    ChannelUnsupported(#[error(not(source))] ExternalId),
 
     #[display("Error accessing data")]
     DataAccessError(anyhow::Error),
@@ -78,9 +79,9 @@ impl ResponseError for GrafanaApiError {
         tracing::warn!("GrafanaApiError: {:?}", self);
 
         match self {
-            GrafanaApiError::ChannelNotFound(_, _) => StatusCode::NOT_FOUND,
+            GrafanaApiError::ChannelNotFound(_) => StatusCode::NOT_FOUND,
             GrafanaApiError::NotFound => StatusCode::NOT_FOUND,
-            GrafanaApiError::ChannelUnsupported(_, _) => StatusCode::BAD_REQUEST,
+            GrafanaApiError::ChannelUnsupported(_) => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

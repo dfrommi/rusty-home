@@ -1,7 +1,5 @@
-use std::fmt::Display;
-
 use db::DbValue;
-use r#macro::{DbMapped, EnumVariants, StateChannel, TypedItem};
+use r#macro::{DbMapped, EnumVariants, Id, StateChannel};
 use support::unit::*;
 
 pub mod db;
@@ -70,7 +68,7 @@ impl From<(Channel, DbValue)> for ChannelValue {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 //TODO remove EnumVariants, only for state-debug
 pub enum Temperature {
     Outside,
@@ -83,7 +81,7 @@ pub enum Temperature {
     Dehumidifier,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
     Outside,
     LivingRoomDoor,
@@ -95,7 +93,7 @@ pub enum RelativeHumidity {
     Dehumidifier,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum Opened {
     KitchenWindow,
     BedroomWindow,
@@ -108,7 +106,7 @@ pub enum Opened {
     RoomOfRequirementsWindowSide,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum Powered {
     Dehumidifier,
     LivingRoomNotificationLight,
@@ -116,7 +114,7 @@ pub enum Powered {
     LivingRoomTv,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum CurrentPowerUsage {
     Fridge,
     Dehumidifier,
@@ -137,7 +135,7 @@ pub enum CurrentPowerUsage {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TotalEnergyConsumption {
     Fridge,
     Dehumidifier,
@@ -158,7 +156,7 @@ pub enum TotalEnergyConsumption {
     InfraredHeater,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum SetPoint {
     LivingRoom,
     Bedroom,
@@ -167,7 +165,7 @@ pub enum SetPoint {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum HeatingDemand {
     LivingRoom,
     Bedroom,
@@ -176,7 +174,7 @@ pub enum HeatingDemand {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum ExternalAutoControl {
     LivingRoomThermostat,
     BedroomThermostat,
@@ -185,7 +183,7 @@ pub enum ExternalAutoControl {
     BathroomThermostat,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,
@@ -196,7 +194,7 @@ pub enum Presence {
     CouchRight,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum TotalRadiatorConsumption {
     LivingRoomBig,
     LivingRoomSmall,
@@ -206,7 +204,7 @@ pub enum TotalRadiatorConsumption {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, TypedItem)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum TotalWaterConsumption {
     KitchenCold,
     KitchenWarm,

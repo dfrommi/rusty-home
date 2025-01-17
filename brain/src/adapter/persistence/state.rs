@@ -10,7 +10,7 @@ use api::{
     get_tag_id,
     state::{db::DbValue, Channel, ChannelValue},
 };
-use support::{t, time::DateTimeRange, DataFrame, DataPoint, ValueObject};
+use support::{t, time::DateTimeRange, DataFrame, DataPoint, ExternalId, ValueObject};
 
 impl super::Database {
     fn ts_caching_range(&self) -> DateTimeRange {
@@ -117,15 +117,20 @@ impl DataPointStore for super::Database {
         let dps: Vec<DataPoint<ChannelValue>> = recs
             .into_iter()
             .filter_map(|row| {
-                let target = Channel::from_type_and_item(row.channel.as_str(), row.name.as_str());
+                let external_id = ExternalId::new(row.channel.as_str(), row.name.as_str());
 
-                match target {
-                    Some(target) => Some(DataPoint {
+                match Channel::try_from(external_id) {
+                    Ok(target) => Some(DataPoint {
                         value: ChannelValue::from((target, row.value)),
                         timestamp: row.timestamp.into(),
                     }),
-                    None => {
-                        tracing::warn!("Received unsupported channel {}/{}", row.channel, row.name);
+                    Err(e) => {
+                        tracing::warn!(
+                            "Received unsupported channel {}/{}: {:?}",
+                            row.channel,
+                            row.name,
+                            e
+                        );
                         None
                     }
                 }

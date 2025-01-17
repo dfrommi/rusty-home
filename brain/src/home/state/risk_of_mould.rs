@@ -1,16 +1,16 @@
 use api::state::RelativeHumidity;
-use r#macro::TypedItem;
+use r#macro::Id;
 use support::{
     t,
     unit::{DegreeCelsius, Percent},
-    DataPoint, TypedItem as _, ValueObject,
+    DataPoint, InternalId, ValueObject,
 };
 
 use anyhow::Result;
 
 use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, TypedItem)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Id)]
 pub enum RiskOfMould {
     Bathroom,
 }
@@ -24,6 +24,8 @@ where
     T: DataPointAccess<RelativeHumidity> + DataPointAccess<DewPoint> + TimeSeriesAccess<DewPoint>,
 {
     async fn current_data_point(&self, item: RiskOfMould) -> Result<DataPoint<bool>> {
+        let int_id = InternalId::from(&item);
+
         let humidity = self
             .current_data_point(match item {
                 RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
@@ -32,8 +34,8 @@ where
 
         if humidity.value < Percent(70.0) {
             tracing::trace!(
-                item_type = %item.type_name(),
-                item_name = %item.item_name(),
+                item_type = %int_id.type_,
+                item_name = %int_id.name,
                 humidity = %humidity.value,
                 result = false,
                 "Humidity of shower-sensor is below 70%, no risk of mould"
@@ -56,8 +58,8 @@ where
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
         tracing::trace!(
-            item_type = %item.type_name(),
-            item_name = %item.item_name(),
+            item_type = %int_id.type_,
+            item_name = %int_id.name,
             result = risk,
             humidity = %humidity.value,
             dewpoint_item = %this_dp.value,

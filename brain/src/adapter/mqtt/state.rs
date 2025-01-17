@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
 use api::state::Powered;
-use support::{mqtt::MqttOutMessage, ValueObject};
+use support::{mqtt::MqttOutMessage, ExternalId, ValueObject};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::{core::event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};
-
-use support::TypedItem;
 
 use super::MqttStateValue;
 
@@ -50,29 +48,30 @@ impl MqttStateSender {
 
     async fn send<'a, 'b: 'a, API, T>(&'a mut self, state: T, api: &'b API)
     where
-        T: TypedItem + ValueObject + Clone,
+        T: Into<ExternalId> + ValueObject + Clone,
         T::ValueType: Into<MqttStateValue>,
         API: DataPointAccess<T>,
     {
         let value = match api.current(state.clone()).await {
             Ok(v) => v.into(),
             Err(e) => {
+                let external_id = state.into();
                 tracing::error!(
                     "Error getting current value of {}/{} for sending to MQTT: {:?}",
-                    state.type_name(),
-                    state.item_name(),
+                    external_id.type_,
+                    external_id.name,
                     e
                 );
                 return;
             }
         };
 
+        let external_id = state.into();
+
         let msg = MqttOutMessage {
             topic: format!(
                 "{}/{}/{}",
-                self.base_topic,
-                state.type_name(),
-                state.item_name()
+                self.base_topic, external_id.type_, external_id.name
             ),
             payload: value.0,
             retain: true,

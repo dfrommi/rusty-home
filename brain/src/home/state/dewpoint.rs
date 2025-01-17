@@ -7,7 +7,7 @@ use super::*;
 use anyhow::Result;
 use api::state::{RelativeHumidity, Temperature};
 
-use r#macro::{EnumVariants, TypedItem};
+use r#macro::{EnumVariants, Id};
 use support::{
     time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
@@ -15,7 +15,7 @@ use support::{
 };
 use tokio::try_join;
 
-#[derive(Debug, Clone, TypedItem, EnumVariants)]
+#[derive(Debug, Clone, Id, EnumVariants)]
 pub enum DewPoint {
     BathroomShower,
     LivingRoomDoor,

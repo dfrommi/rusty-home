@@ -50,7 +50,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         // Define the Channel enum
-        #[derive(Debug, Clone, Hash, Eq, PartialEq, r#macro::TypedItemDelegation)]
+        #[derive(Debug, Clone, Hash, Eq, PartialEq, r#macro::IdDelegation)]
         pub enum #target_enum_name {
             #(#target_variants),*
         }

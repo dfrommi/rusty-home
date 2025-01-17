@@ -4,9 +4,9 @@ use actix_web::{
     web::{self, Query},
     Responder,
 };
-use api::state::{HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::TypedItem;
-use support::{time::DateTime, DataPoint};
+use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
+use support::InternalId;
+use support::{time::DateTime, DataPoint, ExternalId};
 
 use crate::{
     adapter::grafana::{support::csv_response, GrafanaApiError},
@@ -41,15 +41,8 @@ struct Row {
     value: f64,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
-struct TypeAndItem {
-    #[serde(rename = "type")]
-    type_: String,
-    item: String,
-}
-
-fn supported_channels() -> Vec<TypeAndItem> {
-    let mut supported_channels: Vec<TypeAndItem> = vec![];
+fn supported_channels() -> Vec<ExternalId> {
+    let mut supported_channels: Vec<ExternalId> = vec![];
     supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.into()));
     supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.into()));
     supported_channels.extend(Temperature::variants().iter().map(|c| c.into()));
@@ -59,17 +52,8 @@ fn supported_channels() -> Vec<TypeAndItem> {
     supported_channels
 }
 
-impl<T: TypedItem> From<&T> for TypeAndItem {
-    fn from(val: &T) -> Self {
-        TypeAndItem {
-            type_: val.type_name().to_string(),
-            item: val.item_name().to_string(),
-        }
-    }
-}
-
 async fn get_types() -> impl Responder {
-    csv_response(&supported_channels())
+    csv_response(supported_channels())
 }
 
 async fn get_items(path: web::Path<String>) -> impl Responder {
@@ -78,13 +62,13 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
     let supported_channels = supported_channels();
     let items = supported_channels.iter().filter_map(|c| {
         if type_ == c.type_ {
-            Some(c.item.to_owned())
+            Some(c.name.to_owned())
         } else {
             None
         }
     });
 
-    csv_response(&items.collect::<Vec<_>>())
+    csv_response(items.collect::<Vec<_>>())
 }
 
 async fn state_ts<T>(
@@ -98,33 +82,19 @@ where
         + TimeSeriesAccess<Temperature>
         + TimeSeriesAccess<RelativeHumidity>,
 {
-    macro_rules! from_type_and_item {
-        ($type:ident) => {
-            get_rows(
-                $type::from_item_name(&path.1).ok_or(GrafanaApiError::ChannelNotFound(
-                    path.0.to_string(),
-                    path.1.to_string(),
-                ))?,
-                api.as_ref(),
-                &time_range,
-            )
-            .await
-        };
-    }
+    let external_id = ExternalId::new(path.0.as_str(), path.1.as_str());
+    let channel = Channel::try_from(&external_id)
+        .map_err(|_| GrafanaApiError::ChannelNotFound(external_id.clone()))?;
 
-    let mut rows = match path.0.as_str() {
-        TotalEnergyConsumption::TYPE_NAME => from_type_and_item!(TotalEnergyConsumption),
-        HeatingDemand::TYPE_NAME => from_type_and_item!(HeatingDemand),
-        Temperature::TYPE_NAME => from_type_and_item!(Temperature),
-        RelativeHumidity::TYPE_NAME => from_type_and_item!(RelativeHumidity),
-        DewPoint::TYPE_NAME => from_type_and_item!(DewPoint),
+    let mut rows = match channel {
+        Channel::Temperature(item) => get_rows(item, api.as_ref(), &time_range).await?,
+        Channel::RelativeHumidity(item) => get_rows(item, api.as_ref(), &time_range).await?,
+        Channel::TotalEnergyConsumption(item) => get_rows(item, api.as_ref(), &time_range).await?,
+        Channel::HeatingDemand(item) => get_rows(item, api.as_ref(), &time_range).await?,
         _ => {
-            return Err(GrafanaApiError::ChannelUnsupported(
-                path.0.to_string(),
-                path.1.to_string(),
-            ))
+            return Err(GrafanaApiError::ChannelUnsupported(external_id));
         }
-    }?;
+    };
 
     rows.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(Ordering::Equal));
 
@@ -140,7 +110,7 @@ async fn get_rows<T>(
     time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
-    T: Estimatable + Clone + TypedItem,
+    T: Estimatable + Clone + Into<InternalId>,
     T::Type: AsRef<f64>,
 {
     let ts = api
@@ -153,12 +123,14 @@ where
         .filter_map(|t| ts.at(t))
         .collect::<Vec<_>>();
 
+    let int_id: InternalId = item.into();
+
     let rows: Vec<Row> = dps
         .iter()
         .map(|dp| Row {
             timestamp: dp.timestamp,
-            type_: item.type_name().to_string(),
-            item: item.item_name().to_string(),
+            type_: int_id.type_.to_string(),
+            item: int_id.name.to_string(),
             value: *dp.value.as_ref(),
         })
         .collect();

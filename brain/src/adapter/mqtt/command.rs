@@ -1,8 +1,9 @@
+use anyhow::bail;
 use api::{
     state::Powered,
     trigger::{Homekit, UserTrigger},
 };
-use support::mqtt::MqttInMessage;
+use support::{mqtt::MqttInMessage, ExternalId};
 use tokio::sync::mpsc::Receiver;
 
 use crate::{home::state::EnergySaving, port::UserTriggerExecutor};
@@ -47,27 +48,27 @@ fn to_command(
     item_name: &str,
     value: MqttStateValue,
 ) -> anyhow::Result<UserTrigger> {
-    match type_name {
-        Powered::TYPE_NAME => match Powered::from_item_name(item_name) {
-            Some(Powered::Dehumidifier) => Ok(UserTrigger::Homekit(Homekit::DehumidifierPower(
+    let external_id = ExternalId::new(type_name, item_name);
+
+    if let Ok(powered) = Powered::try_from(&external_id) {
+        return match powered {
+            Powered::Dehumidifier => Ok(UserTrigger::Homekit(Homekit::DehumidifierPower(
                 value.try_into()?,
             ))),
-            Some(Powered::InfraredHeater) => Ok(UserTrigger::Homekit(
-                Homekit::InfraredHeaterPower(value.try_into()?),
-            )),
-            Some(_) => Err(anyhow::anyhow!("Powered-item {} not supported", item_name)),
-            None => Err(anyhow::anyhow!("Powered-item {} not found", item_name)),
-        },
-        EnergySaving::TYPE_NAME => match EnergySaving::from_item_name(item_name) {
-            Some(EnergySaving::LivingRoomTv) => Ok(UserTrigger::Homekit(
+            Powered::InfraredHeater => Ok(UserTrigger::Homekit(Homekit::InfraredHeaterPower(
+                value.try_into()?,
+            ))),
+            _ => bail!("Powered-item {} not supported", item_name),
+        };
+    }
+
+    if let Ok(energy_saving) = EnergySaving::try_from(&external_id) {
+        return match energy_saving {
+            EnergySaving::LivingRoomTv => Ok(UserTrigger::Homekit(
                 Homekit::LivingRoomTvEnergySaving(value.try_into()?),
             )),
-            None => Err(anyhow::anyhow!("EnergySaving-item {} not found", item_name)),
-        },
-        _ => Err(anyhow::anyhow!(
-            "Device {} channel {} not supported",
-            type_name,
-            item_name
-        )),
+        };
     }
+
+    bail!("Device {}/{} not supported", type_name, item_name)
 }

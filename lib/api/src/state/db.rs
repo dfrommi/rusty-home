@@ -2,7 +2,7 @@ use anyhow::Context;
 use cached::proc_macro::cached;
 use derive_more::derive::AsRef;
 use sqlx::PgPool;
-use support::TypedItem;
+use support::ExternalId;
 
 use super::*;
 
@@ -16,8 +16,7 @@ pub async fn get_tag_id(
     channel: Channel,
     create_if_missing: bool,
 ) -> anyhow::Result<i64> {
-    let channel_name = channel.type_name();
-    let device_name = channel.item_name();
+    let external_id: ExternalId = channel.into();
 
     let tag_id = if create_if_missing {
         sqlx::query_scalar!(
@@ -35,15 +34,15 @@ pub async fn get_tag_id(
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            channel_name,
-            device_name
+            external_id.type_,
+            external_id.name
         )
         .fetch_one(db_pool)
         .await
         .with_context(|| {
             format!(
                 "Error getting or creating tag id for {}/{}",
-                channel_name, device_name
+                external_id.type_, external_id.name
             )
         })
     } else {
@@ -52,12 +51,17 @@ pub async fn get_tag_id(
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            channel_name,
-            device_name
+            external_id.type_,
+            external_id.name
         )
         .fetch_one(db_pool)
         .await
-        .with_context(|| format!("Error getting tag id for {}/{}", channel_name, device_name))
+        .with_context(|| {
+            format!(
+                "Error getting tag id for {}/{}",
+                external_id.type_, external_id.name
+            )
+        })
     }?;
 
     Ok(tag_id as i64)

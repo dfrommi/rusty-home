@@ -9,4 +9,4 @@ mod mapping;
 
 pub use data::DataFrame;
 pub use data::DataPoint;
-pub use mapping::{TypedItem, ValueObject};
+pub use mapping::{ExternalId, InternalId, ValueObject};

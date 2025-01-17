@@ -1,7 +1,7 @@
 mod db_mapped;
 mod enum_variants;
+mod id_item;
 mod state_channel_derive;
-mod typed_item;
 
 use proc_macro::TokenStream;
 
@@ -15,14 +15,14 @@ pub fn db_mapped_derive(input: TokenStream) -> TokenStream {
     db_mapped::db_mapped(input)
 }
 
-#[proc_macro_derive(TypedItem)]
-pub fn typed_item_derive(input: TokenStream) -> TokenStream {
-    typed_item::derive_typed_item(input)
+#[proc_macro_derive(Id)]
+pub fn id_item_derive(input: TokenStream) -> TokenStream {
+    id_item::derive_id_item(input)
 }
 
-#[proc_macro_derive(TypedItemDelegation)]
-pub fn typed_item_delegation_derive(input: TokenStream) -> TokenStream {
-    typed_item::derive_typed_item_delegation(input)
+#[proc_macro_derive(IdDelegation)]
+pub fn id_item_delegation_derive(input: TokenStream) -> TokenStream {
+    id_item::derive_id_item_delegation(input)
 }
 
 #[proc_macro_derive(EnumVariants)]

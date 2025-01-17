@@ -10,7 +10,7 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
     // Ensure we're working with an enum
     let data_enum = match input.data {
         Data::Enum(data_enum) => data_enum,
-        _ => panic!("TypedItem can only be derived for enums"),
+        _ => panic!("Macro can only be derived for enums"),
     };
 
     let variants = data_enum.variants.iter().map(|variant| {

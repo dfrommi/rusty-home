@@ -74,10 +74,15 @@ where
             let mut incoming_data = vec![];
 
             for channel in channels {
-                match self.inner.get_events(&device_id, channel, &msg.payload) {
+                match self.inner.get_events(&device_id, channel, &msg) {
                     Ok(events) => incoming_data.extend(events),
                     Err(e) => {
-                        tracing::error!("Error parsing event for channel {:?}: {:?}", channel, e);
+                        tracing::error!(
+                            "Error parsing event for channel {:?} with payload {}: {:?}",
+                            channel,
+                            msg.payload,
+                            e
+                        );
                     }
                 }
             }

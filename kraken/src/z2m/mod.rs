@@ -52,11 +52,11 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
         &self,
         device_id: &str,
         channel: &Z2mChannel,
-        payload: &str,
+        msg: &MqttInMessage,
     ) -> anyhow::Result<Vec<IncomingData>> {
         let result: Vec<IncomingData> = match channel {
             Z2mChannel::ClimateSensor(t, h) => {
-                let payload: ClimateSensor = serde_json::from_str(payload)?;
+                let payload: ClimateSensor = serde_json::from_str(&msg.payload)?;
 
                 vec![
                     DataPoint::new(
@@ -74,7 +74,7 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
             }
 
             Z2mChannel::ContactSensor(opened) => {
-                let payload: ContactSensor = serde_json::from_str(payload)?;
+                let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
                         ChannelValue::Opened(opened.clone(), !payload.contact),
@@ -86,7 +86,7 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
             }
 
             Z2mChannel::PowerPlug(power, energy) => {
-                let payload: PowerPlug = serde_json::from_str(payload)?;
+                let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
                         ChannelValue::CurrentPowerUsage(
@@ -109,7 +109,7 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
             }
 
             Z2mChannel::PresenceFromLeakSensor(presence) => {
-                let payload: WaterLeakSensor = serde_json::from_str(payload)?;
+                let payload: WaterLeakSensor = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
                         ChannelValue::Presence(presence.clone(), payload.water_leak),
@@ -121,7 +121,7 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
             }
 
             Z2mChannel::RemoteClick(target) => {
-                let payload: RemoteControl = serde_json::from_str(payload)?;
+                let payload: RemoteControl = serde_json::from_str(&msg.payload)?;
                 let mut events = vec![availability(device_id, payload.last_seen)];
 
                 let button_press = match payload.action.as_deref() {

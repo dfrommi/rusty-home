@@ -36,6 +36,6 @@ pub trait IncomingMqttEventParser<C> {
         &self,
         device_id: &str,
         channel: &C,
-        payload: &str,
+        msg: &MqttInMessage,
     ) -> anyhow::Result<Vec<IncomingData>>;
 }

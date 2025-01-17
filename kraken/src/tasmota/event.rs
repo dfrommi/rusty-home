@@ -57,11 +57,15 @@ impl IncomingMqttEventParser<TasmotaChannel> for TasmotaMqttParser {
         &self,
         device_id: &str,
         channel: &TasmotaChannel,
-        payload: &str,
+        msg: &MqttInMessage,
     ) -> anyhow::Result<Vec<IncomingData>> {
         match channel {
             TasmotaChannel::EnergyMeter(power, energy) => {
-                let tele_message: TeleMessage = serde_json::from_str(payload)?;
+                if !msg.topic.ends_with("/SENSOR") {
+                    return Ok(vec![]);
+                }
+
+                let tele_message: TeleMessage = serde_json::from_str(&msg.payload)?;
 
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
@@ -95,23 +99,29 @@ impl IncomingMqttEventParser<TasmotaChannel> for TasmotaMqttParser {
             }
 
             //No timestamp available in Tasmota. TODO: trigger update of state on startup
-            TasmotaChannel::PowerToggle(powered) => match payload {
-                "ON" => Ok(vec![DataPoint::new(
-                    ChannelValue::Powered(powered.clone(), true),
-                    t!(now),
-                )
-                .into()]),
-                "OFF" => Ok(vec![DataPoint::new(
-                    ChannelValue::Powered(powered.clone(), false),
-                    t!(now),
-                )
-                .into()]),
-                _ => bail!(
-                    "Unexpected payload for PowerToggle {}: {}",
-                    device_id,
-                    payload
-                ),
-            },
+            TasmotaChannel::PowerToggle(powered) => {
+                if !msg.topic.ends_with("/POWER") {
+                    return Ok(vec![]);
+                }
+
+                match msg.payload.as_str() {
+                    "ON" => Ok(vec![DataPoint::new(
+                        ChannelValue::Powered(powered.clone(), true),
+                        t!(now),
+                    )
+                    .into()]),
+                    "OFF" => Ok(vec![DataPoint::new(
+                        ChannelValue::Powered(powered.clone(), false),
+                        t!(now),
+                    )
+                    .into()]),
+                    _ => bail!(
+                        "Unexpected payload for PowerToggle {}: {}",
+                        device_id,
+                        msg.payload
+                    ),
+                }
+            }
         }
     }
 }

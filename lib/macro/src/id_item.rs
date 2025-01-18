@@ -1,6 +1,8 @@
+use heck::ToShoutySnakeCase;
 use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::Ident;
 use syn::{parse_macro_input, DeriveInput};
 
 pub fn derive_id_item(input: TokenStream) -> TokenStream {
@@ -12,23 +14,37 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
     let type_name_int = enum_name.to_string();
     let type_name_ext = enum_name.to_string().to_snake_case();
 
-    let mut into_int_id_impls = Vec::new();
-    let mut into_ext_id_impls = Vec::new();
+    let mut as_ref_int_statics = Vec::new();
+    let mut as_ref_int_matches = Vec::new();
+    let mut as_ref_ext_statics = Vec::new();
+    let mut as_ref_ext_matches = Vec::new();
+
     let mut from_ext_item_name_matches = Vec::new();
     let mut from_int_item_name_matches = Vec::new();
     let mut display_impls = Vec::new();
 
     for variant in enum_variants {
         let variant_name = &variant.ident;
+        let id_static_name = Ident::new(
+            &format!("{}_ID", variant_name.to_string().to_shouty_snake_case()),
+            variant_name.span(),
+        );
+
         let variant_name_int = variant_name.to_string();
         let variant_name_ext = variant_name.to_string().to_snake_case();
 
-        into_int_id_impls.push(quote! {
-            #enum_name::#variant_name => support::InternalId::new(#type_name_int, #variant_name_int)
+        as_ref_int_statics.push(quote! {
+            static #id_static_name: support::InternalId = support::InternalId::new(#type_name_int, #variant_name_int);
+        });
+        as_ref_int_matches.push(quote! {
+            #enum_name::#variant_name => &#id_static_name
         });
 
-        into_ext_id_impls.push(quote! {
-            #enum_name::#variant_name => support::ExternalId::new(#type_name_ext, #variant_name_ext)
+        as_ref_ext_statics.push(quote! {
+            static #id_static_name: support::ExternalId = support::ExternalId::new_static(#type_name_ext, #variant_name_ext);
+        });
+        as_ref_ext_matches.push(quote! {
+            #enum_name::#variant_name => &#id_static_name
         });
 
         from_int_item_name_matches.push(quote! {
@@ -39,7 +55,6 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             #variant_name_ext => #enum_name::#variant_name
         });
 
-        //not snake cased
         let display_name = format!("{}[{}]", enum_name, variant_name);
         display_impls.push(quote! {
             #enum_name::#variant_name => write!(f, #display_name)
@@ -47,31 +62,45 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl From<&#enum_name> for support::InternalId {
-            fn from(val: &#enum_name) -> Self {
-                match val {
-                    #(#into_int_id_impls),*
+        impl AsRef<support::InternalId> for #enum_name {
+            fn as_ref(&self) -> &support::InternalId {
+                #(#as_ref_int_statics)*
+
+                match self {
+                    #(#as_ref_int_matches),*
                 }
             }
         }
 
-        impl From<#enum_name> for support::InternalId {
-            fn from(val: #enum_name) -> Self {
-                (&val).into()
-            }
-        }
+        impl AsRef<support::ExternalId> for #enum_name {
+            fn as_ref(&self) -> &support::ExternalId {
+                #(#as_ref_ext_statics)*
 
-        impl From<&#enum_name> for support::ExternalId {
-            fn from(val: &#enum_name) -> Self {
-                match val {
-                    #(#into_ext_id_impls),*
+                match self {
+                    #(#as_ref_ext_matches),*
                 }
             }
         }
 
-        impl From<#enum_name> for support::ExternalId {
-            fn from(val: #enum_name) -> Self {
-                (&val).into()
+        impl #enum_name {
+            pub fn int_type(&self) -> &str {
+                let id: &support::InternalId = self.as_ref();
+                id.int_type()
+            }
+
+            pub fn int_name(&self) -> &str {
+                let id: &support::InternalId = self.as_ref();
+                id.int_name()
+            }
+
+            pub fn ext_type(&self) -> &str {
+                let id: &support::ExternalId = self.as_ref();
+                id.ext_type()
+            }
+
+            pub fn ext_name(&self) -> &str {
+                let id: &support::ExternalId = self.as_ref();
+                id.ext_name()
             }
         }
 
@@ -79,13 +108,13 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             type Error = anyhow::Error;
 
             fn try_from(value: &support::InternalId) -> Result<Self, Self::Error> {
-                if value.type_ != #type_name_int {
-                    anyhow::bail!("Error converting InternalId, expected type {}, got {}", #type_name_int, value.type_);
+                if value.int_type() != #type_name_int {
+                    anyhow::bail!("Error converting InternalId, expected type {}, got {}", #type_name_int, value.int_type());
                 }
 
-                let item = match value.name.as_str() {
+                let item = match value.int_name() {
                     #(#from_int_item_name_matches),*,
-                    _ => anyhow::bail!("Error converting InternalId, unknown name {}", value.name),
+                    _ => anyhow::bail!("Error converting InternalId, unknown name {}", value.int_name()),
                 };
 
                 Ok(item)
@@ -104,13 +133,13 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             type Error = anyhow::Error;
 
             fn try_from(value: &support::ExternalId) -> Result<Self, Self::Error> {
-                if value.type_ != #type_name_ext {
-                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.type_);
+                if value.ext_type() != #type_name_ext {
+                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.ext_type());
                 }
 
-                let item = match value.name.as_str() {
+                let item = match value.ext_name() {
                     #(#from_ext_item_name_matches),*,
-                    _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.name),
+                    _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.ext_name()),
                 };
 
                 Ok(item)
@@ -127,8 +156,7 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
 
         impl std::fmt::Display for #enum_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let id = support::InternalId::from(self);
-                write!(f, "{}[{}]", id.type_, id.name)
+                write!(f, "{}[{}]", self.int_type(), self.int_name())
             }
         }
     };
@@ -145,14 +173,14 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     // Ensure it's an enum
     let variants = super::enum_variants(input.data);
 
-    let mut value_into_impls = Vec::new();
+    let mut value_as_ref_impls = Vec::new();
     let mut try_from_impls = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
 
-        value_into_impls.push(quote! {
-            #name::#variant_name(v) => v.into()
+        value_as_ref_impls.push(quote! {
+            #name::#variant_name(v) => v.as_ref()
         });
 
         try_from_impls.push(quote! {
@@ -163,36 +191,41 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-
-        impl From<#name> for support::InternalId {
-            fn from(val: #name) -> Self {
-                match val {
-                    #(#value_into_impls),*
+        impl AsRef<support::InternalId> for #name {
+            fn as_ref(&self) -> &support::InternalId {
+                match self {
+                    #(#value_as_ref_impls),*
                 }
             }
         }
 
-        impl From<&#name> for support::InternalId {
-            fn from(val: &#name) -> Self {
-                match val {
-                    #(#value_into_impls),*
+        impl AsRef<support::ExternalId> for #name {
+            fn as_ref(&self) -> &support::ExternalId {
+                match self {
+                    #(#value_as_ref_impls),*
                 }
             }
         }
 
-        impl From<#name> for support::ExternalId {
-            fn from(val: #name) -> Self {
-                match val {
-                    #(#value_into_impls),*
-                }
+        impl #name {
+            pub fn int_type(&self) -> &str {
+                let id: &support::InternalId = self.as_ref();
+                id.int_type()
             }
-        }
 
-        impl From<&#name> for support::ExternalId {
-            fn from(val: &#name) -> Self {
-                match val {
-                    #(#value_into_impls),*
-                }
+            pub fn int_name(&self) -> &str {
+                let id: &support::InternalId = self.as_ref();
+                id.int_name()
+            }
+
+            pub fn ext_type(&self) -> &str {
+                let id: &support::ExternalId = self.as_ref();
+                id.ext_type()
+            }
+
+            pub fn ext_name(&self) -> &str {
+                let id: &support::ExternalId = self.as_ref();
+                id.ext_name()
             }
         }
 
@@ -201,7 +234,7 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
             fn try_from(value: &support::InternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
-                anyhow::bail!("Error converting InternalId, unknown type/name {}/{}", value.type_, value.name);
+                anyhow::bail!("Error converting InternalId, unknown type/name {}/{}", value.int_type(), value.int_name());
             }
         }
 
@@ -218,7 +251,7 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
             fn try_from(value: &support::ExternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
-                anyhow::bail!("Error converting ExternalId, unknown type/name {}/{}", value.type_, value.name);
+                anyhow::bail!("Error converting ExternalId, unknown type/name {}/{}", value.ext_type(), value.ext_name());
             }
         }
 

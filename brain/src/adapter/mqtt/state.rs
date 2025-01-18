@@ -48,30 +48,32 @@ impl MqttStateSender {
 
     async fn send<'a, 'b: 'a, API, T>(&'a mut self, state: T, api: &'b API)
     where
-        T: Into<ExternalId> + ValueObject + Clone,
+        T: AsRef<ExternalId> + ValueObject + Clone,
         T::ValueType: Into<MqttStateValue>,
         API: DataPointAccess<T>,
     {
         let value = match api.current(state.clone()).await {
             Ok(v) => v.into(),
             Err(e) => {
-                let external_id = state.into();
+                let external_id: &ExternalId = state.as_ref();
                 tracing::error!(
                     "Error getting current value of {}/{} for sending to MQTT: {:?}",
-                    external_id.type_,
-                    external_id.name,
+                    external_id.ext_type(),
+                    external_id.ext_name(),
                     e
                 );
                 return;
             }
         };
 
-        let external_id = state.into();
+        let external_id: &ExternalId = state.as_ref();
 
         let msg = MqttOutMessage {
             topic: format!(
                 "{}/{}/{}",
-                self.base_topic, external_id.type_, external_id.name
+                self.base_topic,
+                external_id.ext_type(),
+                external_id.ext_name()
             ),
             payload: value.0,
             retain: true,

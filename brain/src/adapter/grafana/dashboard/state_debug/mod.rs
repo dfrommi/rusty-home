@@ -5,7 +5,6 @@ use actix_web::{
     Responder,
 };
 use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::InternalId;
 use support::{time::DateTime, DataPoint, ExternalId};
 
 use crate::{
@@ -41,13 +40,33 @@ struct Row {
     value: f64,
 }
 
-fn supported_channels() -> Vec<ExternalId> {
-    let mut supported_channels: Vec<ExternalId> = vec![];
-    supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.into()));
-    supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.into()));
-    supported_channels.extend(Temperature::variants().iter().map(|c| c.into()));
-    supported_channels.extend(RelativeHumidity::variants().iter().map(|c| c.into()));
-    supported_channels.extend(DewPoint::variants().iter().map(|c| c.into()));
+fn supported_channels() -> Vec<&'static ExternalId> {
+    let mut supported_channels: Vec<&'static ExternalId> = vec![];
+    supported_channels.extend(
+        TotalEnergyConsumption::variants()
+            .iter()
+            .map(|c| c.as_ref() as &'static ExternalId),
+    );
+    supported_channels.extend(
+        HeatingDemand::variants()
+            .iter()
+            .map(|c| c.as_ref() as &'static ExternalId),
+    );
+    supported_channels.extend(
+        Temperature::variants()
+            .iter()
+            .map(|c| c.as_ref() as &'static ExternalId),
+    );
+    supported_channels.extend(
+        RelativeHumidity::variants()
+            .iter()
+            .map(|c| c.as_ref() as &'static ExternalId),
+    );
+    supported_channels.extend(
+        DewPoint::variants()
+            .iter()
+            .map(|c| c.as_ref() as &'static ExternalId),
+    );
 
     supported_channels
 }
@@ -61,8 +80,8 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
 
     let supported_channels = supported_channels();
     let items = supported_channels.iter().filter_map(|c| {
-        if type_ == c.type_ {
-            Some(c.name.to_owned())
+        if type_ == c.ext_type() {
+            Some(c.ext_name().to_owned())
         } else {
             None
         }
@@ -110,7 +129,7 @@ async fn get_rows<T>(
     time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
-    T: Estimatable + Clone + Into<InternalId>,
+    T: Estimatable + Clone + AsRef<ExternalId>,
     T::Type: AsRef<f64>,
 {
     let ts = api
@@ -123,14 +142,14 @@ where
         .filter_map(|t| ts.at(t))
         .collect::<Vec<_>>();
 
-    let int_id: InternalId = item.into();
+    let ext_id: &ExternalId = item.as_ref();
 
     let rows: Vec<Row> = dps
         .iter()
         .map(|dp| Row {
             timestamp: dp.timestamp,
-            type_: int_id.type_.to_string(),
-            item: int_id.name.to_string(),
+            type_: ext_id.ext_type().to_string(),
+            item: ext_id.ext_name().to_string(),
             value: *dp.value.as_ref(),
         })
         .collect();

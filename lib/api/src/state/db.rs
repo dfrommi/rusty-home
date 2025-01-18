@@ -16,7 +16,7 @@ pub async fn get_tag_id(
     channel: Channel,
     create_if_missing: bool,
 ) -> anyhow::Result<i64> {
-    let external_id: ExternalId = channel.into();
+    let id: &ExternalId = channel.as_ref();
 
     let tag_id = if create_if_missing {
         sqlx::query_scalar!(
@@ -34,15 +34,16 @@ pub async fn get_tag_id(
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            external_id.type_,
-            external_id.name
+            id.ext_type(),
+            id.ext_name()
         )
         .fetch_one(db_pool)
         .await
         .with_context(|| {
             format!(
                 "Error getting or creating tag id for {}/{}",
-                external_id.type_, external_id.name
+                id.ext_type(),
+                id.ext_name()
             )
         })
     } else {
@@ -51,15 +52,16 @@ pub async fn get_tag_id(
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            external_id.type_,
-            external_id.name
+            id.ext_type(),
+            id.ext_name()
         )
         .fetch_one(db_pool)
         .await
         .with_context(|| {
             format!(
                 "Error getting tag id for {}/{}",
-                external_id.type_, external_id.name
+                id.ext_type(),
+                id.ext_name()
             )
         })
     }?;

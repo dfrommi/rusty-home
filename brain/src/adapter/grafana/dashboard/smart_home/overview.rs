@@ -226,12 +226,11 @@ where
 
     let rows = states.into_iter().map(|dp| {
         let target = Channel::from(&dp.value);
-        let int_id: InternalId = target.into();
 
         Row {
             timestamp: dp.timestamp.to_human_readable(),
-            type_: int_id.type_.to_string(),
-            item: int_id.name.to_string(),
+            type_: target.int_type().to_string(),
+            item: target.int_name().to_string(),
             value: dp.value.value_to_string(),
         }
     });

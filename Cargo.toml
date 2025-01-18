@@ -1,3 +1,61 @@
 [workspace]
 members = ["brain", "kraken"]
 resolver = "2"
+
+[workspace.dependencies]
+#Core dependencies
+anyhow = "1"
+config = { version = "0.15.6", features = ["toml"] }
+derive_more = { version = "1", features = [
+  "from",
+  "as_ref",
+  "display",
+  "error",
+] }
+
+#Async dependencies
+tokio = { version = "1", features = ["full"] }
+futures = "*"
+
+#Time dependencies
+chrono = { version = "0.4", features = ["serde", "std"] }
+chrono-humanize = "0.2"
+iso8601-duration = { version = "0.2", features = ["serde", "chrono"] }
+
+#Data format dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+csv = "1"
+
+#MQTT dependencies
+rumqttc = "*"
+
+#Web dependencies
+actix-web = "4"
+reqwest = { version = "*", features = ["json"] }
+mime = "0.3"
+
+#DB Dependencies
+sqlx = { version = "0.8", features = [
+  "postgres",
+  "runtime-tokio",
+  "macros",
+  "chrono",
+] }
+
+#Caching dependencies
+cached = { version = "0.54", features = ["default", "async"] }
+moka = { version = "0.12", features = ["future"] }
+
+#Tracing dependencies
+tracing = "0.1"
+tracing-opentelemetry = "0.28"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = { version = "0.27", features = ["trace"] }
+opentelemetry-appender-tracing = "0.27"
+opentelemetry-otlp = "0.27"
+opentelemetry-stdout = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["trace", "rt-tokio"] }
+
+#Test dependencies
+assert-json-diff = "2"

@@ -4,24 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1"
-sqlx = { version = "0.8", features = [
-  "postgres",
-  "runtime-tokio",
-  "macros",
-  "chrono",
-] }
-tokio = { version = "1", features = ["full"] }
-chrono = { version = "0.4.38", features = ["serde", "std"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-derive_more = { version = "1", features = ["full"] }
-cached = { version = "*", features = ["default", "async"] }
-tracing = "*"
+anyhow = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+derive_more = { workspace = true }
+cached = { workspace = true }
+tracing = { workspace = true }
 
 support = { path = "../support" }
 macro = { path = "../macro" }
 
 
 [dev-dependencies]
-assert-json-diff = "2"
+assert-json-diff = { workspace = true }

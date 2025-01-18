@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 futures = "*"
-enum_dispatch = "0.3"
 derive_more = { version = "1", features = ["display", "error"] }
 tracing = "*"
 tracing-subscriber = "*"

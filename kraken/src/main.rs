@@ -143,7 +143,9 @@ pub async fn main() {
     //TODO embed into infrastructure, type of factory is problematic
     let http_db = infrastructure.database.clone();
     let http_server = actix_web::HttpServer::new(move || {
-        App::new().service(energy_meter::new_web_service(http_db.clone()))
+        App::new()
+            .wrap(tracing_actix_web::TracingLogger::default())
+            .service(energy_meter::new_web_service(http_db.clone()))
     })
     .workers(1)
     .disable_signals()

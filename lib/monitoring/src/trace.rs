@@ -67,3 +67,22 @@ impl TraceContext {
         self.otel_ctx.span().span_context().span_id().to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry_sdk::propagation::TraceContextPropagator;
+
+    use super::*;
+
+    #[test]
+    fn test_trace_context_from_correlation_id() {
+        opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
+
+        let ctx = TraceContext::from_correlation_id(
+            "00-4318fb888997822f5d20fc5c5793c0dc-1075ceed63969488-00",
+        );
+
+        assert_eq!(ctx.trace_id(), "4318fb888997822f5d20fc5c5793c0dc");
+        assert_eq!(ctx.span_id(), "1075ceed63969488");
+    }
+}

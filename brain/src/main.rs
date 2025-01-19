@@ -1,7 +1,7 @@
 use core::event::AppEventListener;
 use std::sync::Arc;
 
-use actix_web::{App, HttpServer};
+use actix_web::{dev::Service, App, HttpServer};
 use adapter::persistence::Database;
 use api::DbEventListener;
 use monitoring::Monitoring;
@@ -109,7 +109,9 @@ pub async fn main() {
     let http_api = Arc::new(database.clone());
     tasks.spawn(async move {
         let http_server = HttpServer::new(move || {
-            App::new().service(adapter::grafana::new_routes(http_api.clone()))
+            App::new()
+                .wrap(tracing_actix_web::TracingLogger::default())
+                .service(adapter::grafana::new_routes(http_api.clone()))
         })
         .workers(1)
         .disable_signals()

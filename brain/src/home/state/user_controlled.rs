@@ -1,5 +1,4 @@
-use std::fmt::Display;
-
+use r#macro::Id;
 use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint, ValueObject};
 
 use api::{
@@ -9,9 +8,11 @@ use api::{
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 
+use crate::home::state::macros::result;
+
 use super::{CommandAccess, DataPointAccess};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Id)]
 pub enum UserControlled {
     Dehumidifier,
     LivingRoomThermostat,
@@ -21,24 +22,14 @@ pub enum UserControlled {
     BathroomThermostat,
 }
 
-impl Display for UserControlled {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let target = match self {
-            UserControlled::Dehumidifier => "dehumidifier",
-            UserControlled::LivingRoomThermostat => "living room thermostat",
-            UserControlled::BedroomThermostat => "bedroom thermostat",
-            UserControlled::KitchenThermostat => "kitchen thermostat",
-            UserControlled::RoomOfRequirementsThermostat => "room of requirements thermostat",
-            UserControlled::BathroomThermostat => "bathroom thermostat",
-        };
-        write!(f, "UserControlled[{}]", target)
-    }
-}
-
 impl ValueObject for UserControlled {
     type ValueType = bool;
 }
 
+//TODO try to simplify
+// - what is the current state and since when?
+// - what is the expected state and since when?
+// - is the current state as expected and reached shortly after triggering the command?
 impl<T> DataPointAccess<UserControlled> for T
 where
     T: DataPointAccess<Powered>
@@ -54,6 +45,7 @@ where
             UserControlled::LivingRoomThermostat => {
                 current_data_point_for_thermostat(
                     self,
+                    item,
                     Thermostat::LivingRoom,
                     ExternalAutoControl::LivingRoomThermostat,
                     SetPoint::LivingRoom,
@@ -63,6 +55,7 @@ where
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(
                     self,
+                    item,
                     Thermostat::Bedroom,
                     ExternalAutoControl::BedroomThermostat,
                     SetPoint::Bedroom,
@@ -72,6 +65,7 @@ where
             UserControlled::KitchenThermostat => {
                 current_data_point_for_thermostat(
                     self,
+                    item,
                     Thermostat::Kitchen,
                     ExternalAutoControl::KitchenThermostat,
                     SetPoint::Kitchen,
@@ -81,6 +75,7 @@ where
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(
                     self,
+                    item,
                     Thermostat::RoomOfRequirements,
                     ExternalAutoControl::RoomOfRequirementsThermostat,
                     SetPoint::RoomOfRequirements,
@@ -90,6 +85,7 @@ where
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
                     self,
+                    item,
                     Thermostat::Bathroom,
                     ExternalAutoControl::BathroomThermostat,
                     SetPoint::Bathroom,
@@ -103,37 +99,64 @@ where
 async fn current_data_point_for_dehumidifier(
     api: &(impl DataPointAccess<Powered> + CommandAccess),
 ) -> anyhow::Result<DataPoint<bool>> {
+    let item = UserControlled::Dehumidifier;
+
     let power = api.current_data_point(Powered::Dehumidifier).await?;
 
     //user-control only valid for 15 minutes
     if power.timestamp < t!(15 minutes ago) {
-        return Ok(DataPoint {
-            value: false,
-            timestamp: power.timestamp,
-        });
+        result!(false, power.timestamp, item,
+            @power,
+            "User controlled not active for dehumidifier, because last state change more than 15 minutes ago"
+        );
     }
 
     let last_command = api
-        .get_latest_command(PowerToggle::Dehumidifier, t!(2 minutes ago))
+        .get_latest_command(PowerToggle::Dehumidifier, t!(20 minutes ago))
         .await?;
 
-    let was_triggered_by_system = match last_command {
+    let system_powered = match last_command {
         Some(CommandExecution {
             command: Command::SetPower { power_on, .. },
             source: CommandSource::System(_),
+            created,
             ..
-        }) => power_on == power.value,
-        _ => false,
+        }) => DataPoint::new(power_on, created),
+
+        _ => {
+            result!(true, power.timestamp, item,
+                @power,
+                "User controlled active, because no system command was triggered for last 20 minutes, but power state changed"
+            );
+        }
     };
 
-    Ok(DataPoint {
-        value: !was_triggered_by_system,
-        timestamp: power.timestamp,
-    })
+    let power_after_command_duration = power.timestamp.elapsed_since(system_powered.timestamp);
+    if power_after_command_duration > t!(30 seconds) {
+        result!(true, power.timestamp, item,
+            @power,
+            @system_powered,
+            state_command_diff = %power_after_command_duration,
+            "User controlled active, because power state changed more than 30 seconds after last system command"
+        );
+    }
+
+    let is_as_expected = system_powered.value == power.value;
+    result!(!is_as_expected, power.timestamp, item,
+        @power,
+        @system_powered,
+        "{}",
+        if is_as_expected {
+            "User controlled not active, because current state matches last system command"
+        } else {
+            "User controlled active, because current state does not match last system"
+        },
+    );
 }
 
 async fn current_data_point_for_thermostat(
     api: &(impl DataPointAccess<ExternalAutoControl> + DataPointAccess<SetPoint> + CommandAccess),
+    item: UserControlled,
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,
@@ -144,19 +167,35 @@ async fn current_data_point_for_thermostat(
         api.get_latest_command(thermostat, t!(24 hours ago))
     )?;
 
-    let most_recent_change = std::cmp::max(auto_mode_on.timestamp, set_point.timestamp);
-
     //if no command, then overridden by user only if in manual mode
     if latest_command.is_none() {
-        return Ok(auto_mode_on.map_value(|v| !v));
+        result!(!auto_mode_on.value, auto_mode_on.timestamp, item,
+            @auto_mode_on,
+            "{}",
+            if auto_mode_on.value {
+                "User controlled not active, because no command found and automatic control is on"
+            } else {
+                "User controlled active, because no command found and automatic control is off"
+            },
+        );
     }
 
+    let most_recent_change = std::cmp::max(auto_mode_on.timestamp, set_point.timestamp);
     let latest_command = latest_command.unwrap();
     let triggered_by_user = matches!(latest_command.source, CommandSource::User(_));
 
     //command after change? -> triggered but roundtrip not yet done -> command source wins
     if latest_command.created > most_recent_change {
-        return Ok(DataPoint::new(triggered_by_user, most_recent_change));
+        result!(triggered_by_user, most_recent_change, item,
+            @auto_mode_on,
+            @set_point,
+            "{}",
+            if triggered_by_user {
+                "User controlled assumed active, because latest command is user-command and effect not yet reflected in state."
+            } else {
+                "User controlled assumed to be inactive, because latest command is system-command and effect not yet reflected in state."
+            },
+        );
     }
 
     let is_expired =
@@ -165,9 +204,37 @@ async fn current_data_point_for_thermostat(
     let comand_setting_followed = matches(&latest_command, auto_mode_on.value, set_point.value);
 
     match (is_expired, comand_setting_followed) {
-        (true, _) => Ok(DataPoint::new(!auto_mode_on.value, most_recent_change)),
-        (false, true) => Ok(DataPoint::new(triggered_by_user, most_recent_change)),
-        (false, false) => Ok(DataPoint::new(true, most_recent_change)),
+        (true, _) => {
+            result!(!auto_mode_on.value, most_recent_change, item,
+                @auto_mode_on,
+                @set_point,
+                "{}",
+                if auto_mode_on.value {
+                    "User controlled not active, because command expired and automatic control is on"
+                } else {
+                    "User controlled active, because command expired and automatic control is off"
+                },
+            );
+        }
+        (false, true) => {
+            result!(triggered_by_user, most_recent_change, item,
+                @auto_mode_on,
+                @set_point,
+                "{}",
+                if triggered_by_user {
+                    "User controlled is active, because last command was triggered by user and state is still reflected"
+                } else {
+                    "User controlled is not active, because last command was triggered by system and state is still reflected"
+                },
+            );
+        }
+        (false, false) => {
+            result!(true, most_recent_change, item,
+                @auto_mode_on,
+                @set_point,
+                "User controlled active, because current state is not reflecting expected state"
+            );
+        }
     }
 }
 
@@ -201,7 +268,7 @@ pub fn get_expiration(command_execution: &CommandExecution) -> Option<DateTime> 
                     duration: until, ..
                 },
             ..
-        } => Some(command_execution.created.clone() + until.clone()),
+        } => Some(command_execution.created + until.clone()),
         _ => None,
     }
 }

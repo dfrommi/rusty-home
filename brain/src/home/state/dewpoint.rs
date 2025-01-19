@@ -61,10 +61,13 @@ where
     T: DataPointAccess<Temperature> + DataPointAccess<RelativeHumidity>,
 {
     async fn current_data_point(&self, item: DewPoint) -> Result<DataPoint<DegreeCelsius>> {
-        let t_value: DataPoint<DegreeCelsius> = self.current_data_point(item.temperature()).await?;
-        let h_value: DataPoint<Percent> = self.current_data_point(item.relative_humidity()).await?;
+        let temperature: DataPoint<DegreeCelsius> =
+            self.current_data_point(item.temperature()).await?;
+        let humidity: DataPoint<Percent> =
+            self.current_data_point(item.relative_humidity()).await?;
+        let dewpoint = dewpoint(&temperature, &humidity);
 
-        Ok(dewpoint(&t_value, &h_value))
+        Ok(dewpoint)
     }
 }
 

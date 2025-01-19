@@ -1,6 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use api::state::Presence;
 use support::{t, time::DateTimeRange, DataPoint, ValueObject};
+
+use crate::home::state::macros::result;
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
@@ -33,47 +35,86 @@ async fn sleeping(
 ) -> Result<DataPoint<bool>> {
     let now = t!(now);
     let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
-    let in_bed_start_range = DateTimeRange::new(
-        *in_bed_full_range.start(),
-        in_bed_full_range.end().at(t!(3:00)).unwrap(),
-    );
 
     if !in_bed_full_range.contains(now) {
-        return Ok(DataPoint {
-            value: false,
-            timestamp: *in_bed_full_range.end(),
-        });
+        result!(
+            false,
+            *in_bed_full_range.end(),
+            in_bed,
+            bedtime_range.start = %in_bed_full_range.start(),
+            bedtime_range.end = %in_bed_full_range.end(),
+            "Not sleeping, because out of bedtime range"
+        );
     }
 
     //TODO TimeSeries with date in future?
     let range_start = in_bed_full_range.start();
     let ts = api
-        .series_since(in_bed, *range_start)
+        .series_since(in_bed.clone(), *range_start)
         .await?
         .with_duration_until_next_dp();
 
-    let sleeping_started = ts.iter().find(|dp| {
-        in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)
-    });
+    let in_bed_start_range = DateTimeRange::new(
+        *in_bed_full_range.start(),
+        in_bed_full_range.end().at(t!(3:00)).unwrap(),
+    );
 
-    let sleeping_stopped = sleeping_started.and_then(|started_dp| {
-        ts.iter().find(|dp| {
-            !dp.value.0 && dp.value.1 > t!(5 minutes) && started_dp.timestamp < dp.timestamp
+    //Some has always true value
+    let sleeping_started = ts
+        .iter()
+        .find(|dp| {
+            in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)
         })
-    });
+        .map(|dp| dp.map_value(|v| v.1.clone()));
 
-    let result = match (sleeping_started, sleeping_stopped) {
-        (_, Some(stopped_dp)) => (false, stopped_dp.timestamp),
+    //Some has always true value
+    let sleeping_stopped = sleeping_started
+        .as_ref()
+        .and_then(|started_dp| {
+            ts.iter().find(|dp| {
+                !dp.value.0 && dp.value.1 > t!(5 minutes) && started_dp.timestamp < dp.timestamp
+            })
+        })
+        .map(|dp| dp.map_value(|v| v.1.clone()));
+
+    match (sleeping_started, sleeping_stopped) {
+        (Some(started), Some(stopped)) => {
+            result!(
+                false,
+                stopped.timestamp,
+                in_bed,
+                @started,
+                @stopped,
+                bedtime_range.start = %in_bed_full_range.start(),
+                bedtime_range.end = %in_bed_full_range.end(),
+                "Not sleeping, because out of bed for more than 5 minutes"
+            );
+        }
 
         //started but not stopped
-        (Some(started_dp), None) => (true, started_dp.timestamp),
+        (Some(started_dp), None) => {
+            result!(true, started_dp.timestamp, in_bed,
+                @started_dp,
+                bedtime_range.start = %in_bed_full_range.start(),
+                bedtime_range.end = %in_bed_full_range.end(),
+                "Sleeping, because in bed for more than 30 seconds"
+            );
+        }
 
-        //should not happen
-        (None, None) => (false, now),
+        (None, None) => {
+            result!(false, now, in_bed,
+                bedtime_range.start = %in_bed_full_range.start(),
+                bedtime_range.end = %in_bed_full_range.end(),
+                "Not sleeping, because in time range, but no in bed for more than 30 seconds"
+            );
+        }
+
+        (None, Some(stopped_dp)) => {
+            bail!(
+                "Internal error: {} sleeping stopped, but not started: {:?}",
+                in_bed,
+                stopped_dp
+            );
+        }
     };
-
-    Ok(DataPoint {
-        value: result.0,
-        timestamp: result.1,
-    })
 }

@@ -1,11 +1,14 @@
 use api::state::Temperature;
+use r#macro::Id;
 use support::{t, unit::DegreeCelsius};
 
 use support::{DataPoint, ValueObject};
 
+use crate::home::state::macros::result;
+
 use super::{opened::Opened, DataPointAccess, TimeSeriesAccess};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Id)]
 pub enum AutomaticTemperatureIncrease {
     LivingRoom,
     Bedroom,
@@ -43,14 +46,27 @@ where
         };
 
         let window_opened = self.current_data_point(window).await?;
+        if window_opened.value {
+            result!(false, window_opened.timestamp, item,
+                @window_opened,
+                "No automatic temperature increase, because window is open"
+            );
+        }
+
         let opened_elapsed = window_opened.timestamp.elapsed();
 
-        if window_opened.value || opened_elapsed > t!(30 minutes) {
-            return Ok(window_opened.map_value(|_| false));
+        if opened_elapsed > t!(30 minutes) {
+            result!(false, window_opened.timestamp, item,
+                @window_opened,
+                "No automatic temperature increase anymore, because window is closed for more than 30 minutes"
+            );
         }
 
         if opened_elapsed < t!(5 minutes) {
-            return Ok(window_opened.map_value(|_| true));
+            result!(true, window_opened.timestamp, item,
+                @window_opened,
+                "Automatic temperature increase assumed, because window is open for less than 5 minutes"
+            );
         }
 
         let temperature = self
@@ -59,7 +75,10 @@ where
 
         //wait for a measurement. until then assume opened window still has effect
         if temperature.len() < 2 {
-            return Ok(window_opened.map_value(|_| true));
+            result!(true, window_opened.timestamp, item,
+                @window_opened,
+                "Automatic temperature increase assumed, because not enough temperature measurements exist after window was opened"
+            );
         }
 
         let current_temperature = temperature.at(t!(now));
@@ -74,9 +93,20 @@ where
             (Some(current_temperature), Some(start_temperature)) => {
                 let diff = current_temperature.value - start_temperature.value;
                 //temperature still increasing significantly
-                Ok(current_temperature.map_value(|current| current - &diff > DegreeCelsius(0.1)))
+                let significant_increase = diff > DegreeCelsius(0.1);
+                result!(significant_increase, current_temperature.timestamp, item,
+                    @window_opened,
+                    @current_temperature,
+                    temperature_increase = %diff,
+                    "Automatic temperature increase active, because temperature increased by more than 0.1 degree in last 5 minutes"
+                );
             }
-            _ => Ok(DataPoint::new(true, any_timestamp)),
+            _ => {
+                result!(true, any_timestamp, item,
+                    @window_opened,
+                    "Automatic temperature increase assumed, because there are not enough temperature measurements"
+                );
+            }
         }
     }
 }

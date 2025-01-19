@@ -69,6 +69,12 @@ impl Duration {
     }
 }
 
+impl std::fmt::Display for Duration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_iso_string())
+    }
+}
+
 impl std::ops::Add<Duration> for Duration {
     type Output = Duration;
 

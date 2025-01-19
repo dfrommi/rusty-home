@@ -8,6 +8,8 @@ use support::{
 
 use anyhow::Result;
 
+use crate::home::state::macros::result;
+
 use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Id)]
@@ -31,18 +33,10 @@ where
             .await?;
 
         if humidity.value < Percent(70.0) {
-            tracing::trace!(
-                item_type = item.int_type(),
-                item_name = item.int_name(),
-                humidity = %humidity.value,
-                result = false,
+            result!(false, humidity.timestamp, item,
+                @humidity,
                 "Humidity of shower-sensor is below 70%, no risk of mould"
             );
-
-            return Ok(DataPoint {
-                timestamp: humidity.timestamp,
-                value: false,
-            });
         }
 
         let this_dp = self
@@ -55,23 +49,13 @@ where
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
-        tracing::trace!(
-            item.name = item.int_name(),
-            item.type_ = item.int_type(),
-            result = risk,
-            humidity = %humidity.value,
+        result!(risk, this_dp.timestamp, item,
+            @humidity,
             dewpoint_item = %this_dp.value,
             dewpoint_reference = %ref_dp,
-            "Risk of mould in {} is {}",
-            item,
+            "Risk of mould is {}",
             if risk { "high" } else { "low" }
         );
-
-        Ok(DataPoint {
-            timestamp: this_dp.timestamp,
-            value: risk, //TODO avoid jumping on and off (different
-                         //thresholds
-        })
     }
 }
 

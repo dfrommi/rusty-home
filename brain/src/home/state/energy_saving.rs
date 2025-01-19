@@ -5,6 +5,8 @@ use api::{
 use r#macro::Id;
 use support::{DataPoint, ValueObject};
 
+use crate::home::state::macros::result;
+
 use super::{CommandAccess, DataPointAccess};
 
 #[derive(Debug, Clone, Id)]
@@ -31,7 +33,10 @@ where
 
         //if device is off, then we save energy
         if !is_tv_on.value {
-            return Ok(DataPoint::new(true, is_tv_on.timestamp));
+            result!(true, is_tv_on.timestamp, item,
+                @is_tv_on,
+                "Energy saving active, because TV is off"
+            );
         }
 
         let target = match item {
@@ -45,8 +50,25 @@ where
                 command: Command::SetEnergySaving { on, .. },
                 created,
                 ..
-            }) => Ok(DataPoint::new(on, created)),
-            _ => Ok(DataPoint::new(false, is_tv_on.timestamp)),
+            }) => {
+                result!(on, created, item,
+                    @is_tv_on,
+                    latest_command.timestamp = %created,
+                    latest_command.elapsed = %created.elapsed(),
+                    "{}",
+                    if on {
+                        "Energy saving active, because energy saving command was received since TV was turned on"
+                    } else {
+                        "Energy saving not active, because no energy saving command was received since TV was turned on"
+                    },
+                );
+            }
+            _ => {
+                result!(false, is_tv_on.timestamp, item,
+                    @is_tv_on,
+                    "Energy saving not active, because no energy saving command was received since TV was turned on"
+                );
+            }
         }
     }
 }

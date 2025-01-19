@@ -7,7 +7,7 @@ use api::{
     state::Channel,
 };
 use monitoring::TraceContext;
-use support::{time::Duration, InternalId};
+use support::time::Duration;
 
 use crate::{
     adapter::grafana::{

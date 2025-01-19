@@ -183,11 +183,16 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
             #name::#variant_name(v) => v.as_ref()
         });
 
-        try_from_impls.push(quote! {
-            if let Ok(item) = #name::try_from(value) {
-                return Ok(item);
-            }
-        });
+        //should always be true
+        if let syn::Fields::Unnamed(fields) = variant.fields {
+            let item_type = &fields.unnamed[0].ty;
+
+            try_from_impls.push(quote! {
+                if let Ok(item) = #item_type::try_from(value) {
+                    return Ok(#name::#variant_name(item));
+                }
+            });
+        }
     }
 
     let expanded = quote! {

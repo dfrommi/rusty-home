@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use infrastructure::mqtt::MqttInMessage;
+use infrastructure::MqttInMessage;
 
 use super::{IncomingData, IncomingDataProcessor, IncomingMqttEventParser};
 
@@ -23,7 +23,7 @@ where
     pub async fn new(
         parser: P,
         config: &[(&str, C)],
-        mqtt_client: &mut infrastructure::mqtt::Mqtt,
+        mqtt_client: &mut infrastructure::Mqtt,
     ) -> anyhow::Result<Self> {
         let mut m: HashMap<String, Vec<C>> = HashMap::new();
         for (id, channel) in config {

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use api::command::{Command, CommandSource, CommandTarget};
-use infrastructure::monitoring::TraceContext;
+use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
 use crate::{

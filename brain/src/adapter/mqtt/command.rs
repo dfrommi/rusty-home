@@ -3,7 +3,7 @@ use api::{
     state::Powered,
     trigger::{Homekit, UserTrigger},
 };
-use infrastructure::mqtt::MqttInMessage;
+use infrastructure::MqttInMessage;
 use support::ExternalId;
 use tokio::sync::mpsc::Receiver;
 

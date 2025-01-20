@@ -6,7 +6,7 @@ use api::{
     command::{Command, CommandSource},
     state::Channel,
 };
-use infrastructure::monitoring::TraceContext;
+use infrastructure::TraceContext;
 use support::time::Duration;
 
 use crate::{

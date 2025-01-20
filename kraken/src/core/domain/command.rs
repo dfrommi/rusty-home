@@ -4,7 +4,7 @@ use super::port::{CommandExecutor, CommandRepository};
 
 use anyhow::Result;
 use api::command::CommandExecution;
-use infrastructure::monitoring;
+use infrastructure::TraceContext;
 use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(
@@ -48,7 +48,7 @@ async fn process_command(
     repo: &impl CommandRepository,
     executor: &impl CommandExecutor,
 ) {
-    monitoring::TraceContext::continue_from(&cmd.correlation_id);
+    TraceContext::continue_from(&cmd.correlation_id);
 
     let res = executor.execute_command(&cmd.command).await;
 

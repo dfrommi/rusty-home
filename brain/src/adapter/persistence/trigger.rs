@@ -13,7 +13,7 @@ impl UserTriggerExecutor for super::Database {
             r#"INSERT INTO user_trigger (trigger, timestamp, correlation_id) VALUES ($1, $2, $3)"#,
             trigger,
             t!(now).into_db(),
-            infrastructure::monitoring::TraceContext::current_correlation_id(),
+            infrastructure::TraceContext::current_correlation_id(),
         )
         .execute(&self.pool)
         .await

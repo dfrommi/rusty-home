@@ -21,8 +21,6 @@ use tracing_subscriber::EnvFilter;
 
 pub use trace::TraceContext;
 
-pub struct Monitoring {}
-
 //KNOWN ISSUES:
 // - EnvFilter on layer-level looses log-statements! Try again in a later version by adding statements in between planning
 // - OpenTelemetry log appender doesn't contain trace-id and attributes from the span. Issue and PR open
@@ -57,27 +55,27 @@ impl TryInto<EnvFilter> for EnvFilterConfig {
     }
 }
 
-impl Monitoring {
-    pub fn init(config: &MonitoringConfig) -> Result<Self, Box<dyn Error>> {
+impl MonitoringConfig {
+    pub fn init(&self) -> Result<(), Box<dyn Error>> {
         let resource = Resource::new(vec![
-            KeyValue::new("service.name", config.service_name.clone()),
-            KeyValue::new("app.name", config.app_name.clone()),
+            KeyValue::new("service.name", self.service_name.clone()),
+            KeyValue::new("app.name", self.app_name.clone()),
         ]);
 
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
 
-        if let Some(otlp_config) = &config.otlp {
-            let fmt_filter: EnvFilter = config.logs.clone().try_into()?;
+        if let Some(otlp_config) = &self.otlp {
+            let fmt_filter: EnvFilter = self.logs.clone().try_into()?;
             let fmt_layer = tracing_subscriber::fmt::layer().with_filter(fmt_filter);
 
             let logger_provider = init_logs(resource.clone(), otlp_config.url.clone())?;
-            let logging_filter: EnvFilter = config.logs.clone().try_into()?;
+            let logging_filter: EnvFilter = self.logs.clone().try_into()?;
             let logging_layer =
                 OpenTelemetryTracingBridge::new(&logger_provider).with_filter(logging_filter);
 
             let tracer_provider = init_traces(resource.clone(), otlp_config.url.clone())?;
-            let tracer = tracer_provider.tracer(config.app_name.to_owned());
-            let tracing_filter: EnvFilter = config.traces.clone().try_into()?;
+            let tracer = tracer_provider.tracer(self.app_name.to_owned());
+            let tracing_filter: EnvFilter = self.traces.clone().try_into()?;
             let tracing_layer = OpenTelemetryLayer::new(tracer).with_filter(tracing_filter);
 
             let metrics = init_metrics(resource.clone(), otlp_config.url.clone())?;
@@ -89,7 +87,7 @@ impl Monitoring {
                 .with(fmt_layer)
                 .init();
         } else {
-            let logging_filter: EnvFilter = config.logs.clone().try_into()?;
+            let logging_filter: EnvFilter = self.logs.clone().try_into()?;
             let fmt_layer = tracing_subscriber::fmt::layer();
             tracing_subscriber::registry()
                 .with(fmt_layer)
@@ -97,7 +95,7 @@ impl Monitoring {
                 .init();
         }
 
-        Ok(Self {})
+        Ok(())
     }
 }
 

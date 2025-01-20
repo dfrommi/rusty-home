@@ -1,6 +1,6 @@
 use anyhow::bail;
 use api::state::ChannelValue;
-use infrastructure::mqtt::MqttInMessage;
+use infrastructure::MqttInMessage;
 use support::{
     t,
     time::DateTime,

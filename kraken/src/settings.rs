@@ -1,37 +1,17 @@
 use config::{Config, ConfigError, File};
-use infrastructure::monitoring::MonitoringConfig;
+use infrastructure::{DatabaseConfig, HttpServerConfig, MonitoringConfig, MqttConfig};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct Settings {
-    pub database: Database,
-    pub mqtt: Mqtt,
+    pub database: DatabaseConfig,
+    pub mqtt: MqttConfig,
     pub homeassistant: HomeAssitant,
     pub z2m: Zigbee2Mqtt,
-    pub tasmota: Tasmota2Mqtt,
-    pub http_server: HttpServer,
+    pub tasmota: Tasmota,
+    pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct Database {
-    pub url: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct Mqtt {
-    pub host: String,
-    pub port: u16,
-    pub client_id: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct HttpServer {
-    pub port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -50,7 +30,7 @@ pub struct Zigbee2Mqtt {
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
-pub struct Tasmota2Mqtt {
+pub struct Tasmota {
     pub event_topic: String,
 }
 

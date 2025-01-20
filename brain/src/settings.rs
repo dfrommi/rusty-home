@@ -1,28 +1,20 @@
 use config::{Config, ConfigError, File};
-use infrastructure::monitoring::MonitoringConfig;
+use infrastructure::{DatabaseConfig, HttpServerConfig, MonitoringConfig, MqttConfig};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct Settings {
-    pub database: Database,
-    pub mqtt: Mqtt,
-    pub http_server: HttpServer,
+    pub database: DatabaseConfig,
+    pub mqtt: MqttConfig,
+    pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(unused)]
-pub struct Database {
-    pub url: String,
+    pub homekit: HomekitConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
-pub struct Mqtt {
-    pub host: String,
-    pub port: u16,
-    pub client_id: String,
+pub struct HomekitConfig {
     pub base_topic_status: String,
     pub base_topic_set: String,
 }
@@ -37,12 +29,6 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct HttpServer {
-    pub port: u16,
-}
-
 #[cfg(test)]
 pub mod test {
     use support::file::find_file_upwards;
@@ -51,7 +37,7 @@ pub mod test {
 
     #[derive(Debug, Deserialize)]
     pub struct TestSettings {
-        pub live_database: Database,
+        pub live_database: DatabaseConfig,
     }
 
     impl TestSettings {

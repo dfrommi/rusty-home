@@ -33,11 +33,7 @@ fn infrastructure() -> &'static TestInfrastructure {
 
         let db_pool = runtime.block_on(async {
             let settings = settings::test::TestSettings::load().unwrap();
-            sqlx::postgres::PgPoolOptions::new()
-                .max_connections(4)
-                .connect(settings.live_database.url.as_str())
-                .await
-                .unwrap()
+            settings.live_database.new_pool().await.unwrap()
         });
 
         TestInfrastructure {

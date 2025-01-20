@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = { workspace = true }
 
 #Tracing dependencies
 tracing = { workspace = true }
@@ -22,3 +23,14 @@ cached = { workspace = true }
 #MQTT dependencies
 rumqttc = { workspace = true }
 tokio = { workspace = true }
+
+#DB Dependencies
+sqlx = { workspace = true }
+
+#HTTP dependencies
+actix-web = { workspace = true }
+tracing-actix-web = { workspace = true }
+
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-tracing = { workspace = true }

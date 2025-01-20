@@ -1,5 +1,5 @@
 use api::command::{Command, CommandTarget};
-use infrastructure::mqtt::MqttOutMessage;
+use infrastructure::MqttOutMessage;
 
 use crate::core::CommandExecutor;
 

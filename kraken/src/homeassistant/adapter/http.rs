@@ -1,6 +1,6 @@
 use anyhow::Context;
+use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
-use reqwest_tracing::TracingMiddleware;
 
 use crate::homeassistant::domain::{CallServicePort, GetAllEntityStatesPort, StateChangedEvent};
 
@@ -11,28 +11,13 @@ pub struct HaRestClient {
 }
 
 impl HaRestClient {
-    pub fn new(url: &str, token: &str) -> Self {
-        use reqwest::header;
+    pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
+        let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
 
-        let mut headers = header::HeaderMap::new();
-        let mut auth_value =
-            header::HeaderValue::from_str(format!("Bearer {}", token).as_str()).unwrap();
-        auth_value.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, auth_value);
-
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap();
-
-        let client = reqwest_middleware::ClientBuilder::new(client)
-            .with(TracingMiddleware::default())
-            .build();
-
-        Self {
+        Ok(Self {
             client,
             base_url: url.to_owned(),
-        }
+        })
     }
 }
 

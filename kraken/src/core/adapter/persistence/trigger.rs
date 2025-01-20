@@ -1,6 +1,6 @@
 use anyhow::Context;
 use api::trigger::UserTrigger;
-use infrastructure::monitoring;
+use infrastructure::TraceContext;
 use support::t;
 
 use crate::{core::domain::UserTriggerStorage, Database};
@@ -13,7 +13,7 @@ impl UserTriggerStorage for Database {
             r#"INSERT INTO user_trigger (trigger, timestamp, correlation_id) VALUES ($1, $2, $3)"#,
             trigger,
             t!(now).into_db(),
-            monitoring::TraceContext::current_correlation_id(),
+            TraceContext::current_correlation_id(),
         )
         .execute(&self.db_pool)
         .await

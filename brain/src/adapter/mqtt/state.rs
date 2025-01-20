@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use api::state::Powered;
-use infrastructure::mqtt::MqttOutMessage;
+use infrastructure::MqttOutMessage;
 use support::{ExternalId, ValueObject};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 

@@ -1,4 +1,3 @@
-use actix_web::App;
 use anyhow::Context;
 use api::{command::Command, DbEventListener};
 use config::{
@@ -7,12 +6,11 @@ use config::{
 };
 use core::{
     event::{AppEventListener, CommandAddedEvent},
-    CommandExecutor, IncomingDataProcessor, IncomingMqttDataProcessor,
+    CommandExecutor, IncomingData, IncomingDataProcessor, IncomingMqttDataProcessor,
 };
 use homeassistant::HaCommandExecutor;
-use infrastructure::{monitoring::Monitoring, mqtt::MqttInMessage};
+use infrastructure::MqttInMessage;
 use settings::Settings;
-use sqlx::postgres::PgListener;
 use tasmota::TasmotaCommandExecutor;
 use tokio::sync::{broadcast::Receiver, mpsc};
 
@@ -29,7 +27,8 @@ mod z2m;
 struct Infrastructure {
     database: Database,
     event_listener: AppEventListener,
-    mqtt_client: infrastructure::mqtt::Mqtt,
+    mqtt_client: infrastructure::Mqtt,
+    incoming_data_tx: mpsc::Sender<IncomingData>,
 }
 
 #[derive(Clone)]
@@ -47,12 +46,12 @@ impl Database {
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
 
-    let mut _monitoring =
-        Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");
+    settings
+        .monitoring
+        .init()
+        .expect("Error initializing monitoring");
 
-    let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
-
-    let (incoming_data_tx, incoming_data_rx) = mpsc::channel(16);
+    let (mut infrastructure, incoming_data_rx) = Infrastructure::init(&settings).await.unwrap();
 
     let energy_meter_processing = {
         let mut energy_meter_processor = energy_meter::new(
@@ -61,7 +60,7 @@ pub async fn main() {
                 .event_listener
                 .new_energy_reading_added_listener(),
         );
-        let tx = incoming_data_tx.clone();
+        let tx = infrastructure.incoming_data_tx.clone();
 
         async move {
             energy_meter_processor
@@ -76,7 +75,8 @@ pub async fn main() {
             .homeassistant
             .new_incoming_data_processor(&mut infrastructure)
             .await;
-        let tx = incoming_data_tx.clone();
+        let tx = infrastructure.incoming_data_tx.clone();
+
         async move {
             ha_incoming_data_processor
                 .process(tx.clone())
@@ -90,7 +90,7 @@ pub async fn main() {
             .z2m
             .new_incoming_data_processor(&mut infrastructure)
             .await;
-        let tx = incoming_data_tx.clone();
+        let tx = infrastructure.incoming_data_tx.clone();
         async move {
             z2m_incoming_data_processor
                 .process(tx)
@@ -104,7 +104,7 @@ pub async fn main() {
             .tasmota
             .new_incoming_data_processor(&mut infrastructure)
             .await;
-        let tx = incoming_data_tx.clone();
+        let tx = infrastructure.incoming_data_tx.clone();
         async move {
             tasmota_incoming_data_processor
                 .process(tx)
@@ -139,20 +139,16 @@ pub async fn main() {
         }
     };
 
-    //TODO embed into infrastructure, type of factory is problematic
-    let http_db = infrastructure.database.clone();
-    let http_server = actix_web::HttpServer::new(move || {
-        App::new()
-            .wrap(tracing_actix_web::TracingLogger::default())
-            .service(energy_meter::new_web_service(http_db.clone()))
-    })
-    .workers(1)
-    .disable_signals()
-    .bind(("0.0.0.0", settings.http_server.port))
-    .expect("Error configuring HTTP server");
+    let http_server_exec = {
+        let http_db = infrastructure.database.clone();
 
-    let http_server_exec = async move {
-        http_server.run().await.unwrap();
+        async move {
+            settings
+                .http_server
+                .run_server(move || vec![energy_meter::new_web_service(http_db.clone())])
+                .await
+                .expect("HTTP server execution failed");
+        }
     };
 
     let process_infrastucture = infrastructure.process();
@@ -171,7 +167,8 @@ pub async fn main() {
 
 impl settings::HomeAssitant {
     fn new_command_executor(&self) -> impl CommandExecutor {
-        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token);
+        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
+            .expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(http_client, &default_ha_command_config())
     }
 
@@ -179,7 +176,9 @@ impl settings::HomeAssitant {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl IncomingDataProcessor {
-        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token);
+        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
+            .expect("Error initializing Home Assistant REST client");
+
         let mqtt_client = homeassistant::HaMqttClient::new(
             infrastructure
                 .subscribe_to_mqtt(&self.topic_event)
@@ -213,7 +212,7 @@ impl settings::Zigbee2Mqtt {
     }
 }
 
-impl settings::Tasmota2Mqtt {
+impl settings::Tasmota {
     async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
@@ -260,32 +259,24 @@ where
 }
 
 impl Infrastructure {
-    pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
-        let db_pool = sqlx::postgres::PgPoolOptions::new()
-            .min_connections(2)
-            .max_connections(8)
-            .connect(&settings.database.url)
-            .await
-            .unwrap();
-
-        let db_listener = PgListener::connect(&settings.database.url)
-            .await
-            .expect("Error initializing database listener");
+    pub async fn init(settings: &Settings) -> anyhow::Result<(Self, mpsc::Receiver<IncomingData>)> {
+        let db_pool = settings.database.new_pool().await?;
+        let db_listener = settings.database.new_listener().await?;
         let event_listener = AppEventListener::new(DbEventListener::new(db_listener));
 
-        let mqtt_client = infrastructure::mqtt::Mqtt::connect(
-            &settings.mqtt.host,
-            settings.mqtt.port,
-            &settings.mqtt.client_id,
-        );
-
+        let mqtt_client = settings.mqtt.new_client();
         let database = Database::new(db_pool);
 
-        Ok(Self {
+        let (incoming_data_tx, incoming_data_rx) = mpsc::channel(16);
+
+        let infrastructure = Self {
             database,
             mqtt_client,
             event_listener,
-        })
+            incoming_data_tx,
+        };
+
+        Ok((infrastructure, incoming_data_rx))
     }
 
     async fn subscribe_to_mqtt(

@@ -1,4 +1,4 @@
-use monitoring::meter::increment;
+use infrastructure::monitoring::meter::increment;
 
 const ITEM_TYPE: &str = "item_type";
 const ITEM_NAME: &str = "item_name";

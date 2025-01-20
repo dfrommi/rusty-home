@@ -1,5 +1,5 @@
 use api::command::{Command, CommandTarget};
-use monitoring::TraceContext;
+use infrastructure::monitoring::TraceContext;
 use support::t;
 
 use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor, CommandStore};

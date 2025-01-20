@@ -4,6 +4,7 @@ use super::port::{CommandExecutor, CommandRepository};
 
 use anyhow::Result;
 use api::command::CommandExecution;
+use infrastructure::monitoring;
 use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(

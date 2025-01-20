@@ -10,10 +10,9 @@ use core::{
     CommandExecutor, IncomingDataProcessor, IncomingMqttDataProcessor,
 };
 use homeassistant::HaCommandExecutor;
-use monitoring::Monitoring;
+use infrastructure::{monitoring::Monitoring, mqtt::MqttInMessage};
 use settings::Settings;
 use sqlx::postgres::PgListener;
-use support::mqtt::MqttInMessage;
 use tasmota::TasmotaCommandExecutor;
 use tokio::sync::{broadcast::Receiver, mpsc};
 
@@ -30,7 +29,7 @@ mod z2m;
 struct Infrastructure {
     database: Database,
     event_listener: AppEventListener,
-    mqtt_client: support::mqtt::Mqtt,
+    mqtt_client: infrastructure::mqtt::Mqtt,
 }
 
 #[derive(Clone)]
@@ -274,7 +273,7 @@ impl Infrastructure {
             .expect("Error initializing database listener");
         let event_listener = AppEventListener::new(DbEventListener::new(db_listener));
 
-        let mqtt_client = support::mqtt::Mqtt::connect(
+        let mqtt_client = infrastructure::mqtt::Mqtt::connect(
             &settings.mqtt.host,
             settings.mqtt.port,
             &settings.mqtt.client_id,

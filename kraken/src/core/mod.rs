@@ -10,7 +10,7 @@ pub use domain::execute_commands;
 pub use domain::CommandExecutor;
 pub use domain::IncomingDataProcessor;
 
-use support::mqtt::MqttInMessage;
+use infrastructure::mqtt::MqttInMessage;
 use support::time::DateTime;
 use support::DataPoint;
 

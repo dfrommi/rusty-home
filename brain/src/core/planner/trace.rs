@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::Mutex};
 
-use monitoring::TraceContext;
+use infrastructure::monitoring::TraceContext;
 use support::{t, time::DateTime};
 
 use crate::port::PlanningResultTracer;

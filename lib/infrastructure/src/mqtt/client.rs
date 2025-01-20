@@ -4,7 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use monitoring::TraceContext;
 use rumqttc::v5::{
     mqttbytes::{
         v5::{ConnectProperties, Publish, SubscribeProperties},
@@ -19,6 +18,8 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     task::JoinSet,
 };
+
+use crate::monitoring::TraceContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MqttOutMessage {

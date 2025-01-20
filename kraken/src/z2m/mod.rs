@@ -5,8 +5,8 @@ use api::{
     },
     trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
 };
+use infrastructure::mqtt::MqttInMessage;
 use support::{
-    mqtt::MqttInMessage,
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
     DataPoint,

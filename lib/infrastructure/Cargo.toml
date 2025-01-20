@@ -1,9 +1,11 @@
 [package]
-name = "monitoring"
+name = "infrastructure"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+
+#Tracing dependencies
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-opentelemetry = { workspace = true }
@@ -16,3 +18,7 @@ opentelemetry-appender-tracing = { workspace = true }
 
 serde = { workspace = true }
 cached = { workspace = true }
+
+#MQTT dependencies
+rumqttc = { workspace = true }
+tokio = { workspace = true }

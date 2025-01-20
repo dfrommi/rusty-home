@@ -1,5 +1,6 @@
 use anyhow::Context;
 use api::trigger::UserTrigger;
+use infrastructure::monitoring;
 use support::t;
 
 use crate::{core::domain::UserTriggerStorage, Database};

@@ -1,10 +1,10 @@
 use core::event::AppEventListener;
 use std::sync::Arc;
 
-use actix_web::{dev::Service, App, HttpServer};
+use actix_web::{App, HttpServer};
 use adapter::persistence::Database;
 use api::DbEventListener;
-use monitoring::Monitoring;
+use infrastructure::monitoring::Monitoring;
 use settings::Settings;
 use sqlx::postgres::PgListener;
 use tokio::task::JoinSet;
@@ -37,7 +37,7 @@ pub async fn main() {
         .expect("Error initializing database listener");
     let event_listener = AppEventListener::new(DbEventListener::new(db_listener), database.clone());
 
-    let mut mqtt_client = ::support::mqtt::Mqtt::connect(
+    let mut mqtt_client = infrastructure::mqtt::Mqtt::connect(
         &settings.mqtt.host,
         settings.mqtt.port,
         &settings.mqtt.client_id,

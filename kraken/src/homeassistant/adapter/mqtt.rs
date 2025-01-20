@@ -1,5 +1,5 @@
+use infrastructure::mqtt::MqttInMessage;
 use serde::Deserialize;
-use support::mqtt::MqttInMessage;
 
 use crate::homeassistant::domain::{ListenToStateChangesPort, StateChangedEvent};
 

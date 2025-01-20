@@ -28,7 +28,7 @@ mime = { workspace = true }
 api = { path = "../lib/api" }
 support = { path = "../lib/support" }
 macro = { path = "../lib/macro" }
-monitoring = { path = "../lib/monitoring" }
+infrastructure = { path = "../lib/infrastructure" }
 
 [dev-dependencies]
 assert-json-diff = { workspace = true }

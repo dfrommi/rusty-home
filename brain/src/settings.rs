@@ -1,5 +1,5 @@
 use config::{Config, ConfigError, File};
-use monitoring::MonitoringConfig;
+use infrastructure::monitoring::MonitoringConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

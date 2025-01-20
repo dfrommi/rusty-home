@@ -32,7 +32,7 @@ impl TraceContext {
         Self { otel_ctx }
     }
 
-    pub fn continue_from(correlation_id: Option<String>) {
+    pub fn continue_from(correlation_id: &Option<String>) {
         if let Some(id) = correlation_id {
             Self::from_correlation_id(id.as_str()).make_parent();
         }

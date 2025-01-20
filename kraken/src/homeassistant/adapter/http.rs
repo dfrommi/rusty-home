@@ -1,10 +1,12 @@
 use anyhow::Context;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_tracing::TracingMiddleware;
 
 use crate::homeassistant::domain::{CallServicePort, GetAllEntityStatesPort, StateChangedEvent};
 
 #[derive(Debug, Clone)]
 pub struct HaRestClient {
-    client: reqwest::Client,
+    client: ClientWithMiddleware,
     base_url: String,
 }
 
@@ -22,6 +24,10 @@ impl HaRestClient {
             .default_headers(headers)
             .build()
             .unwrap();
+
+        let client = reqwest_middleware::ClientBuilder::new(client)
+            .with(TracingMiddleware::default())
+            .build();
 
         Self {
             client,

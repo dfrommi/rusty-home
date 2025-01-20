@@ -42,6 +42,8 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
     for HaIncomingDataProcessor<C, L>
 {
     async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
+        tracing::info!("Requesting current state from HA");
+
         let current_dps: Vec<IncomingData> = self
             .client
             .get_current_state()
@@ -53,6 +55,8 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
         for dp in current_dps {
             sender.send(dp).await?;
         }
+
+        tracing::info!("Waiting for HA state changes");
 
         loop {
             match ListenToStateChangesPort::recv(&mut self.listener).await {

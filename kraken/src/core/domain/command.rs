@@ -47,9 +47,7 @@ async fn process_command(
     repo: &impl CommandRepository,
     executor: &impl CommandExecutor,
 ) {
-    if let Some(id) = cmd.correlation_id {
-        monitoring::TraceContext::from_correlation_id(id.as_str()).make_parent();
-    }
+    monitoring::TraceContext::continue_from(&cmd.correlation_id);
 
     let res = executor.execute_command(&cmd.command).await;
 

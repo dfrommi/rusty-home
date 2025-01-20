@@ -28,7 +28,7 @@ impl<C> HaCommandExecutor<C> {
 }
 
 impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
-    #[tracing::instrument(ret, skip(self))]
+    #[tracing::instrument(name = "execute_command HA", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let command_target: CommandTarget = command.clone().into();
 

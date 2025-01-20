@@ -33,6 +33,7 @@ rumqttc = "*"
 #Web dependencies
 actix-web = "4"
 reqwest = { version = "*", features = ["json"] }
+reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 
 #DB Dependencies
@@ -57,6 +58,7 @@ opentelemetry-otlp = "0.27"
 opentelemetry-stdout = "0.27"
 opentelemetry_sdk = { version = "0.27", features = ["trace", "rt-tokio"] }
 tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_27"] }
+reqwest-tracing = { version = "0.5", features = ["opentelemetry_0_27"] }
 
 #Test dependencies
 assert-json-diff = "2"

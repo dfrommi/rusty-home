@@ -15,5 +15,7 @@ derive_more = { workspace = true }
 iso8601-duration = { workspace = true }
 chrono-humanize = { workspace = true }
 
+monitoring = { path = "../monitoring" }
+
 [dev-dependencies]
 serde_json = { workspace = true }

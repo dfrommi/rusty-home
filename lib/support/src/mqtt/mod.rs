@@ -4,6 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use monitoring::TraceContext;
 use rumqttc::v5::{
     mqttbytes::{
         v5::{ConnectProperties, Publish, SubscribeProperties},
@@ -21,9 +22,30 @@ use tokio::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MqttOutMessage {
-    pub topic: String,
-    pub payload: String,
-    pub retain: bool,
+    topic: String,
+    payload: String,
+    retain: bool,
+    correlation_id: Option<String>,
+}
+
+impl MqttOutMessage {
+    pub fn transient(topic: String, payload: String) -> Self {
+        Self {
+            topic,
+            payload,
+            retain: false,
+            correlation_id: TraceContext::current_correlation_id(),
+        }
+    }
+
+    pub fn retained(topic: String, payload: String) -> Self {
+        Self {
+            topic,
+            payload,
+            retain: true,
+            correlation_id: TraceContext::current_correlation_id(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +128,7 @@ impl Mqtt {
         let client = self.client;
         let mut event_loop = self.event_loop;
 
+        //Receive and forward MQTT messages
         tasks.spawn(async move {
             let mut last_seen: HashMap<String, (Instant, String)> = HashMap::new();
 
@@ -166,22 +189,30 @@ impl Mqtt {
             }
         });
 
+        //Publish MQTT messages
         tasks.spawn(async move {
             while let Some(cmd) = self.publisher_rx.recv().await {
-                tracing::debug!("Publishing MQTT message to {}: {:?}", cmd.topic, cmd);
-
-                if let Err(e) = client
-                    .publish(cmd.topic.clone(), QoS::ExactlyOnce, cmd.retain, cmd.payload)
-                    .await
-                {
-                    tracing::error!("Error publishing MQTT message to {}: {}", cmd.topic, e);
-                }
+                send_message(cmd, &client).await;
             }
         });
 
         while let Some(task) = tasks.join_next().await {
             let () = task.unwrap();
         }
+    }
+}
+
+#[tracing::instrument(skip_all, fields(topic = %cmd.topic, otel.name = format!("MQTT publish {}", cmd.topic)))]
+async fn send_message(cmd: MqttOutMessage, client: &AsyncClient) {
+    TraceContext::continue_from(&cmd.correlation_id);
+
+    tracing::debug!("Publishing MQTT message to {}: {:?}", cmd.topic, cmd);
+
+    if let Err(e) = client
+        .publish(cmd.topic.clone(), QoS::ExactlyOnce, cmd.retain, cmd.payload)
+        .await
+    {
+        tracing::error!("Error publishing MQTT message to {}: {}", cmd.topic, e);
     }
 }
 

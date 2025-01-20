@@ -48,7 +48,6 @@ where
     T: Into<Channel> + ValueObject + Debug + Clone,
     T::ValueType: From<DbValue> + Clone,
 {
-    #[tracing::instrument(skip(self))]
     async fn current_data_point(
         &self,
         item: T,
@@ -172,6 +171,7 @@ impl super::Database {
     }
 }
 
+#[tracing::instrument(skip_all, fields(tag_id = tag_id))]
 async fn query_dataframe(
     pool: &sqlx::PgPool,
     tag_id: i64,

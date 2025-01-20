@@ -263,6 +263,7 @@ where
 impl Infrastructure {
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
         let db_pool = sqlx::postgres::PgPoolOptions::new()
+            .min_connections(2)
             .max_connections(8)
             .connect(&settings.database.url)
             .await

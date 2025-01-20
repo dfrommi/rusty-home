@@ -67,23 +67,21 @@ impl MqttStateSender {
         };
 
         let external_id: &ExternalId = state.as_ref();
+        let topic = format!(
+            "{}/{}/{}",
+            self.base_topic,
+            external_id.ext_type(),
+            external_id.ext_name()
+        );
+        let payload = value.0;
 
-        let msg = MqttOutMessage {
-            topic: format!(
-                "{}/{}/{}",
-                self.base_topic,
-                external_id.ext_type(),
-                external_id.ext_name()
-            ),
-            payload: value.0,
-            retain: true,
-        };
-
-        if self.last_sent.get(&msg.topic) == Some(&msg.payload) {
+        if self.last_sent.get(&topic) == Some(&payload) {
             return;
         }
 
-        self.tx.send(msg.clone()).await.unwrap();
-        self.last_sent.insert(msg.topic, msg.payload);
+        let msg = MqttOutMessage::retained(topic.clone(), payload.clone());
+
+        self.tx.send(msg).await.unwrap();
+        self.last_sent.insert(topic, payload);
     }
 }

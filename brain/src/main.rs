@@ -25,6 +25,7 @@ pub async fn main() {
         Monitoring::init(&settings.monitoring).expect("Error initializing monitoring");
 
     let db_pool = sqlx::postgres::PgPoolOptions::new()
+        .min_connections(2)
         .max_connections(8)
         .connect(&settings.database.url)
         .await

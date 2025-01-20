@@ -93,12 +93,18 @@ where
             (Some(current_temperature), Some(start_temperature)) => {
                 let diff = current_temperature.value - start_temperature.value;
                 //temperature still increasing significantly
-                let significant_increase = diff > DegreeCelsius(0.1);
+                let significant_increase = diff >= DegreeCelsius(0.1);
                 result!(significant_increase, current_temperature.timestamp, item,
                     @window_opened,
                     @current_temperature,
+                    @start_temperature,
                     temperature_increase = %diff,
-                    "Automatic temperature increase active, because temperature increased by more than 0.1 degree in last 5 minutes"
+                    "{}",
+                    if significant_increase {
+                        "Automatic temperature increase active, because temperature increased by more than 0.1 degree in last 5 minutes"
+                    } else {
+                        "Automatic temperature increase not active, because temperature increased by less than 0.1 degree in last 5 minutes"
+                    },
                 );
             }
             _ => {

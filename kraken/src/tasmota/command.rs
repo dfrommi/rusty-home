@@ -26,7 +26,7 @@ impl TasmotaCommandExecutor {
 }
 
 impl CommandExecutor for TasmotaCommandExecutor {
-    #[tracing::instrument(ret, skip(self))]
+    #[tracing::instrument(name = "execute_command TASMOTA", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let cmd_target: CommandTarget = command.into();
         let tasmota_target = self.config.iter().find_map(|(cmd, tasmota)| {
@@ -43,15 +43,14 @@ impl CommandExecutor for TasmotaCommandExecutor {
 
         match (command, tasmota_target.unwrap()) {
             (Command::SetPower { power_on, .. }, TasmotaCommandTarget::PowerSwitch(device_id)) => {
-                let msg = MqttOutMessage {
-                    topic: format!("{}/cmnd/{}/Power1", self.base_topic, device_id),
-                    payload: if *power_on {
+                let msg = MqttOutMessage::transient(
+                    format!("{}/cmnd/{}/Power1", self.base_topic, device_id),
+                    if *power_on {
                         "ON".to_string()
                     } else {
                         "OFF".to_string()
                     },
-                    retain: false,
-                };
+                );
 
                 self.sender.send(msg).await?;
                 Ok(true)

@@ -42,6 +42,7 @@ mod macros {
             let result = support::DataPoint::new($result, $timestamp);
 
             tracing::trace!(
+                timestamp = %support::t!(now),
                 item.r#type = %$item.int_type(),
                 item.name = %$item.int_name(),
                 result.value = %result.value,

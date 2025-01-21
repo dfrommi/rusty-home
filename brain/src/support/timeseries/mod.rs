@@ -12,6 +12,7 @@ use anyhow::{bail, Result};
 pub struct TimeSeries<T: Estimatable> {
     context: T,
     values: DataFrame<T::Type>,
+    num_estimated: usize,
 }
 
 impl<C: Estimatable> TimeSeries<C> {
@@ -23,19 +24,24 @@ impl<C: Estimatable> TimeSeries<C> {
             .cloned()
             .collect::<Vec<_>>();
 
+        let mut num_estimated = 0;
+
         let start_at = *range.start();
         if let Some(interpolated) = Self::interpolate_or_guess(&context, start_at, df) {
             dps_in_range.push(DataPoint::new(interpolated, start_at));
+            num_estimated += 1;
         }
 
         let end_at = *range.end();
         if let Some(interpolated) = Self::interpolate_or_guess(&context, end_at, df) {
             dps_in_range.push(DataPoint::new(interpolated, end_at));
+            num_estimated += 1;
         }
 
         Ok(Self {
             context,
             values: DataFrame::new(dps_in_range)?,
+            num_estimated,
         })
     }
 
@@ -138,8 +144,8 @@ impl<T: Estimatable> TimeSeries<T> {
         &self.values
     }
 
-    pub fn len(&self) -> usize {
-        self.values.len()
+    pub fn len_non_estimated(&self) -> usize {
+        self.values.len() - self.num_estimated
     }
 
     pub fn range(&self) -> DateTimeRange {

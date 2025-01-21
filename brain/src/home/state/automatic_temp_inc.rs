@@ -74,7 +74,7 @@ where
             .await?;
 
         //wait for a measurement. until then assume opened window still has effect
-        if temperature.len() < 2 {
+        if temperature.len_non_estimated() < 2 {
             result!(true, window_opened.timestamp, item,
                 @window_opened,
                 "Automatic temperature increase assumed, because not enough temperature measurements exist after window was opened"

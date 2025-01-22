@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::ensure;
 
+#[derive(Debug, Clone)]
 pub struct DataFrame<T> {
     data: BTreeMap<DateTime, DataPoint<T>>,
 }

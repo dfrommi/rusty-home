@@ -23,7 +23,7 @@ impl ValueObject for AutomaticTemperatureIncrease {
 //TODO detect active heating and summer mode
 impl<T> DataPointAccess<AutomaticTemperatureIncrease> for T
 where
-    T: DataPointAccess<Opened> + DataPointAccess<Temperature> + TimeSeriesAccess<Temperature>,
+    T: DataPointAccess<Opened> + TimeSeriesAccess<Temperature>,
 {
     async fn current_data_point(
         &self,
@@ -108,11 +108,82 @@ where
                 );
             }
             _ => {
+                //Should not happen, covered before
                 result!(true, any_timestamp, item,
                     @window_opened,
                     "Automatic temperature increase assumed, because there are not enough temperature measurements"
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use super::super::tests::Api;
+
+    #[tokio::test]
+    async fn no_increase_when_window_open() {
+        let mut api = Api::default();
+        api.opened(true, t!(5 minutes ago));
+
+        assert!(!increasing(api).await);
+    }
+
+    #[tokio::test]
+    async fn increasing_when_window_just_opened() {
+        let mut api = Api::default();
+        api.opened(false, t!(4 minutes ago));
+
+        assert!(increasing(api).await);
+    }
+
+    #[tokio::test]
+    async fn not_increasing_when_window_closed_for_long_time() {
+        let mut api = Api::default();
+        api.opened(false, t!(35 minutes ago));
+
+        assert!(!increasing(api).await);
+    }
+
+    #[tokio::test]
+    async fn increasing_when_not_enough_data_points() {
+        let mut api = Api::default();
+        api.opened(false, t!(8 minutes ago))
+            .temperature_series(&[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))]);
+
+        assert!(increasing(api).await);
+    }
+
+    #[tokio::test]
+    async fn increasing_when_temperature_difference_big() {
+        let mut api = Api::default();
+        api.opened(false, t!(15 minutes ago)).temperature_series(&[
+            (17.0, t!(10 minutes ago)),
+            (17.5, t!(6 minutes ago)),
+            (17.9, t!(2 minutes ago)),
+        ]);
+
+        assert!(increasing(api).await);
+    }
+
+    #[tokio::test]
+    async fn not_increasing_when_temperature_change_small() {
+        let mut api = Api::default();
+        api.opened(false, t!(15 minutes ago)).temperature_series(&[
+            (17.0, t!(10 minutes ago)),
+            (17.5, t!(6 minutes ago)),
+            (17.6, t!(2 minutes ago)),
+        ]);
+
+        assert!(!increasing(api).await);
+    }
+
+    async fn increasing(api: Api) -> bool {
+        api.current(AutomaticTemperatureIncrease::LivingRoom)
+            .await
+            .unwrap()
     }
 }

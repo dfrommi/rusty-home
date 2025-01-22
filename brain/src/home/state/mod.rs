@@ -65,3 +65,74 @@ mod macros {
 
     pub(super) use result;
 }
+
+#[cfg(test)]
+mod tests {
+    use api::state::*;
+    use support::{t, time::DateTime, unit::*, DataFrame, DataPoint};
+
+    use crate::support::timeseries::TimeSeries;
+
+    use super::{DataPointAccess, TimeSeriesAccess};
+
+    #[derive(Clone, Default)]
+    pub struct Api {
+        opened: Option<DataPoint<bool>>,
+        temperature_dp: Option<DataPoint<DegreeCelsius>>,
+        temperature_df: Option<DataFrame<DegreeCelsius>>,
+    }
+
+    impl Api {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn opened(&mut self, value: bool, at: DateTime) -> &mut Self {
+            self.opened = Some(DataPoint::new(value, at));
+            self
+        }
+
+        pub fn current_temperature(&mut self, value: f64) -> &mut Self {
+            self.temperature_dp = Some(DataPoint::new(DegreeCelsius(value), t!(now)));
+            self
+        }
+
+        pub fn temperature_series(&mut self, values: &[(f64, DateTime)]) -> &mut Self {
+            self.temperature_df = Some(
+                DataFrame::new(
+                    values
+                        .iter()
+                        .map(|(v, t)| DataPoint::new(DegreeCelsius(*v), *t)),
+                )
+                .unwrap(),
+            );
+
+            self
+        }
+    }
+
+    impl DataPointAccess<Opened> for Api {
+        async fn current_data_point(&self, _: Opened) -> anyhow::Result<DataPoint<bool>> {
+            Ok(self.opened.clone().unwrap())
+        }
+    }
+
+    impl DataPointAccess<Temperature> for Api {
+        async fn current_data_point(
+            &self,
+            _: Temperature,
+        ) -> anyhow::Result<DataPoint<DegreeCelsius>> {
+            Ok(self.temperature_dp.clone().unwrap())
+        }
+    }
+
+    impl TimeSeriesAccess<Temperature> for Api {
+        async fn series(
+            &self,
+            item: Temperature,
+            range: support::time::DateTimeRange,
+        ) -> anyhow::Result<TimeSeries<Temperature>> {
+            TimeSeries::new(item, &self.temperature_df.clone().unwrap(), range)
+        }
+    }
+}

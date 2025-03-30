@@ -81,9 +81,13 @@ impl DailyTimeRange {
     }
 
     pub fn active_or_previous_at(&self, reference: DateTime) -> DateTimeRange {
-        //TODO could crash with DST -> fallback to duration between start and end
-        let start = reference.at(self.start).unwrap();
-        let mut end = start.at(self.end).unwrap();
+        //TODO handle switch to winter time
+        //workaround for switch to summer time by adjusting the range. Not ideal, but does the job
+        let start = reference
+            .at(self.start)
+            .or_else(|_| reference.at(t!(2:00)))
+            .unwrap();
+        let mut end = start.at(self.end).or_else(|_| start.at(t!(3:00))).unwrap();
 
         if start > end {
             end = end.on_next_day();
@@ -231,6 +235,15 @@ mod tests {
 
         assert_eq!(range.start(), &t!(22:00).yesterday());
         assert_eq!(range.end(), &t!(03:00).today());
+    }
+
+    #[test]
+    fn test_active_or_previous_dst() {
+        let range = t!(02:15 - 02:45)
+            .active_or_previous_at(DateTime::from_iso("2025-03-30T12:30:00+01:00").unwrap());
+
+        assert_eq!(range.start(), &t!(2:00).today());
+        assert_eq!(range.end(), &t!(3:00).today());
     }
 
     #[tokio::test]

@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 
 use actix_web::{
+    HttpResponse, Responder,
     http::header,
     web::{self},
-    HttpResponse, Responder,
 };
 use api::state::{CurrentPowerUsage, HeatingDemand};
 use support::{DataPoint, ValueObject};
@@ -24,7 +24,10 @@ where
     current_values_response(api.as_ref(), HeatingDemand::variants()).await
 }
 
-async fn current_values_response<T>(api: &impl DataPointAccess<T>, items: &[T]) -> impl Responder
+async fn current_values_response<T, U: DataPointAccess<T>>(
+    api: &U,
+    items: &[T],
+) -> impl Responder + use<T, U>
 where
     T: ValueObject + DashboardDisplay + Clone,
     T::ValueType: PartialOrd + AsRef<f64>,

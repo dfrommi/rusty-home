@@ -1,20 +1,20 @@
 use std::cmp::Ordering;
 
 use actix_web::{
+    HttpResponse, Responder,
     http::header,
     web::{self, Query},
-    HttpResponse, Responder,
 };
 use api::state::{HeatingDemand, TotalEnergyConsumption};
-use support::{time::DateTimeRange, ValueObject};
+use support::{ValueObject, time::DateTimeRange};
 
 use crate::{
     adapter::grafana::{
-        dashboard::{Room, TimeRangeQuery, EURO_PER_KWH},
         DashboardDisplay,
+        dashboard::{EURO_PER_KWH, Room, TimeRangeQuery},
     },
     port::TimeSeriesAccess,
-    support::timeseries::{interpolate::Estimatable, TimeSeries},
+    support::timeseries::{TimeSeries, interpolate::Estimatable},
 };
 
 pub async fn total_power<T>(api: web::Data<T>, time_range: Query<TimeRangeQuery>) -> impl Responder
@@ -54,12 +54,12 @@ where
     .await
 }
 
-async fn total_values_response<T>(
-    api: &impl TimeSeriesAccess<T>,
+async fn total_values_response<T, U: TimeSeriesAccess<T>, V: Fn(&T, TimeSeries<T>) -> (f64, f64)>(
+    api: &U,
     items: &[T],
     time_range: DateTimeRange,
-    value_mapper: impl Fn(&T, TimeSeries<T>) -> (f64, f64),
-) -> impl Responder
+    value_mapper: V,
+) -> impl Responder + use<T, U, V>
 where
     T: ValueObject + DashboardDisplay + Estimatable + Clone,
     T::ValueType: PartialOrd + AsRef<f64>,

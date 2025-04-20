@@ -10,3 +10,4 @@ Cargo.lock
 /*.toml
 !Cargo.toml
 
+homebridge/

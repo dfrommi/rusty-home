@@ -14,7 +14,7 @@ pub fn new_incoming_data_processor(
     client: HaRestClient,
     mqtt_client: HaMqttClient,
     config: &[(&str, HaChannel)],
-) -> anyhow::Result<impl IncomingDataProcessor> {
+) -> anyhow::Result<impl IncomingDataProcessor + use<>> {
     let collector = domain::HaIncomingDataProcessor::new(client, mqtt_client, config);
     Ok(collector)
 }

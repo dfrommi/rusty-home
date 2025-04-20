@@ -1,12 +1,12 @@
 use anyhow::Context;
-use api::{command::Command, DbEventListener};
+use api::{DbEventListener, command::Command};
 use config::{
     default_ha_command_config, default_ha_state_config, default_tasmota_command_config,
     default_tasmota_state_config, default_z2m_state_config,
 };
 use core::{
-    event::{AppEventListener, CommandAddedEvent},
     CommandExecutor, IncomingData, IncomingDataProcessor, IncomingMqttDataProcessor,
+    event::{AppEventListener, CommandAddedEvent},
 };
 use homeassistant::HaCommandExecutor;
 use infrastructure::MqttInMessage;
@@ -175,7 +175,7 @@ impl settings::HomeAssitant {
     async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor {
+    ) -> impl IncomingDataProcessor + use<> {
         let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
             .expect("Error initializing Home Assistant REST client");
 
@@ -199,7 +199,7 @@ impl settings::Zigbee2Mqtt {
     async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor {
+    ) -> impl IncomingDataProcessor + use<> {
         let parser = z2m::Z2mMqttParser::new(self.event_topic.clone());
 
         IncomingMqttDataProcessor::new(
@@ -216,7 +216,7 @@ impl settings::Tasmota {
     async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor {
+    ) -> impl IncomingDataProcessor + use<> {
         let parser = tasmota::TasmotaMqttParser::new(self.event_topic.clone());
 
         IncomingMqttDataProcessor::new(
@@ -228,7 +228,10 @@ impl settings::Tasmota {
         .expect("Error initializing Tasmota state collector")
     }
 
-    fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor {
+    fn new_command_executor(
+        &self,
+        infrastructure: &Infrastructure,
+    ) -> impl CommandExecutor + use<> {
         let tx = infrastructure.mqtt_client.new_publisher();
         let config = default_tasmota_command_config();
         TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)

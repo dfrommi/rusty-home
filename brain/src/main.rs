@@ -79,7 +79,7 @@ impl Infrastructure {
         })
     }
 
-    fn run_http_server(&self, http_settings: HttpServerConfig) -> impl Future<Output = ()> {
+    fn run_http_server(&self, http_settings: HttpServerConfig) -> impl Future<Output = ()> + use<> {
         let http_api = Arc::new(self.database.clone());
 
         async move {
@@ -110,7 +110,7 @@ impl Infrastructure {
     }
 }
 
-fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> {
+fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
     let api = infrastructure.database.clone();
     let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
     let mut user_trigger_events = infrastructure
@@ -133,7 +133,7 @@ fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()>
 }
 
 impl settings::HomekitConfig {
-    fn export_state(&self, infrastructure: &Infrastructure) -> impl Future<Output = ()> {
+    fn export_state(&self, infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
         let mqtt_api = infrastructure.database.clone();
         let mqtt_sender = infrastructure.mqtt_client.new_publisher();
         let state_topic = self.base_topic_status.clone();
@@ -148,7 +148,7 @@ impl settings::HomekitConfig {
     async fn process_commands(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = ()> + use<> {
         let mqtt_command_receiver = infrastructure
             .mqtt_client
             .subscribe(format!("{}/#", &self.base_topic_set))

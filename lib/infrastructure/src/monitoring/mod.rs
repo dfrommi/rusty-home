@@ -2,22 +2,20 @@ pub mod meter;
 mod trace;
 
 use opentelemetry::trace::TracerProvider;
-use opentelemetry_sdk::metrics::MetricError;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_opentelemetry::OpenTelemetryLayer;
 
 use tracing_subscriber::layer::SubscriberExt;
 
-use opentelemetry::trace::TraceError;
 use opentelemetry::KeyValue;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::logs::LogError;
-use opentelemetry_sdk::logs::LoggerProvider;
-use opentelemetry_sdk::{trace as sdktrace, Resource};
+use opentelemetry_otlp::{ExporterBuildError, WithExportConfig};
+use opentelemetry_sdk::Resource;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
 use std::error::Error;
-use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::prelude::*;
 
 pub use trace::TraceContext;
 
@@ -57,10 +55,10 @@ impl TryInto<EnvFilter> for EnvFilterConfig {
 
 impl MonitoringConfig {
     pub fn init(&self) -> Result<(), Box<dyn Error>> {
-        let resource = Resource::new(vec![
-            KeyValue::new("service.name", self.service_name.clone()),
-            KeyValue::new("app.name", self.app_name.clone()),
-        ]);
+        let resource = Resource::builder()
+            .with_attribute(KeyValue::new("service.name", self.service_name.clone()))
+            .with_attribute(KeyValue::new("app.name", self.app_name.clone()))
+            .build();
 
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
 
@@ -102,19 +100,19 @@ impl MonitoringConfig {
 fn init_traces(
     resource: Resource,
     url: Option<String>,
-) -> Result<sdktrace::TracerProvider, TraceError> {
+) -> Result<SdkTracerProvider, ExporterBuildError> {
     match url {
         Some(url) => {
             let exporter = opentelemetry_otlp::SpanExporter::builder()
                 .with_tonic()
                 .with_endpoint(url)
                 .build()?;
-            Ok(sdktrace::TracerProvider::builder()
+            Ok(SdkTracerProvider::builder()
                 .with_resource(resource)
-                .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                .with_batch_exporter(exporter)
                 .build())
         }
-        None => Ok(sdktrace::TracerProvider::builder()
+        None => Ok(SdkTracerProvider::builder()
             .with_resource(resource)
             .with_simple_exporter(opentelemetry_stdout::SpanExporter::default())
             .build()),
@@ -124,38 +122,41 @@ fn init_traces(
 fn init_metrics(
     resource: Resource,
     url: Option<String>,
-) -> Result<opentelemetry_sdk::metrics::SdkMeterProvider, MetricError> {
-    let reader = match url {
+) -> Result<opentelemetry_sdk::metrics::SdkMeterProvider, ExporterBuildError> {
+    match url {
         Some(url) => {
             let exporter = opentelemetry_otlp::MetricExporter::builder()
                 .with_tonic()
                 .with_endpoint(url)
                 .build()?;
-            opentelemetry_sdk::metrics::PeriodicReader::builder(
-                exporter,
-                opentelemetry_sdk::runtime::Tokio,
+            let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(exporter)
+                .with_interval(std::time::Duration::from_secs(5))
+                .build();
+
+            Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
+                .with_reader(reader)
+                .with_resource(resource)
+                .build())
+        }
+        None => {
+            let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
+                opentelemetry_stdout::MetricExporter::default(),
             )
             .with_interval(std::time::Duration::from_secs(5))
-            .build()
-        }
-        None => opentelemetry_sdk::metrics::PeriodicReader::builder(
-            opentelemetry_stdout::MetricExporter::default(),
-            opentelemetry_sdk::runtime::Tokio,
-        )
-        .with_interval(std::time::Duration::from_secs(5))
-        .build(),
-    };
+            .build();
 
-    Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
-        .with_reader(reader)
-        .with_resource(resource)
-        .build())
+            Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
+                .with_reader(reader)
+                .with_resource(resource)
+                .build())
+        }
+    }
 }
 
 fn init_logs(
     resource: Resource,
     url: Option<String>,
-) -> Result<opentelemetry_sdk::logs::LoggerProvider, LogError> {
+) -> Result<SdkLoggerProvider, ExporterBuildError> {
     match url {
         Some(url) => {
             let exporter = opentelemetry_otlp::LogExporter::builder()
@@ -163,12 +164,12 @@ fn init_logs(
                 .with_endpoint(url)
                 .build()?;
 
-            Ok(LoggerProvider::builder()
+            Ok(SdkLoggerProvider::builder()
                 .with_resource(resource)
-                .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                .with_batch_exporter(exporter)
                 .build())
         }
-        None => Ok(LoggerProvider::builder()
+        None => Ok(SdkLoggerProvider::builder()
             .with_resource(resource)
             .with_simple_exporter(opentelemetry_stdout::LogExporter::default())
             .build()),

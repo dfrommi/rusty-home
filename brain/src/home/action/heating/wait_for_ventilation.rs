@@ -10,7 +10,7 @@ use crate::{
     port::{CommandAccess, DataPointAccess},
 };
 
-use super::{trigger_once_and_keep_running, CommandState};
+use super::{CommandState, trigger_once_and_keep_running};
 
 #[derive(Debug, Clone)]
 pub enum DeferHeatingUntilVentilationDone {

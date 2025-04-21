@@ -10,7 +10,7 @@ use crate::{
     port::{CommandAccess, DataPointAccess},
 };
 
-use super::{trigger_once_and_keep_running, CommandState};
+use super::{CommandState, trigger_once_and_keep_running};
 
 #[derive(Debug, Clone)]
 pub enum ExtendHeatingUntilSleeping {
@@ -28,8 +28,8 @@ impl ExtendHeatingUntilSleeping {
 
     fn target_temperature(&self) -> DegreeCelsius {
         match self {
-            ExtendHeatingUntilSleeping::LivingRoom => DegreeCelsius(20.0),
-            ExtendHeatingUntilSleeping::Bedroom => DegreeCelsius(19.0),
+            ExtendHeatingUntilSleeping::LivingRoom => DegreeCelsius(19.5),
+            ExtendHeatingUntilSleeping::Bedroom => DegreeCelsius(18.0),
         }
     }
 

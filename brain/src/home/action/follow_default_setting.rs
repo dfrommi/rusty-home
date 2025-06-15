@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use api::command::{Command, CommandTarget};
+use support::unit::Percent;
 
 use crate::core::planner::{Action, ActionEvaluationResult};
 
@@ -43,6 +44,10 @@ impl Action<()> for FollowDefaultSetting {
             CommandTarget::SetEnergySaving { device } => {
                 Command::SetEnergySaving { device, on: true }
             }
+            CommandTarget::ControlFan { device } => Command::ControlFan {
+                device,
+                speed: Percent(0.0),
+            },
         };
 
         Ok(ActionEvaluationResult::Execute(

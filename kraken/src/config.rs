@@ -1,8 +1,7 @@
 use api::command::{
-    CommandTarget, EnergySavingDevice, Notification, NotificationRecipient, Thermostat,
+    CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, Thermostat,
 };
 
-use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
 use api::state::{
     CurrentPowerUsage, FanSpeed, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption,
 };
@@ -61,6 +60,12 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
                 device: EnergySavingDevice::LivingRoomTv,
             },
             HaServiceTarget::LgWebosSmartTv("media_player.lg_webos_smart_tv"),
+        ),
+        (
+            CommandTarget::ControlFan {
+                device: Fan::LivingRoomFan,
+            },
+            HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_living_room"),
         ),
     ]
 }

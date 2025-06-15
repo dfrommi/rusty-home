@@ -2,7 +2,7 @@ use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
 use support::{
     time::{DateTime, Duration},
-    unit::DegreeCelsius,
+    unit::{DegreeCelsius, Percent},
 };
 
 pub mod db;
@@ -28,6 +28,10 @@ pub enum Command {
         device: EnergySavingDevice,
         on: bool,
     },
+    ControlFan {
+        device: Fan,
+        speed: Percent,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, Serialize, Deserialize, derive_more::Display)]
@@ -47,6 +51,9 @@ pub enum CommandTarget {
 
     #[display("SetEnergySaving[{}]", device)]
     SetEnergySaving { device: EnergySavingDevice },
+
+    #[display("ControlFan[{}]", device)]
+    ControlFan { device: Fan },
 }
 
 impl From<Command> for CommandTarget {
@@ -73,6 +80,9 @@ impl From<&Command> for CommandTarget {
                 notification: notification.clone(),
             },
             Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving {
+                device: device.clone(),
+            },
+            Command::ControlFan { device, .. } => CommandTarget::ControlFan {
                 device: device.clone(),
             },
         }
@@ -185,6 +195,15 @@ impl From<NotificationTarget> for CommandTarget {
 #[serde(rename_all = "snake_case")]
 pub enum EnergySavingDevice {
     LivingRoomTv,
+}
+
+//
+// FAN CONTROL
+//
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[serde(rename_all = "snake_case")]
+pub enum Fan {
+    LivingRoomFan,
 }
 
 #[cfg(test)]

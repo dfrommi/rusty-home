@@ -28,6 +28,7 @@ pub enum HaServiceTarget {
     ClimateControl(&'static str),
     PushNotification(&'static str),
     LgWebosSmartTv(&'static str),
+    WindcalmFanSpeed(&'static str),
 }
 
 #[derive(Deserialize, Debug)]

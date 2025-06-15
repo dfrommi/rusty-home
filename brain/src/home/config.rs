@@ -127,6 +127,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
                 recipient: NotificationRecipient::Sabine,
                 notification: api::command::Notification::WindowOpened,
             }).into(),
+            FollowDefaultSetting::new(CommandTarget::ControlFan {
+                device: Fan::LivingRoomFan,
+            }).into(),
         ]
     )
     ]

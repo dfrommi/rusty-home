@@ -1,10 +1,13 @@
 use api::command::{Command, CommandTarget};
 use serde_json::json;
-use support::{time::Duration, unit::DegreeCelsius};
+use support::{
+    time::Duration,
+    unit::{DegreeCelsius, Percent},
+};
 
 use crate::{
     core::CommandExecutor,
-    homeassistant::domain::{port::CallServicePort, HaServiceTarget},
+    homeassistant::domain::{HaServiceTarget, port::CallServicePort},
 };
 
 pub struct HaCommandExecutor<C> {
@@ -59,8 +62,8 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
         command: &Command,
         ha_target: &HaServiceTarget,
     ) -> anyhow::Result<()> {
-        use api::command::*;
         use HaServiceTarget::*;
+        use api::command::*;
 
         match (ha_target, command) {
             (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => {
@@ -110,6 +113,9 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => {
                 self.lg_tv_energy_saving_mode(id, *on).await
             }
+            (WindcalmFanSpeed(id), Command::ControlFan { speed, .. }) => {
+                self.windcalm_fan_speed(id, speed).await
+            }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }
     }
@@ -157,6 +163,31 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
                 }),
             )
             .await
+    }
+
+    async fn windcalm_fan_speed(&self, id: &str, speed: &Percent) -> anyhow::Result<()> {
+        if speed.0 == 0.0 {
+            self.client
+                .call_service(
+                    "fan",
+                    "turn_off",
+                    json!({
+                        "entity_id": vec![id.to_string()]
+                    }),
+                )
+                .await
+        } else {
+            self.client
+                .call_service(
+                    "fan",
+                    "turn_on",
+                    json!({
+                                        "entity_id": vec![id.to_string()],
+                                        "percentage": speed.0 + 1.0, //setting 21 leads to 20
+                    }),
+                )
+                .await
+        }
     }
 
     async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {

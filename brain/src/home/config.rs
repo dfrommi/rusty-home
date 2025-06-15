@@ -21,6 +21,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::LivingRoom),
         vec![
+            UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
             NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
             KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),

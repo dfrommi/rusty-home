@@ -35,3 +35,13 @@ impl From<Percent> for MqttStateValue {
     }
 }
 
+impl TryInto<Percent> for MqttStateValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Percent, Self::Error> {
+        match self.0.parse() {
+            Ok(v) => Ok(Percent(v)),
+            Err(_) => anyhow::bail!("Error converting {} to Percent", self.0),
+        }
+    }
+}

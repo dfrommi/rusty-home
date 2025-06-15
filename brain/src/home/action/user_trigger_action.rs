@@ -12,7 +12,7 @@ use crate::core::{
     service::CommandState,
 };
 
-use super::{trigger_once_and_keep_running, CommandAccess, DataPointAccess, UserTriggerAccess};
+use super::{CommandAccess, DataPointAccess, UserTriggerAccess, trigger_once_and_keep_running};
 
 #[derive(Debug, Clone, derive_more::Display)]
 #[display("UserTriggerAction[{}]", target)]
@@ -106,6 +106,9 @@ impl UserTriggerAction {
                     }
                 }
             }
+            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed) => {
+                Some(t!(30 minutes ago))
+            }
         }
     }
 }
@@ -138,6 +141,12 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
             Some(Command::SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
                 on: false,
+            })
+        }
+        UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(speed)) => {
+            Some(Command::ControlFan {
+                device: Fan::LivingRoomFan,
+                speed,
             })
         }
 

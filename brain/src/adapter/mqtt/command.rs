@@ -1,6 +1,6 @@
 use anyhow::bail;
 use api::{
-    state::Powered,
+    state::{FanSpeed, Powered},
     trigger::{Homekit, UserTrigger},
 };
 use infrastructure::MqttInMessage;
@@ -67,6 +67,14 @@ fn to_command(
         return match energy_saving {
             EnergySaving::LivingRoomTv => Ok(UserTrigger::Homekit(
                 Homekit::LivingRoomTvEnergySaving(value.try_into()?),
+            )),
+        };
+    }
+
+    if let Ok(fan_speed) = FanSpeed::try_from(&external_id) {
+        return match fan_speed {
+            FanSpeed::LivingRoomCeilingFan => Ok(UserTrigger::Homekit(
+                Homekit::LivingRoomCeilingFanSpeed(value.try_into()?),
             )),
         };
     }

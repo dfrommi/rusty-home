@@ -3,6 +3,9 @@ use api::command::{
 };
 
 use api::state::{CurrentPowerUsage, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption};
+use api::state::{
+    CurrentPowerUsage, FanSpeed, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption,
+};
 use api::trigger::RemoteTarget;
 use api::{
     command::PowerToggle, state::Opened, state::Powered, state::RelativeHumidity,
@@ -217,6 +220,13 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "device_tracker.simi_2",
             HaChannel::PresenceFromDeviceTracker(Presence::AtHomeSabine),
+        ),
+        //
+        // FAN SPEED
+        //
+        (
+            "fan.ceiling_fan_living_room",
+            HaChannel::WindcalmFanSpeed(FanSpeed::LivingRoomCeilingFan),
         ),
     ]
 }

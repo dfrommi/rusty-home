@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use api::state::Powered;
+use api::state::{FanSpeed, Powered};
 use infrastructure::MqttOutMessage;
 use support::{ExternalId, ValueObject};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
@@ -15,7 +15,7 @@ pub async fn export_state<T>(
     tx: Sender<MqttOutMessage>,
     mut state_changed: Receiver<StateChangedEvent>,
 ) where
-    T: DataPointAccess<Powered> + DataPointAccess<EnergySaving>,
+    T: DataPointAccess<Powered> + DataPointAccess<EnergySaving> + DataPointAccess<FanSpeed>,
 {
     let mut sender = MqttStateSender::new(base_topic.to_owned(), tx);
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
@@ -29,6 +29,7 @@ pub async fn export_state<T>(
         sender.send(Powered::Dehumidifier, api).await;
         sender.send(Powered::InfraredHeater, api).await;
         sender.send(EnergySaving::LivingRoomTv, api).await;
+        sender.send(FanSpeed::LivingRoomCeilingFan, api).await;
     }
 }
 

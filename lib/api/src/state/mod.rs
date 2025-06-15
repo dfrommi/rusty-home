@@ -18,6 +18,7 @@ pub enum ChannelValue {
     Presence(Presence, bool),
     TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
+    FanSpeed(FanSpeed, Percent),
 }
 
 impl ChannelValue {
@@ -35,6 +36,7 @@ impl ChannelValue {
             ChannelValue::Presence(_, value) => value.to_string(),
             ChannelValue::TotalRadiatorConsumption(_, value) => value.to_string(),
             ChannelValue::TotalWaterConsumption(_, value) => value.to_string(),
+            ChannelValue::FanSpeed(_, value) => value.to_string(),
         }
     }
 }
@@ -64,6 +66,7 @@ impl From<(Channel, DbValue)> for ChannelValue {
             Channel::TotalWaterConsumption(item) => {
                 ChannelValue::TotalWaterConsumption(item, value.into())
             }
+            Channel::FanSpeed(item) => ChannelValue::FanSpeed(item, value.into()),
         }
     }
 }
@@ -210,6 +213,11 @@ pub enum TotalWaterConsumption {
     KitchenWarm,
     BathroomCold,
     BathroomWarm,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+pub enum FanSpeed {
+    LivingRoomCeilingFan,
 }
 
 #[cfg(test)]

@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use anyhow::bail;
 use api::state::ChannelValue;
 use support::{
+    DataPoint,
     time::DateTime,
     unit::{DegreeCelsius, Percent},
-    DataPoint,
 };
 use tokio::sync::mpsc;
 
@@ -195,6 +195,20 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
+        HaChannel::WindcalmFanSpeed(channel) => {
+            let v = match (
+                ha_value,
+                attributes.get("percentage").and_then(|v| v.as_f64()),
+            ) {
+                ("off", _) => 0.0,
+                (_, Some(f_value)) => f_value,
+                _ => bail!("No temperature found in attributes or not a number"),
+            };
+
+            Some(
+                DataPoint::new(ChannelValue::FanSpeed(channel, Percent::from(v)), timestamp).into(),
+            )
+        }
     };
 
     Ok(dp)

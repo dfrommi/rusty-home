@@ -1,4 +1,4 @@
-use api::command::{CommandTarget, NotificationRecipient, PowerToggle, Thermostat};
+use api::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
 use api::trigger::{HomekitTarget, RemoteTarget};
 use support::t;
 

@@ -5,7 +5,7 @@ use api::{
         ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget,
     },
 };
-use support::{t, time::DateTime};
+use support::{t, time::Duration};
 
 use crate::core::{
     planner::{Action, ActionEvaluationResult},
@@ -31,8 +31,8 @@ where
     API: UserTriggerAccess + CommandAccess + CommandState + DataPointAccess<Powered>,
 {
     async fn evaluate(&self, api: &API) -> anyhow::Result<ActionEvaluationResult> {
-        let start_of_range = match self.range_start(api).await {
-            Some(duration) => duration,
+        let start_of_range = match self.default_duration(api).await {
+            Some(duration) => t!(now) - duration,
             None => {
                 tracing::trace!("User-trigger action currently disabled, skipping");
                 return Ok(ActionEvaluationResult::Skip);
@@ -84,21 +84,19 @@ impl UserTriggerAction {
         CommandSource::User(format!("{}:{}", source_group, self.target))
     }
 
-    async fn range_start<API>(&self, api: &API) -> Option<DateTime>
+    async fn default_duration<API>(&self, api: &API) -> Option<Duration>
     where
         API: DataPointAccess<Powered>,
     {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
             | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => {
-                Some(t!(30 minutes ago))
+                Some(t!(30 minutes))
             }
-            UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => {
-                Some(t!(15 minutes ago))
-            }
+            UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomTvEnergySaving) => {
                 match api.current_data_point(Powered::LivingRoomTv).await {
-                    Ok(dp) if dp.value => Some(dp.timestamp),
+                    Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
                     Err(e) => {
                         tracing::error!("Error getting current state of living room tv: {:?}", e);
@@ -107,7 +105,7 @@ impl UserTriggerAction {
                 }
             }
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed) => {
-                Some(t!(30 minutes ago))
+                Some(t!(30 minutes))
             }
         }
     }

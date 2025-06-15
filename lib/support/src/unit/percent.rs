@@ -1,8 +1,9 @@
 use std::{f64, fmt::Display};
 
 use derive_more::derive::AsRef;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef, Serialize, Deserialize)]
 pub struct Percent(pub f64);
 
 //Made-up unit to represent percentage-usage over time.

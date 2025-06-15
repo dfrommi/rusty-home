@@ -49,7 +49,11 @@ impl Duration {
     }
 
     pub fn as_hours_f64(&self) -> f64 {
-        self.delegate.num_milliseconds() as f64 / 1000.0 / 3600.0
+        self.as_secs_f64() / 3600.0
+    }
+
+    pub fn as_days_f64(&self) -> f64 {
+        self.as_hours_f64() / 24.0
     }
 
     pub fn as_minutes(&self) -> i64 {
@@ -94,7 +98,7 @@ impl From<Duration> for std::time::Duration {
 
 mod duration_format {
     use iso8601_duration::Duration as Iso8601Duration;
-    use serde::{de::Visitor, Deserializer, Serializer};
+    use serde::{Deserializer, Serializer, de::Visitor};
 
     // Serialize `chrono::Duration` to ISO 8601 string format (e.g., "P1DT2H30M")
     pub fn serialize<S>(duration: &chrono::TimeDelta, serializer: S) -> Result<S::Ok, S::Error>

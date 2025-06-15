@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
-use actix_web::{http::header, web, HttpResponse};
+use actix_web::{HttpResponse, http::header, web};
 use anyhow::Context;
 use api::{
     command::{Command, CommandSource},
     state::Channel,
 };
 use infrastructure::TraceContext;
-use support::time::Duration;
 
 use crate::{
     adapter::grafana::{
-        dashboard::TimeRangeQuery, support::csv_response, GrafanaApiError, GrafanaResponse,
-        ItemAvailabilitySupportStorage,
+        GrafanaApiError, GrafanaResponse, ItemAvailabilitySupportStorage,
+        dashboard::TimeRangeQuery, support::csv_response,
     },
     port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
@@ -246,7 +245,7 @@ where
     struct Row {
         source: String,
         item: String,
-        duration: Duration,
+        days: f64,
     }
 
     let offline_items = api
@@ -257,7 +256,7 @@ where
     let rows = offline_items.into_iter().map(|item| Row {
         source: item.source,
         item: item.item,
-        duration: item.duration,
+        days: item.duration.as_days_f64(),
     });
 
     csv_response(rows)

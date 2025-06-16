@@ -6,7 +6,7 @@ use support::{DataPoint, ValueObject};
 
 use crate::home::state::macros::result;
 
-use super::{opened::Opened, DataPointAccess, TimeSeriesAccess};
+use super::{DataPointAccess, TimeSeriesAccess, opened::Opened};
 
 #[derive(Clone, Debug, Id)]
 pub enum AutomaticTemperatureIncrease {
@@ -23,12 +23,22 @@ impl ValueObject for AutomaticTemperatureIncrease {
 //TODO detect active heating and summer mode
 impl<T> DataPointAccess<AutomaticTemperatureIncrease> for T
 where
-    T: DataPointAccess<Opened> + TimeSeriesAccess<Temperature>,
+    T: DataPointAccess<Opened> + DataPointAccess<Temperature> + TimeSeriesAccess<Temperature>,
 {
     async fn current_data_point(
         &self,
         item: AutomaticTemperatureIncrease,
     ) -> anyhow::Result<DataPoint<bool>> {
+        //TODO define heating schedule lookup and test outside > schedule + 1.0
+        let outside_temp = self.current_data_point(Temperature::Outside).await?;
+
+        if outside_temp.value > DegreeCelsius(22.0) {
+            result!(false, outside_temp.timestamp, item,
+                @outside_temp,
+                "No automatic increase, temperature outside is too high"
+            );
+        }
+
         let (window, temp_sensor) = match item {
             AutomaticTemperatureIncrease::LivingRoom => {
                 (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor)

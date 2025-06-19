@@ -18,7 +18,7 @@ pub enum ChannelValue {
     Presence(Presence, bool),
     TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
-    FanSpeed(FanSpeed, Percent),
+    FanSpeed(FanSpeed, Percent), //TODO consider level 1 to 5 instead as percentages are adjusted
 }
 
 impl ChannelValue {

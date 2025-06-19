@@ -1,10 +1,11 @@
 use api::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
+use api::state::FanSpeed;
 use api::trigger::{HomekitTarget, RemoteTarget};
 use support::t;
 
 use crate::home::action::{
     FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,
-    UserTriggerAction,
+    SupportVentilationWithFan, UserTriggerAction,
 };
 use crate::home::state::UserControlled;
 
@@ -21,12 +22,13 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::LivingRoom),
         vec![
-            UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
             NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
             KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::LivingRoom.into(),
             DeferHeatingUntilVentilationDone::LivingRoom.into(),
+            SupportVentilationWithFan::new(FanSpeed::LivingRoomCeilingFan).into(),
+            UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
         ]
     ),
     (

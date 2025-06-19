@@ -54,6 +54,7 @@ pub enum HomeAction {
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
+    SupportVentilationWithFan(SupportVentilationWithFan),
 }
 
 impl<API> Action<API> for HomeAction
@@ -113,6 +114,9 @@ where
             }
             HomeAction::UserTriggerAction(user_trigger_action) => {
                 user_trigger_action.evaluate(api).await
+            }
+            HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
+                support_ventilation_with_fan.evaluate(api).await
             }
         }
     }

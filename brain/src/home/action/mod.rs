@@ -16,6 +16,7 @@ use api::command::Command;
 use api::command::CommandSource;
 use api::state::ExternalAutoControl;
 use api::state::Powered;
+use api::state::Presence;
 use api::state::RelativeHumidity;
 use api::state::SetPoint;
 pub use dehumidify::Dehumidify;
@@ -68,6 +69,7 @@ where
         + DataPointAccess<RelativeHumidity>
         + DataPointAccess<Resident>
         + DataPointAccess<EnergySaving>
+        + DataPointAccess<Presence>
         + CommandState
         + CommandAccess
         + UserTriggerAccess,

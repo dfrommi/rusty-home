@@ -1,9 +1,10 @@
 use std::fmt::Display;
 
-use api::command::{
-    Command, CommandSource, Notification, NotificationAction, NotificationRecipient,
+use api::{
+    command::{Command, CommandSource, Notification, NotificationAction, NotificationRecipient},
+    state::Presence,
 };
-use support::{t, time::DateTime, DataPoint};
+use support::{DataPoint, t, time::DateTime};
 
 use crate::{
     core::planner::{CommandAction, ConditionalAction},
@@ -47,9 +48,19 @@ impl CommandAction for InformWindowOpen {
 
 impl<T> ConditionalAction<T> for InformWindowOpen
 where
-    T: DataPointAccess<ColdAirComingIn>,
+    T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Presence>,
 {
     async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
+        let presence_item = match self.recipient {
+            NotificationRecipient::Dennis => Presence::AtHomeDennis,
+            NotificationRecipient::Sabine => Presence::AtHomeSabine,
+        };
+
+        let at_home = api.current(presence_item).await?;
+        if !at_home {
+            return Ok(false);
+        }
+
         match cold_air_coming_in(api).await? {
             Some((_, max_dt)) => Ok(t!(now).elapsed_since(max_dt) > t!(3 minutes)),
             None => Ok(false),

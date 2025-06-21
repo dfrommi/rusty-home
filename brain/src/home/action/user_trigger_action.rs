@@ -143,7 +143,7 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
         }
         UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(speed)) => {
             Some(Command::ControlFan {
-                device: Fan::LivingRoomFan,
+                device: Fan::LivingRoomCeilingFan,
                 speed,
             })
         }

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use support::unit::Percent;
+
+use crate::state::unit::FanAirflow;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -41,7 +42,7 @@ pub enum Homekit {
     InfraredHeaterPower(bool),
     DehumidifierPower(bool),
     LivingRoomTvEnergySaving(bool),
-    LivingRoomCeilingFanSpeed(Percent),
+    LivingRoomCeilingFanSpeed(FanAirflow),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]

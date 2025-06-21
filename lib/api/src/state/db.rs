@@ -72,11 +72,17 @@ pub async fn get_tag_id(
 mod mapper {
     use support::unit::*;
 
-    use super::DbValue;
+    use super::{DbValue, unit::FanAirflow, unit::FanSpeed};
 
     impl From<&bool> for DbValue {
         fn from(value: &bool) -> Self {
             DbValue(if *value { 1.0 } else { 0.0 })
+        }
+    }
+
+    impl From<DbValue> for bool {
+        fn from(value: DbValue) -> Self {
+            value.0 > 0.0
         }
     }
 
@@ -152,9 +158,51 @@ mod mapper {
         }
     }
 
-    impl From<DbValue> for bool {
+    impl From<&FanAirflow> for DbValue {
+        fn from(value: &FanAirflow) -> Self {
+            let f_value = match value {
+                FanAirflow::Off => 0.0,
+                FanAirflow::Forward(FanSpeed::Silent) => 1.0,
+                FanAirflow::Forward(FanSpeed::Low) => 2.0,
+                FanAirflow::Forward(FanSpeed::Medium) => 3.0,
+                FanAirflow::Forward(FanSpeed::High) => 4.0,
+                FanAirflow::Forward(FanSpeed::Turbo) => 5.0,
+                FanAirflow::Reverse(FanSpeed::Silent) => -1.0,
+                FanAirflow::Reverse(FanSpeed::Low) => -2.0,
+                FanAirflow::Reverse(FanSpeed::Medium) => -3.0,
+                FanAirflow::Reverse(FanSpeed::High) => -4.0,
+                FanAirflow::Reverse(FanSpeed::Turbo) => -5.0,
+            };
+
+            DbValue(f_value)
+        }
+    }
+
+    impl From<DbValue> for FanAirflow {
         fn from(value: DbValue) -> Self {
-            value.0 > 0.0
+            if value.0 < -4.0 {
+                FanAirflow::Reverse(FanSpeed::Turbo)
+            } else if value.0 < -3.0 {
+                FanAirflow::Reverse(FanSpeed::High)
+            } else if value.0 < -2.0 {
+                FanAirflow::Reverse(FanSpeed::Medium)
+            } else if value.0 < -1.0 {
+                FanAirflow::Reverse(FanSpeed::Low)
+            } else if value.0 < 0.0 {
+                FanAirflow::Reverse(FanSpeed::Silent)
+            } else if value.0 > 4.0 {
+                FanAirflow::Forward(FanSpeed::Turbo)
+            } else if value.0 > 3.0 {
+                FanAirflow::Forward(FanSpeed::High)
+            } else if value.0 > 2.0 {
+                FanAirflow::Forward(FanSpeed::Medium)
+            } else if value.0 > 1.0 {
+                FanAirflow::Forward(FanSpeed::Low)
+            } else if value.0 > 0.0 {
+                FanAirflow::Forward(FanSpeed::Silent)
+            } else {
+                FanAirflow::Off
+            }
         }
     }
 }

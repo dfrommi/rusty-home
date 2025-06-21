@@ -1,9 +1,9 @@
-use api::command::{Command, CommandTarget};
-use serde_json::json;
-use support::{
-    time::Duration,
-    unit::{DegreeCelsius, Percent},
+use api::{
+    command::{Command, CommandTarget},
+    state::unit::{FanAirflow, FanSpeed},
 };
+use serde_json::json;
+use support::{time::Duration, unit::DegreeCelsius};
 
 use crate::{
     core::CommandExecutor,
@@ -165,28 +165,42 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             .await
     }
 
-    async fn windcalm_fan_speed(&self, id: &str, speed: &Percent) -> anyhow::Result<()> {
-        if speed.0 == 0.0 {
-            self.client
-                .call_service(
-                    "fan",
-                    "turn_off",
-                    json!({
-                        "entity_id": vec![id.to_string()]
-                    }),
-                )
-                .await
-        } else {
-            self.client
-                .call_service(
-                    "fan",
-                    "turn_on",
-                    json!({
-                                        "entity_id": vec![id.to_string()],
-                                        "percentage": speed.0 + 1.0, //setting 21 leads to 20
-                    }),
-                )
-                .await
+    async fn windcalm_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+        fn to_percent(fan_speed: &FanSpeed) -> usize {
+            match fan_speed {
+                FanSpeed::Silent => 1,
+                FanSpeed::Low => 21,
+                FanSpeed::Medium => 41,
+                FanSpeed::High => 61,
+                FanSpeed::Turbo => 81,
+            }
+        }
+
+        match airflow {
+            FanAirflow::Off => {
+                self.client
+                    .call_service(
+                        "fan",
+                        "turn_off",
+                        json!({
+                            "entity_id": vec![id.to_string()]
+                        }),
+                    )
+                    .await
+            }
+            FanAirflow::Forward(fan_speed) => {
+                self.client
+                    .call_service(
+                        "fan",
+                        "turn_on",
+                        json!({
+                            "entity_id": vec![id.to_string()],
+                            "percentage": to_percent(fan_speed)
+                        }),
+                    )
+                    .await
+            }
+            FanAirflow::Reverse(_) => anyhow::bail!("Reverse direction not yet supported"),
         }
     }
 

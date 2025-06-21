@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::bail;
-use api::state::ChannelValue;
+use api::state::{
+    ChannelValue,
+    unit::{FanAirflow, FanSpeed},
+};
 use support::{
     DataPoint,
     time::DateTime,
@@ -196,18 +199,24 @@ fn to_persistent_data_point(
             .into(),
         ),
         HaChannel::WindcalmFanSpeed(channel) => {
-            let v = match (
-                ha_value,
-                attributes.get("percentage").and_then(|v| v.as_f64()),
-            ) {
-                ("off", _) => 0.0,
-                (_, Some(f_value)) => f_value,
+            let fan_speed = match attributes.get("percentage").and_then(|v| v.as_f64()) {
+                Some(1.0) => FanSpeed::Silent,
+                Some(f_value) if f_value <= 20.0 => FanSpeed::Low,
+                Some(f_value) if f_value <= 40.0 => FanSpeed::Medium,
+                Some(f_value) if f_value <= 60.0 => FanSpeed::High,
+                Some(_) => FanSpeed::Turbo,
                 _ => bail!("No temperature found in attributes or not a number"),
             };
 
-            Some(
-                DataPoint::new(ChannelValue::FanSpeed(channel, Percent::from(v)), timestamp).into(),
-            )
+            let airflow = if ha_value == "off" {
+                FanAirflow::Off
+            } else if attributes.get("direction").and_then(|v| v.as_str()) == Some("reverse") {
+                FanAirflow::Reverse(fan_speed)
+            } else {
+                FanAirflow::Forward(fan_speed)
+            };
+
+            Some(DataPoint::new(ChannelValue::FanActivity(channel, airflow), timestamp).into())
         }
     };
 

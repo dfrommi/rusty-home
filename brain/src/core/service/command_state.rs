@@ -4,12 +4,9 @@ use api::{
         Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification,
         NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
     },
-    state::{ExternalAutoControl, FanSpeed, Powered, SetPoint},
+    state::{ExternalAutoControl, FanActivity, Powered, SetPoint, unit::FanAirflow},
 };
-use support::{
-    t,
-    unit::{DegreeCelsius, Percent},
-};
+use support::{t, unit::DegreeCelsius};
 
 use crate::{
     home::state::EnergySaving,
@@ -28,7 +25,7 @@ where
         + DataPointAccess<Powered>
         + CommandAccess
         + DataPointAccess<EnergySaving>
-        + DataPointAccess<FanSpeed>,
+        + DataPointAccess<FanActivity>,
 {
     async fn is_reflected_in_state(&self, command: &Command) -> Result<bool> {
         match command {
@@ -150,17 +147,17 @@ where
 
 async fn is_fan_control_reflected_in_state<API>(
     device: &Fan,
-    percentage: &Percent,
+    airflow: &FanAirflow,
     api: &API,
 ) -> Result<bool>
 where
-    API: DataPointAccess<FanSpeed>,
+    API: DataPointAccess<FanActivity>,
 {
     let state_device = match device {
-        api::command::Fan::LivingRoomFan => FanSpeed::LivingRoomCeilingFan,
+        api::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
     };
 
-    let current_speed = api.current(state_device).await?;
-    //TODO cover ranges of percentages
-    Ok(current_speed == *percentage)
+    let current_flow = api.current(state_device).await?;
+
+    Ok(current_flow == *airflow)
 }

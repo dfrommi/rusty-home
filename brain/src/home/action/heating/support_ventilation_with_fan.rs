@@ -2,9 +2,9 @@ use std::fmt::Display;
 
 use api::{
     command::{Command, Fan},
-    state::FanSpeed,
+    state::unit::{FanAirflow, FanSpeed},
 };
-use support::{t, unit::Percent};
+use support::t;
 
 use crate::core::planner::{CommandAction, ConditionalAction};
 
@@ -12,11 +12,11 @@ use super::{DataPointAccess, Opened};
 
 #[derive(Debug, Clone)]
 pub struct SupportVentilationWithFan {
-    fan: FanSpeed,
+    fan: Fan,
 }
 
 impl SupportVentilationWithFan {
-    pub fn new(fan: FanSpeed) -> Self {
+    pub fn new(fan: Fan) -> Self {
         Self { fan }
     }
 }
@@ -26,14 +26,11 @@ impl Display for SupportVentilationWithFan {
         write!(f, "SupportVentilationWithFan[{:?}]", self.fan)
     }
 }
-
 impl CommandAction for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
-            device: match self.fan {
-                FanSpeed::LivingRoomCeilingFan => Fan::LivingRoomFan,
-            },
-            speed: Percent(20.0),
+            device: Fan::LivingRoomCeilingFan,
+            speed: FanAirflow::Forward(FanSpeed::Low),
         }
     }
 
@@ -48,7 +45,7 @@ where
 {
     async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
         let window = match self.fan {
-            FanSpeed::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
+            Fan::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
         };
 
         let opened_dp = api.current_data_point(window).await?;

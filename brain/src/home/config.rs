@@ -1,5 +1,4 @@
 use api::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
-use api::state::FanSpeed;
 use api::trigger::{HomekitTarget, RemoteTarget};
 use support::t;
 
@@ -27,7 +26,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::LivingRoom.into(),
             DeferHeatingUntilVentilationDone::LivingRoom.into(),
-            SupportVentilationWithFan::new(FanSpeed::LivingRoomCeilingFan).into(),
+            SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
             UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
         ]
     ),
@@ -131,7 +130,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
                 notification: api::command::Notification::WindowOpened,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::ControlFan {
-                device: Fan::LivingRoomFan,
+                device: Fan::LivingRoomCeilingFan,
             }).into(),
         ]
     )

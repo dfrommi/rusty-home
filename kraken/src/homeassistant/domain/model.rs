@@ -1,7 +1,7 @@
 use ::api::state::{
     ExternalAutoControl, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
 };
-use api::state::FanSpeed;
+use api::state::FanActivity;
 
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ pub enum HaChannel {
     ClimateAutoMode(ExternalAutoControl),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
-    WindcalmFanSpeed(FanSpeed),
+    WindcalmFanSpeed(FanActivity),
 }
 
 #[derive(Debug, Clone)]

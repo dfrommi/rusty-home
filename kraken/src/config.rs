@@ -3,7 +3,7 @@ use api::command::{
 };
 
 use api::state::{
-    CurrentPowerUsage, FanSpeed, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption,
+    CurrentPowerUsage, FanActivity, HeatingDemand, Presence, SetPoint, TotalEnergyConsumption,
 };
 use api::trigger::RemoteTarget;
 use api::{
@@ -63,7 +63,7 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
         ),
         (
             CommandTarget::ControlFan {
-                device: Fan::LivingRoomFan,
+                device: Fan::LivingRoomCeilingFan,
             },
             HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_living_room"),
         ),
@@ -231,7 +231,7 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         (
             "fan.ceiling_fan_living_room",
-            HaChannel::WindcalmFanSpeed(FanSpeed::LivingRoomCeilingFan),
+            HaChannel::WindcalmFanSpeed(FanActivity::LivingRoomCeilingFan),
         ),
     ]
 }

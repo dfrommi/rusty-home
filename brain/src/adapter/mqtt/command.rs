@@ -1,10 +1,10 @@
 use anyhow::bail;
 use api::{
-    state::{FanSpeed, Powered},
+    state::{Powered, unit::FanAirflow},
     trigger::{Homekit, UserTrigger},
 };
 use infrastructure::MqttInMessage;
-use support::ExternalId;
+use support::{ExternalId, unit::Percent};
 use tokio::sync::mpsc::Receiver;
 
 use crate::{home::state::EnergySaving, port::UserTriggerExecutor};
@@ -71,12 +71,19 @@ fn to_command(
         };
     }
 
-    if let Ok(fan_speed) = FanSpeed::try_from(&external_id) {
-        return match fan_speed {
-            FanSpeed::LivingRoomCeilingFan => Ok(UserTrigger::Homekit(
-                Homekit::LivingRoomCeilingFanSpeed(value.try_into()?),
-            )),
+    if type_name == "fan_speed" {
+        let percent: Percent = value.clone().try_into()?;
+        let activity = if percent.0 == 0.0 {
+            FanAirflow::Off
+        } else {
+            FanAirflow::Forward(value.try_into()?)
         };
+
+        if item_name == "living_room_ceiling_fan" {
+            return Ok(UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(
+                activity,
+            )));
+        }
     }
 
     bail!("Device {}/{} not supported", type_name, item_name)

@@ -2,8 +2,10 @@ use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
 use support::{
     time::{DateTime, Duration},
-    unit::{DegreeCelsius, Percent},
+    unit::DegreeCelsius,
 };
+
+use crate::state::unit::FanAirflow;
 
 pub mod db;
 
@@ -30,7 +32,7 @@ pub enum Command {
     },
     ControlFan {
         device: Fan,
-        speed: Percent,
+        speed: FanAirflow,
     },
 }
 
@@ -203,7 +205,7 @@ pub enum EnergySavingDevice {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Fan {
-    LivingRoomFan,
+    LivingRoomCeilingFan,
 }
 
 #[cfg(test)]

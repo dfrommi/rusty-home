@@ -1,7 +1,9 @@
 use std::fmt::Display;
 
-use api::command::{Command, CommandTarget};
-use support::unit::Percent;
+use api::{
+    command::{Command, CommandTarget},
+    state::unit::FanAirflow,
+};
 
 use crate::core::planner::{Action, ActionEvaluationResult};
 
@@ -46,7 +48,7 @@ impl Action<()> for FollowDefaultSetting {
             }
             CommandTarget::ControlFan { device } => Command::ControlFan {
                 device,
-                speed: Percent(0.0),
+                speed: FanAirflow::Off,
             },
         };
 

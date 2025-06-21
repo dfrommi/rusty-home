@@ -1,10 +1,12 @@
 mod command;
 mod state;
 
+use api::state::unit::FanSpeed;
 pub use command::process_commands;
 pub use state::export_state;
 use support::unit::Percent;
 
+#[derive(Debug, Clone)]
 struct MqttStateValue(String);
 
 impl From<bool> for MqttStateValue {
@@ -43,5 +45,44 @@ impl TryInto<Percent> for MqttStateValue {
             Ok(v) => Ok(Percent(v)),
             Err(_) => anyhow::bail!("Error converting {} to Percent", self.0),
         }
+    }
+}
+
+impl From<FanSpeed> for MqttStateValue {
+    fn from(val: FanSpeed) -> Self {
+        MqttStateValue(
+            match val {
+                FanSpeed::Silent => "20",
+                FanSpeed::Low => "40",
+                FanSpeed::Medium => "60.0",
+                FanSpeed::High => "80.0",
+                FanSpeed::Turbo => "100",
+            }
+            .to_string(),
+        )
+    }
+}
+
+impl TryInto<FanSpeed> for MqttStateValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<FanSpeed, Self::Error> {
+        let percent: Percent = self.try_into()?;
+
+        if percent.0 == 0.0 {
+            anyhow::bail!("Fan speed is 0.0, not a fan speed, should be OFF");
+        }
+
+        Ok(if percent.0 <= 20.0 {
+            FanSpeed::Silent
+        } else if percent.0 <= 40.0 {
+            FanSpeed::Low
+        } else if percent.0 <= 60.0 {
+            FanSpeed::Medium
+        } else if percent.0 <= 80.0 {
+            FanSpeed::High
+        } else {
+            FanSpeed::Turbo
+        })
     }
 }

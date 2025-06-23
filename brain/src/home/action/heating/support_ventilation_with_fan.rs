@@ -29,7 +29,7 @@ impl Display for SupportVentilationWithFan {
 impl CommandAction for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
-            device: Fan::LivingRoomCeilingFan,
+            device: self.fan.clone(),
             speed: FanAirflow::Forward(FanSpeed::Low),
         }
     }
@@ -46,6 +46,7 @@ where
     async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
         let window = match self.fan {
             Fan::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
+            Fan::BedroomCeilingFan => Opened::BedroomWindow,
         };
 
         let opened_dp = api.current_data_point(window).await?;

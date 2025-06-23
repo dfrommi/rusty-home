@@ -104,7 +104,8 @@ impl UserTriggerAction {
                     }
                 }
             }
-            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed) => {
+            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed)
+            | UserTriggerTarget::Homekit(HomekitTarget::BedroomCeilingFanSpeed) => {
                 Some(t!(30 minutes))
             }
         }
@@ -147,6 +148,10 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
                 speed,
             })
         }
+        UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
+            device: Fan::BedroomCeilingFan,
+            speed,
+        }),
 
         UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(_)) => None,
     }

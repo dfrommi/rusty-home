@@ -206,6 +206,7 @@ pub enum EnergySavingDevice {
 #[serde(rename_all = "snake_case")]
 pub enum Fan {
     LivingRoomCeilingFan,
+    BedroomCeilingFan,
 }
 
 #[cfg(test)]

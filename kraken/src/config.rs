@@ -67,6 +67,12 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             },
             HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_living_room"),
         ),
+        (
+            CommandTarget::ControlFan {
+                device: Fan::BedroomCeilingFan,
+            },
+            HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_bedroom"),
+        ),
     ]
 }
 
@@ -232,6 +238,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "fan.ceiling_fan_living_room",
             HaChannel::WindcalmFanSpeed(FanActivity::LivingRoomCeilingFan),
+        ),
+        (
+            "fan.ceiling_fan_bedroom",
+            HaChannel::WindcalmFanSpeed(FanActivity::BedroomCeilingFan),
         ),
     ]
 }

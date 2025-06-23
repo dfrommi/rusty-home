@@ -1,6 +1,6 @@
 use anyhow::bail;
 use api::{
-    state::{Powered, unit::FanAirflow},
+    state::{FanActivity, Powered, unit::FanAirflow},
     trigger::{Homekit, UserTrigger},
 };
 use infrastructure::MqttInMessage;
@@ -79,8 +79,14 @@ fn to_command(
             FanAirflow::Forward(value.try_into()?)
         };
 
-        if item_name == "living_room_ceiling_fan" {
+        if item_name == FanActivity::LivingRoomCeilingFan.ext_name() {
             return Ok(UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(
+                activity,
+            )));
+        }
+
+        if item_name == FanActivity::BedroomCeilingFan.ext_name() {
+            return Ok(UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(
                 activity,
             )));
         }

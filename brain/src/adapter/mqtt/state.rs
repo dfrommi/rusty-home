@@ -30,6 +30,7 @@ pub async fn export_state<T>(
         send_with_defaults(&mut sender, Powered::InfraredHeater, api).await;
         send_with_defaults(&mut sender, EnergySaving::LivingRoomTv, api).await;
         send_fan_activity(&mut sender, FanActivity::LivingRoomCeilingFan, api).await;
+        send_fan_activity(&mut sender, FanActivity::BedroomCeilingFan, api).await;
     }
 }
 
@@ -87,6 +88,7 @@ async fn send_fan_activity<'a, 'b: 'a, API>(
         FanAirflow::Reverse(fan_speed) => sender.send(&percent_ext_id, fan_speed).await,
     };
 }
+
 struct MqttStateSender {
     base_topic: String,
     tx: Sender<MqttOutMessage>,

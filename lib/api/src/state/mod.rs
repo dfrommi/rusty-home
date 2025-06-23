@@ -218,6 +218,7 @@ pub enum TotalWaterConsumption {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum FanActivity {
     LivingRoomCeilingFan,
+    BedroomCeilingFan,
 }
 
 pub mod unit {

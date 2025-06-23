@@ -155,6 +155,7 @@ where
 {
     let state_device = match device {
         api::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
+        api::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
     };
 
     let current_flow = api.current(state_device).await?;

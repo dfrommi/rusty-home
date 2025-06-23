@@ -43,6 +43,7 @@ pub enum Homekit {
     DehumidifierPower(bool),
     LivingRoomTvEnergySaving(bool),
     LivingRoomCeilingFanSpeed(FanAirflow),
+    BedroomCeilingFanSpeed(FanAirflow),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
@@ -53,6 +54,7 @@ pub enum HomekitTarget {
     DehumidifierPower,
     LivingRoomTvEnergySaving,
     LivingRoomCeilingFanSpeed,
+    BedroomCeilingFanSpeed,
 }
 
 #[cfg(test)]

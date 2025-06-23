@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::bail;
 use api::{
     state::{FanActivity, Powered, unit::FanAirflow},
@@ -5,7 +7,7 @@ use api::{
 };
 use infrastructure::MqttInMessage;
 use support::{ExternalId, unit::Percent};
-use tokio::sync::mpsc::Receiver;
+use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
 use crate::{home::state::EnergySaving, port::UserTriggerExecutor};
 
@@ -14,8 +16,10 @@ use super::MqttStateValue;
 pub async fn process_commands(
     base_topic: String,
     mut rx: Receiver<MqttInMessage>,
-    api: &impl UserTriggerExecutor,
+    api: crate::Database,
 ) {
+    let mut debounce_tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
+
     while let Some(msg) = rx.recv().await {
         let topic_parts: Vec<&str> = msg
             .topic
@@ -29,18 +33,34 @@ pub async fn process_commands(
             continue;
         }
 
-        let type_name = topic_parts[1];
-        let item_name = topic_parts[2];
-
-        match to_command(type_name, item_name, MqttStateValue(msg.payload)) {
-            Ok(trigger) => {
-                tracing::info!("Executing command received via Mqtt: {:?}", trigger);
-                if let Err(e) = api.add_user_trigger(trigger).await {
-                    tracing::error!("Error triggering user action: {:?}", e)
-                }
-            }
-            Err(e) => tracing::error!("{}", e),
+        if let Some(handle) = debounce_tasks.remove(&msg.topic) {
+            tracing::debug!(
+                "Received command for already scheduled command on topic {}, aborting previous task",
+                msg.topic,
+            );
+            handle.abort();
         }
+
+        let type_name = topic_parts[1].to_string();
+        let item_name = topic_parts[2].to_string();
+
+        let schedule_api = api.clone();
+
+        let handle = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+            match to_command(&type_name, &item_name, MqttStateValue(msg.payload)) {
+                Ok(trigger) => {
+                    tracing::info!("Executing command received via Mqtt: {:?}", trigger);
+                    if let Err(e) = schedule_api.add_user_trigger(trigger).await {
+                        tracing::error!("Error triggering user action: {:?}", e)
+                    }
+                }
+                Err(e) => tracing::error!("{}", e),
+            }
+        });
+
+        debounce_tasks.insert(msg.topic.clone(), handle);
     }
 }
 

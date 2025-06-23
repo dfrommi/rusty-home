@@ -158,6 +158,6 @@ impl settings::HomekitConfig {
         let api = infrastructure.database.clone();
         let target_topic = self.base_topic_set.clone();
 
-        async move { adapter::mqtt::process_commands(target_topic, mqtt_command_receiver, &api).await }
+        async move { adapter::mqtt::process_commands(target_topic, mqtt_command_receiver, api).await }
     }
 }

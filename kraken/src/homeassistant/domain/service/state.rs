@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::bail;
 use api::state::{
-    ChannelValue,
+    ChannelValue, FanActivity,
     unit::{FanAirflow, FanSpeed},
 };
 use support::{
@@ -199,7 +199,11 @@ fn to_persistent_data_point(
             .into(),
         ),
         HaChannel::WindcalmFanSpeed(channel) => {
-            let fan_speed = match attributes.get("percentage").and_then(|v| v.as_f64()) {
+            //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
+            //trigger, otherwise assume command worked an directly set state from command
+            //processing, assuming everything is done via the smart home
+            /*
+            last_seent fan_speed = match attributes.get("percentage").and_then(|v| v.as_f64()) {
                 Some(1.0) => FanSpeed::Silent,
                 Some(f_value) if f_value <= 20.0 => FanSpeed::Low,
                 Some(f_value) if f_value <= 40.0 => FanSpeed::Medium,
@@ -217,6 +221,19 @@ fn to_persistent_data_point(
             };
 
             Some(DataPoint::new(ChannelValue::FanActivity(channel, airflow), timestamp).into())
+            */
+
+            if ha_value == "off" {
+                Some(
+                    DataPoint::new(
+                        ChannelValue::FanActivity(channel, FanAirflow::Off),
+                        timestamp,
+                    )
+                    .into(),
+                )
+            } else {
+                None
+            }
         }
     };
 

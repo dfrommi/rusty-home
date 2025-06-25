@@ -24,11 +24,13 @@ mod settings;
 mod tasmota;
 mod z2m;
 
+type IncomingDataSender = mpsc::Sender<IncomingData>;
+
 struct Infrastructure {
     database: Database,
     event_listener: AppEventListener,
     mqtt_client: infrastructure::Mqtt,
-    incoming_data_tx: mpsc::Sender<IncomingData>,
+    incoming_data_tx: IncomingDataSender,
 }
 
 #[derive(Clone)]
@@ -126,7 +128,9 @@ pub async fn main() {
     let execute_commands = {
         let command_repo = infrastructure.database.clone();
         let new_cmd_available = infrastructure.new_command_available_listener();
-        let ha_cmd_executor = settings.homeassistant.new_command_executor();
+        let ha_cmd_executor = settings
+            .homeassistant
+            .new_command_executor(infrastructure.incoming_data_tx.clone());
         let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
 
         let cmd_executor = MultiCommandExecutor {
@@ -166,10 +170,10 @@ pub async fn main() {
 }
 
 impl settings::HomeAssitant {
-    fn new_command_executor(&self) -> impl CommandExecutor {
+    fn new_command_executor(&self, incoming_data_tx: IncomingDataSender) -> impl CommandExecutor {
         let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
             .expect("Error initializing Home Assistant REST client");
-        HaCommandExecutor::new(http_client, &default_ha_command_config())
+        HaCommandExecutor::new(http_client, incoming_data_tx, &default_ha_command_config())
     }
 
     async fn new_incoming_data_processor(

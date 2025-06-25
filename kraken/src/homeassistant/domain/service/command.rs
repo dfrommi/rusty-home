@@ -1,22 +1,31 @@
 use api::{
-    command::{Command, CommandTarget},
-    state::unit::{FanAirflow, FanSpeed},
+    command::{Command, CommandTarget, Fan},
+    state::{
+        ChannelValue, FanActivity,
+        unit::{FanAirflow, FanSpeed},
+    },
 };
 use serde_json::json;
-use support::{time::Duration, unit::DegreeCelsius};
+use support::{DataPoint, t, time::Duration, unit::DegreeCelsius};
 
 use crate::{
-    core::CommandExecutor,
+    IncomingDataSender,
+    core::{CommandExecutor, IncomingData},
     homeassistant::domain::{HaServiceTarget, port::CallServicePort},
 };
 
 pub struct HaCommandExecutor<C> {
     client: C,
+    incoming_data_tx: IncomingDataSender,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl<C> HaCommandExecutor<C> {
-    pub fn new(client: C, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
+    pub fn new(
+        client: C,
+        incoming_data_tx: IncomingDataSender,
+        config: &[(CommandTarget, HaServiceTarget)],
+    ) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
         for (cmd, ha) in config {
@@ -25,6 +34,7 @@ impl<C> HaCommandExecutor<C> {
 
         Self {
             client,
+            incoming_data_tx,
             config: data,
         }
     }
@@ -113,8 +123,8 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => {
                 self.lg_tv_energy_saving_mode(id, *on).await
             }
-            (WindcalmFanSpeed(id), Command::ControlFan { speed, .. }) => {
-                self.windcalm_fan_speed(id, speed).await
+            (WindcalmFanSpeed(id), Command::ControlFan { device, speed }) => {
+                self.windcalm_fan_speed(id, device, speed).await
             }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }
@@ -165,7 +175,12 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             .await
     }
 
-    async fn windcalm_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+    async fn windcalm_fan_speed(
+        &self,
+        id: &str,
+        fan: &Fan,
+        airflow: &FanAirflow,
+    ) -> anyhow::Result<()> {
         fn to_percent(fan_speed: &FanSpeed) -> usize {
             match fan_speed {
                 FanSpeed::Silent => 1,
@@ -176,7 +191,7 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
             }
         }
 
-        match airflow {
+        let result = match airflow {
             FanAirflow::Off => {
                 self.client
                     .call_service(
@@ -201,7 +216,21 @@ impl<C: CallServicePort> HaCommandExecutor<C> {
                     .await
             }
             FanAirflow::Reverse(_) => anyhow::bail!("Reverse direction not yet supported"),
-        }
+        };
+
+        let channel = match fan {
+            Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
+            Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
+        };
+
+        self.incoming_data_tx
+            .send(IncomingData::StateValue(DataPoint::new(
+                ChannelValue::FanActivity(channel, airflow.clone()),
+                t!(now),
+            )))
+            .await?;
+
+        result
     }
 
     async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {

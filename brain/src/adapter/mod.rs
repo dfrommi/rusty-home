@@ -1,3 +1,3 @@
 pub mod grafana;
-pub mod mqtt;
+pub mod homekit;
 pub mod persistence;

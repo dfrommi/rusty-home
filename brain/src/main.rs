@@ -140,7 +140,7 @@ impl settings::HomekitConfig {
         let mqtt_trigger = infrastructure.event_listener.new_state_changed_listener();
 
         async move {
-            adapter::mqtt::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await
+            adapter::homekit::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await
         }
     }
 
@@ -158,6 +158,6 @@ impl settings::HomekitConfig {
         let api = infrastructure.database.clone();
         let target_topic = self.base_topic_set.clone();
 
-        async move { adapter::mqtt::process_commands(target_topic, mqtt_command_receiver, api).await }
+        async move { adapter::homekit::process_commands(target_topic, mqtt_command_receiver, api).await }
     }
 }

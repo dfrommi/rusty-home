@@ -18,6 +18,8 @@ pub enum HomeGoal {
     StayInformed,
     #[display("SmarterHeating[{}]", _0)]
     SmarterHeating(Room),
+    #[display("BetterRoomClimate[{}]", _0)]
+    BetterRoomClimate(Room),
     TvControl,
     ResetToDefaltSettings,
 }
@@ -27,14 +29,18 @@ pub async fn get_active_goals<API>(api: &API) -> Vec<HomeGoal>
 where
     API: DataPointAccess<Powered>,
 {
+    //TODO auto-detect summer mode
     let mut goals = vec![
-        HomeGoal::SmarterHeating(Room::LivingRoom),
-        HomeGoal::SmarterHeating(Room::Bedroom),
-        HomeGoal::SmarterHeating(Room::Kitchen),
-        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
-        HomeGoal::SmarterHeating(Room::Bathroom),
+        //HomeGoal::SmarterHeating(Room::LivingRoom),
+        HomeGoal::BetterRoomClimate(Room::LivingRoom),
+        //HomeGoal::SmarterHeating(Room::Bedroom),
+        HomeGoal::BetterRoomClimate(Room::Bedroom),
+        //HomeGoal::SmarterHeating(Room::Kitchen),
+        //HomeGoal::SmarterHeating(Room::RoomOfRequirements),
+        //HomeGoal::SmarterHeating(Room::Bathroom),
         HomeGoal::PreventMouldInBathroom,
-        HomeGoal::StayInformed,
+        //HomeGoal::StayInformed,
+        HomeGoal::TvControl,
         HomeGoal::ResetToDefaltSettings,
     ];
 

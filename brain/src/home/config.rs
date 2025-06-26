@@ -26,6 +26,11 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::LivingRoom.into(),
             DeferHeatingUntilVentilationDone::LivingRoom.into(),
+        ]
+    ),
+    (
+        HomeGoal::BetterRoomClimate(Room::LivingRoom),
+        vec![
             UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
             SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
         ]
@@ -41,6 +46,11 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
             ExtendHeatingUntilSleeping::Bedroom.into(),
             DeferHeatingUntilVentilationDone::Bedroom.into(),
+        ]
+    ),
+    (
+        HomeGoal::BetterRoomClimate(Room::Bedroom),
+        vec![
             UserTriggerAction::new(HomekitTarget::BedroomCeilingFanSpeed.into()).into(),
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
         ]

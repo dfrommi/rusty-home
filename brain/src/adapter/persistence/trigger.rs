@@ -1,12 +1,10 @@
 use anyhow::Context;
 use api::trigger::{UserTrigger, UserTriggerTarget};
-use support::{t, time::DateTime, DataPoint};
+use support::{DataPoint, t, time::DateTime};
 
-use crate::port::{UserTriggerAccess, UserTriggerExecutor};
-
-impl UserTriggerExecutor for super::Database {
+impl super::Database {
     #[tracing::instrument(skip(self))]
-    async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
         sqlx::query!(
@@ -20,11 +18,9 @@ impl UserTriggerExecutor for super::Database {
         .map(|_| ())
         .context("Error adding user trigger")
     }
-}
 
-impl UserTriggerAccess for super::Database {
     #[tracing::instrument(name = "get_latest_user_trigger", skip(self))]
-    async fn latest_since(
+    pub async fn latest_since(
         &self,
         target: &UserTriggerTarget,
         since: DateTime,

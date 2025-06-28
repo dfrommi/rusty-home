@@ -11,10 +11,9 @@ pub mod state;
 #[cfg(test)]
 mod tests;
 
+use crate::Database;
 pub use goal::get_active_goals;
 use tracing::info;
-
-use crate::port::{CommandExecutor, PlanningResultTracer};
 
 pub fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
     static CONFIG: OnceLock<Vec<(HomeGoal, Vec<HomeAction>)>> = OnceLock::new();
@@ -22,21 +21,10 @@ pub fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn plan_for_home(
-    api: &super::Database,
-    command_executor: &impl CommandExecutor,
-    result_tracer: &impl PlanningResultTracer,
-) {
+pub async fn plan_for_home(api: &Database) {
     info!("Start planning");
     let active_goals = get_active_goals(api).await;
-    let res = crate::core::planner::perform_planning(
-        &active_goals,
-        default_config(),
-        api,
-        command_executor,
-        result_tracer,
-    )
-    .await;
+    let res = crate::core::planner::perform_planning(&active_goals, default_config(), api).await;
 
     match res {
         Ok(_) => info!("Planning done"),

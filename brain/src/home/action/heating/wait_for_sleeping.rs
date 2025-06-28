@@ -5,12 +5,13 @@ use api::command::Command;
 use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
+    Database,
     core::planner::{CommandAction, ConditionalAction},
     home::{action::HeatingZone, state::Resident},
-    port::{CommandAccess, DataPointAccess},
+    port::DataPointAccess,
 };
 
-use super::{CommandState, trigger_once_and_keep_running};
+use super::trigger_once_and_keep_running;
 
 #[derive(Debug, Clone)]
 pub enum ExtendHeatingUntilSleeping {
@@ -67,12 +68,9 @@ impl CommandAction for ExtendHeatingUntilSleeping {
     }
 }
 
-impl<T> ConditionalAction<T> for ExtendHeatingUntilSleeping
-where
-    T: DataPointAccess<Resident> + CommandAccess + CommandState,
-{
+impl ConditionalAction<Database> for ExtendHeatingUntilSleeping {
     //Strong overlap with wait_for_ventilation
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let time_range = match self.time_range().active() {
             Some(range) => range,
             None => return Ok(false),

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use api::command::{
-    db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandSource, CommandState, CommandTarget,
+    db::schema::{DbCommandSource, DbCommandState},
 };
 use sqlx::PgPool;
 use support::{
@@ -11,11 +11,9 @@ use support::{
     time::{DateTime, DateTimeRange},
 };
 
-use crate::port::{CommandAccess, CommandStore};
-
-impl CommandAccess for super::Database {
+impl super::Database {
     #[tracing::instrument(skip_all, fields(command_target))]
-    async fn get_latest_command(
+    pub async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -29,7 +27,7 @@ impl CommandAccess for super::Database {
     }
 
     #[tracing::instrument(skip_all, fields(command_target))]
-    async fn get_all_commands_for_target(
+    pub async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -40,7 +38,7 @@ impl CommandAccess for super::Database {
         self.get_commands_using_cache(&target, since).await
     }
 
-    async fn get_all_commands(
+    pub async fn get_all_commands(
         &self,
         from: DateTime,
         until: DateTime,
@@ -50,9 +48,9 @@ impl CommandAccess for super::Database {
     }
 }
 
-impl CommandStore for super::Database {
+impl super::Database {
     #[tracing::instrument(skip(self))]
-    async fn save_command(
+    pub async fn save_command(
         &self,
         command: Command,
         source: CommandSource,

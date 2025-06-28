@@ -7,12 +7,12 @@ use api::{
 };
 use support::{t, time::Duration};
 
-use crate::core::{
-    planner::{Action, ActionEvaluationResult},
-    service::CommandState,
+use crate::{
+    Database,
+    core::planner::{Action, ActionEvaluationResult},
 };
 
-use super::{CommandAccess, DataPointAccess, UserTriggerAccess, trigger_once_and_keep_running};
+use super::{DataPointAccess, trigger_once_and_keep_running};
 
 #[derive(Debug, Clone, derive_more::Display)]
 #[display("UserTriggerAction[{}]", target)]
@@ -26,11 +26,8 @@ impl UserTriggerAction {
     }
 }
 
-impl<API> Action<API> for UserTriggerAction
-where
-    API: UserTriggerAccess + CommandAccess + CommandState + DataPointAccess<Powered>,
-{
-    async fn evaluate(&self, api: &API) -> anyhow::Result<ActionEvaluationResult> {
+impl Action<Database> for UserTriggerAction {
+    async fn evaluate(&self, api: &Database) -> anyhow::Result<ActionEvaluationResult> {
         let start_of_range = match self.default_duration(api).await {
             Some(duration) => t!(now) - duration,
             None => {

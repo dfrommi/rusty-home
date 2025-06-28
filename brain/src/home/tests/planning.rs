@@ -1,6 +1,6 @@
 use ::support::time::{DateTime, FIXED_NOW};
 use api::command::{Command, CommandSource, PowerToggle};
-use support::TestCommandProcessor;
+use support::TestDatabase;
 
 use crate::home::plan_for_home;
 
@@ -10,11 +10,10 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
     let fake_now = DateTime::from_iso(iso).unwrap();
 
     let f = async {
-        let tracer = support::TestPlanningResultTracer;
-        let command_api = TestCommandProcessor::new();
+        let command_api = TestDatabase::new();
         let api = &infrastructure().api();
 
-        plan_for_home(api, &command_api, &tracer).await;
+        plan_for_home(api).await;
 
         let executed_actions = command_api.executed_actions();
         println!("TEST2: Executed actions: {:?}", executed_actions);
@@ -58,48 +57,13 @@ mod support {
     use api::command::{Command, CommandSource};
     use support::time::{DateTime, DateTimeRange};
 
-    use crate::{
-        core::{planner::PlanningTrace, service::CommandState},
-        home::tests::infrastructure,
-        port::{CommandAccess, CommandStore, PlanningResultTracer},
-    };
+    use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 
-    pub struct TestPlanningResultTracer;
-
-    impl PlanningResultTracer for TestPlanningResultTracer {
-        async fn add_planning_trace(&self, results: &PlanningTrace) -> anyhow::Result<()> {
-            println!("{:?}", results);
-            Ok(())
-        }
-
-        async fn get_latest_planning_trace(&self, _: DateTime) -> anyhow::Result<PlanningTrace> {
-            Ok(PlanningTrace::current(vec![]))
-        }
-
-        async fn get_planning_traces_in_range(
-            &self,
-            _: DateTimeRange,
-        ) -> anyhow::Result<Vec<PlanningTrace>> {
-            Ok(vec![])
-        }
-
-        async fn get_planning_traces_by_trace_id(
-            &self,
-            _: &str,
-        ) -> anyhow::Result<Option<PlanningTrace>> {
-            Ok(None)
-        }
-
-        async fn get_trace_ids(&self, _: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
-            Ok(vec![])
-        }
-    }
-
-    pub struct TestCommandProcessor {
+    pub struct TestDatabase {
         executed_actions: Mutex<Vec<(Command, CommandSource)>>,
     }
 
-    impl TestCommandProcessor {
+    impl TestDatabase {
         pub fn new() -> Self {
             Self {
                 executed_actions: Mutex::new(vec![]),
@@ -107,14 +71,49 @@ mod support {
         }
     }
 
-    impl TestCommandProcessor {
-        pub fn executed_actions(&self) -> Vec<(Command, CommandSource)> {
-            self.executed_actions.lock().unwrap().clone()
+    //Tracer
+    impl TestDatabase {
+        pub async fn add_planning_trace(&self, results: &PlanningTrace) -> anyhow::Result<()> {
+            println!("{:?}", results);
+            Ok(())
+        }
+
+        pub async fn get_latest_planning_trace(
+            &self,
+            _: DateTime,
+        ) -> anyhow::Result<PlanningTrace> {
+            Ok(PlanningTrace::current(vec![]))
+        }
+
+        pub async fn get_planning_traces_in_range(
+            &self,
+            _: DateTimeRange,
+        ) -> anyhow::Result<Vec<PlanningTrace>> {
+            Ok(vec![])
+        }
+
+        pub async fn get_planning_traces_by_trace_id(
+            &self,
+            _: &str,
+        ) -> anyhow::Result<Option<PlanningTrace>> {
+            Ok(None)
+        }
+
+        pub async fn get_trace_ids(
+            &self,
+            _: DateTimeRange,
+        ) -> anyhow::Result<Vec<(String, DateTime)>> {
+            Ok(vec![])
         }
     }
 
-    impl CommandStore for TestCommandProcessor {
-        async fn save_command(
+    //Command
+    impl TestDatabase {
+        pub fn executed_actions(&self) -> Vec<(Command, CommandSource)> {
+            self.executed_actions.lock().unwrap().clone()
+        }
+
+        pub async fn save_command(
             &self,
             command: Command,
             source: CommandSource,
@@ -130,16 +129,12 @@ mod support {
 
             Ok(())
         }
-    }
 
-    impl CommandState for TestCommandProcessor {
-        async fn is_reflected_in_state(&self, command: &Command) -> anyhow::Result<bool> {
+        pub async fn is_reflected_in_state(&self, command: &Command) -> anyhow::Result<bool> {
             infrastructure().api().is_reflected_in_state(command).await
         }
-    }
 
-    impl CommandAccess for TestCommandProcessor {
-        async fn get_latest_command(
+        pub async fn get_latest_command(
             &self,
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
@@ -150,7 +145,7 @@ mod support {
                 .await
         }
 
-        async fn get_all_commands_for_target(
+        pub async fn get_all_commands_for_target(
             &self,
             target: impl Into<api::command::CommandTarget>,
             since: DateTime,
@@ -161,7 +156,7 @@ mod support {
                 .await
         }
 
-        async fn get_all_commands(
+        pub async fn get_all_commands(
             &self,
             from: DateTime,
             until: DateTime,

@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::Mutex};
 use infrastructure::TraceContext;
 use support::{t, time::DateTime};
 
-use crate::port::PlanningResultTracer;
+use crate::Database;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanningTrace {
@@ -70,7 +70,7 @@ impl PlanningTraceStep {
     }
 }
 
-pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &impl PlanningResultTracer) {
+pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &Database) {
     if planning_trace_has_changed(trace) {
         tracing::info!("Planning result:\n{:?}", trace);
 

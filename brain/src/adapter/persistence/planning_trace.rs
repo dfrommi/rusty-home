@@ -1,10 +1,7 @@
 use sqlx::types::chrono;
 use support::{t, time::DateTime};
 
-use crate::{
-    core::planner::{PlanningTrace, PlanningTraceStep},
-    port::PlanningResultTracer,
-};
+use crate::core::planner::{PlanningTrace, PlanningTraceStep};
 
 struct PlanningTraceRow {
     id: i64,
@@ -26,9 +23,9 @@ impl TryInto<PlanningTrace> for PlanningTraceRow {
     }
 }
 
-impl PlanningResultTracer for super::Database {
+impl super::Database {
     #[tracing::instrument(skip_all)]
-    async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
+    pub async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
         sqlx::query!(
             r#"INSERT INTO planning_trace (trace_id, timestamp, steps) VALUES ($1, $2, $3)"#,
             result.trace_id,
@@ -41,7 +38,7 @@ impl PlanningResultTracer for super::Database {
         Ok(())
     }
 
-    async fn get_latest_planning_trace(
+    pub async fn get_latest_planning_trace(
         &self,
         before: support::time::DateTime,
     ) -> anyhow::Result<PlanningTrace> {
@@ -63,7 +60,7 @@ impl PlanningResultTracer for super::Database {
         }
     }
 
-    async fn get_planning_traces_by_trace_id(
+    pub async fn get_planning_traces_by_trace_id(
         &self,
         trace_id: &str,
     ) -> anyhow::Result<Option<PlanningTrace>> {
@@ -78,7 +75,7 @@ impl PlanningResultTracer for super::Database {
         recs.map(TryInto::try_into).transpose()
     }
 
-    async fn get_trace_ids(
+    pub async fn get_trace_ids(
         &self,
         range: support::time::DateTimeRange,
     ) -> anyhow::Result<Vec<(String, DateTime)>> {
@@ -105,7 +102,7 @@ impl PlanningResultTracer for super::Database {
             .collect())
     }
 
-    async fn get_planning_traces_in_range(
+    pub async fn get_planning_traces_in_range(
         &self,
         range: support::time::DateTimeRange,
     ) -> anyhow::Result<Vec<PlanningTrace>> {

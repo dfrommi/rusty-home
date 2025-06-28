@@ -9,7 +9,7 @@ use infrastructure::MqttInMessage;
 use support::{ExternalId, unit::Percent};
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
-use crate::{home::state::EnergySaving, port::UserTriggerExecutor};
+use crate::home::state::EnergySaving;
 
 use super::MqttStateValue;
 

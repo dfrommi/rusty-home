@@ -5,15 +5,16 @@ use api::command::Command;
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
+    Database,
     core::planner::{CommandAction, ConditionalAction},
     home::{
         action::HeatingZone,
         state::{AutomaticTemperatureIncrease, Opened},
     },
-    port::{CommandAccess, DataPointAccess},
+    port::DataPointAccess,
 };
 
-use super::{trigger_once_and_keep_running, CommandState};
+use super::trigger_once_and_keep_running;
 
 static NO_HEATING_SET_POINT: DegreeCelsius = DegreeCelsius(7.0);
 
@@ -56,14 +57,8 @@ impl CommandAction for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 }
 
-impl<T> ConditionalAction<T> for NoHeatingDuringAutomaticTemperatureIncrease
-where
-    T: DataPointAccess<Opened>
-        + DataPointAccess<AutomaticTemperatureIncrease>
-        + CommandAccess
-        + CommandState,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+impl ConditionalAction<Database> for NoHeatingDuringAutomaticTemperatureIncrease {
+    async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
             HeatingZone::LivingRoom => (
                 AutomaticTemperatureIncrease::LivingRoom,

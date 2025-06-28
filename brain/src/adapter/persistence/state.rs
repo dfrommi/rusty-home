@@ -1,16 +1,16 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    port::{DataPointAccess, DataPointStore, TimeSeriesAccess},
-    support::timeseries::{interpolate::Estimatable, TimeSeries},
+    port::{DataPointAccess, TimeSeriesAccess},
+    support::timeseries::{TimeSeries, interpolate::Estimatable},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use api::{
     get_tag_id,
-    state::{db::DbValue, Channel, ChannelValue},
+    state::{Channel, ChannelValue, db::DbValue},
 };
-use support::{t, time::DateTimeRange, DataFrame, DataPoint, ExternalId, ValueObject};
+use support::{DataFrame, DataPoint, ExternalId, ValueObject, t, time::DateTimeRange};
 
 impl super::Database {
     fn ts_caching_range(&self) -> DateTimeRange {
@@ -91,8 +91,8 @@ where
     }
 }
 
-impl DataPointStore for super::Database {
-    async fn get_all_data_points_in_range(
+impl super::Database {
+    pub async fn get_all_data_points_in_range(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<ChannelValue>>> {
@@ -138,9 +138,7 @@ impl DataPointStore for super::Database {
 
         Ok(dps)
     }
-}
 
-impl super::Database {
     //try to return reference or at least avoid copy of entire dataframe
     async fn get_default_dataframe<T>(&self, tag_id: i64) -> anyhow::Result<DataFrame<T>>
     where

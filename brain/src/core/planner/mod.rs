@@ -8,24 +8,21 @@ use std::fmt::Display;
 
 use trace::display_planning_trace;
 
-use crate::port::{CommandExecutor, PlanningResultTracer};
+use crate::Database;
 
 pub use action::{Action, ActionEvaluationResult, CommandAction, ConditionalAction};
 pub use trace::{PlanningTrace, PlanningTraceStep};
 
-pub async fn perform_planning<G, A, API, EXE>(
+pub async fn perform_planning<G, A>(
     active_goals: &[G],
     config: &[(G, Vec<A>)],
-    api: &API,
-    command_processor: &EXE,
-    result_tracer: &impl PlanningResultTracer,
+    api: &Database,
 ) -> anyhow::Result<()>
 where
     G: Eq + Display,
-    A: Action<API>,
-    EXE: CommandExecutor,
+    A: Action<Database>,
 {
-    let results = processor::plan_and_execute(active_goals, config, api, command_processor).await?;
-    display_planning_trace(&results, result_tracer).await;
+    let results = processor::plan_and_execute(active_goals, config, api).await?;
+    display_planning_trace(&results, api).await;
     Ok(())
 }

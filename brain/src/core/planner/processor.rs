@@ -6,22 +6,19 @@ use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
 use crate::{
-    core::planner::action::ActionEvaluationResult,
-    port::{CommandExecutionResult, CommandExecutor},
+    Database, core::planner::action::ActionEvaluationResult, port::CommandExecutionResult,
 };
 
-use super::{action::Action, context::Context, resource_lock::ResourceLock, PlanningTrace};
+use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
-pub async fn plan_and_execute<G, A, API, EXE>(
+pub async fn plan_and_execute<G, A>(
     active_goals: &[G],
     config: &[(G, Vec<A>)],
-    api: &API,
-    command_processor: &EXE,
+    api: &Database,
 ) -> Result<PlanningTrace>
 where
     G: Eq + Display,
-    A: Action<API>,
-    EXE: CommandExecutor,
+    A: Action<Database>,
 {
     let (first_tx, mut prev_rx) = oneshot::channel();
 
@@ -43,7 +40,7 @@ where
 
     let mut tasks = vec![];
     for context in contexts {
-        tasks.push(process_action(context, api, command_processor));
+        tasks.push(process_action(context, api));
     }
 
     let results: Result<Vec<Context<A>>> =
@@ -57,14 +54,12 @@ where
     skip_all,
     fields(action = %context.action, otel.name = %context.action),
 )]
-async fn process_action<'a, A, API, EXE>(
+async fn process_action<'a, A>(
     mut context: Context<'a, A>,
-    api: &API,
-    command_processor: &EXE,
+    api: &Database,
 ) -> Result<Context<'a, A>>
 where
-    A: Action<API>,
-    EXE: CommandExecutor,
+    A: Action<Database>,
 {
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
@@ -78,7 +73,7 @@ where
 
     //EXECUTION
     if let ActionEvaluationResult::Execute(command, source) = evaluation_result {
-        execute_action(&mut context, command, source, command_processor).await;
+        execute_action(&mut context, command, source, api).await;
     }
 
     Ok(context)
@@ -137,14 +132,13 @@ fn check_locked<'a, A>(
 }
 
 #[tracing::instrument(skip(context, command_processor))]
-async fn execute_action<'a, A, API, EXE>(
+async fn execute_action<'a, A>(
     context: &mut Context<'a, A>,
     command: Command,
     source: CommandSource,
-    command_processor: &EXE,
+    command_processor: &Database,
 ) where
-    A: Action<API>,
-    EXE: CommandExecutor,
+    A: Action<Database>,
 {
     match command_processor.execute(command, source).await {
         Ok(CommandExecutionResult::Triggered) => {

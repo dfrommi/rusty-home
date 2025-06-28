@@ -5,12 +5,13 @@ use api::command::Command;
 use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
+    Database,
     core::planner::{CommandAction, ConditionalAction},
     home::{action::HeatingZone, state::Opened},
-    port::{CommandAccess, DataPointAccess},
+    port::DataPointAccess,
 };
 
-use super::{CommandState, trigger_once_and_keep_running};
+use super::trigger_once_and_keep_running;
 
 #[derive(Debug, Clone)]
 pub enum DeferHeatingUntilVentilationDone {
@@ -79,11 +80,8 @@ impl CommandAction for DeferHeatingUntilVentilationDone {
     }
 }
 
-impl<T> ConditionalAction<T> for DeferHeatingUntilVentilationDone
-where
-    T: DataPointAccess<Opened> + CommandAccess + CommandState,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+impl ConditionalAction<Database> for DeferHeatingUntilVentilationDone {
+    async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let time_range = match self.time_range().active() {
             Some(range) => range,
             None => return Ok(false),

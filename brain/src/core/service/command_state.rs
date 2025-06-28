@@ -8,26 +8,11 @@ use api::{
 };
 use support::{t, unit::DegreeCelsius};
 
-use crate::{
-    home::state::EnergySaving,
-    port::{CommandAccess, DataPointAccess},
-};
+use crate::Database;
+use crate::{home::state::EnergySaving, port::DataPointAccess};
 
-#[allow(async_fn_in_trait)]
-pub trait CommandState {
-    async fn is_reflected_in_state(&self, command: &Command) -> Result<bool>;
-}
-
-impl<API> CommandState for API
-where
-    API: DataPointAccess<SetPoint>
-        + DataPointAccess<ExternalAutoControl>
-        + DataPointAccess<Powered>
-        + CommandAccess
-        + DataPointAccess<EnergySaving>
-        + DataPointAccess<FanActivity>,
-{
-    async fn is_reflected_in_state(&self, command: &Command) -> Result<bool> {
+impl Database {
+    pub async fn is_reflected_in_state(&self, command: &Command) -> Result<bool> {
         match command {
             Command::SetPower { device, power_on } => {
                 is_set_power_reflected_in_state(device, *power_on, self).await
@@ -102,15 +87,12 @@ where
     Ok(powered == power_on)
 }
 
-async fn is_push_notify_reflected_in_state<API>(
+async fn is_push_notify_reflected_in_state(
     recipient: &NotificationRecipient,
     notification: &Notification,
     notify_action: &NotificationAction,
-    api: &API,
-) -> Result<bool>
-where
-    API: CommandAccess,
-{
+    api: &Database,
+) -> Result<bool> {
     let target = NotificationTarget {
         recipient: recipient.clone(),
         notification: notification.clone(),

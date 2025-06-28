@@ -1,48 +1,19 @@
 mod dashboard;
 mod display;
-mod port;
 mod support;
 
 use std::sync::Arc;
 
 use ::support::ExternalId;
 use actix_web::{
-    web::{self},
     HttpResponse, ResponseError,
-};
-use api::state::{
-    CurrentPowerUsage, HeatingDemand, RelativeHumidity, SetPoint, Temperature,
-    TotalEnergyConsumption,
+    web::{self},
 };
 use derive_more::derive::{Display, Error};
 
-use crate::{
-    home::state::Opened,
-    port::{
-        CommandAccess, DataPointAccess, DataPointStore, PlanningResultTracer, TimeSeriesAccess,
-    },
-};
-
 use display::DashboardDisplay;
 
-pub use port::*;
-
-pub fn new_routes<T>(api: Arc<T>) -> actix_web::Scope
-where
-    T: DataPointAccess<CurrentPowerUsage>
-        + DataPointAccess<HeatingDemand>
-        + TimeSeriesAccess<TotalEnergyConsumption>
-        + TimeSeriesAccess<HeatingDemand>
-        + TimeSeriesAccess<Temperature>
-        + TimeSeriesAccess<RelativeHumidity>
-        + TimeSeriesAccess<SetPoint>
-        + TimeSeriesAccess<Opened>
-        + CommandAccess
-        + PlanningResultTracer
-        + DataPointStore
-        + ItemAvailabilitySupportStorage
-        + 'static,
-{
+pub fn new_routes(api: Arc<crate::Database>) -> actix_web::Scope {
     web::scope("/grafana")
         .service(dashboard::energy_iq::routes(api.clone()))
         .service(dashboard::energy_monitor::routes(api.clone()))

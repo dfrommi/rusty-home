@@ -7,7 +7,7 @@ use support::{DataPoint, ValueObject};
 
 use crate::home::state::macros::result;
 
-use super::{CommandAccess, DataPointAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone, Id)]
 pub enum EnergySaving {
@@ -18,10 +18,7 @@ impl ValueObject for EnergySaving {
     type ValueType = bool;
 }
 
-impl<T> DataPointAccess<EnergySaving> for T
-where
-    T: CommandAccess + DataPointAccess<Powered>,
-{
+impl DataPointAccess<EnergySaving> for crate::Database {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     async fn current_data_point(
         &self,

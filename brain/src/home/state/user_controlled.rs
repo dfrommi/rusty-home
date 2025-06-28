@@ -1,5 +1,5 @@
 use r#macro::Id;
-use support::{t, time::DateTime, unit::DegreeCelsius, DataPoint, ValueObject};
+use support::{DataPoint, ValueObject, t, time::DateTime, unit::DegreeCelsius};
 
 use api::{
     command::{
@@ -8,9 +8,9 @@ use api::{
     state::{ExternalAutoControl, Powered, SetPoint},
 };
 
-use crate::home::state::macros::result;
+use crate::{Database, home::state::macros::result};
 
-use super::{CommandAccess, DataPointAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone, Id)]
 pub enum UserControlled {
@@ -30,13 +30,7 @@ impl ValueObject for UserControlled {
 // - what is the current state and since when?
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
-impl<T> DataPointAccess<UserControlled> for T
-where
-    T: DataPointAccess<Powered>
-        + DataPointAccess<ExternalAutoControl>
-        + DataPointAccess<SetPoint>
-        + CommandAccess,
-{
+impl DataPointAccess<UserControlled> for Database {
     async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
         match item {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(self).await,
@@ -96,9 +90,7 @@ where
     }
 }
 
-async fn current_data_point_for_dehumidifier(
-    api: &(impl DataPointAccess<Powered> + CommandAccess),
-) -> anyhow::Result<DataPoint<bool>> {
+async fn current_data_point_for_dehumidifier(api: &Database) -> anyhow::Result<DataPoint<bool>> {
     let item = UserControlled::Dehumidifier;
 
     let power = api.current_data_point(Powered::Dehumidifier).await?;
@@ -155,7 +147,7 @@ async fn current_data_point_for_dehumidifier(
 }
 
 async fn current_data_point_for_thermostat(
-    api: &(impl DataPointAccess<ExternalAutoControl> + DataPointAccess<SetPoint> + CommandAccess),
+    api: &Database,
     item: UserControlled,
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,

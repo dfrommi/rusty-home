@@ -2,15 +2,10 @@ use api::command::{Command, CommandTarget};
 use infrastructure::TraceContext;
 use support::t;
 
-use crate::port::{CommandAccess, CommandExecutionResult, CommandExecutor, CommandStore};
+use crate::port::CommandExecutionResult;
 
-use super::CommandState;
-
-impl<T> CommandExecutor for T
-where
-    T: CommandStore + CommandState + CommandAccess,
-{
-    async fn execute(
+impl crate::Database {
+    pub async fn execute(
         &self,
         command: Command,
         source: api::command::CommandSource,

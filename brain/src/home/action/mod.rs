@@ -14,11 +14,6 @@ use anyhow::Result;
 use api::command::Command;
 
 use api::command::CommandSource;
-use api::state::ExternalAutoControl;
-use api::state::Powered;
-use api::state::Presence;
-use api::state::RelativeHumidity;
-use api::state::SetPoint;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
@@ -30,9 +25,9 @@ use support::t;
 use support::time::DateTime;
 pub use user_trigger_action::UserTriggerAction;
 
+use crate::Database;
 use crate::core::planner::Action;
 use crate::core::planner::ActionEvaluationResult;
-use crate::core::service::CommandState;
 use crate::home::state::*;
 use crate::port::*;
 
@@ -57,25 +52,8 @@ pub enum HomeAction {
     SupportVentilationWithFan(SupportVentilationWithFan),
 }
 
-impl<API> Action<API> for HomeAction
-where
-    API: DataPointAccess<Powered>
-        + DataPointAccess<ExternalAutoControl>
-        + DataPointAccess<SetPoint>
-        + DataPointAccess<RiskOfMould>
-        + DataPointAccess<ColdAirComingIn>
-        + DataPointAccess<Opened>
-        + DataPointAccess<AutomaticTemperatureIncrease>
-        + DataPointAccess<UserControlled>
-        + DataPointAccess<RelativeHumidity>
-        + DataPointAccess<Resident>
-        + DataPointAccess<EnergySaving>
-        + DataPointAccess<Presence>
-        + CommandState
-        + CommandAccess
-        + UserTriggerAccess,
-{
-    async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult> {
+impl Action<Database> for HomeAction {
+    async fn evaluate(&self, api: &Database) -> Result<ActionEvaluationResult> {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
             HomeAction::RequestClosingWindow(request_closing_window) => {
@@ -123,15 +101,12 @@ where
 }
 
 //trigger and keep running until something else changes state
-async fn trigger_once_and_keep_running<API>(
+async fn trigger_once_and_keep_running(
     command: &Command,
     source: &CommandSource,
     oneshot_range_start: DateTime,
-    api: &API,
-) -> Result<bool>
-where
-    API: CommandAccess + CommandState,
-{
+    api: &Database,
+) -> Result<bool> {
     let executions = api
         .get_all_commands_for_target(command.clone(), oneshot_range_start)
         .await?;

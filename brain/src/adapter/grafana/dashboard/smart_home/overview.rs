@@ -9,36 +9,28 @@ use api::{
 use infrastructure::TraceContext;
 
 use crate::{
+    Database,
     adapter::grafana::{
-        GrafanaApiError, GrafanaResponse, ItemAvailabilitySupportStorage,
-        dashboard::TimeRangeQuery, support::csv_response,
+        GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response,
     },
-    port::{CommandAccess, DataPointStore, PlanningResultTracer},
 };
 
 use super::TraceView;
 
-pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
-where
-    T: PlanningResultTracer
-        + CommandAccess
-        + DataPointStore
-        + ItemAvailabilitySupportStorage
-        + 'static,
-{
+pub fn routes(api: Arc<Database>) -> actix_web::Scope {
     web::scope("/overview")
-        .route("/trace", web::get().to(get_trace::<T>))
-        .route("/trace/states", web::get().to(get_trace_states::<T>))
-        .route("/commands", web::get().to(get_commands::<T>))
-        .route("/states", web::get().to(get_states::<T>))
-        .route("/offline", web::get().to(get_offline_items::<T>))
+        .route("/trace", web::get().to(get_trace))
+        .route("/trace/states", web::get().to(get_trace_states))
+        .route("/commands", web::get().to(get_commands))
+        .route("/states", web::get().to(get_states))
+        .route("/offline", web::get().to(get_offline_items))
         .app_data(web::Data::from(api))
 }
 
-async fn get_trace<T>(api: web::Data<T>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse
-where
-    T: PlanningResultTracer,
-{
+async fn get_trace(
+    api: web::Data<Database>,
+    time_range: web::Query<TimeRangeQuery>,
+) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         state: String,
@@ -69,13 +61,10 @@ where
     csv_response(rows)
 }
 
-async fn get_trace_states<T>(
-    api: web::Data<T>,
+async fn get_trace_states(
+    api: web::Data<Database>,
     time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse
-where
-    T: PlanningResultTracer,
-{
+) -> GrafanaResponse {
     let traces = api
         .get_planning_traces_in_range(time_range.range())
         .await
@@ -116,13 +105,10 @@ where
         ))
 }
 
-async fn get_commands<T>(
-    api: web::Data<T>,
+async fn get_commands(
+    api: web::Data<Database>,
     time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse
-where
-    T: CommandAccess,
-{
+) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         icon: String,
@@ -205,10 +191,10 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
     }
 }
 
-async fn get_states<T>(api: web::Data<T>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse
-where
-    T: DataPointStore,
-{
+async fn get_states(
+    api: web::Data<Database>,
+    time_range: web::Query<TimeRangeQuery>,
+) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         timestamp: String,
@@ -240,10 +226,7 @@ where
     csv_response(rows)
 }
 
-async fn get_offline_items<T>(api: web::Data<T>) -> GrafanaResponse
-where
-    T: ItemAvailabilitySupportStorage,
-{
+async fn get_offline_items(api: web::Data<Database>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         source: String,

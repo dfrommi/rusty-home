@@ -1,10 +1,14 @@
 use sqlx::postgres::types::PgInterval;
 use support::{t, time::Duration};
 
-use crate::adapter::grafana::{ItemAvailabilitySupportStorage, OfflineItem};
+pub struct OfflineItem {
+    pub source: String,
+    pub item: String,
+    pub duration: Duration,
+}
 
-impl ItemAvailabilitySupportStorage for super::Database {
-    async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
+impl super::Database {
+    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
         let recs = sqlx::query!(
             r#"SELECT source, item, last_seen, marked_offline, considered_offline_after, entry_updated
                 FROM item_availability"#

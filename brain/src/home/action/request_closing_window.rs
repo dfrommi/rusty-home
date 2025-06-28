@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-    core::planner::{CommandAction, ConditionalAction},
-    home::state::{ColdAirComingIn, Powered},
-};
+use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 use anyhow::Result;
 use api::command::{Command, PowerToggle};
 
@@ -24,7 +21,7 @@ impl Display for RequestClosingWindow {
     }
 }
 
-impl CommandAction for RequestClosingWindow {
+impl SimpleAction for RequestClosingWindow {
     fn command(&self) -> Command {
         Command::SetPower {
             device: PowerToggle::LivingRoomNotificationLight,
@@ -35,13 +32,8 @@ impl CommandAction for RequestClosingWindow {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for RequestClosingWindow
-where
-    T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Powered>,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> Result<bool> {
         let result: Result<Vec<bool>> = futures::future::join_all([
             api.current(ColdAirComingIn::Bedroom),
             api.current(ColdAirComingIn::Kitchen),

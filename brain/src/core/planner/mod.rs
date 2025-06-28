@@ -10,7 +10,7 @@ use trace::display_planning_trace;
 
 use crate::Database;
 
-pub use action::{Action, ActionEvaluationResult, CommandAction, ConditionalAction};
+pub use action::{Action, ActionEvaluationResult, SimpleAction};
 pub use trace::{PlanningTrace, PlanningTraceStep};
 
 pub async fn perform_planning<G, A>(
@@ -20,7 +20,7 @@ pub async fn perform_planning<G, A>(
 ) -> anyhow::Result<()>
 where
     G: Eq + Display,
-    A: Action<Database>,
+    A: Action,
 {
     let results = processor::plan_and_execute(active_goals, config, api).await?;
     display_planning_trace(&results, api).await;

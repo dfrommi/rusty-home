@@ -6,7 +6,7 @@ use api::{
 };
 use support::t;
 
-use crate::core::planner::{CommandAction, ConditionalAction};
+use crate::core::planner::SimpleAction;
 
 use super::{DataPointAccess, Opened};
 
@@ -26,7 +26,8 @@ impl Display for SupportVentilationWithFan {
         write!(f, "SupportVentilationWithFan[{:?}]", self.fan)
     }
 }
-impl CommandAction for SupportVentilationWithFan {
+
+impl SimpleAction for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
             device: self.fan.clone(),
@@ -37,13 +38,8 @@ impl CommandAction for SupportVentilationWithFan {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for SupportVentilationWithFan
-where
-    T: DataPointAccess<Opened>,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
         let window = match self.fan {
             Fan::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
             Fan::BedroomCeilingFan => Opened::BedroomWindow,

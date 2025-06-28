@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::{command::Command, state::SetPoint};
+use api::command::Command;
 
 use crate::{
-    core::planner::{CommandAction, ConditionalAction},
+    core::planner::SimpleAction,
     home::{action::HeatingZone, state::ColdAirComingIn},
     port::DataPointAccess,
 };
@@ -28,7 +28,7 @@ impl Display for NoHeatingDuringVentilation {
     }
 }
 
-impl CommandAction for NoHeatingDuringVentilation {
+impl SimpleAction for NoHeatingDuringVentilation {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
@@ -39,15 +39,8 @@ impl CommandAction for NoHeatingDuringVentilation {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for NoHeatingDuringVentilation
-where
-    T: DataPointAccess<ColdAirComingIn>
-        + DataPointAccess<ColdAirComingIn>
-        + DataPointAccess<SetPoint>,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> Result<bool> {
         api.current(match self.heating_zone {
             HeatingZone::LivingRoom => ColdAirComingIn::LivingRoom,
             HeatingZone::Bedroom => ColdAirComingIn::Bedroom,

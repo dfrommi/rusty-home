@@ -4,10 +4,7 @@ use api::{
 };
 use support::t;
 
-use crate::{
-    core::planner::{CommandAction, ConditionalAction},
-    port::DataPointAccess,
-};
+use crate::{core::planner::SimpleAction, port::DataPointAccess};
 
 #[derive(Debug, Clone)]
 pub struct IrHeaterAutoTurnOff;
@@ -24,7 +21,7 @@ impl std::fmt::Display for IrHeaterAutoTurnOff {
     }
 }
 
-impl CommandAction for IrHeaterAutoTurnOff {
+impl SimpleAction for IrHeaterAutoTurnOff {
     fn command(&self) -> Command {
         Command::SetPower {
             device: PowerToggle::InfraredHeater,
@@ -35,13 +32,8 @@ impl CommandAction for IrHeaterAutoTurnOff {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<API> ConditionalAction<API> for IrHeaterAutoTurnOff
-where
-    API: DataPointAccess<Powered>,
-{
-    async fn preconditions_fulfilled(&self, api: &API) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
         let device = Powered::InfraredHeater;
         let current = api.current_data_point(device).await?;
 

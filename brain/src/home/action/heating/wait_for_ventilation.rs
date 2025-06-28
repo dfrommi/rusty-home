@@ -6,7 +6,7 @@ use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
     Database,
-    core::planner::{CommandAction, ConditionalAction},
+    core::planner::SimpleAction,
     home::{action::HeatingZone, state::Opened},
     port::DataPointAccess,
 };
@@ -64,7 +64,7 @@ impl Display for DeferHeatingUntilVentilationDone {
     }
 }
 
-impl CommandAction for DeferHeatingUntilVentilationDone {
+impl SimpleAction for DeferHeatingUntilVentilationDone {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone().thermostat(),
@@ -78,9 +78,7 @@ impl CommandAction for DeferHeatingUntilVentilationDone {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl ConditionalAction<Database> for DeferHeatingUntilVentilationDone {
     async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let time_range = match self.time_range().active() {
             Some(range) => range,

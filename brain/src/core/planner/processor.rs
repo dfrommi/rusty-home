@@ -18,7 +18,7 @@ pub async fn plan_and_execute<G, A>(
 ) -> Result<PlanningTrace>
 where
     G: Eq + Display,
-    A: Action<Database>,
+    A: Action,
 {
     let (first_tx, mut prev_rx) = oneshot::channel();
 
@@ -59,7 +59,7 @@ async fn process_action<'a, A>(
     api: &Database,
 ) -> Result<Context<'a, A>>
 where
-    A: Action<Database>,
+    A: Action,
 {
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
@@ -80,12 +80,12 @@ where
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<'a, A, API>(
+async fn evaluate_action<'a, A>(
     context: &mut Context<'a, A>,
-    api: &API,
+    api: &Database,
 ) -> ActionEvaluationResult
 where
-    A: Action<API>,
+    A: Action,
 {
     let result = if context.goal_active {
         context.action.evaluate(api).await.unwrap_or_else(|e| {
@@ -138,7 +138,7 @@ async fn execute_action<'a, A>(
     source: CommandSource,
     command_processor: &Database,
 ) where
-    A: Action<Database>,
+    A: Action,
 {
     match command_processor.execute(command, source).await {
         Ok(CommandExecutionResult::Triggered) => {

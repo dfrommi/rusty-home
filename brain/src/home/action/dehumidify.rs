@@ -1,15 +1,9 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::{
-    command::{Command, PowerToggle},
-    state::Powered,
-};
+use api::command::{Command, PowerToggle};
 
-use crate::{
-    core::planner::{CommandAction, ConditionalAction},
-    home::state::RiskOfMould,
-};
+use crate::{core::planner::SimpleAction, home::state::RiskOfMould};
 
 use super::DataPointAccess;
 
@@ -28,7 +22,7 @@ impl Display for Dehumidify {
     }
 }
 
-impl CommandAction for Dehumidify {
+impl SimpleAction for Dehumidify {
     fn command(&self) -> Command {
         Command::SetPower {
             device: PowerToggle::Dehumidifier,
@@ -39,13 +33,8 @@ impl CommandAction for Dehumidify {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for Dehumidify
-where
-    T: DataPointAccess<RiskOfMould> + DataPointAccess<Powered>,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> Result<bool> {
         api.current(RiskOfMould::Bathroom).await
     }
 }

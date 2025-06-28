@@ -26,7 +26,7 @@ impl UserTriggerAction {
     }
 }
 
-impl Action<Database> for UserTriggerAction {
+impl Action for UserTriggerAction {
     async fn evaluate(&self, api: &Database) -> anyhow::Result<ActionEvaluationResult> {
         let start_of_range = match self.default_duration(api).await {
             Some(duration) => t!(now) - duration,

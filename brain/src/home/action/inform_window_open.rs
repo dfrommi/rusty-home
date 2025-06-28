@@ -6,10 +6,7 @@ use api::{
 };
 use support::{DataPoint, t, time::DateTime};
 
-use crate::{
-    core::planner::{CommandAction, ConditionalAction},
-    home::state::ColdAirComingIn,
-};
+use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 
 use super::DataPointAccess;
 
@@ -32,7 +29,7 @@ impl Display for InformWindowOpen {
     }
 }
 
-impl CommandAction for InformWindowOpen {
+impl SimpleAction for InformWindowOpen {
     fn command(&self) -> Command {
         Command::PushNotify {
             action: NotificationAction::Notify,
@@ -44,13 +41,8 @@ impl CommandAction for InformWindowOpen {
     fn source(&self) -> CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for InformWindowOpen
-where
-    T: DataPointAccess<ColdAirComingIn> + DataPointAccess<Presence>,
-{
-    async fn preconditions_fulfilled(&self, api: &T) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
         let presence_item = match self.recipient {
             NotificationRecipient::Dennis => Presence::AtHomeDennis,
             NotificationRecipient::Sabine => Presence::AtHomeSabine,

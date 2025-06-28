@@ -52,7 +52,7 @@ pub enum HomeAction {
     SupportVentilationWithFan(SupportVentilationWithFan),
 }
 
-impl Action<Database> for HomeAction {
+impl Action for HomeAction {
     async fn evaluate(&self, api: &Database) -> Result<ActionEvaluationResult> {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
@@ -88,7 +88,7 @@ impl Action<Database> for HomeAction {
                 reduce_noise_at_night.evaluate(api).await
             }
             HomeAction::FollowDefaultSetting(follow_default_setting) => {
-                follow_default_setting.evaluate(&()).await
+                follow_default_setting.evaluate(api).await
             }
             HomeAction::UserTriggerAction(user_trigger_action) => {
                 user_trigger_action.evaluate(api).await

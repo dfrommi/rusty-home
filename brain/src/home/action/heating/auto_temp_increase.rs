@@ -6,7 +6,7 @@ use support::{t, unit::DegreeCelsius};
 
 use crate::{
     Database,
-    core::planner::{CommandAction, ConditionalAction},
+    core::planner::SimpleAction,
     home::{
         action::HeatingZone,
         state::{AutomaticTemperatureIncrease, Opened},
@@ -41,7 +41,7 @@ impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
     }
 }
 
-impl CommandAction for NoHeatingDuringAutomaticTemperatureIncrease {
+impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
@@ -55,9 +55,7 @@ impl CommandAction for NoHeatingDuringAutomaticTemperatureIncrease {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl ConditionalAction<Database> for NoHeatingDuringAutomaticTemperatureIncrease {
     async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
             HeatingZone::LivingRoom => (

@@ -24,11 +24,8 @@ impl KeepUserOverride {
     }
 }
 
-impl<API> Action<API> for KeepUserOverride
-where
-    API: DataPointAccess<UserControlled>,
-{
-    async fn evaluate(&self, api: &API) -> Result<ActionEvaluationResult> {
+impl Action for KeepUserOverride {
+    async fn evaluate(&self, api: &crate::Database) -> Result<ActionEvaluationResult> {
         let fulfilled = api.current(self.user_controlled.clone()).await?;
 
         if fulfilled {

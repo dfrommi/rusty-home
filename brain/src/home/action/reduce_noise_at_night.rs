@@ -1,14 +1,9 @@
 use std::fmt::Display;
 
-use api::{
-    command::{Command, PowerToggle},
-    state::Powered,
-};
+use api::command::{Command, PowerToggle};
 use support::{t, time::DailyTimeRange};
 
-use crate::core::planner::{CommandAction, ConditionalAction};
-
-use super::DataPointAccess;
+use crate::core::planner::SimpleAction;
 
 #[derive(Debug, Clone)]
 pub struct ReduceNoiseAtNight {
@@ -27,7 +22,7 @@ impl Display for ReduceNoiseAtNight {
     }
 }
 
-impl CommandAction for ReduceNoiseAtNight {
+impl SimpleAction for ReduceNoiseAtNight {
     fn command(&self) -> Command {
         Command::SetPower {
             device: PowerToggle::Dehumidifier,
@@ -38,13 +33,8 @@ impl CommandAction for ReduceNoiseAtNight {
     fn source(&self) -> api::command::CommandSource {
         super::action_source(self)
     }
-}
 
-impl<T> ConditionalAction<T> for ReduceNoiseAtNight
-where
-    T: DataPointAccess<Powered>,
-{
-    async fn preconditions_fulfilled(&self, _: &T) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, _: &crate::Database) -> anyhow::Result<bool> {
         Ok(self.range.contains(t!(now).time()))
     }
 }

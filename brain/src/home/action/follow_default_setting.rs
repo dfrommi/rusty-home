@@ -24,8 +24,8 @@ impl Display for FollowDefaultSetting {
     }
 }
 
-impl Action<()> for FollowDefaultSetting {
-    async fn evaluate(&self, _: &()) -> anyhow::Result<ActionEvaluationResult> {
+impl Action for FollowDefaultSetting {
+    async fn evaluate(&self, _: &crate::Database) -> anyhow::Result<ActionEvaluationResult> {
         let command = match self.target.clone() {
             CommandTarget::SetPower { device } => Command::SetPower {
                 device,

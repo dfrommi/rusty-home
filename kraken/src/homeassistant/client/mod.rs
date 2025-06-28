@@ -1,5 +1,5 @@
 mod http;
 mod mqtt;
 
-pub use http::HaRestClient;
+pub use http::HaHttpClient;
 pub use mqtt::HaMqttClient;

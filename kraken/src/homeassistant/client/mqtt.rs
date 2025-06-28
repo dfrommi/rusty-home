@@ -1,7 +1,7 @@
 use infrastructure::MqttInMessage;
 use serde::Deserialize;
 
-use crate::homeassistant::domain::{ListenToStateChangesPort, StateChangedEvent};
+use crate::homeassistant::StateChangedEvent;
 
 pub struct HaMqttClient {
     state_rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
@@ -13,8 +13,8 @@ impl HaMqttClient {
     }
 }
 
-impl ListenToStateChangesPort for HaMqttClient {
-    async fn recv(&mut self) -> anyhow::Result<crate::homeassistant::domain::StateChangedEvent> {
+impl HaMqttClient {
+    pub async fn recv(&mut self) -> anyhow::Result<StateChangedEvent> {
         loop {
             match self.state_rx.recv().await {
                 Some(msg) => {

@@ -171,7 +171,7 @@ pub async fn main() {
 
 impl settings::HomeAssitant {
     fn new_command_executor(&self, incoming_data_tx: IncomingDataSender) -> impl CommandExecutor {
-        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
+        let http_client = homeassistant::HaHttpClient::new(&self.url, &self.token)
             .expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(http_client, incoming_data_tx, &default_ha_command_config())
     }
@@ -180,7 +180,7 @@ impl settings::HomeAssitant {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl IncomingDataProcessor + use<> {
-        let http_client = homeassistant::HaRestClient::new(&self.url, &self.token)
+        let http_client = homeassistant::HaHttpClient::new(&self.url, &self.token)
             .expect("Error initializing Home Assistant REST client");
 
         let mqtt_client = homeassistant::HaMqttClient::new(

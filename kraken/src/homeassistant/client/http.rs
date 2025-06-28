@@ -2,15 +2,15 @@ use anyhow::Context;
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
-use crate::homeassistant::domain::{CallServicePort, GetAllEntityStatesPort, StateChangedEvent};
+use crate::homeassistant::StateChangedEvent;
 
 #[derive(Debug, Clone)]
-pub struct HaRestClient {
+pub struct HaHttpClient {
     client: ClientWithMiddleware,
     base_url: String,
 }
 
-impl HaRestClient {
+impl HaHttpClient {
     pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
         let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
 
@@ -21,8 +21,8 @@ impl HaRestClient {
     }
 }
 
-impl GetAllEntityStatesPort for HaRestClient {
-    async fn get_current_state(&self) -> anyhow::Result<Vec<StateChangedEvent>> {
+impl HaHttpClient {
+    pub async fn get_current_state(&self) -> anyhow::Result<Vec<StateChangedEvent>> {
         let response = self
             .client
             .get(format!("{}/api/states", self.base_url))
@@ -34,11 +34,9 @@ impl GetAllEntityStatesPort for HaRestClient {
             .await
             .context("Error getting all states")
     }
-}
 
-impl CallServicePort for HaRestClient {
     #[tracing::instrument(skip(self))]
-    async fn call_service(
+    pub async fn call_service(
         &self,
         domain: &str,
         service: &str,

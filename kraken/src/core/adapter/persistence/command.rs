@@ -1,15 +1,15 @@
 use api::command::{
-    db::schema::{DbCommandSource, DbCommandState},
     Command, CommandExecution, CommandSource, CommandState,
+    db::schema::{DbCommandSource, DbCommandState},
 };
 
 use anyhow::Result;
 
-use crate::{core::domain::CommandRepository, Database};
+use crate::Database;
 
-impl CommandRepository for Database {
+impl Database {
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
-    async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
+    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.db_pool.begin().await?;
 
         let maybe_rec = sqlx::query!(
@@ -73,11 +73,15 @@ impl CommandRepository for Database {
         }
     }
 
-    async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
+    pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
         set_command_status_in_tx(&self.db_pool, command_id, DbCommandState::Success, None).await
     }
 
-    async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
+    pub async fn set_command_state_error(
+        &self,
+        command_id: i64,
+        error_message: &str,
+    ) -> Result<()> {
         set_command_status_in_tx(
             &self.db_pool,
             command_id,

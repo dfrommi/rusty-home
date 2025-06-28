@@ -1,15 +1,15 @@
 use api::{
     get_tag_id,
-    state::{db::DbValue, ChannelValue},
+    state::{ChannelValue, db::DbValue},
 };
 
 use anyhow::Result;
 use support::time::DateTime;
 
-use crate::{core::domain::StateStorage, Database};
+use crate::Database;
 
-impl StateStorage for Database {
-    async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
+impl Database {
+    pub async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.db_pool, value.into(), true).await?;
 
         let fvalue: DbValue = value.into();

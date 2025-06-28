@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::bail;
-use api::state::{
-    ChannelValue, FanActivity,
-    unit::{FanAirflow, FanSpeed},
-};
+use api::state::{ChannelValue, unit::FanAirflow};
 use support::{
     DataPoint,
     time::DateTime,
@@ -14,19 +11,17 @@ use tokio::sync::mpsc;
 
 use crate::{
     core::{IncomingData, IncomingDataProcessor, ItemAvailability},
-    homeassistant::domain::{
-        GetAllEntityStatesPort, HaChannel, ListenToStateChangesPort, StateChangedEvent, StateValue,
-    },
+    homeassistant::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue},
 };
 
-pub struct HaIncomingDataProcessor<C, L> {
-    client: C,
-    listener: L,
+pub struct HaIncomingDataProcessor {
+    client: HaHttpClient,
+    listener: HaMqttClient,
     config: HashMap<String, Vec<HaChannel>>,
 }
 
-impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> HaIncomingDataProcessor<C, L> {
-    pub fn new(client: C, listener: L, config: &[(&str, HaChannel)]) -> Self {
+impl HaIncomingDataProcessor {
+    pub fn new(client: HaHttpClient, listener: HaMqttClient, config: &[(&str, HaChannel)]) -> Self {
         let mut m: HashMap<String, Vec<HaChannel>> = HashMap::new();
         for (id, channel) in config {
             let id = id.to_string();
@@ -41,9 +36,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> HaIncomingDataProce
     }
 }
 
-impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcessor
-    for HaIncomingDataProcessor<C, L>
-{
+impl IncomingDataProcessor for HaIncomingDataProcessor {
     async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
         tracing::info!("Requesting current state from HA");
 
@@ -62,7 +55,7 @@ impl<C: GetAllEntityStatesPort, L: ListenToStateChangesPort> IncomingDataProcess
         tracing::info!("Waiting for HA state changes");
 
         loop {
-            match ListenToStateChangesPort::recv(&mut self.listener).await {
+            match self.listener.recv().await {
                 Ok(event) => {
                     let dps = to_smart_home_events(&event, &self.config);
 

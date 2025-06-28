@@ -2,17 +2,13 @@ use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
 
-use super::AddEnergyReadingUseCase;
-use super::{EnergyReading, Faucet, Radiator};
+use super::{EnergyMeterService, EnergyReading, Faucet, Radiator};
 
-pub fn new_actix_web_scope<R>(add_reading: R) -> actix_web::Scope
-where
-    R: AddEnergyReadingUseCase + 'static,
-{
+pub fn new_actix_web_scope(api: EnergyMeterService) -> actix_web::Scope {
     web::scope("/api/energy/readings")
-        .route("/heating", web::put().to(handle_heating_reading::<R>))
-        .route("/water", web::put().to(handle_water_reading::<R>))
-        .app_data(web::Data::new(add_reading))
+        .route("/heating", web::put().to(handle_heating_reading))
+        .route("/water", web::put().to(handle_water_reading))
+        .app_data(web::Data::new(api))
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,13 +24,10 @@ struct WaterReadingDTO {
     is_hot: bool,
 }
 
-async fn handle_heating_reading<R>(
-    api: web::Data<R>,
+async fn handle_heating_reading(
+    api: web::Data<EnergyMeterService>,
     Json(dto): Json<HeatingReadingDTO>,
-) -> impl Responder
-where
-    R: AddEnergyReadingUseCase,
-{
+) -> impl Responder {
     let radiator = match dto.label.as_str() {
         "Wohnzimmer (groß)" => Radiator::LivingRoomBig,
         "Wohnzimmer (klein)" => Radiator::LivingRoomSmall,
@@ -62,13 +55,10 @@ where
     HttpResponse::NoContent()
 }
 
-async fn handle_water_reading<R>(
-    api: web::Data<R>,
+async fn handle_water_reading(
+    api: web::Data<EnergyMeterService>,
     Json(dto): Json<WaterReadingDTO>,
-) -> impl Responder
-where
-    R: AddEnergyReadingUseCase,
-{
+) -> impl Responder {
     let faucet = match dto.label.as_str() {
         "Küche" => Faucet::Kitchen,
         "Bad" => Faucet::Bathroom,

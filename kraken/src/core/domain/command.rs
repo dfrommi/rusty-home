@@ -1,6 +1,6 @@
-use crate::core::event::CommandAddedEvent;
+use crate::{Database, core::event::CommandAddedEvent};
 
-use super::port::{CommandExecutor, CommandRepository};
+use super::port::CommandExecutor;
 
 use anyhow::Result;
 use api::command::CommandExecution;
@@ -8,7 +8,7 @@ use infrastructure::TraceContext;
 use tokio::sync::broadcast::Receiver;
 
 pub async fn execute_commands(
-    repo: &impl CommandRepository,
+    repo: &Database,
     executor: &impl CommandExecutor,
     mut new_command_available: Receiver<CommandAddedEvent>,
 ) {
@@ -43,11 +43,7 @@ pub async fn execute_commands(
 }
 
 #[tracing::instrument(skip_all, fields(command = ?cmd.command))]
-async fn process_command(
-    cmd: CommandExecution,
-    repo: &impl CommandRepository,
-    executor: &impl CommandExecutor,
-) {
+async fn process_command(cmd: CommandExecution, repo: &Database, executor: &impl CommandExecutor) {
     TraceContext::continue_from(&cmd.correlation_id);
 
     let res = executor.execute_command(&cmd.command).await;
@@ -55,11 +51,7 @@ async fn process_command(
     handle_execution_result(cmd.id, res, repo).await;
 }
 
-async fn handle_execution_result(
-    command_id: i64,
-    res: Result<bool>,
-    repo: &impl CommandRepository,
-) {
+async fn handle_execution_result(command_id: i64, res: Result<bool>, repo: &Database) {
     let set_state_res = match res {
         Ok(true) => repo.set_command_state_success(command_id).await,
         Ok(false) => {

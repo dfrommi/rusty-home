@@ -1,13 +1,10 @@
 use sqlx::postgres::types::PgInterval;
 use support::t;
 
-use crate::{
-    core::{domain::ItemAvailabilityStorage, ItemAvailability},
-    Database,
-};
+use crate::{Database, core::ItemAvailability};
 
-impl ItemAvailabilityStorage for Database {
-    async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()> {
+impl Database {
+    pub async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()> {
         sqlx::query!(
             r#"INSERT INTO item_availability (source, item, last_seen, marked_offline, considered_offline_after, entry_updated)
                 VALUES ($1, $2, $3, $4, $5, $6)

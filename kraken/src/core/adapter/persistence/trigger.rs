@@ -3,10 +3,10 @@ use api::trigger::UserTrigger;
 use infrastructure::TraceContext;
 use support::t;
 
-use crate::{core::domain::UserTriggerStorage, Database};
+use crate::Database;
 
-impl UserTriggerStorage for Database {
-    async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+impl Database {
+    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
         sqlx::query!(

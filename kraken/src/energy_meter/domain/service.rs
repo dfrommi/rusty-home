@@ -1,52 +1,48 @@
 use api::state::{ChannelValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use support::{
-    t,
+    DataPoint, t,
     unit::{HeatingUnit, KiloCubicMeter},
-    DataPoint,
 };
 use tokio::sync::{broadcast::Receiver, mpsc};
 
-use crate::core::{event::EnergyReadingAddedEvent, IncomingData, IncomingDataProcessor};
+use crate::{
+    Database,
+    core::{IncomingData, IncomingDataProcessor, event::EnergyReadingAddedEvent},
+};
 
-use super::{AddEnergyReadingUseCase, EnergyReading, EnergyReadingRepository, Faucet, Radiator};
+use super::{EnergyReading, Faucet, Radiator};
 
 #[derive(Clone)]
-pub struct EnergyMeterService<R> {
-    repo: R,
+pub struct EnergyMeterService {
+    repo: Database,
 }
 
-pub struct EnergyMeterIncomingDataProcessor<R> {
-    repo: R,
+pub struct EnergyMeterIncomingDataProcessor {
+    repo: Database,
     rx: Receiver<EnergyReadingAddedEvent>,
 }
 
-impl<R> EnergyMeterService<R> {
-    pub fn new(repo: R) -> Self {
+impl EnergyMeterService {
+    pub fn new(repo: Database) -> Self {
         Self { repo }
     }
 }
 
-impl<R> EnergyMeterIncomingDataProcessor<R> {
-    pub fn new(repo: R, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
+impl EnergyMeterIncomingDataProcessor {
+    pub fn new(repo: Database, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
         Self { repo, rx }
     }
 }
 
 //PORT IN
 
-impl<R> AddEnergyReadingUseCase for EnergyMeterService<R>
-where
-    R: EnergyReadingRepository + Send + Clone + Sync,
-{
-    async fn add_energy_reading(&self, reading: EnergyReading) -> anyhow::Result<()> {
+impl EnergyMeterService {
+    pub async fn add_energy_reading(&self, reading: EnergyReading) -> anyhow::Result<()> {
         self.repo.add_yearly_energy_reading(reading, t!(now)).await
     }
 }
 
-impl<R> IncomingDataProcessor for EnergyMeterIncomingDataProcessor<R>
-where
-    R: EnergyReadingRepository,
-{
+impl IncomingDataProcessor for EnergyMeterIncomingDataProcessor {
     async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
         let dps: Vec<DataPoint<ChannelValue>> = self
             .repo

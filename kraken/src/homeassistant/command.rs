@@ -11,18 +11,18 @@ use support::{DataPoint, t, time::Duration, unit::DegreeCelsius};
 use crate::{
     IncomingDataSender,
     core::{CommandExecutor, IncomingData},
-    homeassistant::domain::{HaServiceTarget, port::CallServicePort},
+    homeassistant::{HaHttpClient, HaServiceTarget},
 };
 
-pub struct HaCommandExecutor<C> {
-    client: C,
+pub struct HaCommandExecutor {
+    client: HaHttpClient,
     incoming_data_tx: IncomingDataSender,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
-impl<C> HaCommandExecutor<C> {
+impl HaCommandExecutor {
     pub fn new(
-        client: C,
+        client: HaHttpClient,
         incoming_data_tx: IncomingDataSender,
         config: &[(CommandTarget, HaServiceTarget)],
     ) -> Self {
@@ -40,7 +40,7 @@ impl<C> HaCommandExecutor<C> {
     }
 }
 
-impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
+impl CommandExecutor for HaCommandExecutor {
     #[tracing::instrument(name = "execute_command HA", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let command_target: CommandTarget = command.clone().into();
@@ -66,7 +66,7 @@ impl<C: CallServicePort> CommandExecutor for HaCommandExecutor<C> {
     }
 }
 
-impl<C: CallServicePort> HaCommandExecutor<C> {
+impl HaCommandExecutor {
     async fn dispatch_service_call(
         &self,
         command: &Command,

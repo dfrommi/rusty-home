@@ -1,11 +1,11 @@
-use support::{time::DateTime, DataPoint};
+use support::{DataPoint, time::DateTime};
 
 use crate::Database;
 
-use super::{EnergyReading, EnergyReadingRepository, Faucet, Radiator};
+use super::{EnergyReading, Faucet, Radiator};
 
-impl EnergyReadingRepository for Database {
-    async fn add_yearly_energy_reading(
+impl Database {
+    pub async fn add_yearly_energy_reading(
         &self,
         reading: EnergyReading,
         timestamp: DateTime,
@@ -31,7 +31,7 @@ impl EnergyReadingRepository for Database {
         Ok(())
     }
 
-    async fn get_latest_total_readings(&self) -> anyhow::Result<Vec<DataPoint<EnergyReading>>> {
+    pub async fn get_latest_total_readings(&self) -> anyhow::Result<Vec<DataPoint<EnergyReading>>> {
         let rows = sqlx::query!(
             r#"SELECT DISTINCT ON (type, name) 
                 type as "reading_type!", 
@@ -54,7 +54,10 @@ impl EnergyReadingRepository for Database {
         Ok(readings)
     }
 
-    async fn get_total_reading_by_id(&self, id: i64) -> anyhow::Result<DataPoint<EnergyReading>> {
+    pub async fn get_total_reading_by_id(
+        &self,
+        id: i64,
+    ) -> anyhow::Result<DataPoint<EnergyReading>> {
         let row = sqlx::query!(
             r#"SELECT DISTINCT ON (type, name) 
                 type as "reading_type!", 

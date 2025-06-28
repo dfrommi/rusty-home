@@ -1,12 +1,10 @@
 use tokio::sync::mpsc;
 
-use crate::core::IncomingData;
-
-use super::{port::StateStorage, ItemAvailabilityStorage, UserTriggerStorage};
+use crate::{Database, core::IncomingData};
 
 pub async fn collect_states(
     mut incoming_data: mpsc::Receiver<IncomingData>,
-    storage: &(impl StateStorage + UserTriggerStorage + ItemAvailabilityStorage),
+    storage: &Database,
 ) -> anyhow::Result<()> {
     tracing::info!("Start persisting current states");
 

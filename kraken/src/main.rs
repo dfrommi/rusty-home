@@ -7,11 +7,12 @@ use config::{
 use core::{
     CommandExecutor, IncomingData, IncomingDataProcessor, IncomingMqttDataProcessor,
     event::{AppEventListener, CommandAddedEvent},
+    process_incoming_data_source,
 };
 use homeassistant::HaCommandExecutor;
 use infrastructure::MqttInMessage;
 use settings::Settings;
-use tasmota::TasmotaCommandExecutor;
+use tasmota::{TasmotaCommandExecutor, TasmotaIncomingDataSource};
 use tokio::sync::{broadcast::Receiver, mpsc};
 
 use sqlx::PgPool;
@@ -102,14 +103,13 @@ pub async fn main() {
     };
 
     let tasmota_incoming_data_processing = {
-        let mut tasmota_incoming_data_processor = settings
+        let tasmota_incoming_data_source = settings
             .tasmota
-            .new_incoming_data_processor(&mut infrastructure)
+            .new_incoming_data_source(&mut infrastructure)
             .await;
-        let tx = infrastructure.incoming_data_tx.clone();
+        let db = infrastructure.database.clone();
         async move {
-            tasmota_incoming_data_processor
-                .process(tx)
+            process_incoming_data_source("Tasmota", tasmota_incoming_data_source, &db)
                 .await
                 .expect("Error processing Tasmota incoming data");
         }
@@ -217,19 +217,16 @@ impl settings::Zigbee2Mqtt {
 }
 
 impl settings::Tasmota {
-    async fn new_incoming_data_processor(
+    async fn new_incoming_data_source(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor + use<> {
-        let parser = tasmota::TasmotaMqttParser::new(self.event_topic.clone());
-
-        IncomingMqttDataProcessor::new(
-            parser,
+    ) -> TasmotaIncomingDataSource {
+        tasmota::new_incoming_data_source(
+            &self.event_topic,
             &default_tasmota_state_config(),
             &mut infrastructure.mqtt_client,
         )
         .await
-        .expect("Error initializing Tasmota state collector")
     }
 
     fn new_command_executor(

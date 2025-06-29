@@ -2,17 +2,20 @@ mod adapter;
 mod domain;
 pub mod event;
 
+pub use adapter::DeviceConfig;
+pub use adapter::IncomingDataSource;
 pub use adapter::IncomingMqttDataProcessor;
+pub use adapter::process_incoming_data_source;
 use api::state::ChannelValue;
 use api::trigger::UserTrigger;
-pub use domain::collect_states;
-pub use domain::execute_commands;
 pub use domain::CommandExecutor;
 pub use domain::IncomingDataProcessor;
+pub use domain::collect_states;
+pub use domain::execute_commands;
 
 use infrastructure::MqttInMessage;
-use support::time::DateTime;
 use support::DataPoint;
+use support::time::DateTime;
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {

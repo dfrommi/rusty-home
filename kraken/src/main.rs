@@ -14,6 +14,7 @@ use infrastructure::MqttInMessage;
 use settings::Settings;
 use tasmota::{TasmotaCommandExecutor, TasmotaIncomingDataSource};
 use tokio::sync::{broadcast::Receiver, mpsc};
+use z2m::Z2mIncomingDataSource;
 
 use sqlx::PgPool;
 
@@ -89,14 +90,13 @@ pub async fn main() {
     };
 
     let z2m_incoming_data_processing = {
-        let mut z2m_incoming_data_processor = settings
+        let z2m_incoming_data_source = settings
             .z2m
-            .new_incoming_data_processor(&mut infrastructure)
+            .new_incoming_data_source(&mut infrastructure)
             .await;
-        let tx = infrastructure.incoming_data_tx.clone();
+        let db = infrastructure.database.clone();
         async move {
-            z2m_incoming_data_processor
-                .process(tx)
+            process_incoming_data_source("Z2M", z2m_incoming_data_source, &db)
                 .await
                 .expect("Error processing Z2M incoming data");
         }
@@ -200,19 +200,16 @@ impl settings::HomeAssitant {
 }
 
 impl settings::Zigbee2Mqtt {
-    async fn new_incoming_data_processor(
+    async fn new_incoming_data_source(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor + use<> {
-        let parser = z2m::Z2mMqttParser::new(self.event_topic.clone());
-
-        IncomingMqttDataProcessor::new(
-            parser,
+    ) -> Z2mIncomingDataSource {
+        z2m::new_incoming_data_source(
+            &self.event_topic,
             &default_z2m_state_config(),
             &mut infrastructure.mqtt_client,
         )
         .await
-        .expect("Error initializing Z2M state collector")
     }
 }
 

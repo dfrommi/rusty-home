@@ -5,14 +5,15 @@ use api::{
     },
     trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
 };
-use infrastructure::MqttInMessage;
+use infrastructure::{Mqtt, MqttInMessage};
 use support::{
+    DataPoint,
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
-    DataPoint,
 };
+use tokio::sync::mpsc;
 
-use crate::core::{IncomingData, IncomingMqttEventParser, ItemAvailability};
+use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};
 
 #[derive(Debug, Clone)]
 pub enum Z2mChannel {
@@ -23,21 +24,43 @@ pub enum Z2mChannel {
     RemoteClick(RemoteTarget),
 }
 
-pub struct Z2mMqttParser {
-    base_topic: String,
+pub async fn new_incoming_data_source(
+    base_topic: &str,
+    config: &[(&str, Z2mChannel)],
+    mqtt: &mut Mqtt,
+) -> Z2mIncomingDataSource {
+    let config = DeviceConfig::new(config);
+    let rx = mqtt
+        .subscribe(format!("{}/#", base_topic))
+        .await
+        .expect("Error subscribing to MQTT topic");
+
+    Z2mIncomingDataSource::new(base_topic.to_string(), config, rx)
 }
 
-impl Z2mMqttParser {
-    pub fn new(base_topic: String) -> Self {
+pub struct Z2mIncomingDataSource {
+    base_topic: String,
+    device_config: DeviceConfig<Z2mChannel>,
+    mqtt_receiver: mpsc::Receiver<MqttInMessage>,
+}
+
+impl Z2mIncomingDataSource {
+    pub fn new(
+        base_topic: String,
+        config: DeviceConfig<Z2mChannel>,
+        mqtt_rx: mpsc::Receiver<MqttInMessage>,
+    ) -> Self {
         Self {
             base_topic: base_topic.trim_matches('/').to_owned(),
+            device_config: config,
+            mqtt_receiver: mqtt_rx,
         }
     }
 }
 
-impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
-    fn topic_patterns(&self) -> Vec<String> {
-        vec![format!("{}/#", &self.base_topic)]
+impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
+    async fn recv(&mut self) -> Option<MqttInMessage> {
+        self.mqtt_receiver.recv().await
     }
 
     fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
@@ -48,7 +71,11 @@ impl IncomingMqttEventParser<Z2mChannel> for Z2mMqttParser {
             .map(|topic| topic.trim_matches('/').to_owned())
     }
 
-    fn get_events(
+    fn get_channels(&self, device_id: &str) -> &[Z2mChannel] {
+        self.device_config.get(device_id)
+    }
+
+    fn to_incoming_data(
         &self,
         device_id: &str,
         channel: &Z2mChannel,

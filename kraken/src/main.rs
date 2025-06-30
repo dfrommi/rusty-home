@@ -5,11 +5,11 @@ use config::{
     default_tasmota_state_config, default_z2m_state_config,
 };
 use core::{
-    CommandExecutor, IncomingData, IncomingDataProcessor, IncomingMqttDataProcessor,
+    CommandExecutor, IncomingData, IncomingDataProcessor,
     event::{AppEventListener, CommandAddedEvent},
     process_incoming_data_source,
 };
-use homeassistant::HaCommandExecutor;
+use homeassistant::{HaCommandExecutor, HaIncomingDataSource};
 use infrastructure::MqttInMessage;
 use settings::Settings;
 use tasmota::{TasmotaCommandExecutor, TasmotaIncomingDataSource};
@@ -75,15 +75,14 @@ pub async fn main() {
     };
 
     let ha_incoming_data_processing = {
-        let mut ha_incoming_data_processor = settings
+        let ha_incoming_data_source = settings
             .homeassistant
-            .new_incoming_data_processor(&mut infrastructure)
+            .new_incoming_data_source(&mut infrastructure)
             .await;
-        let tx = infrastructure.incoming_data_tx.clone();
 
+        let db = infrastructure.database.clone();
         async move {
-            ha_incoming_data_processor
-                .process(tx.clone())
+            process_incoming_data_source("HomeAssistant", ha_incoming_data_source, &db)
                 .await
                 .expect("Error processing HA incoming data");
         }
@@ -176,26 +175,18 @@ impl settings::HomeAssitant {
         HaCommandExecutor::new(http_client, incoming_data_tx, &default_ha_command_config())
     }
 
-    async fn new_incoming_data_processor(
+    async fn new_incoming_data_source(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl IncomingDataProcessor + use<> {
-        let http_client = homeassistant::HaHttpClient::new(&self.url, &self.token)
-            .expect("Error initializing Home Assistant REST client");
-
-        let mqtt_client = homeassistant::HaMqttClient::new(
-            infrastructure
-                .subscribe_to_mqtt(&self.topic_event)
-                .await
-                .expect("Error subscribing to MQTT topic"),
-        );
-
-        homeassistant::new_incoming_data_processor(
-            http_client,
-            mqtt_client,
+    ) -> HaIncomingDataSource {
+        homeassistant::new_incoming_data_source(
+            &self.url,
+            &self.token,
+            &self.topic_event,
             &default_ha_state_config(),
+            &mut infrastructure.mqtt_client,
         )
-        .expect("Error initializing HA state collector")
+        .await
     }
 }
 

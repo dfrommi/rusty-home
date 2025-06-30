@@ -14,27 +14,31 @@ impl HaMqttClient {
 }
 
 impl HaMqttClient {
-    pub async fn recv(&mut self) -> anyhow::Result<StateChangedEvent> {
-        loop {
-            match self.state_rx.recv().await {
-                Some(msg) => {
-                    match serde_json::from_str::<HaEvent>(&msg.payload) {
-                        Ok(HaEvent::StateChanged {
-                            new_state: event, ..
-                        }) => {
-                            return Ok(event);
-                        }
-                        Ok(HaEvent::Unknown(_)) => {
-                            tracing::trace!("Received unsupported event: {:?}", msg.payload);
-                        }
+    pub async fn recv(&mut self) -> Option<StateChangedEvent> {
+        match self.state_rx.recv().await {
+            Some(msg) => {
+                match serde_json::from_str::<HaEvent>(&msg.payload) {
+                    Ok(HaEvent::StateChanged {
+                        new_state: event, ..
+                    }) => {
+                        return Some(event);
+                    }
+                    Ok(HaEvent::Unknown(_)) => {
+                        tracing::trace!("Received unsupported event: {:?}", msg.payload);
+                        None
+                    }
 
-                        //json parsing error
-                        Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
+                    //json parsing error
+                    Err(e) => {
+                        tracing::error!("Error parsing MQTT message: {}", e);
+                        None
                     }
                 }
-                None => {
-                    tracing::error!("Error parsing MQTT message: channel closed");
-                }
+            }
+
+            None => {
+                tracing::error!("Error parsing MQTT message: channel closed");
+                None
             }
         }
     }

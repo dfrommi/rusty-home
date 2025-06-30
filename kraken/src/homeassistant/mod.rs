@@ -5,12 +5,13 @@ mod state;
 pub use client::HaHttpClient;
 pub use client::HaMqttClient;
 pub use command::HaCommandExecutor;
+pub use state::HaIncomingDataSource;
 
 use ::api::state::{
     ExternalAutoControl, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
 };
 use api::state::FanActivity;
-use state::HaIncomingDataProcessor;
+use infrastructure::Mqtt;
 
 use std::collections::HashMap;
 
@@ -18,15 +19,25 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use support::time::DateTime;
 
-use crate::core::IncomingDataProcessor;
+use crate::core::DeviceConfig;
 
-pub fn new_incoming_data_processor(
-    client: HaHttpClient,
-    mqtt_client: HaMqttClient,
+pub async fn new_incoming_data_source(
+    url: &str,
+    token: &str,
+    topic: &str,
     config: &[(&str, HaChannel)],
-) -> anyhow::Result<impl IncomingDataProcessor + use<>> {
-    let collector = HaIncomingDataProcessor::new(client, mqtt_client, config);
-    Ok(collector)
+    mqtt: &mut Mqtt,
+) -> HaIncomingDataSource {
+    let config = DeviceConfig::new(config);
+    let rx = mqtt
+        .subscribe(topic)
+        .await
+        .expect("Error subscribing to MQTT topic");
+
+    let mqtt_client = HaMqttClient::new(rx);
+    let http_client = HaHttpClient::new(url, token).expect("Error creating HA HTTP client");
+
+    HaIncomingDataSource::new(http_client, mqtt_client, config)
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +63,7 @@ pub enum HaServiceTarget {
 }
 
 #[derive(Deserialize, Debug)]
-struct StateChangedEvent {
+pub struct StateChangedEvent {
     pub entity_id: String,
     pub state: StateValue,
     pub last_changed: DateTime,
@@ -61,7 +72,7 @@ struct StateChangedEvent {
 }
 
 #[derive(Debug)]
-enum StateValue {
+pub enum StateValue {
     Available(String),
     Unavailable,
 }

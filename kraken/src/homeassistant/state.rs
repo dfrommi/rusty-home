@@ -7,122 +7,100 @@ use support::{
     time::DateTime,
     unit::{DegreeCelsius, Percent},
 };
-use tokio::sync::mpsc;
 
 use crate::{
-    core::{IncomingData, IncomingDataProcessor, ItemAvailability},
+    core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability},
     homeassistant::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue},
 };
 
-pub struct HaIncomingDataProcessor {
+pub struct HaIncomingDataSource {
     client: HaHttpClient,
     listener: HaMqttClient,
-    config: HashMap<String, Vec<HaChannel>>,
+    config: DeviceConfig<HaChannel>,
+    initial_load: Option<Vec<StateChangedEvent>>,
 }
 
-impl HaIncomingDataProcessor {
-    pub fn new(client: HaHttpClient, listener: HaMqttClient, config: &[(&str, HaChannel)]) -> Self {
-        let mut m: HashMap<String, Vec<HaChannel>> = HashMap::new();
-        for (id, channel) in config {
-            let id = id.to_string();
-            m.entry(id).or_default().push(channel.clone());
-        }
-
+impl HaIncomingDataSource {
+    pub fn new(
+        client: HaHttpClient,
+        listener: HaMqttClient,
+        config: DeviceConfig<HaChannel>,
+    ) -> Self {
         Self {
             client,
             listener,
-            config: m,
+            config,
+            initial_load: None,
         }
     }
 }
 
-impl IncomingDataProcessor for HaIncomingDataProcessor {
-    async fn process(&mut self, sender: mpsc::Sender<IncomingData>) -> anyhow::Result<()> {
-        tracing::info!("Requesting current state from HA");
-
-        let current_dps: Vec<IncomingData> = self
-            .client
-            .get_current_state()
-            .await?
-            .iter()
-            .flat_map(|e| to_smart_home_events(e, &self.config))
-            .collect();
-
-        for dp in current_dps {
-            sender.send(dp).await?;
+impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
+    async fn recv(&mut self) -> Option<StateChangedEvent> {
+        if self.initial_load.is_none() {
+            self.initial_load = match self.client.get_current_state().await {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::error!("Error loading initial state for HA: {:?}", e);
+                    Some(vec![])
+                }
+            };
         }
 
-        tracing::info!("Waiting for HA state changes");
+        match &mut self.initial_load {
+            Some(data) if !data.is_empty() => data.pop(),
+            _ => self.listener.recv().await,
+        }
+    }
 
-        loop {
-            match self.listener.recv().await {
-                Ok(event) => {
-                    let dps = to_smart_home_events(&event, &self.config);
+    fn device_id(&self, msg: &StateChangedEvent) -> Option<String> {
+        Some(msg.entity_id.clone())
+    }
 
-                    for dp in dps {
-                        sender.send(dp).await?;
+    fn get_channels(&self, device_id: &str) -> &[HaChannel] {
+        self.config.get(device_id)
+    }
+
+    fn to_incoming_data(
+        &self,
+        device_id: &str,
+        channel: &HaChannel,
+        msg: &StateChangedEvent,
+    ) -> anyhow::Result<Vec<IncomingData>> {
+        let mut result = match &msg.state {
+            StateValue::Available(state_value) => {
+                tracing::info!("Received supported event {}", device_id);
+
+                let dp_result = to_persistent_data_point(
+                    channel.clone(),
+                    state_value,
+                    &msg.attributes,
+                    msg.last_changed,
+                );
+
+                match dp_result {
+                    Ok(Some(dp)) => vec![dp],
+                    Ok(None) => vec![],
+                    Err(e) => {
+                        tracing::error!(
+                            "Error processing homeassistant event of {}: {:?}",
+                            device_id,
+                            e
+                        );
+                        vec![]
                     }
                 }
-
-                //json parsing error
-                Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
             }
-        }
+            _ => {
+                tracing::warn!("Value of {} is not available", device_id);
+                vec![]
+            }
+        };
+
+        result.push(to_item_availability(msg));
+
+        Ok(result)
     }
-}
-
-fn to_smart_home_events(
-    new_state: &StateChangedEvent,
-    config: &HashMap<String, Vec<HaChannel>>,
-) -> Vec<IncomingData> {
-    let entity_id: &str = &new_state.entity_id;
-
-    let ha_channels = config.get(entity_id as &str);
-
-    if ha_channels.is_none() {
-        tracing::trace!("Skipped {}", entity_id);
-        return vec![];
-    }
-
-    let ha_channels = ha_channels.unwrap();
-
-    let mut result = match &new_state.state {
-        StateValue::Available(state_value) => {
-            tracing::info!("Received supported event {}", entity_id);
-
-            ha_channels
-                .iter()
-                .filter_map(|ha_channel| {
-                    let dp_result = to_persistent_data_point(
-                        ha_channel.clone(),
-                        state_value,
-                        &new_state.attributes,
-                        new_state.last_changed,
-                    );
-
-                    match dp_result {
-                        Ok(dp) => dp,
-                        Err(e) => {
-                            tracing::error!(
-                                "Error processing homeassistant event of {}: {:?}",
-                                entity_id,
-                                e
-                            );
-                            None
-                        }
-                    }
-                })
-                .collect()
-        }
-        _ => {
-            tracing::warn!("Value of {} is not available", entity_id);
-            vec![]
-        }
-    };
-
-    result.push(to_item_availability(new_state));
-
-    result
 }
 
 fn to_persistent_data_point(

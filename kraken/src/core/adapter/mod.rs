@@ -37,10 +37,6 @@ where
 //TODO OutgoingDataSender for commands and Homekit state
 
 pub trait IncomingDataSource<Message, Channel> {
-    async fn recv_missed_on_startup(&mut self) -> Vec<Message> {
-        vec![]
-    }
-
     async fn recv(&mut self) -> Option<Message>;
 
     fn device_id(&self, msg: &Message) -> Option<String>;
@@ -63,10 +59,6 @@ where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
 {
-    for msg in source.recv_missed_on_startup().await {
-        handle_incoming_data(name, &msg, &source, db).await;
-    }
-
     loop {
         let msg = match source.recv().await {
             Some(msg) => msg,

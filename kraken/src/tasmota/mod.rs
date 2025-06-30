@@ -1,43 +1,75 @@
-mod command;
-mod event;
+mod config;
+mod incoming;
+mod outgoing;
 
 use api::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption};
 
-pub use command::TasmotaCommandExecutor;
-pub use event::TasmotaIncomingDataSource;
-use infrastructure::Mqtt;
+use incoming::TasmotaIncomingDataSource;
+use outgoing::TasmotaCommandExecutor;
+use serde::Deserialize;
 
-use crate::core::DeviceConfig;
+use crate::{
+    Infrastructure,
+    core::{CommandExecutor, DeviceConfig, process_incoming_data_source},
+};
 
-pub async fn new_incoming_data_source(
-    base_topic: &str,
-    config: &[(&str, TasmotaChannel)],
-    mqtt: &mut Mqtt,
-) -> TasmotaIncomingDataSource {
-    let config = DeviceConfig::new(config);
-    let tele_base_topic = format!("{}/tele", base_topic);
-    let stat_base_topic = format!("{}/stat", base_topic);
-    let rx = mqtt
-        .subscribe_all(
-            vec![
-                format!("{}/+/SENSOR", tele_base_topic),
-                format!("{}/+/POWER", stat_base_topic),
-            ]
-            .as_slice(),
-        )
-        .await
-        .expect("Error subscribing to MQTT topic");
-
-    TasmotaIncomingDataSource::new(tele_base_topic, stat_base_topic, config, rx)
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct Tasmota {
+    pub event_topic: String,
 }
 
 #[derive(Debug, Clone)]
-pub enum TasmotaChannel {
+enum TasmotaChannel {
     EnergyMeter(CurrentPowerUsage, TotalEnergyConsumption),
     PowerToggle(Powered),
 }
 
 #[derive(Debug, Clone)]
-pub enum TasmotaCommandTarget {
+enum TasmotaCommandTarget {
     PowerSwitch(&'static str),
+}
+
+impl Tasmota {
+    pub async fn new_incoming_data_processor(
+        &self,
+        infrastructure: &mut Infrastructure,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + use<> {
+        let ds = self
+            .new_incoming_data_source(&mut infrastructure.mqtt_client)
+            .await;
+
+        let db = infrastructure.database.clone();
+        async move { process_incoming_data_source("Tasmota", ds, &db).await }
+    }
+
+    pub fn new_command_executor(
+        &self,
+        infrastructure: &Infrastructure,
+    ) -> impl CommandExecutor + use<> {
+        let tx = infrastructure.mqtt_client.new_publisher();
+        let config = config::default_tasmota_command_config();
+        TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
+    }
+
+    async fn new_incoming_data_source(
+        &self,
+        mqtt_client: &mut infrastructure::Mqtt,
+    ) -> TasmotaIncomingDataSource {
+        let config = DeviceConfig::new(&config::default_tasmota_state_config());
+        let tele_base_topic = format!("{}/tele", self.event_topic);
+        let stat_base_topic = format!("{}/stat", self.event_topic);
+        let rx = mqtt_client
+            .subscribe_all(
+                vec![
+                    format!("{}/+/SENSOR", tele_base_topic),
+                    format!("{}/+/POWER", stat_base_topic),
+                ]
+                .as_slice(),
+            )
+            .await
+            .expect("Error subscribing to MQTT topic");
+
+        TasmotaIncomingDataSource::new(tele_base_topic, stat_base_topic, config, rx)
+    }
 }

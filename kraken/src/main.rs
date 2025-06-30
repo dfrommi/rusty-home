@@ -1,24 +1,15 @@
 use anyhow::Context;
 use api::{DbEventListener, command::Command};
-use config::{
-    default_ha_command_config, default_ha_state_config, default_tasmota_command_config,
-    default_tasmota_state_config, default_z2m_state_config,
-};
 use core::{
     CommandExecutor, IncomingData, IncomingDataProcessor,
     event::{AppEventListener, CommandAddedEvent},
-    process_incoming_data_source,
 };
-use homeassistant::{HaCommandExecutor, HaIncomingDataSource};
 use infrastructure::MqttInMessage;
 use settings::Settings;
-use tasmota::{TasmotaCommandExecutor, TasmotaIncomingDataSource};
 use tokio::sync::{broadcast::Receiver, mpsc};
-use z2m::Z2mIncomingDataSource;
 
 use sqlx::PgPool;
 
-mod config;
 mod core;
 mod energy_meter;
 mod homeassistant;
@@ -74,45 +65,20 @@ pub async fn main() {
         }
     };
 
-    let ha_incoming_data_processing = {
-        let ha_incoming_data_source = settings
-            .homeassistant
-            .new_incoming_data_source(&mut infrastructure)
-            .await;
+    let ha_incoming_data_processing = settings
+        .homeassistant
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
 
-        let db = infrastructure.database.clone();
-        async move {
-            process_incoming_data_source("HomeAssistant", ha_incoming_data_source, &db)
-                .await
-                .expect("Error processing HA incoming data");
-        }
-    };
+    let z2m_incoming_data_processing = settings
+        .z2m
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
 
-    let z2m_incoming_data_processing = {
-        let z2m_incoming_data_source = settings
-            .z2m
-            .new_incoming_data_source(&mut infrastructure)
-            .await;
-        let db = infrastructure.database.clone();
-        async move {
-            process_incoming_data_source("Z2M", z2m_incoming_data_source, &db)
-                .await
-                .expect("Error processing Z2M incoming data");
-        }
-    };
-
-    let tasmota_incoming_data_processing = {
-        let tasmota_incoming_data_source = settings
-            .tasmota
-            .new_incoming_data_source(&mut infrastructure)
-            .await;
-        let db = infrastructure.database.clone();
-        async move {
-            process_incoming_data_source("Tasmota", tasmota_incoming_data_source, &db)
-                .await
-                .expect("Error processing Tasmota incoming data");
-        }
-    };
+    let tasmota_incoming_data_processing = settings
+        .tasmota
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
 
     let incoming_data_persisting = {
         let storage = infrastructure.database.clone();
@@ -166,65 +132,6 @@ pub async fn main() {
         _ = http_server_exec => {},
         _ = process_infrastucture => {},
     );
-}
-
-impl settings::HomeAssitant {
-    fn new_command_executor(&self, incoming_data_tx: IncomingDataSender) -> impl CommandExecutor {
-        let http_client = homeassistant::HaHttpClient::new(&self.url, &self.token)
-            .expect("Error initializing Home Assistant REST client");
-        HaCommandExecutor::new(http_client, incoming_data_tx, &default_ha_command_config())
-    }
-
-    async fn new_incoming_data_source(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> HaIncomingDataSource {
-        homeassistant::new_incoming_data_source(
-            &self.url,
-            &self.token,
-            &self.topic_event,
-            &default_ha_state_config(),
-            &mut infrastructure.mqtt_client,
-        )
-        .await
-    }
-}
-
-impl settings::Zigbee2Mqtt {
-    async fn new_incoming_data_source(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> Z2mIncomingDataSource {
-        z2m::new_incoming_data_source(
-            &self.event_topic,
-            &default_z2m_state_config(),
-            &mut infrastructure.mqtt_client,
-        )
-        .await
-    }
-}
-
-impl settings::Tasmota {
-    async fn new_incoming_data_source(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> TasmotaIncomingDataSource {
-        tasmota::new_incoming_data_source(
-            &self.event_topic,
-            &default_tasmota_state_config(),
-            &mut infrastructure.mqtt_client,
-        )
-        .await
-    }
-
-    fn new_command_executor(
-        &self,
-        infrastructure: &Infrastructure,
-    ) -> impl CommandExecutor + use<> {
-        let tx = infrastructure.mqtt_client.new_publisher();
-        let config = default_tasmota_command_config();
-        TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
-    }
 }
 
 struct MultiCommandExecutor<A, B>

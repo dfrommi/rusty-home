@@ -1,11 +1,12 @@
 mod client;
-mod command;
-mod state;
+mod config;
+mod incoming;
+mod outgoing;
 
-pub use client::HaHttpClient;
-pub use client::HaMqttClient;
-pub use command::HaCommandExecutor;
-pub use state::HaIncomingDataSource;
+use client::HaHttpClient;
+use client::HaMqttClient;
+use incoming::HaIncomingDataSource;
+use outgoing::HaCommandExecutor;
 
 use ::api::state::{
     ExternalAutoControl, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
@@ -19,29 +20,63 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use support::time::DateTime;
 
+use crate::IncomingDataSender;
+use crate::Infrastructure;
+use crate::core::CommandExecutor;
 use crate::core::DeviceConfig;
+use crate::core::process_incoming_data_source;
 
-pub async fn new_incoming_data_source(
-    url: &str,
-    token: &str,
-    topic: &str,
-    config: &[(&str, HaChannel)],
-    mqtt: &mut Mqtt,
-) -> HaIncomingDataSource {
-    let config = DeviceConfig::new(config);
-    let rx = mqtt
-        .subscribe(topic)
-        .await
-        .expect("Error subscribing to MQTT topic");
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct HomeAssitant {
+    pub topic_event: String,
+    pub url: String,
+    pub token: String,
+}
 
-    let mqtt_client = HaMqttClient::new(rx);
-    let http_client = HaHttpClient::new(url, token).expect("Error creating HA HTTP client");
+impl HomeAssitant {
+    pub async fn new_incoming_data_processor(
+        &self,
+        infrastructure: &mut Infrastructure,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + use<> {
+        let ds = self
+            .new_incoming_data_source(&mut infrastructure.mqtt_client)
+            .await;
 
-    HaIncomingDataSource::new(http_client, mqtt_client, config)
+        let db = infrastructure.database.clone();
+        async move { process_incoming_data_source("HomeAssitant", ds, &db).await }
+    }
+
+    pub fn new_command_executor(
+        &self,
+        incoming_data_tx: IncomingDataSender,
+    ) -> impl CommandExecutor {
+        let http_client = HaHttpClient::new(&self.url, &self.token)
+            .expect("Error initializing Home Assistant REST client");
+        HaCommandExecutor::new(
+            http_client,
+            incoming_data_tx,
+            &config::default_ha_command_config(),
+        )
+    }
+
+    async fn new_incoming_data_source(&self, mqtt: &mut Mqtt) -> HaIncomingDataSource {
+        let config = DeviceConfig::new(&config::default_ha_state_config());
+        let rx = mqtt
+            .subscribe(self.topic_event.clone())
+            .await
+            .expect("Error subscribing to MQTT topic");
+
+        let mqtt_client = HaMqttClient::new(rx);
+        let http_client =
+            HaHttpClient::new(&self.url, &self.token).expect("Error creating HA HTTP client");
+
+        HaIncomingDataSource::new(http_client, mqtt_client, config)
+    }
 }
 
 #[derive(Debug, Clone)]
-pub enum HaChannel {
+enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Powered(Powered),
@@ -54,7 +89,7 @@ pub enum HaChannel {
 }
 
 #[derive(Debug, Clone)]
-pub enum HaServiceTarget {
+enum HaServiceTarget {
     LightTurnOnOff(&'static str),
     ClimateControl(&'static str),
     PushNotification(&'static str),
@@ -63,7 +98,7 @@ pub enum HaServiceTarget {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct StateChangedEvent {
+struct StateChangedEvent {
     pub entity_id: String,
     pub state: StateValue,
     pub last_changed: DateTime,
@@ -72,7 +107,7 @@ pub struct StateChangedEvent {
 }
 
 #[derive(Debug)]
-pub enum StateValue {
+enum StateValue {
     Available(String),
     Unavailable,
 }

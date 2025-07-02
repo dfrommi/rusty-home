@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use infrastructure::MqttInMessage;
-
 use crate::Database;
 
-use super::{IncomingData, IncomingDataProcessor, IncomingMqttEventParser};
+use super::IncomingData;
 
 pub mod persistence;
 
@@ -42,7 +40,7 @@ pub trait IncomingDataSource<Message, Channel> {
     fn device_id(&self, msg: &Message) -> Option<String>;
     fn get_channels(&self, device_id: &str) -> &[Channel];
 
-    fn to_incoming_data(
+    async fn to_incoming_data(
         &self,
         device_id: &str,
         channel: &Channel,
@@ -98,7 +96,7 @@ async fn handle_incoming_data<M, C>(
     let mut incoming_data = vec![];
 
     for channel in channels.iter() {
-        match source.to_incoming_data(&device_id, channel, msg) {
+        match source.to_incoming_data(&device_id, channel, msg).await {
             Ok(events) => incoming_data.extend(events),
             Err(e) => {
                 tracing::error!(
@@ -129,89 +127,6 @@ async fn handle_incoming_data<M, C>(
             IncomingData::ItemAvailability(item) => {
                 if let Err(e) = db.add_item_availability(item.clone()).await {
                     tracing::error!("Error processing item availability {:?}: {:?}", item, e);
-                }
-            }
-        }
-    }
-}
-
-pub struct IncomingMqttDataProcessor<C, P>
-where
-    P: IncomingMqttEventParser<C>,
-{
-    inner: P,
-    rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
-    config: DeviceConfig<C>,
-}
-
-impl<C, P> IncomingMqttDataProcessor<C, P>
-where
-    P: IncomingMqttEventParser<C>,
-    C: std::fmt::Debug + Clone,
-{
-    pub async fn new(
-        parser: P,
-        config: &[(&str, C)],
-        mqtt_client: &mut infrastructure::Mqtt,
-    ) -> anyhow::Result<Self> {
-        let rx = mqtt_client.subscribe_all(&parser.topic_patterns()).await?;
-
-        Ok(Self {
-            inner: parser,
-            rx,
-            config: DeviceConfig::new(config),
-        })
-    }
-}
-
-impl<C, P> IncomingDataProcessor for IncomingMqttDataProcessor<C, P>
-where
-    P: IncomingMqttEventParser<C>,
-    C: std::fmt::Debug + Clone,
-{
-    async fn process(
-        &mut self,
-        sender: tokio::sync::mpsc::Sender<IncomingData>,
-    ) -> anyhow::Result<()> {
-        loop {
-            let msg = match self.rx.recv().await {
-                Some(msg) => msg,
-                None => {
-                    anyhow::bail!("Event receiver closed");
-                }
-            };
-
-            let device_id = match self.inner.device_id(&msg) {
-                Some(device_id) => device_id,
-                None => continue,
-            };
-
-            let channels = self.config.get(&device_id);
-            if channels.is_empty() {
-                continue;
-            }
-
-            tracing::debug!("Received event for devices {}: {:?}", device_id, channels);
-
-            let mut incoming_data = vec![];
-
-            for channel in channels {
-                match self.inner.get_events(&device_id, channel, &msg) {
-                    Ok(events) => incoming_data.extend(events),
-                    Err(e) => {
-                        tracing::error!(
-                            "Error parsing event for channel {:?} with payload {}: {:?}",
-                            channel,
-                            msg.payload,
-                            e
-                        );
-                    }
-                }
-            }
-
-            for event in incoming_data {
-                if let Err(e) = sender.send(event.clone()).await {
-                    tracing::error!("Error sending event {:?}: {:?}", event, e);
                 }
             }
         }

@@ -1,12 +1,10 @@
-use anyhow::Context;
 use api::{DbEventListener, command::Command};
 use core::{
-    CommandExecutor, IncomingData, IncomingDataProcessor,
+    CommandExecutor,
     event::{AppEventListener, CommandAddedEvent},
 };
-use infrastructure::MqttInMessage;
 use settings::Settings;
-use tokio::sync::{broadcast::Receiver, mpsc};
+use tokio::sync::broadcast::Receiver;
 
 use sqlx::PgPool;
 
@@ -17,13 +15,10 @@ mod settings;
 mod tasmota;
 mod z2m;
 
-type IncomingDataSender = mpsc::Sender<IncomingData>;
-
 struct Infrastructure {
     database: Database,
     event_listener: AppEventListener,
     mqtt_client: infrastructure::Mqtt,
-    incoming_data_tx: IncomingDataSender,
 }
 
 #[derive(Clone)]
@@ -46,24 +41,9 @@ pub async fn main() {
         .init()
         .expect("Error initializing monitoring");
 
-    let (mut infrastructure, incoming_data_rx) = Infrastructure::init(&settings).await.unwrap();
+    let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 
-    let energy_meter_processing = {
-        let mut energy_meter_processor = energy_meter::new(
-            infrastructure.database.clone(),
-            infrastructure
-                .event_listener
-                .new_energy_reading_added_listener(),
-        );
-        let tx = infrastructure.incoming_data_tx.clone();
-
-        async move {
-            energy_meter_processor
-                .process(tx)
-                .await
-                .expect("Error processing energy meter incoming data");
-        }
-    };
+    let energy_meter = energy_meter::EnergyMeter;
 
     let ha_incoming_data_processing = settings
         .homeassistant
@@ -80,22 +60,17 @@ pub async fn main() {
         .new_incoming_data_processor(&mut infrastructure)
         .await;
 
-    let incoming_data_persisting = {
-        let storage = infrastructure.database.clone();
-
-        async move {
-            core::collect_states(incoming_data_rx, &storage)
-                .await
-                .expect("Error persisting incoming data");
-        }
-    };
+    let energy_meter_processing = energy_meter.new_incoming_data_processor(
+        infrastructure.database.clone(),
+        infrastructure
+            .event_listener
+            .new_energy_reading_added_listener(),
+    );
 
     let execute_commands = {
         let command_repo = infrastructure.database.clone();
         let new_cmd_available = infrastructure.new_command_available_listener();
-        let ha_cmd_executor = settings
-            .homeassistant
-            .new_command_executor(infrastructure.incoming_data_tx.clone());
+        let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
         let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
 
         let cmd_executor = MultiCommandExecutor {
@@ -127,7 +102,6 @@ pub async fn main() {
         _ = ha_incoming_data_processing => {},
         _ = z2m_incoming_data_processing => {},
         _ = tasmota_incoming_data_processing => {},
-        _ = incoming_data_persisting => {},
         _ = execute_commands => {},
         _ = http_server_exec => {},
         _ = process_infrastucture => {},
@@ -158,7 +132,7 @@ where
 }
 
 impl Infrastructure {
-    pub async fn init(settings: &Settings) -> anyhow::Result<(Self, mpsc::Receiver<IncomingData>)> {
+    pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
         let db_pool = settings.database.new_pool().await?;
         let db_listener = settings.database.new_listener().await?;
         let event_listener = AppEventListener::new(DbEventListener::new(db_listener));
@@ -166,26 +140,13 @@ impl Infrastructure {
         let mqtt_client = settings.mqtt.new_client();
         let database = Database::new(db_pool);
 
-        let (incoming_data_tx, incoming_data_rx) = mpsc::channel(16);
-
         let infrastructure = Self {
             database,
             mqtt_client,
             event_listener,
-            incoming_data_tx,
         };
 
-        Ok((infrastructure, incoming_data_rx))
-    }
-
-    async fn subscribe_to_mqtt(
-        &mut self,
-        topic: &str,
-    ) -> anyhow::Result<tokio::sync::mpsc::Receiver<MqttInMessage>> {
-        self.mqtt_client
-            .subscribe(topic)
-            .await
-            .context("Error subscribing to MQTT topic")
+        Ok(infrastructure)
     }
 
     fn new_command_available_listener(&self) -> Receiver<CommandAddedEvent> {

@@ -20,7 +20,6 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use support::time::DateTime;
 
-use crate::IncomingDataSender;
 use crate::Infrastructure;
 use crate::core::CommandExecutor;
 use crate::core::DeviceConfig;
@@ -49,13 +48,13 @@ impl HomeAssitant {
 
     pub fn new_command_executor(
         &self,
-        incoming_data_tx: IncomingDataSender,
-    ) -> impl CommandExecutor {
+        infrastructure: &Infrastructure,
+    ) -> impl CommandExecutor + use<> {
         let http_client = HaHttpClient::new(&self.url, &self.token)
             .expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(
             http_client,
-            incoming_data_tx,
+            infrastructure.database.clone(),
             &config::default_ha_command_config(),
         )
     }

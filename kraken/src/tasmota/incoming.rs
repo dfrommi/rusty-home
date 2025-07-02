@@ -64,7 +64,7 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
         self.device_config.get(device_id)
     }
 
-    fn to_incoming_data(
+    async fn to_incoming_data(
         &self,
         device_id: &str,
         channel: &TasmotaChannel,

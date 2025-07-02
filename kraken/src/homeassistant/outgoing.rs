@@ -6,24 +6,24 @@ use api::{
     },
 };
 use serde_json::json;
-use support::{DataPoint, t, time::Duration, unit::DegreeCelsius};
+use support::{t, time::Duration, unit::DegreeCelsius};
 
 use crate::{
-    IncomingDataSender,
-    core::{CommandExecutor, IncomingData},
+    Database,
+    core::CommandExecutor,
     homeassistant::{HaHttpClient, HaServiceTarget},
 };
 
 pub struct HaCommandExecutor {
     client: HaHttpClient,
-    incoming_data_tx: IncomingDataSender,
+    db: Database,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HaCommandExecutor {
     pub fn new(
         client: HaHttpClient,
-        incoming_data_tx: IncomingDataSender,
+        db: Database,
         config: &[(CommandTarget, HaServiceTarget)],
     ) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
@@ -34,7 +34,7 @@ impl HaCommandExecutor {
 
         Self {
             client,
-            incoming_data_tx,
+            db,
             config: data,
         }
     }
@@ -191,7 +191,7 @@ impl HaCommandExecutor {
             }
         }
 
-        let result = match airflow {
+        match airflow {
             FanAirflow::Off => {
                 self.client
                     .call_service(
@@ -201,7 +201,7 @@ impl HaCommandExecutor {
                             "entity_id": vec![id.to_string()]
                         }),
                     )
-                    .await
+                    .await?
             }
             FanAirflow::Forward(fan_speed) => {
                 self.client
@@ -213,7 +213,7 @@ impl HaCommandExecutor {
                             "percentage": to_percent(fan_speed)
                         }),
                     )
-                    .await
+                    .await?
             }
             FanAirflow::Reverse(_) => anyhow::bail!("Reverse direction not yet supported"),
         };
@@ -223,14 +223,15 @@ impl HaCommandExecutor {
             Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
         };
 
-        self.incoming_data_tx
-            .send(IncomingData::StateValue(DataPoint::new(
-                ChannelValue::FanActivity(channel, airflow.clone()),
-                t!(now),
-            )))
+        //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
+        self.db
+            .add_state(
+                &ChannelValue::FanActivity(channel, airflow.clone()),
+                &t!(now),
+            )
             .await?;
 
-        result
+        Ok(())
     }
 
     async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {

@@ -1,12 +1,8 @@
 use api::{
-    state::{
-        ChannelValue, CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature,
-        TotalEnergyConsumption,
-    },
+    state::ChannelValue,
     trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger},
 };
-use infrastructure::{Mqtt, MqttInMessage};
-use serde::Deserialize;
+use infrastructure::MqttInMessage;
 use support::{
     DataPoint,
     time::DateTime,
@@ -55,7 +51,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
         self.device_config.get(device_id)
     }
 
-    fn to_incoming_data(
+    async fn to_incoming_data(
         &self,
         device_id: &str,
         channel: &Z2mChannel,

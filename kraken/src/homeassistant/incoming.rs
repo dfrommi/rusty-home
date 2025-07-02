@@ -61,7 +61,7 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
         self.config.get(device_id)
     }
 
-    fn to_incoming_data(
+    async fn to_incoming_data(
         &self,
         device_id: &str,
         channel: &HaChannel,

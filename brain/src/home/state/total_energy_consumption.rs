@@ -1,7 +1,7 @@
 pub use api::state::TotalEnergyConsumption;
 use support::{time::DateTime, unit::KiloWattHours};
 
-use crate::support::timeseries::interpolate::{algo, Estimatable};
+use crate::core::timeseries::interpolate::{Estimatable, algo};
 
 impl Estimatable for TotalEnergyConsumption {
     type Type = KiloWattHours;

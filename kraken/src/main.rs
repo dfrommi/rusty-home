@@ -8,12 +8,9 @@ use tokio::sync::broadcast::Receiver;
 
 use sqlx::PgPool;
 
+mod adapter;
 mod core;
-mod energy_meter;
-mod homeassistant;
 mod settings;
-mod tasmota;
-mod z2m;
 
 struct Infrastructure {
     database: Database,
@@ -43,7 +40,7 @@ pub async fn main() {
 
     let mut infrastructure = Infrastructure::init(&settings).await.unwrap();
 
-    let energy_meter = energy_meter::EnergyMeter;
+    let energy_meter = adapter::energy_meter::EnergyMeter;
 
     let ha_incoming_data_processing = settings
         .homeassistant
@@ -89,7 +86,7 @@ pub async fn main() {
         async move {
             settings
                 .http_server
-                .run_server(move || vec![energy_meter::new_web_service(http_db.clone())])
+                .run_server(move || vec![adapter::energy_meter::new_web_service(http_db.clone())])
                 .await
                 .expect("HTTP server execution failed");
         }

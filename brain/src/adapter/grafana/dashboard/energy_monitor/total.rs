@@ -13,8 +13,8 @@ use crate::{
         DashboardDisplay,
         dashboard::{EURO_PER_KWH, Room, TimeRangeQuery},
     },
+    core::timeseries::{TimeSeries, interpolate::Estimatable},
     port::TimeSeriesAccess,
-    support::timeseries::{TimeSeries, interpolate::Estimatable},
 };
 
 pub async fn total_power<T>(api: web::Data<T>, time_range: Query<TimeRangeQuery>) -> impl Responder

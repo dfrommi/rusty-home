@@ -1,17 +1,17 @@
 use std::{cmp::Ordering, sync::Arc};
 
 use actix_web::{
-    web::{self, Query},
     Responder,
+    web::{self, Query},
 };
 use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::{time::DateTime, DataPoint, ExternalId};
+use support::{DataPoint, ExternalId, time::DateTime};
 
 use crate::{
-    adapter::grafana::{support::csv_response, GrafanaApiError},
+    adapter::grafana::{GrafanaApiError, support::csv_response},
+    core::timeseries::interpolate::Estimatable,
     home::state::DewPoint,
     port::TimeSeriesAccess,
-    support::timeseries::interpolate::Estimatable,
 };
 
 use super::TimeRangeWithIntervalQuery;

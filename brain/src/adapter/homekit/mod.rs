@@ -2,9 +2,48 @@ mod command;
 mod state;
 
 use api::state::unit::FanSpeed;
-pub use command::process_commands;
-pub use state::export_state;
+use serde::Deserialize;
 use support::unit::Percent;
+
+use crate::Infrastructure;
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct Homekit {
+    pub base_topic_status: String,
+    pub base_topic_set: String,
+}
+
+impl Homekit {
+    pub fn export_state(
+        &self,
+        infrastructure: &Infrastructure,
+    ) -> impl Future<Output = ()> + use<> {
+        let mqtt_api = infrastructure.database.clone();
+        let mqtt_sender = infrastructure.mqtt_client.new_publisher();
+        let state_topic = self.base_topic_status.clone();
+        let mqtt_trigger = infrastructure.event_listener.new_state_changed_listener();
+
+        async move { state::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await }
+    }
+
+    //async for await during init, future for later processing
+    pub async fn process_commands(
+        &self,
+        infrastructure: &mut Infrastructure,
+    ) -> impl Future<Output = ()> + use<> {
+        let mqtt_command_receiver = infrastructure
+            .mqtt_client
+            .subscribe(format!("{}/#", &self.base_topic_set))
+            .await
+            .expect("Error subscribing to MQTT topic");
+
+        let api = infrastructure.database.clone();
+        let target_topic = self.base_topic_set.clone();
+
+        async move { command::process_commands(target_topic, mqtt_command_receiver, api).await }
+    }
+}
 
 #[derive(Debug, Clone)]
 struct MqttStateValue(String);

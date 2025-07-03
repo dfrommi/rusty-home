@@ -58,7 +58,7 @@ mod tests {
     use api::trigger::*;
     use support::t;
 
-    use crate::adapter::persistence::Database;
+    use crate::Database;
 
     use super::*;
 

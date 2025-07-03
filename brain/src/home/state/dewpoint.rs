@@ -1,6 +1,6 @@
-use crate::support::timeseries::{
-    interpolate::{self, Estimatable},
+use crate::core::timeseries::{
     TimeSeries,
+    interpolate::{self, Estimatable},
 };
 
 use super::*;
@@ -9,9 +9,9 @@ use api::state::{RelativeHumidity, Temperature};
 
 use r#macro::{EnumVariants, Id};
 use support::{
+    DataFrame, DataPoint, ValueObject,
     time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
-    DataFrame, DataPoint, ValueObject,
 };
 use tokio::try_join;
 

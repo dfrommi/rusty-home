@@ -2,7 +2,7 @@ use api::DbEventListener;
 use support::time::Duration;
 use tokio::sync::broadcast;
 
-use crate::adapter::persistence::Database;
+use crate::Database;
 
 #[derive(Debug, Clone)]
 pub struct StateChangedEvent;

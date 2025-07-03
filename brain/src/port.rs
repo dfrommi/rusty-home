@@ -6,7 +6,7 @@ use support::{
     time::{DateTime, DateTimeRange},
 };
 
-use crate::support::timeseries::{TimeSeries, interpolate::Estimatable};
+use crate::core::timeseries::{TimeSeries, interpolate::Estimatable};
 
 pub trait DataPointAccess<T: ValueObject> {
     async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>>;

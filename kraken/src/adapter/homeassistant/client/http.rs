@@ -2,7 +2,7 @@ use anyhow::Context;
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
-use crate::homeassistant::StateChangedEvent;
+use crate::adapter::homeassistant::StateChangedEvent;
 
 #[derive(Debug, Clone)]
 pub struct HaHttpClient {

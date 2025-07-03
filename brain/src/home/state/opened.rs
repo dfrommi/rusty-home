@@ -1,12 +1,11 @@
 use support::{
-    t,
+    DataPoint, ValueObject, t,
     time::{DateTime, DateTimeRange},
-    DataPoint, ValueObject,
 };
 
-use crate::support::timeseries::{
-    interpolate::{algo, Estimatable},
+use crate::core::timeseries::{
     TimeSeries,
+    interpolate::{Estimatable, algo},
 };
 
 use super::{DataPointAccess, TimeSeriesAccess};

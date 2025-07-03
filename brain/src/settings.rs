@@ -9,14 +9,7 @@ pub struct Settings {
     pub mqtt: MqttConfig,
     pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
-    pub homekit: HomekitConfig,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct HomekitConfig {
-    pub base_topic_status: String,
-    pub base_topic_set: String,
+    pub homekit: crate::adapter::homekit::Homekit,
 }
 
 impl Settings {

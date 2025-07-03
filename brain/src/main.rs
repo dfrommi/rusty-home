@@ -1,8 +1,8 @@
-use core::event::AppEventListener;
+use core::app_event::AppEventListener;
 use std::{future::Future, sync::Arc};
 
-use adapter::persistence::Database;
 use api::DbEventListener;
+use core::persistence::Database;
 use infrastructure::{HttpServerConfig, Mqtt};
 use settings::Settings;
 use tokio::task::JoinSet;
@@ -12,7 +12,6 @@ mod core;
 mod home;
 pub mod port;
 mod settings;
-mod support;
 
 struct Infrastructure {
     database: Database,
@@ -129,35 +128,5 @@ fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()>
 
             home::plan_for_home(&api).await;
         }
-    }
-}
-
-impl settings::HomekitConfig {
-    fn export_state(&self, infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
-        let mqtt_api = infrastructure.database.clone();
-        let mqtt_sender = infrastructure.mqtt_client.new_publisher();
-        let state_topic = self.base_topic_status.clone();
-        let mqtt_trigger = infrastructure.event_listener.new_state_changed_listener();
-
-        async move {
-            adapter::homekit::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await
-        }
-    }
-
-    //async for await during init, future for later processing
-    async fn process_commands(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
-        let mqtt_command_receiver = infrastructure
-            .mqtt_client
-            .subscribe(format!("{}/#", &self.base_topic_set))
-            .await
-            .expect("Error subscribing to MQTT topic");
-
-        let api = infrastructure.database.clone();
-        let target_topic = self.base_topic_set.clone();
-
-        async move { adapter::homekit::process_commands(target_topic, mqtt_command_receiver, api).await }
     }
 }

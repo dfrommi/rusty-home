@@ -4,7 +4,7 @@ mod state;
 
 use std::sync::OnceLock;
 
-use crate::{adapter::persistence::Database, settings};
+use crate::{Database, settings};
 use tokio::runtime::Runtime;
 
 struct TestInfrastructure {

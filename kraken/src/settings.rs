@@ -7,9 +7,9 @@ use serde::Deserialize;
 pub struct Settings {
     pub database: DatabaseConfig,
     pub mqtt: MqttConfig,
-    pub homeassistant: crate::homeassistant::HomeAssitant,
-    pub z2m: crate::z2m::Zigbee2Mqtt,
-    pub tasmota: crate::tasmota::Tasmota,
+    pub homeassistant: crate::adapter::homeassistant::HomeAssitant,
+    pub z2m: crate::adapter::z2m::Zigbee2Mqtt,
+    pub tasmota: crate::adapter::tasmota::Tasmota,
     pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
 }

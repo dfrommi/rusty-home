@@ -1,7 +1,7 @@
 pub use api::state::HeatingDemand;
-use support::{time::DateTime, unit::Percent, DataFrame};
+use support::{DataFrame, time::DateTime, unit::Percent};
 
-use crate::support::timeseries::interpolate::{algo, Estimatable};
+use crate::core::timeseries::interpolate::{Estimatable, algo};
 
 impl Estimatable for HeatingDemand {
     type Type = Percent;

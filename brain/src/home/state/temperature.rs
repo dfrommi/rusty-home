@@ -1,7 +1,7 @@
 pub use api::state::Temperature;
 use support::{time::DateTime, unit::DegreeCelsius};
 
-use crate::support::timeseries::interpolate::{algo, Estimatable};
+use crate::core::timeseries::interpolate::{Estimatable, algo};
 
 impl Estimatable for Temperature {
     type Type = DegreeCelsius;

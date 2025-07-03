@@ -1,7 +1,7 @@
 pub use api::state::Presence;
 use support::time::DateTime;
 
-use crate::support::timeseries::interpolate::{Estimatable, algo};
+use crate::core::timeseries::interpolate::{Estimatable, algo};
 
 //TODO impl anyoneSleeping. Requires impl of enum from crate
 

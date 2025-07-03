@@ -1,7 +1,7 @@
 use infrastructure::MqttInMessage;
 use serde::Deserialize;
 
-use crate::homeassistant::StateChangedEvent;
+use crate::adapter::homeassistant::StateChangedEvent;
 
 pub struct HaMqttClient {
     state_rx: tokio::sync::mpsc::Receiver<MqttInMessage>,

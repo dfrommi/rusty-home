@@ -1,8 +1,8 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
+    core::timeseries::{TimeSeries, interpolate::Estimatable},
     port::{DataPointAccess, TimeSeriesAccess},
-    support::timeseries::{TimeSeries, interpolate::Estimatable},
 };
 
 use anyhow::{Result, bail};

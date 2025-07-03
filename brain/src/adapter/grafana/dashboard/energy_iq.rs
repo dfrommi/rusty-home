@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use actix_web::{
-    web::{self, Query},
     Responder,
+    web::{self, Query},
 };
 use api::state::{HeatingDemand, Temperature};
 use support::{
@@ -11,9 +11,9 @@ use support::{
 };
 
 use crate::{
-    adapter::grafana::{support::csv_response, GrafanaApiError},
+    adapter::grafana::{GrafanaApiError, support::csv_response},
+    core::timeseries::TimeSeries,
     port::TimeSeriesAccess,
-    support::timeseries::TimeSeries,
 };
 
 use super::Room;

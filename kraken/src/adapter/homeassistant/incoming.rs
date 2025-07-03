@@ -8,10 +8,8 @@ use support::{
     unit::{DegreeCelsius, Percent},
 };
 
-use crate::{
-    core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability},
-    homeassistant::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue},
-};
+use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
+use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};
 
 pub struct HaIncomingDataSource {
     client: HaHttpClient,

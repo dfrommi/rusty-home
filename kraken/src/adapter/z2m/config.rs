@@ -1,6 +1,6 @@
 use api::{state::*, trigger::RemoteTarget};
 
-use crate::z2m::Z2mChannel;
+use super::Z2mChannel;
 
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
     vec![

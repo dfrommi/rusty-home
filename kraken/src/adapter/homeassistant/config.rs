@@ -5,7 +5,7 @@ use api::command::{
 use api::state::{FanActivity, HeatingDemand, Presence, SetPoint};
 use api::{command::PowerToggle, state::Powered, state::RelativeHumidity, state::Temperature};
 
-use crate::homeassistant::{HaChannel, HaServiceTarget};
+use super::{HaChannel, HaServiceTarget};
 
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![

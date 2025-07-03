@@ -69,9 +69,9 @@ mod macros {
 #[cfg(test)]
 mod tests {
     use api::state::*;
-    use support::{t, time::DateTime, unit::*, DataFrame, DataPoint};
+    use support::{DataFrame, DataPoint, t, time::DateTime, unit::*};
 
-    use crate::support::timeseries::TimeSeries;
+    use crate::core::timeseries::TimeSeries;
 
     use super::{DataPointAccess, TimeSeriesAccess};
 

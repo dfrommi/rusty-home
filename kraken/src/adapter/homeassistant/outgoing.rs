@@ -8,11 +8,8 @@ use api::{
 use serde_json::json;
 use support::{t, time::Duration, unit::DegreeCelsius};
 
-use crate::{
-    Database,
-    core::CommandExecutor,
-    homeassistant::{HaHttpClient, HaServiceTarget},
-};
+use super::{HaHttpClient, HaServiceTarget};
+use crate::{Database, core::CommandExecutor};
 
 pub struct HaCommandExecutor {
     client: HaHttpClient,

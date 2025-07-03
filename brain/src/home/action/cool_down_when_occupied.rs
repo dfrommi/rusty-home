@@ -9,7 +9,7 @@ use api::{
 };
 use support::{DataPoint, t, unit::DegreeCelsius};
 
-use crate::{adapter::persistence::Database, core::planner::SimpleAction};
+use crate::{Database, core::planner::SimpleAction};
 
 use super::{DataPointAccess as _, Resident, trigger_once_and_keep_running};
 

@@ -1,12 +1,9 @@
 use support::{
-    time::{DateTime, FIXED_NOW},
     DataPoint, ValueObject,
+    time::{DateTime, FIXED_NOW},
 };
 
-use crate::{
-    adapter::persistence::Database, home::state::AutomaticTemperatureIncrease,
-    port::DataPointAccess,
-};
+use crate::{Database, home::state::AutomaticTemperatureIncrease, port::DataPointAccess};
 
 use super::{infrastructure, runtime};
 

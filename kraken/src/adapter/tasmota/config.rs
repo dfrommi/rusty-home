@@ -2,7 +2,7 @@ use api::command::{CommandTarget, PowerToggle};
 use api::state::Powered;
 use api::state::{CurrentPowerUsage, TotalEnergyConsumption};
 
-use crate::tasmota::TasmotaChannel;
+use super::TasmotaChannel;
 
 use super::TasmotaCommandTarget;
 

@@ -27,7 +27,6 @@ impl Homekit {
         async move { state::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await }
     }
 
-    //async for await during init, future for later processing
     pub async fn process_commands(
         &self,
         infrastructure: &mut Infrastructure,
@@ -37,7 +36,6 @@ impl Homekit {
             .subscribe(format!("{}/#", &self.base_topic_set))
             .await
             .expect("Error subscribing to MQTT topic");
-
         let api = infrastructure.database.clone();
         let target_topic = self.base_topic_set.clone();
 

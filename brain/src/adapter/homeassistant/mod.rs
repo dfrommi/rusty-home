@@ -37,7 +37,7 @@ impl HomeAssitant {
     pub async fn new_incoming_data_processor(
         &self,
         infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + use<> {
+    ) -> impl Future<Output = ()> + use<> {
         let ds = self
             .new_incoming_data_source(&mut infrastructure.mqtt_client)
             .await;

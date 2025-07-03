@@ -17,7 +17,7 @@ impl EnergyMeter {
         &self,
         db: Database,
         rx: Receiver<EnergyReadingAddedEvent>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + use<> {
+    ) -> impl Future<Output = ()> + use<> {
         async move {
             let ds = EnergyMeterIncomingDataSource::new(db.clone(), rx);
             process_incoming_data_source("EnergyReading", ds, &db).await

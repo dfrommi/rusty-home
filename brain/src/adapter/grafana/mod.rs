@@ -13,7 +13,9 @@ use derive_more::derive::{Display, Error};
 
 use display::DashboardDisplay;
 
-pub fn new_routes(api: Arc<crate::Database>) -> actix_web::Scope {
+pub fn new_routes(api: crate::Database) -> actix_web::Scope {
+    let api = Arc::new(api);
+
     web::scope("/grafana")
         .service(dashboard::energy_iq::routes(api.clone()))
         .service(dashboard::energy_monitor::routes(api.clone()))

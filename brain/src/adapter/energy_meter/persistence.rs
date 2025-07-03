@@ -25,7 +25,7 @@ impl Database {
             value,
             timestamp.into_db(),
         )
-        .execute(&self.db_pool)
+        .execute(&self.pool)
         .await?;
 
         Ok(())
@@ -41,7 +41,7 @@ impl Database {
                 FROM energy_reading_total
                 ORDER BY type, name, timestamp DESC"#
         )
-        .fetch_all(&self.db_pool)
+        .fetch_all(&self.pool)
         .await?;
 
         let mut readings: Vec<DataPoint<EnergyReading>> = vec![];
@@ -65,7 +65,7 @@ impl Database {
                 FROM energy_reading_total
                 ORDER BY type, name, timestamp DESC"#
         )
-        .fetch_all(&self.db_pool)
+        .fetch_all(&self.pool)
         .await?;
 
         let mut readings: Vec<i64> = vec![];
@@ -91,7 +91,7 @@ impl Database {
                 WHERE id = $1"#,
             id
         )
-        .fetch_optional(&self.db_pool)
+        .fetch_optional(&self.pool)
         .await?;
 
         match row {

@@ -28,5 +28,8 @@ support = { path = "../lib/support" }
 macro = { path = "../lib/macro" }
 infrastructure = { path = "../lib/infrastructure" }
 
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+
 [dev-dependencies]
 assert-json-diff = { workspace = true }

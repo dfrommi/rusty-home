@@ -20,8 +20,7 @@ pub async fn process_incoming_data_source<M, C>(
     name: &str,
     mut source: impl IncomingDataSource<M, C>,
     db: &Database,
-) -> anyhow::Result<()>
-where
+) where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
 {

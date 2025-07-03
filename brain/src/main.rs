@@ -1,11 +1,10 @@
-use core::app_event::AppEventListener;
-use std::{future::Future, sync::Arc};
+use core::{CommandExecutor, app_event::AppEventListener};
+use std::future::Future;
 
-use api::DbEventListener;
+use api::{DbEventListener, command::Command};
 use core::persistence::Database;
-use infrastructure::{HttpServerConfig, Mqtt};
+use infrastructure::Mqtt;
 use settings::Settings;
-use tokio::task::JoinSet;
 
 mod adapter;
 mod core;
@@ -19,14 +18,75 @@ struct Infrastructure {
     mqtt_client: Mqtt,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
-    let mut tasks = JoinSet::new();
 
     let mut infrastructure = Infrastructure::init(&settings)
         .await
         .expect("Error initializing infrastructure");
+
+    let energy_meter = adapter::energy_meter::EnergyMeter;
+
+    let ha_incoming_data_processing = settings
+        .homeassistant
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
+
+    let z2m_incoming_data_processing = settings
+        .z2m
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
+
+    let tasmota_incoming_data_processing = settings
+        .tasmota
+        .new_incoming_data_processor(&mut infrastructure)
+        .await;
+
+    let energy_meter_processing = energy_meter
+        .new_incoming_data_processor(
+            infrastructure.database.clone(),
+            infrastructure
+                .event_listener
+                .new_energy_reading_added_listener(),
+        )
+        .await;
+
+    let hk_export_states = settings.homekit.export_state(&infrastructure);
+    let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
+
+    let execute_commands = {
+        let command_repo = infrastructure.database.clone();
+        let new_cmd_available = infrastructure.event_listener.new_command_added_listener();
+        let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
+        let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
+
+        let cmd_executor = MultiCommandExecutor {
+            primary: ha_cmd_executor,
+            secondary: tasmota_cmd_executor,
+        };
+
+        async move {
+            core::execute_commands(&command_repo, &cmd_executor, new_cmd_available).await;
+        }
+    };
+
+    let http_server_exec = {
+        let http_db = infrastructure.database.clone();
+
+        async move {
+            settings
+                .http_server
+                .run_server(move || {
+                    vec![
+                        adapter::energy_meter::new_web_service(http_db.clone()),
+                        adapter::grafana::new_routes(http_db.clone()),
+                    ]
+                })
+                .await
+                .expect("HTTP server execution failed");
+        }
+    };
 
     //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
     //in between preloading and actual use)
@@ -36,14 +96,47 @@ pub async fn main() {
         .await
         .expect("Error preloading cache");
 
-    tasks.spawn(perform_planning(&infrastructure));
-    tasks.spawn(settings.homekit.export_state(&infrastructure));
-    tasks.spawn(settings.homekit.process_commands(&mut infrastructure).await);
-    tasks.spawn(infrastructure.run_http_server(settings.http_server.clone()));
-    tasks.spawn(infrastructure.process());
+    let planning_exec = perform_planning(&infrastructure);
+    tracing::info!("Starting infrastructure processing");
+    let process_infrastucture = infrastructure.process();
 
-    while let Some(task) = tasks.join_next().await {
-        let () = task.unwrap();
+    tracing::info!("Starting main loop");
+
+    //TODO something blocking here. No execution happening
+    tokio::select!(
+        _ = process_infrastucture => {},
+        _ = planning_exec => {},
+        _ = energy_meter_processing => {},
+        _ = ha_incoming_data_processing => {},
+        _ = z2m_incoming_data_processing => {},
+        _ = tasmota_incoming_data_processing => {},
+        _ = execute_commands => {},
+        _ = http_server_exec => {},
+        _ = hk_export_states => {},
+        _ = hk_process_commands => {},
+    );
+}
+
+struct MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    primary: A,
+    secondary: B,
+}
+
+impl<A, B> CommandExecutor for MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
+        match self.primary.execute_command(command).await {
+            Ok(true) => Ok(true),
+            Ok(false) => self.secondary.execute_command(command).await,
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -78,34 +171,11 @@ impl Infrastructure {
         })
     }
 
-    fn run_http_server(&self, http_settings: HttpServerConfig) -> impl Future<Output = ()> + use<> {
-        let http_api = Arc::new(self.database.clone());
-
-        async move {
-            http_settings
-                .run_server(move || vec![adapter::grafana::new_routes(http_api.clone())])
-                .await
-                .expect("Error starting HTTP server");
-        }
-    }
-
     async fn process(self) {
-        let (event_listener, mqtt_client) = (self.event_listener, self.mqtt_client);
-
-        let app_event_processing = tokio::spawn(async move {
-            tracing::debug!("Start dispatching events");
-            event_listener
-                .dispatch_events()
-                .await
-                .expect("Error processing events")
-        });
-
-        let mqtt_processing = tokio::spawn(async move {
-            tracing::debug!("Start processing MQTT");
-            mqtt_client.process().await
-        });
-
-        futures::future::select(app_event_processing, mqtt_processing).await;
+        tokio::select!(
+            _ = self.mqtt_client.process() => {},
+            _ = self.event_listener.dispatch_events() => {},
+        )
     }
 }
 

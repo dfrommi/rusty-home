@@ -6,9 +6,8 @@ use api::{
 };
 use moka::future::Cache;
 use support::{
-    t,
+    DataFrame, t,
     time::{DateTime, Duration},
-    DataFrame,
 };
 
 mod availability;
@@ -19,7 +18,7 @@ mod trigger;
 
 #[derive(Clone)]
 pub struct Database {
-    pool: sqlx::PgPool,
+    pub pool: sqlx::PgPool,
     ts_cache_duration: Duration,
     ts_cache: Cache<i64, Arc<DataFrame<DbValue>>>,
     cmd_cache_duration: Duration,

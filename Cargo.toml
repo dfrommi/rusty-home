@@ -1,5 +1,5 @@
 [workspace]
-members = ["brain", "kraken"]
+members = ["brain"]
 resolver = "2"
 
 [workspace.dependencies]

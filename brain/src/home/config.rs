@@ -9,9 +9,9 @@ use crate::home::action::{
 use crate::home::state::UserControlled;
 
 use super::action::{
-    DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,
-    KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, NoHeatingDuringVentilation,
-    RequestClosingWindow,
+    CoolDownWhenOccupied, DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping,
+    HomeAction, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
+    NoHeatingDuringVentilation, RequestClosingWindow,
 };
 use super::goal::{HomeGoal, Room};
 
@@ -33,6 +33,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
             SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
+            //CoolDownWhenOccupied::LivingRoom.into(),
         ]
     ),
     (
@@ -53,6 +54,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             UserTriggerAction::new(HomekitTarget::BedroomCeilingFanSpeed.into()).into(),
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
+            //RoolDownWhenOccupied::Bedroom.into(),
         ]
     ),
     (

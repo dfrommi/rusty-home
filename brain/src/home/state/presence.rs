@@ -1,7 +1,9 @@
 pub use api::state::Presence;
 use support::time::DateTime;
 
-use crate::support::timeseries::interpolate::{algo, Estimatable};
+use crate::support::timeseries::interpolate::{Estimatable, algo};
+
+//TODO impl anyoneSleeping. Requires impl of enum from crate
 
 impl Estimatable for Presence {
     type Type = bool;

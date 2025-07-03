@@ -1,3 +1,4 @@
+mod cool_down_when_occupied;
 mod dehumidify;
 mod follow_default_setting;
 mod heating;
@@ -14,6 +15,7 @@ use anyhow::Result;
 use api::command::Command;
 
 use api::command::CommandSource;
+pub use cool_down_when_occupied::CoolDownWhenOccupied;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
@@ -50,6 +52,7 @@ pub enum HomeAction {
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
     SupportVentilationWithFan(SupportVentilationWithFan),
+    CoolDownWhenOccupied(CoolDownWhenOccupied),
 }
 
 impl Action for HomeAction {
@@ -95,6 +98,9 @@ impl Action for HomeAction {
             }
             HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                 support_ventilation_with_fan.evaluate(api).await
+            }
+            HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => {
+                cool_down_when_occupied.evaluate(api).await
             }
         }
     }

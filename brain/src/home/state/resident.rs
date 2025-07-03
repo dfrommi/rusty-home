@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use api::state::Presence;
-use support::{t, time::DateTimeRange, DataPoint, ValueObject};
+use support::{DataPoint, ValueObject, t, time::DateTimeRange};
 
 use crate::home::state::macros::result;
 
@@ -10,6 +10,7 @@ use super::{DataPointAccess, TimeSeriesAccess};
 pub enum Resident {
     DennisSleeping,
     SabineSleeping,
+    AnyoneOnCouch,
 }
 
 impl ValueObject for Resident {
@@ -25,6 +26,7 @@ where
         match item {
             Resident::DennisSleeping => sleeping(Presence::BedDennis, self).await,
             Resident::SabineSleeping => sleeping(Presence::BedSabine, self).await,
+            Resident::AnyoneOnCouch => anyone_on_couch(self).await,
         }
     }
 }
@@ -59,6 +61,11 @@ async fn sleeping(
         in_bed_full_range.end().at(t!(3:00)).unwrap(),
     );
 
+    let in_bed_stop_range = DateTimeRange::new(
+        in_bed_full_range.end().at(t!(5:00)).unwrap(),
+        *in_bed_full_range.end(),
+    );
+
     //Some has always true value
     let sleeping_started = ts
         .iter()
@@ -72,7 +79,10 @@ async fn sleeping(
         .as_ref()
         .and_then(|started_dp| {
             ts.iter().find(|dp| {
-                !dp.value.0 && dp.value.1 > t!(5 minutes) && started_dp.timestamp < dp.timestamp
+                in_bed_stop_range.contains(dp.timestamp)
+                    && !dp.value.0
+                    && dp.value.1 > t!(5 minutes)
+                    && started_dp.timestamp < dp.timestamp
             })
         })
         .map(|dp| dp.map_value(|v| v.1.clone()));
@@ -117,4 +127,38 @@ async fn sleeping(
             );
         }
     };
+}
+
+//TODO cover flaky on/off behaviour on movement
+async fn anyone_on_couch(api: &impl DataPointAccess<Presence>) -> Result<DataPoint<bool>> {
+    let (left, center, right) = tokio::try_join!(
+        api.current_data_point(Presence::CouchLeft),
+        api.current_data_point(Presence::CouchCenter),
+        api.current_data_point(Presence::CouchRight)
+    )?;
+
+    let dps = [&left, &center, &right];
+
+    //not fully correct. Iterate over timeseries backwards, then stop when first time all false
+
+    let occupied_dps = dps.iter().filter(|dp| dp.value).collect::<Vec<_>>();
+
+    if occupied_dps.is_empty() {
+        return Ok(DataPoint::new(
+            false,
+            dps.iter()
+                .map(|dp| dp.timestamp)
+                .max()
+                .context("Internal error: no minimum of non-empty vec")?,
+        ));
+    }
+
+    Ok(DataPoint::new(
+        true,
+        occupied_dps
+            .iter()
+            .map(|dp| dp.timestamp)
+            .min()
+            .context("Internal error: no minimum of non-empty vec")?,
+    ))
 }

@@ -103,7 +103,7 @@ impl UserTriggerAction {
             }
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed)
             | UserTriggerTarget::Homekit(HomekitTarget::BedroomCeilingFanSpeed) => {
-                Some(t!(30 minutes))
+                Some(t!(10 hours))
             }
         }
     }

@@ -4,7 +4,7 @@ mod persistence;
 
 use crate::{
     Database,
-    core::{event::EnergyReadingAddedEvent, process_incoming_data_source},
+    core::{app_event::EnergyReadingAddedEvent, process_incoming_data_source},
 };
 use incoming::EnergyMeterIncomingDataSource;
 use tokio::sync::broadcast::Receiver;

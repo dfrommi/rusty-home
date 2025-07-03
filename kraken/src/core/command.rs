@@ -1,11 +1,14 @@
-use crate::{Database, core::event::CommandAddedEvent};
-
-use super::port::CommandExecutor;
+use crate::{Database, core::app_event::CommandAddedEvent};
 
 use anyhow::Result;
-use api::command::CommandExecution;
+use api::command::{Command, CommandExecution};
 use infrastructure::TraceContext;
 use tokio::sync::broadcast::Receiver;
+
+pub trait CommandExecutor {
+    //Returns true if command was executed
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
+}
 
 pub async fn execute_commands(
     repo: &Database,

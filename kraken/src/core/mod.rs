@@ -1,14 +1,16 @@
-mod adapter;
-mod domain;
-pub mod event;
+pub mod app_event;
+mod command;
+mod incoming_data;
+mod persistence;
 
-pub use adapter::DeviceConfig;
-pub use adapter::IncomingDataSource;
-pub use adapter::process_incoming_data_source;
+use std::collections::HashMap;
+
 use api::state::ChannelValue;
 use api::trigger::UserTrigger;
-pub use domain::CommandExecutor;
-pub use domain::execute_commands;
+pub use command::CommandExecutor;
+pub use command::execute_commands;
+pub use incoming_data::IncomingDataSource;
+pub use incoming_data::process_incoming_data_source;
 
 use support::DataPoint;
 use support::time::DateTime;
@@ -26,4 +28,30 @@ pub struct ItemAvailability {
     pub item: String,
     pub last_seen: DateTime,
     pub marked_offline: bool,
+}
+
+pub struct DeviceConfig<V> {
+    config: HashMap<String, Vec<V>>,
+}
+
+impl<V> DeviceConfig<V>
+where
+    V: Clone,
+{
+    pub fn new(config: &[(&str, V)]) -> Self {
+        let mut m: HashMap<String, Vec<V>> = HashMap::new();
+        for (key, value) in config {
+            let key = key.to_string();
+            m.entry(key).or_default().push(value.clone());
+        }
+
+        Self { config: m }
+    }
+
+    pub fn get(&self, key: &str) -> &[V] {
+        match self.config.get(key) {
+            Some(v) => v,
+            None => &[],
+        }
+    }
 }

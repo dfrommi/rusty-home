@@ -1,7 +1,7 @@
 use api::{DbEventListener, command::Command};
 use core::{
     CommandExecutor,
-    event::{AppEventListener, CommandAddedEvent},
+    app_event::{AppEventListener, CommandAddedEvent},
 };
 use settings::Settings;
 use tokio::sync::broadcast::Receiver;

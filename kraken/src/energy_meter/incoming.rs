@@ -4,7 +4,7 @@ use tokio::sync::broadcast::Receiver;
 
 use crate::{
     Database,
-    core::{IncomingData, IncomingDataSource, event::EnergyReadingAddedEvent},
+    core::{IncomingData, IncomingDataSource, app_event::EnergyReadingAddedEvent},
 };
 
 use super::{EnergyReading, Faucet, Radiator};

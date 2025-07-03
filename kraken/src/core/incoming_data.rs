@@ -1,38 +1,6 @@
-use std::collections::HashMap;
-
 use crate::Database;
 
 use super::IncomingData;
-
-pub mod persistence;
-
-pub struct DeviceConfig<V> {
-    config: HashMap<String, Vec<V>>,
-}
-
-impl<V> DeviceConfig<V>
-where
-    V: Clone,
-{
-    pub fn new(config: &[(&str, V)]) -> Self {
-        let mut m: HashMap<String, Vec<V>> = HashMap::new();
-        for (key, value) in config {
-            let key = key.to_string();
-            m.entry(key).or_default().push(value.clone());
-        }
-
-        Self { config: m }
-    }
-
-    pub fn get(&self, key: &str) -> &[V] {
-        match self.config.get(key) {
-            Some(v) => v,
-            None => &[],
-        }
-    }
-}
-
-//TODO OutgoingDataSender for commands and Homekit state
 
 pub trait IncomingDataSource<Message, Channel> {
     async fn recv(&mut self) -> Option<Message>;

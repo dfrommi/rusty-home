@@ -2,7 +2,7 @@ mod config;
 mod incoming;
 mod outgoing;
 
-use api::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption};
+use crate::home::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption};
 
 use incoming::TasmotaIncomingDataSource;
 use outgoing::TasmotaCommandExecutor;

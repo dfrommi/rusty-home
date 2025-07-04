@@ -5,7 +5,7 @@ use actix_web::{
     http::header,
     web::{self, Query},
 };
-use api::state::{HeatingDemand, TotalEnergyConsumption};
+use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
 use support::{ValueObject, time::DateTimeRange};
 
 use crate::{

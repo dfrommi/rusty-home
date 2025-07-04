@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
+use crate::home::command::{Command, CommandSource};
 use actix_web::{HttpResponse, http::header, web};
 use anyhow::Context;
-use api::{
-    command::{Command, CommandSource},
-    state::Channel,
-};
+use crate::home::state::Channel;
 use infrastructure::TraceContext;
 
 use crate::{
@@ -164,9 +162,9 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             "SetHeating",
             device.to_string(),
             match target_state {
-                api::command::HeatingTargetState::Auto => "auto".to_string(),
-                api::command::HeatingTargetState::Off => "off".to_string(),
-                api::command::HeatingTargetState::Heat { temperature, .. } => {
+                crate::home::command::HeatingTargetState::Auto => "auto".to_string(),
+                crate::home::command::HeatingTargetState::Off => "off".to_string(),
+                crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
                     temperature.to_string()
                 }
             },

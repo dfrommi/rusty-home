@@ -1,7 +1,19 @@
-pub use api::state::RelativeHumidity;
+use r#macro::{EnumVariants, Id};
 use support::{time::DateTime, unit::Percent};
 
 use crate::core::timeseries::interpolate::{Estimatable, algo};
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+pub enum RelativeHumidity {
+    Outside,
+    LivingRoomDoor,
+    RoomOfRequirementsDoor,
+    BedroomDoor,
+    BedroomOuterWall,
+    KitchenOuterWall,
+    BathroomShower,
+    Dehumidifier,
+}
 
 impl Estimatable for RelativeHumidity {
     type Type = Percent;

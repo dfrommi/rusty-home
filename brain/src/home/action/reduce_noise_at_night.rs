@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use api::command::{Command, PowerToggle};
+use crate::home::command::{Command, PowerToggle};
 use support::{t, time::DailyTimeRange};
 
 use crate::core::planner::SimpleAction;
@@ -30,7 +30,7 @@ impl SimpleAction for ReduceNoiseAtNight {
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

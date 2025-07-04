@@ -1,9 +1,7 @@
 use std::fmt::Display;
 
-use api::{
-    command::{Command, CommandTarget},
-    state::unit::FanAirflow,
-};
+use crate::home::command::{Command, CommandTarget};
+use crate::home::state::FanAirflow;
 
 use crate::core::planner::{Action, ActionEvaluationResult};
 
@@ -33,13 +31,13 @@ impl Action for FollowDefaultSetting {
             },
             CommandTarget::SetHeating { device } => Command::SetHeating {
                 device,
-                target_state: api::command::HeatingTargetState::Auto,
+                target_state: crate::home::command::HeatingTargetState::Auto,
             },
             CommandTarget::PushNotify {
                 recipient,
                 notification,
             } => Command::PushNotify {
-                action: api::command::NotificationAction::Dismiss,
+                action: crate::home::command::NotificationAction::Dismiss,
                 notification,
                 recipient,
             },

@@ -1,5 +1,5 @@
 use ::support::time::{DateTime, FIXED_NOW};
-use api::command::{Command, CommandSource, PowerToggle};
+use crate::home::command::{Command, CommandSource, PowerToggle};
 use support::TestDatabase;
 
 use crate::home::plan_for_home;
@@ -54,7 +54,7 @@ fn test_planning_execution() {
 mod support {
     use std::sync::Mutex;
 
-    use api::command::{Command, CommandSource};
+    use crate::home::command::{Command, CommandSource};
     use support::time::{DateTime, DateTimeRange};
 
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
@@ -136,9 +136,9 @@ mod support {
 
         pub async fn get_latest_command(
             &self,
-            target: impl Into<api::command::CommandTarget>,
+            target: impl Into<crate::home::command::CommandTarget>,
             since: DateTime,
-        ) -> anyhow::Result<Option<api::command::CommandExecution>> {
+        ) -> anyhow::Result<Option<crate::home::command::CommandExecution>> {
             infrastructure()
                 .api()
                 .get_latest_command(target, since)
@@ -147,9 +147,9 @@ mod support {
 
         pub async fn get_all_commands_for_target(
             &self,
-            target: impl Into<api::command::CommandTarget>,
+            target: impl Into<crate::home::command::CommandTarget>,
             since: DateTime,
-        ) -> anyhow::Result<Vec<api::command::CommandExecution>> {
+        ) -> anyhow::Result<Vec<crate::home::command::CommandExecution>> {
             infrastructure()
                 .api()
                 .get_all_commands_for_target(target, since)
@@ -160,7 +160,7 @@ mod support {
             &self,
             from: DateTime,
             until: DateTime,
-        ) -> anyhow::Result<Vec<api::command::CommandExecution>> {
+        ) -> anyhow::Result<Vec<crate::home::command::CommandExecution>> {
             infrastructure().api().get_all_commands(from, until).await
         }
     }

@@ -1,12 +1,10 @@
 mod config;
 mod incoming;
 
-use api::{
-    state::{
-        CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption,
-    },
-    trigger::RemoteTarget,
+use crate::home::state::{
+    CurrentPowerUsage, OpenedRaw, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption,
 };
+use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use serde::Deserialize;
 
@@ -24,7 +22,7 @@ pub struct Zigbee2Mqtt {
 #[derive(Debug, Clone)]
 enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
-    ContactSensor(Opened),
+    ContactSensor(OpenedRaw),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),

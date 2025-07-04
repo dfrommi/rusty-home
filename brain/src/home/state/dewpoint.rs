@@ -5,7 +5,7 @@ use crate::core::timeseries::{
 
 use super::*;
 use anyhow::Result;
-use api::state::{RelativeHumidity, Temperature};
+use crate::home::state::{RelativeHumidity, Temperature};
 
 use r#macro::{EnumVariants, Id};
 use support::{

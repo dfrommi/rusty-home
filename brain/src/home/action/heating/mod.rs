@@ -5,7 +5,7 @@ mod ventilation_in_progress;
 mod wait_for_sleeping;
 mod wait_for_ventilation;
 
-use api::command::Thermostat;
+use crate::home::command::Thermostat;
 
 pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
 pub use ir_heater_auto_turn_off::IrHeaterAutoTurnOff;

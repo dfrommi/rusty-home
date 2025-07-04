@@ -1,7 +1,7 @@
 use crate::{Database, core::app_event::CommandAddedEvent};
 
+use crate::home::command::{Command, CommandExecution};
 use anyhow::Result;
-use api::command::{Command, CommandExecution};
 use infrastructure::TraceContext;
 use tokio::sync::broadcast::Receiver;
 

@@ -1,5 +1,5 @@
 use anyhow::Context;
-use api::trigger::{UserTrigger, UserTriggerTarget};
+use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use support::{DataPoint, t, time::DateTime};
 
 impl super::Database {
@@ -55,7 +55,7 @@ impl super::Database {
 
 #[cfg(test)]
 mod tests {
-    use api::trigger::*;
+    use crate::home::trigger::*;
     use support::t;
 
     use crate::Database;

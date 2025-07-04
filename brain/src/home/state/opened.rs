@@ -18,25 +18,42 @@ pub enum Opened {
     RoomOfRequirementsWindow,
 }
 
+pub mod raw {
+    use r#macro::Id;
+
+    #[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+    pub enum Opened {
+        KitchenWindow,
+        BedroomWindow,
+        LivingRoomWindowLeft,
+        LivingRoomWindowRight,
+        LivingRoomWindowSide,
+        LivingRoomBalconyDoor,
+        RoomOfRequirementsWindowLeft,
+        RoomOfRequirementsWindowRight,
+        RoomOfRequirementsWindowSide,
+    }
+}
+
 impl ValueObject for Opened {
     type ValueType = bool;
 }
 
 impl Opened {
-    fn api_items(&self) -> Vec<api::state::Opened> {
+    fn api_items(&self) -> Vec<raw::Opened> {
         match self {
             Opened::LivingRoomWindowOrDoor => vec![
-                api::state::Opened::LivingRoomWindowLeft,
-                api::state::Opened::LivingRoomWindowRight,
-                api::state::Opened::LivingRoomWindowSide,
-                api::state::Opened::LivingRoomBalconyDoor,
+                raw::Opened::LivingRoomWindowLeft,
+                raw::Opened::LivingRoomWindowRight,
+                raw::Opened::LivingRoomWindowSide,
+                raw::Opened::LivingRoomBalconyDoor,
             ],
-            Opened::BedroomWindow => vec![api::state::Opened::BedroomWindow],
-            Opened::KitchenWindow => vec![api::state::Opened::KitchenWindow],
+            Opened::BedroomWindow => vec![raw::Opened::BedroomWindow],
+            Opened::KitchenWindow => vec![raw::Opened::KitchenWindow],
             Opened::RoomOfRequirementsWindow => vec![
-                api::state::Opened::RoomOfRequirementsWindowLeft,
-                api::state::Opened::RoomOfRequirementsWindowRight,
-                api::state::Opened::RoomOfRequirementsWindowSide,
+                raw::Opened::RoomOfRequirementsWindowLeft,
+                raw::Opened::RoomOfRequirementsWindowRight,
+                raw::Opened::RoomOfRequirementsWindowSide,
             ],
         }
     }
@@ -44,7 +61,7 @@ impl Opened {
 
 impl<T> DataPointAccess<Opened> for T
 where
-    T: DataPointAccess<api::state::Opened>,
+    T: DataPointAccess<raw::Opened>,
 {
     async fn current_data_point(&self, item: Opened) -> anyhow::Result<DataPoint<bool>> {
         any_of(self, item.api_items()).await
@@ -52,8 +69,8 @@ where
 }
 
 async fn any_of(
-    api: &impl DataPointAccess<api::state::Opened>,
-    opened_states: Vec<api::state::Opened>,
+    api: &impl DataPointAccess<raw::Opened>,
+    opened_states: Vec<raw::Opened>,
 ) -> anyhow::Result<DataPoint<bool>> {
     let futures: Vec<_> = opened_states
         .into_iter()
@@ -74,7 +91,7 @@ async fn any_of(
 
 impl<T> TimeSeriesAccess<Opened> for T
 where
-    T: TimeSeriesAccess<api::state::Opened>,
+    T: TimeSeriesAccess<raw::Opened>,
 {
     async fn series(
         &self,
@@ -82,7 +99,7 @@ where
         range: DateTimeRange,
     ) -> anyhow::Result<TimeSeries<Opened>> {
         let api_items = item.api_items();
-        let context: api::state::Opened = api_items[0].clone();
+        let context: raw::Opened = api_items[0].clone();
 
         let futures = api_items
             .into_iter()
@@ -97,7 +114,7 @@ where
     }
 }
 
-impl Estimatable for api::state::Opened {
+impl Estimatable for raw::Opened {
     type Type = bool;
 
     fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
@@ -154,17 +171,14 @@ mod tests {
         balcony: bool,
     }
 
-    impl DataPointAccess<api::state::Opened> for FakeAccess {
-        async fn current_data_point(
-            &self,
-            item: api::state::Opened,
-        ) -> anyhow::Result<DataPoint<bool>> {
+    impl DataPointAccess<raw::Opened> for FakeAccess {
+        async fn current_data_point(&self, item: raw::Opened) -> anyhow::Result<DataPoint<bool>> {
             Ok(DataPoint {
                 value: match item {
-                    api::state::Opened::LivingRoomWindowLeft => self.left,
-                    api::state::Opened::LivingRoomWindowRight => self.right,
-                    api::state::Opened::LivingRoomWindowSide => self.side,
-                    api::state::Opened::LivingRoomBalconyDoor => self.balcony,
+                    raw::Opened::LivingRoomWindowLeft => self.left,
+                    raw::Opened::LivingRoomWindowRight => self.right,
+                    raw::Opened::LivingRoomWindowSide => self.side,
+                    raw::Opened::LivingRoomBalconyDoor => self.balcony,
                     _ => panic!("Unexpected item {:?}", item),
                 },
                 timestamp: DateTime::now(),

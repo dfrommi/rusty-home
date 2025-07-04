@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use api::state::{FanActivity, Powered, unit::FanAirflow};
+use crate::home::state::{FanActivity, FanAirflow, Powered};
 use infrastructure::MqttOutMessage;
 use support::{ExternalId, ValueObject, unit::Percent};
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};

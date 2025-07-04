@@ -1,11 +1,9 @@
-use anyhow::Result;
-use api::{
-    command::{
-        Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification,
-        NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
-    },
-    state::{ExternalAutoControl, FanActivity, Powered, SetPoint, unit::FanAirflow},
+use crate::home::command::{
+    Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification,
+    NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
+use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, SetPoint};
+use anyhow::Result;
 use support::{t, unit::DegreeCelsius};
 
 use crate::Database;
@@ -61,9 +59,11 @@ where
     let (set_point, auto_mode) = tokio::try_join!(api.current(set_point), api.current(auto_mode))?;
 
     match target_state {
-        api::command::HeatingTargetState::Auto => Ok(auto_mode),
-        api::command::HeatingTargetState::Off => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
-        api::command::HeatingTargetState::Heat { temperature, .. } => {
+        crate::home::command::HeatingTargetState::Auto => Ok(auto_mode),
+        crate::home::command::HeatingTargetState::Off => {
+            Ok(!auto_mode && set_point == DegreeCelsius(0.0))
+        }
+        crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
             Ok(!auto_mode && &set_point == temperature)
         }
     }
@@ -119,7 +119,7 @@ where
     API: DataPointAccess<EnergySaving>,
 {
     let state_device = match device {
-        api::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
+        crate::home::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
     };
 
     let is_energy_saving = api.current(state_device).await?;
@@ -136,8 +136,8 @@ where
     API: DataPointAccess<FanActivity>,
 {
     let state_device = match device {
-        api::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
-        api::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
+        crate::home::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
+        crate::home::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
     };
 
     let current_flow = api.current(state_device).await?;

@@ -242,7 +242,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use api::state::Temperature;
+    use crate::home::state::Temperature;
     use support::unit::DegreeCelsius;
 
     #[test]
@@ -338,7 +338,7 @@ mod tests {
 #[cfg(test)]
 mod combined {
     use crate::home::state::DewPoint;
-    use api::state::{RelativeHumidity, Temperature};
+    use crate::home::state::{RelativeHumidity, Temperature};
     use support::unit::{DegreeCelsius, Percent};
 
     use super::*;

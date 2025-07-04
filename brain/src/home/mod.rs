@@ -4,9 +4,11 @@ use action::HomeAction;
 use goal::HomeGoal;
 
 mod action;
+pub mod command;
 mod config;
 mod goal;
 pub mod state;
+pub mod trigger;
 
 #[cfg(test)]
 mod tests;

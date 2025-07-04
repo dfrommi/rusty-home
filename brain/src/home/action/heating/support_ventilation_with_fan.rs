@@ -1,9 +1,7 @@
 use std::fmt::Display;
 
-use api::{
-    command::{Command, Fan},
-    state::unit::{FanAirflow, FanSpeed},
-};
+use crate::home::command::{Command, Fan};
+use crate::home::state::{FanAirflow, FanSpeed};
 use support::t;
 
 use crate::core::planner::SimpleAction;
@@ -35,7 +33,7 @@ impl SimpleAction for SupportVentilationWithFan {
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

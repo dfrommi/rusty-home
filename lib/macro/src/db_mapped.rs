@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 pub fn db_mapped(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -36,7 +36,7 @@ pub fn db_mapped(input: TokenStream) -> TokenStream {
         // Implement ChannelTypeInfo for each variant
         #(#type_info_impls)*
 
-        impl From<&#name> for crate::state::db::DbValue {
+        impl From<&#name> for crate::core::persistence::DbValue {
             fn from(val: &#name) -> Self {
                 match val {
                     #(#into_dbvalue_impls),*

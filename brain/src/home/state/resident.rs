@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use api::state::Presence;
+use crate::home::state::Presence;
 use support::{DataPoint, ValueObject, t, time::DateTimeRange};
 
 use crate::home::state::macros::result;

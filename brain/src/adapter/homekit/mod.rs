@@ -1,7 +1,7 @@
 mod command;
 mod state;
 
-use api::state::unit::FanSpeed;
+use crate::home::state::FanSpeed;
 use serde::Deserialize;
 use support::unit::Percent;
 

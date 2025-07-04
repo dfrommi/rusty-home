@@ -8,10 +8,10 @@ use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
-use ::api::state::{
-    ExternalAutoControl, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
+use crate::home::state::{
+    ExternalAutoControl, FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint,
+    Temperature,
 };
-use api::state::FanActivity;
 use infrastructure::Mqtt;
 
 use std::collections::HashMap;

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
-use api::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
+use crate::home::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
 
 use crate::port::{DataPointAccess, TimeSeriesAccess};
 

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
-use api::command::{Command, CommandSource, CommandTarget};
+use crate::home::command::{Command, CommandSource, CommandTarget};
 
 use crate::Database;
 

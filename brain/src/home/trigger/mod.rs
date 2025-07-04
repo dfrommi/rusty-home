@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::state::unit::FanAirflow;
+use crate::home::state::FanAirflow;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

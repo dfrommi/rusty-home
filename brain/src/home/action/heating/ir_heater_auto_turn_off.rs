@@ -1,7 +1,6 @@
-use api::{
-    command::{Command, PowerToggle},
-    state::Powered,
-};
+
+use crate::home::command::{Command, PowerToggle};
+use crate::home::state::Powered;
 use support::t;
 
 use crate::{core::planner::SimpleAction, port::DataPointAccess};
@@ -29,7 +28,7 @@ impl SimpleAction for IrHeaterAutoTurnOff {
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

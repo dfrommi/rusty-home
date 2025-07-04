@@ -1,4 +1,4 @@
-use api::state::*;
+use crate::home::state::*;
 
 pub trait DashboardDisplay {
     fn display(&self) -> &'static str;

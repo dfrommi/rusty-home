@@ -1,8 +1,9 @@
-use api::DbEventListener;
 use support::time::Duration;
 use tokio::sync::broadcast;
 
 use crate::Database;
+
+use super::persistence::listener::{DbEvent, DbEventListener};
 
 #[derive(Debug, Clone)]
 pub struct StateChangedEvent;
@@ -79,28 +80,28 @@ impl AppEventListener {
 
             for event in events {
                 match event {
-                    api::DbEvent::StateValueAdded { tag_id, .. } if !state_changed_sent => {
+                    DbEvent::StateValueAdded { tag_id, .. } if !state_changed_sent => {
                         self.database.invalidate_ts_cache(tag_id).await;
                         if let Err(e) = self.state_changed_tx.send(StateChangedEvent) {
                             tracing::error!("Error sending state changed event: {:?}", e);
                         }
                         state_changed_sent = true;
                     }
-                    api::DbEvent::UserTriggerInsert { .. } if !user_trigger_sent => {
+                    DbEvent::UserTriggerInsert { .. } if !user_trigger_sent => {
                         if let Err(e) = self.user_trigger_tx.send(UserTriggerEvent) {
                             tracing::error!("Error sending user trigger event: {:?}", e);
                         }
                         user_trigger_sent = true;
                     }
 
-                    api::DbEvent::CommandAdded { .. } if !command_added_sent => {
+                    DbEvent::CommandAdded { .. } if !command_added_sent => {
                         if let Err(e) = self.command_added_tx.send(CommandAddedEvent) {
                             tracing::error!("Error sending command added event: {:?}", e);
                         }
                         command_added_sent = true;
                     }
 
-                    api::DbEvent::EnergyReadingInsert { id } => {
+                    DbEvent::EnergyReadingInsert { id } => {
                         if let Err(e) = self
                             .energy_reading_added_tx
                             .send(EnergyReadingAddedEvent { id })

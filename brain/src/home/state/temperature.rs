@@ -1,7 +1,20 @@
-pub use api::state::Temperature;
+use r#macro::{EnumVariants, Id};
 use support::{time::DateTime, unit::DegreeCelsius};
 
 use crate::core::timeseries::interpolate::{Estimatable, algo};
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+//TODO remove EnumVariants, only for state-debug
+pub enum Temperature {
+    Outside,
+    LivingRoomDoor,
+    RoomOfRequirementsDoor,
+    BedroomDoor,
+    BedroomOuterWall,
+    KitchenOuterWall,
+    BathroomShower,
+    Dehumidifier,
+}
 
 impl Estimatable for Temperature {
     type Type = DegreeCelsius;

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::{Ok, Result};
-use api::command::Command;
+use crate::home::command::Command;
 use support::{t, time::DailyTimeRange, unit::DegreeCelsius};
 
 use crate::{
@@ -68,14 +68,14 @@ impl SimpleAction for DeferHeatingUntilVentilationDone {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone().thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
+            target_state: crate::home::command::HeatingTargetState::Heat {
                 temperature: self.target_temperature(),
                 duration: self.time_range().duration(),
             },
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

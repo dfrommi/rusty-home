@@ -1,9 +1,11 @@
-use api::command::{
-    CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, Thermostat,
+use crate::home::command::{
+    CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle,
+    Thermostat,
 };
 
-use api::state::{FanActivity, HeatingDemand, Presence, SetPoint};
-use api::{command::PowerToggle, state::Powered, state::RelativeHumidity, state::Temperature};
+use crate::home::state::{
+    FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
+};
 
 use super::{HaChannel, HaServiceTarget};
 
@@ -165,24 +167,26 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "climate.arbeitszimmer",
             HaChannel::ClimateAutoMode(
-                api::state::ExternalAutoControl::RoomOfRequirementsThermostat,
+                crate::home::state::ExternalAutoControl::RoomOfRequirementsThermostat,
             ),
         ),
         (
             "climate.bad",
-            HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::BathroomThermostat),
+            HaChannel::ClimateAutoMode(crate::home::state::ExternalAutoControl::BathroomThermostat),
         ),
         (
             "climate.kuche",
-            HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::KitchenThermostat),
+            HaChannel::ClimateAutoMode(crate::home::state::ExternalAutoControl::KitchenThermostat),
         ),
         (
             "climate.schlafzimmer",
-            HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::BedroomThermostat),
+            HaChannel::ClimateAutoMode(crate::home::state::ExternalAutoControl::BedroomThermostat),
         ),
         (
             "climate.wohnzimmer",
-            HaChannel::ClimateAutoMode(api::state::ExternalAutoControl::LivingRoomThermostat),
+            HaChannel::ClimateAutoMode(
+                crate::home::state::ExternalAutoControl::LivingRoomThermostat,
+            ),
         ),
         //
         // PRESENCE

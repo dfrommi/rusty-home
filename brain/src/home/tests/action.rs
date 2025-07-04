@@ -1,7 +1,5 @@
-use api::{
-    command::Thermostat,
-    trigger::{HomekitTarget, UserTriggerTarget},
-};
+use crate::home::command::Thermostat;
+use crate::home::trigger::{HomekitTarget, UserTriggerTarget};
 use support::time::{DateTime, FIXED_NOW};
 
 use crate::{
@@ -55,8 +53,8 @@ fn heating_started_before_window_was_opened_in_one_room() {
     let result = get_state_at("2024-11-11T06:12:01+01:00", action);
 
     assert!(
-            result.is_fulfilled,
-            "Not fulfilled but expected. Check that window-open time is verified against date and time, not only time"
+        result.is_fulfilled,
+        "Not fulfilled but expected. Check that window-open time is verified against date and time, not only time"
     );
 }
 

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::{Command, PowerToggle};
+use crate::home::command::{Command, PowerToggle};
 
 use crate::{core::planner::SimpleAction, home::state::RiskOfMould};
 
@@ -30,7 +30,7 @@ impl SimpleAction for Dehumidify {
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

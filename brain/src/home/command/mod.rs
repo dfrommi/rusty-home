@@ -5,9 +5,7 @@ use support::{
     unit::DegreeCelsius,
 };
 
-use crate::state::unit::FanAirflow;
-
-pub mod db;
+use crate::home::state::FanAirflow;
 
 #[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

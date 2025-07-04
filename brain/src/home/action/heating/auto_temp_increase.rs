@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
+use crate::home::command::Command;
 use anyhow::Result;
-use api::command::Command;
 use support::{t, unit::DegreeCelsius};
 
 use crate::{
@@ -45,14 +45,14 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Heat {
+            target_state: crate::home::command::HeatingTargetState::Heat {
                 temperature: NO_HEATING_SET_POINT,
                 duration: t!(1 hours),
             },
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

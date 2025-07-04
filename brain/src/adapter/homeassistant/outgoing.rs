@@ -1,10 +1,5 @@
-use api::{
-    command::{Command, CommandTarget, Fan},
-    state::{
-        ChannelValue, FanActivity,
-        unit::{FanAirflow, FanSpeed},
-    },
-};
+use crate::home::command::{Command, CommandTarget, Fan};
+use crate::home::state::{ChannelValue, FanActivity, FanAirflow, FanSpeed};
 use serde_json::json;
 use support::{t, time::Duration, unit::DegreeCelsius};
 
@@ -69,8 +64,8 @@ impl HaCommandExecutor {
         command: &Command,
         ha_target: &HaServiceTarget,
     ) -> anyhow::Result<()> {
+        use crate::home::command::*;
         use HaServiceTarget::*;
-        use api::command::*;
 
         match (ha_target, command) {
             (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => {

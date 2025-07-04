@@ -1,7 +1,16 @@
-pub use api::state::SetPoint;
+use r#macro::Id;
 use support::{time::DateTime, unit::DegreeCelsius};
 
 use crate::core::timeseries::interpolate::{Estimatable, algo};
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+pub enum SetPoint {
+    LivingRoom,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
+}
 
 impl Estimatable for SetPoint {
     type Type = DegreeCelsius;

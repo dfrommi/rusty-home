@@ -1,16 +1,13 @@
-use api::{
-    command::{Command, CommandSource},
-    state::Powered,
-    trigger::{
-        ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget,
-    },
+use crate::home::command::{Command, CommandSource};
+use crate::home::state::Powered;
+use crate::home::trigger::{
+    ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget,
 };
-use support::{t, time::Duration};
-
 use crate::{
     Database,
     core::planner::{Action, ActionEvaluationResult},
 };
+use support::{t, time::Duration};
 
 use super::{DataPointAccess, trigger_once_and_keep_running};
 
@@ -110,7 +107,7 @@ impl UserTriggerAction {
 }
 
 fn into_command(trigger: UserTrigger) -> Option<Command> {
-    use api::command::*;
+    use crate::home::command::*;
 
     match trigger {
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => {
@@ -156,7 +153,7 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
 
 #[cfg(test)]
 mod tests {
-    use api::trigger::*;
+    use crate::home::trigger::*;
 
     use super::*;
 

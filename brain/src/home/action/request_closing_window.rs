@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 use anyhow::Result;
-use api::command::{Command, PowerToggle};
+use crate::home::command::{Command, PowerToggle};
 
 use super::DataPointAccess;
 
@@ -29,7 +29,7 @@ impl SimpleAction for RequestClosingWindow {
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

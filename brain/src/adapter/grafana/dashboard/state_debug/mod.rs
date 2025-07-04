@@ -4,7 +4,7 @@ use actix_web::{
     Responder,
     web::{self, Query},
 };
-use api::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
+use crate::home::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use support::{DataPoint, ExternalId, time::DateTime};
 
 use crate::{

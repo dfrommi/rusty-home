@@ -20,10 +20,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 csv = { workspace = true }
 
+cached = { workspace = true }
+
 actix-web = { workspace = true }
 mime = { workspace = true }
 
-api = { path = "../lib/api" }
 support = { path = "../lib/support" }
 macro = { path = "../lib/macro" }
 infrastructure = { path = "../lib/infrastructure" }

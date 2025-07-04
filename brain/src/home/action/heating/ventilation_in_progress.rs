@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use api::command::Command;
+use crate::home::command::Command;
 
 use crate::{
     core::planner::SimpleAction,
@@ -32,11 +32,11 @@ impl SimpleAction for NoHeatingDuringVentilation {
     fn command(&self) -> Command {
         Command::SetHeating {
             device: self.heating_zone.thermostat(),
-            target_state: api::command::HeatingTargetState::Off,
+            target_state: crate::home::command::HeatingTargetState::Off,
         }
     }
 
-    fn source(&self) -> api::command::CommandSource {
+    fn source(&self) -> crate::home::command::CommandSource {
         super::action_source(self)
     }
 

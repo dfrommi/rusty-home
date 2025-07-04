@@ -1,4 +1,4 @@
-use api::command::{Command, CommandTarget};
+use crate::home::command::{Command, CommandTarget};
 use infrastructure::TraceContext;
 use support::t;
 
@@ -8,7 +8,7 @@ impl crate::Database {
     pub async fn execute(
         &self,
         command: Command,
-        source: api::command::CommandSource,
+        source: crate::home::command::CommandSource,
     ) -> anyhow::Result<CommandExecutionResult> {
         let target: CommandTarget = command.clone().into();
         let last_execution = self

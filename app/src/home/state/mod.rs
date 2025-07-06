@@ -89,6 +89,77 @@ impl PersistentStateValue {
     }
 }
 
+impl From<&PersistentStateValue> for f64 {
+    fn from(val: &PersistentStateValue) -> Self {
+        match val {
+            PersistentStateValue::Temperature(_, value) => value.into(),
+            PersistentStateValue::RelativeHumidity(_, value) => value.into(),
+            PersistentStateValue::Opened(_, value) => bool_to_f64(*value),
+            PersistentStateValue::Powered(_, value) => bool_to_f64(*value),
+            PersistentStateValue::CurrentPowerUsage(_, value) => value.into(),
+            PersistentStateValue::TotalEnergyConsumption(_, value) => value.into(),
+            PersistentStateValue::SetPoint(_, value) => value.into(),
+            PersistentStateValue::HeatingDemand(_, value) => value.into(),
+            PersistentStateValue::ExternalAutoControl(_, value) => bool_to_f64(*value),
+            PersistentStateValue::Presence(_, value) => bool_to_f64(*value),
+            PersistentStateValue::TotalRadiatorConsumption(_, value) => value.into(),
+            PersistentStateValue::TotalWaterConsumption(_, value) => value.into(),
+            PersistentStateValue::FanActivity(_, value) => value.into(),
+        }
+    }
+}
+
+impl From<(PersistentState, f64)> for PersistentStateValue {
+    fn from(val: (PersistentState, f64)) -> Self {
+        let (channel, value) = val;
+        match channel {
+            PersistentState::Temperature(item) => {
+                PersistentStateValue::Temperature(item, value.into())
+            }
+            PersistentState::RelativeHumidity(item) => {
+                PersistentStateValue::RelativeHumidity(item, value.into())
+            }
+            PersistentState::Opened(item) => PersistentStateValue::Opened(item, f64_to_bool(value)),
+            PersistentState::Powered(item) => {
+                PersistentStateValue::Powered(item, f64_to_bool(value))
+            }
+            PersistentState::CurrentPowerUsage(item) => {
+                PersistentStateValue::CurrentPowerUsage(item, value.into())
+            }
+            PersistentState::TotalEnergyConsumption(item) => {
+                PersistentStateValue::TotalEnergyConsumption(item, value.into())
+            }
+            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, value.into()),
+            PersistentState::HeatingDemand(item) => {
+                PersistentStateValue::HeatingDemand(item, value.into())
+            }
+            PersistentState::ExternalAutoControl(item) => {
+                PersistentStateValue::ExternalAutoControl(item, f64_to_bool(value))
+            }
+            PersistentState::Presence(item) => {
+                PersistentStateValue::Presence(item, f64_to_bool(value))
+            }
+            PersistentState::TotalRadiatorConsumption(item) => {
+                PersistentStateValue::TotalRadiatorConsumption(item, value.into())
+            }
+            PersistentState::TotalWaterConsumption(item) => {
+                PersistentStateValue::TotalWaterConsumption(item, value.into())
+            }
+            PersistentState::FanActivity(item) => {
+                PersistentStateValue::FanActivity(item, value.into())
+            }
+        }
+    }
+}
+
+fn bool_to_f64(value: bool) -> f64 {
+    if value { 1.0 } else { 0.0 }
+}
+
+fn f64_to_bool(value: f64) -> bool {
+    value > 0.0
+}
+
 //TODO macro
 impl From<(PersistentState, DbValue)> for PersistentStateValue {
     fn from(val: (PersistentState, DbValue)) -> Self {

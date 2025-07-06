@@ -42,3 +42,51 @@ impl Display for FanAirflow {
         }
     }
 }
+
+impl From<&FanAirflow> for f64 {
+    fn from(value: &FanAirflow) -> Self {
+        let f_value = match value {
+            FanAirflow::Off => 0.0,
+            FanAirflow::Forward(FanSpeed::Silent) => 1.0,
+            FanAirflow::Forward(FanSpeed::Low) => 2.0,
+            FanAirflow::Forward(FanSpeed::Medium) => 3.0,
+            FanAirflow::Forward(FanSpeed::High) => 4.0,
+            FanAirflow::Forward(FanSpeed::Turbo) => 5.0,
+            FanAirflow::Reverse(FanSpeed::Silent) => -1.0,
+            FanAirflow::Reverse(FanSpeed::Low) => -2.0,
+            FanAirflow::Reverse(FanSpeed::Medium) => -3.0,
+            FanAirflow::Reverse(FanSpeed::High) => -4.0,
+            FanAirflow::Reverse(FanSpeed::Turbo) => -5.0,
+        };
+
+        f_value
+    }
+}
+
+impl From<f64> for FanAirflow {
+    fn from(value: f64) -> Self {
+        if value < -4.0 {
+            FanAirflow::Reverse(FanSpeed::Turbo)
+        } else if value < -3.0 {
+            FanAirflow::Reverse(FanSpeed::High)
+        } else if value < -2.0 {
+            FanAirflow::Reverse(FanSpeed::Medium)
+        } else if value < -1.0 {
+            FanAirflow::Reverse(FanSpeed::Low)
+        } else if value < 0.0 {
+            FanAirflow::Reverse(FanSpeed::Silent)
+        } else if value > 4.0 {
+            FanAirflow::Forward(FanSpeed::Turbo)
+        } else if value > 3.0 {
+            FanAirflow::Forward(FanSpeed::High)
+        } else if value > 2.0 {
+            FanAirflow::Forward(FanSpeed::Medium)
+        } else if value > 1.0 {
+            FanAirflow::Forward(FanSpeed::Low)
+        } else if value > 0.0 {
+            FanAirflow::Forward(FanSpeed::Silent)
+        } else {
+            FanAirflow::Off
+        }
+    }
+}

@@ -9,3 +9,15 @@ impl Display for Watt {
         write!(f, "{} W", self.0)
     }
 }
+
+impl From<&Watt> for f64 {
+    fn from(value: &Watt) -> Self {
+        value.0
+    }
+}
+
+impl From<f64> for Watt {
+    fn from(value: f64) -> Self {
+        Self(value)
+    }
+}

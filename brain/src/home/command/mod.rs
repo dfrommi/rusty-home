@@ -2,7 +2,7 @@ mod command_state;
 
 use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 use crate::core::time::{DateTime, Duration};
 
 use crate::home::state::FanAirflow;

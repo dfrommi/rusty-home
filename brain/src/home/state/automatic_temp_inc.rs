@@ -2,7 +2,7 @@ use crate::core::timeseries::DataPoint;
 use crate::home::state::Temperature;
 use crate::t;
 use r#macro::Id;
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 
 use support::ValueObject;
 

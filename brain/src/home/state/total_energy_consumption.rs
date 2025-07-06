@@ -1,5 +1,5 @@
 use r#macro::{EnumVariants, Id};
-use support::unit::KiloWattHours;
+use crate::core::unit::KiloWattHours;
 use crate::core::time::DateTime;
 
 use crate::core::timeseries::{

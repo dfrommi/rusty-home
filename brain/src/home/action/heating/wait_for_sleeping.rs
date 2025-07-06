@@ -4,7 +4,7 @@ use anyhow::{Ok, Result};
 use crate::home::command::Command;
 use crate::t;
 use crate::core::time::DailyTimeRange;
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 
 use crate::{
     Database,

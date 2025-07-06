@@ -3,7 +3,7 @@ use crate::home::state::{ChannelValue, FanActivity, FanAirflow, FanSpeed};
 use serde_json::json;
 use crate::t;
 use crate::core::time::Duration;
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 
 use super::{HaHttpClient, HaServiceTarget};
 use crate::{Database, core::CommandExecutor};

@@ -6,6 +6,7 @@ pub mod persistence;
 pub mod planner;
 pub mod time;
 pub mod timeseries;
+pub mod unit;
 
 use std::collections::HashMap;
 

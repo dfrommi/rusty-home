@@ -4,7 +4,8 @@ use crate::home::state::{FanActivity, FanAirflow, Powered};
 use crate::home::trigger::{Homekit, UserTrigger};
 use anyhow::bail;
 use infrastructure::MqttInMessage;
-use support::{ExternalId, unit::Percent};
+use support::ExternalId;
+use crate::core::unit::Percent;
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
 use crate::home::state::EnergySaving;

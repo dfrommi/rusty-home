@@ -243,7 +243,7 @@ where
 mod tests {
     use super::*;
     use crate::home::state::Temperature;
-    use support::unit::DegreeCelsius;
+    use crate::core::unit::DegreeCelsius;
 
     #[test]
     fn test_mean() {
@@ -339,7 +339,7 @@ mod tests {
 mod combined {
     use crate::home::state::DewPoint;
     use crate::home::state::{RelativeHumidity, Temperature};
-    use support::unit::{DegreeCelsius, Percent};
+    use crate::core::unit::{DegreeCelsius, Percent};
 
     use super::*;
 

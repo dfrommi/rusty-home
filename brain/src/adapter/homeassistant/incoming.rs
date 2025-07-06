@@ -5,7 +5,7 @@ use crate::{
     home::state::{ChannelValue, FanAirflow},
 };
 use anyhow::bail;
-use support::unit::{DegreeCelsius, Percent};
+use crate::core::unit::{DegreeCelsius, Percent};
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};

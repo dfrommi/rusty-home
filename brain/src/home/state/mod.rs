@@ -50,7 +50,7 @@ pub use user_controlled::UserControlled;
 
 use crate::{core::persistence::DbValue, port::*};
 use r#macro::{DbMapped, StateChannel};
-use support::unit::*;
+use crate::core::unit::*;
 
 #[derive(Debug, Clone, StateChannel, DbMapped)]
 pub enum ChannelValue {

@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::home::state::{FanActivity, FanAirflow, Powered};
 use infrastructure::MqttOutMessage;
-use support::{ExternalId, ValueObject, unit::Percent};
+use support::{ExternalId, ValueObject};
+use crate::core::unit::Percent;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::{core::app_event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};

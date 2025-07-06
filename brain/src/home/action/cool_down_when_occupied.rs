@@ -4,7 +4,7 @@ use crate::core::timeseries::DataPoint;
 use crate::home::command::{Command, CommandSource, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 
 use crate::{Database, core::planner::SimpleAction};
 

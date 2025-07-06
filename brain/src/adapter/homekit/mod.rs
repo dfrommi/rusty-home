@@ -3,7 +3,7 @@ mod state;
 
 use crate::home::state::FanSpeed;
 use serde::Deserialize;
-use support::unit::Percent;
+use crate::core::unit::Percent;
 
 use crate::Infrastructure;
 

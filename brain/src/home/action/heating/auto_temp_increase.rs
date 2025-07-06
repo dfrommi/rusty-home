@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::home::command::Command;
 use crate::t;
 use anyhow::Result;
-use support::unit::DegreeCelsius;
+use crate::core::unit::DegreeCelsius;
 
 use crate::{
     Database,

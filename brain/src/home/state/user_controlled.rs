@@ -1,5 +1,5 @@
 use r#macro::Id;
-use support::ValueObject;
+use crate::core::ValueObject;
 use crate::core::unit::DegreeCelsius;
 use crate::t;
 use crate::core::time::DateTime;

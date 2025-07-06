@@ -12,7 +12,8 @@ use anyhow::{Context as _, Result, bail};
 use cached::proc_macro::cached;
 use derive_more::derive::AsRef;
 use sqlx::PgPool;
-use support::{ExternalId, ValueObject};
+use crate::core::id::ExternalId;
+use crate::core::ValueObject;
 
 #[derive(Debug, Clone, PartialEq, sqlx::Type, AsRef)]
 #[sqlx(transparent)]

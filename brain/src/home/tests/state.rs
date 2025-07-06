@@ -1,4 +1,4 @@
-use support::ValueObject;
+use crate::core::ValueObject;
 use crate::core::time::{DateTime, FIXED_NOW};
 
 use crate::{

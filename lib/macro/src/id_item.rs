@@ -34,14 +34,14 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
         let variant_name_ext = variant_name.to_string().to_snake_case();
 
         as_ref_int_statics.push(quote! {
-            static #id_static_name: support::InternalId = support::InternalId::new(#type_name_int, #variant_name_int);
+            static #id_static_name: crate::core::id::InternalId = crate::core::id::InternalId::new(#type_name_int, #variant_name_int);
         });
         as_ref_int_matches.push(quote! {
             #enum_name::#variant_name => &#id_static_name
         });
 
         as_ref_ext_statics.push(quote! {
-            static #id_static_name: support::ExternalId = support::ExternalId::new_static(#type_name_ext, #variant_name_ext);
+            static #id_static_name: crate::core::id::ExternalId = crate::core::id::ExternalId::new_static(#type_name_ext, #variant_name_ext);
         });
         as_ref_ext_matches.push(quote! {
             #enum_name::#variant_name => &#id_static_name
@@ -62,8 +62,8 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl AsRef<support::InternalId> for #enum_name {
-            fn as_ref(&self) -> &support::InternalId {
+        impl AsRef<crate::core::id::InternalId> for #enum_name {
+            fn as_ref(&self) -> &crate::core::id::InternalId {
                 #(#as_ref_int_statics)*
 
                 match self {
@@ -72,8 +72,8 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl AsRef<support::ExternalId> for #enum_name {
-            fn as_ref(&self) -> &support::ExternalId {
+        impl AsRef<crate::core::id::ExternalId> for #enum_name {
+            fn as_ref(&self) -> &crate::core::id::ExternalId {
                 #(#as_ref_ext_statics)*
 
                 match self {
@@ -84,30 +84,30 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
 
         impl #enum_name {
             pub fn int_type(&self) -> &str {
-                let id: &support::InternalId = self.as_ref();
+                let id: &crate::core::id::InternalId = self.as_ref();
                 id.int_type()
             }
 
             pub fn int_name(&self) -> &str {
-                let id: &support::InternalId = self.as_ref();
+                let id: &crate::core::id::InternalId = self.as_ref();
                 id.int_name()
             }
 
             pub fn ext_type(&self) -> &str {
-                let id: &support::ExternalId = self.as_ref();
+                let id: &crate::core::id::ExternalId = self.as_ref();
                 id.ext_type()
             }
 
             pub fn ext_name(&self) -> &str {
-                let id: &support::ExternalId = self.as_ref();
+                let id: &crate::core::id::ExternalId = self.as_ref();
                 id.ext_name()
             }
         }
 
-        impl TryFrom<&support::InternalId> for #enum_name {
+        impl TryFrom<&crate::core::id::InternalId> for #enum_name {
             type Error = anyhow::Error;
 
-            fn try_from(value: &support::InternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: &crate::core::id::InternalId) -> Result<Self, Self::Error> {
                 if value.int_type() != #type_name_int {
                     anyhow::bail!("Error converting InternalId, expected type {}, got {}", #type_name_int, value.int_type());
                 }
@@ -121,18 +121,18 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<support::InternalId> for #enum_name {
+        impl TryFrom<crate::core::id::InternalId> for #enum_name {
             type Error = anyhow::Error;
 
-            fn try_from(value: support::InternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: crate::core::id::InternalId) -> Result<Self, Self::Error> {
                 Self::try_from(&value)
             }
         }
 
-        impl TryFrom<&support::ExternalId> for #enum_name {
+        impl TryFrom<&crate::core::id::ExternalId> for #enum_name {
             type Error = anyhow::Error;
 
-            fn try_from(value: &support::ExternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
                 if value.ext_type() != #type_name_ext {
                     anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.ext_type());
                 }
@@ -146,10 +146,10 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<support::ExternalId> for #enum_name {
+        impl TryFrom<crate::core::id::ExternalId> for #enum_name {
             type Error = anyhow::Error;
 
-            fn try_from(value: support::ExternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: crate::core::id::ExternalId) -> Result<Self, Self::Error> {
                 Self::try_from(&value)
             }
         }
@@ -196,16 +196,16 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl AsRef<support::InternalId> for #name {
-            fn as_ref(&self) -> &support::InternalId {
+        impl AsRef<crate::core::id::InternalId> for #name {
+            fn as_ref(&self) -> &crate::core::id::InternalId {
                 match self {
                     #(#value_as_ref_impls),*
                 }
             }
         }
 
-        impl AsRef<support::ExternalId> for #name {
-            fn as_ref(&self) -> &support::ExternalId {
+        impl AsRef<crate::core::id::ExternalId> for #name {
+            fn as_ref(&self) -> &crate::core::id::ExternalId {
                 match self {
                     #(#value_as_ref_impls),*
                 }
@@ -214,56 +214,56 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
         impl #name {
             pub fn int_type(&self) -> &str {
-                let id: &support::InternalId = self.as_ref();
+                let id: &crate::core::id::InternalId = self.as_ref();
                 id.int_type()
             }
 
             pub fn int_name(&self) -> &str {
-                let id: &support::InternalId = self.as_ref();
+                let id: &crate::core::id::InternalId = self.as_ref();
                 id.int_name()
             }
 
             pub fn ext_type(&self) -> &str {
-                let id: &support::ExternalId = self.as_ref();
+                let id: &crate::core::id::ExternalId = self.as_ref();
                 id.ext_type()
             }
 
             pub fn ext_name(&self) -> &str {
-                let id: &support::ExternalId = self.as_ref();
+                let id: &crate::core::id::ExternalId = self.as_ref();
                 id.ext_name()
             }
         }
 
-        impl TryFrom<&support::InternalId> for #name {
+        impl TryFrom<&crate::core::id::InternalId> for #name {
             type Error = anyhow::Error;
 
-            fn try_from(value: &support::InternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: &crate::core::id::InternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
                 anyhow::bail!("Error converting InternalId, unknown type/name {}/{}", value.int_type(), value.int_name());
             }
         }
 
-        impl TryFrom<support::InternalId> for #name {
+        impl TryFrom<crate::core::id::InternalId> for #name {
             type Error = anyhow::Error;
 
-            fn try_from(value: support::InternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: crate::core::id::InternalId) -> Result<Self, Self::Error> {
                 Self::try_from(&value)
             }
         }
 
-        impl TryFrom<&support::ExternalId> for #name {
+        impl TryFrom<&crate::core::id::ExternalId> for #name {
             type Error = anyhow::Error;
 
-            fn try_from(value: &support::ExternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
                 anyhow::bail!("Error converting ExternalId, unknown type/name {}/{}", value.ext_type(), value.ext_name());
             }
         }
 
-        impl TryFrom<support::ExternalId> for #name {
+        impl TryFrom<crate::core::id::ExternalId> for #name {
             type Error = anyhow::Error;
 
-            fn try_from(value: support::ExternalId) -> Result<Self, Self::Error> {
+            fn try_from(value: crate::core::id::ExternalId) -> Result<Self, Self::Error> {
                 Self::try_from(&value)
             }
         }

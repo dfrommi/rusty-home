@@ -27,7 +27,6 @@ cached = { workspace = true }
 actix-web = { workspace = true }
 mime = { workspace = true }
 
-support = { path = "../lib/support" }
 macro = { path = "../lib/macro" }
 infrastructure = { path = "../lib/infrastructure" }
 

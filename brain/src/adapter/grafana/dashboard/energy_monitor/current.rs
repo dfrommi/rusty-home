@@ -9,7 +9,7 @@ use actix_web::{
     http::header,
     web::{self},
 };
-use support::ValueObject;
+use crate::core::ValueObject;
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 

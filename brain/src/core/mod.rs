@@ -1,5 +1,6 @@
 pub mod app_event;
 pub mod command;
+pub mod id;
 pub mod incoming_data;
 pub mod metrics;
 pub mod persistence;
@@ -19,6 +20,10 @@ pub use incoming_data::process_incoming_data_source;
 
 use time::DateTime;
 use timeseries::DataPoint;
+
+pub trait ValueObject {
+    type ValueType;
+}
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {

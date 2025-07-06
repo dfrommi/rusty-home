@@ -1,6 +1,6 @@
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
-use support::ValueObject;
+use crate::core::ValueObject;
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,

@@ -5,7 +5,7 @@ use crate::{
     t,
 };
 use anyhow::Result;
-use support::ValueObject;
+use crate::core::ValueObject;
 
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 

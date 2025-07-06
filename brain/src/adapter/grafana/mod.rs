@@ -4,7 +4,7 @@ mod support;
 
 use std::sync::Arc;
 
-use ::support::ExternalId;
+use crate::core::id::ExternalId;
 use actix_web::{
     HttpResponse, ResponseError,
     web::{self},

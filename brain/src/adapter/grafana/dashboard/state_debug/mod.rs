@@ -8,7 +8,7 @@ use actix_web::{
     Responder,
     web::{self, Query},
 };
-use support::ExternalId;
+use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 
 use crate::{

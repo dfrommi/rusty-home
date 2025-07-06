@@ -1,9 +1,5 @@
 use std::{borrow::Cow, fmt::Display};
 
-pub trait ValueObject {
-    type ValueType;
-}
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct InternalId {
     type_: &'static str,

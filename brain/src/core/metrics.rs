@@ -4,8 +4,8 @@ const ITEM_TYPE: &str = "item_type";
 const ITEM_NAME: &str = "item_name";
 const OPERATION: &str = "operation";
 
-pub fn cache_hit_data_point_access(item: impl AsRef<support::ExternalId>) {
-    let ext_id: &support::ExternalId = item.as_ref();
+pub fn cache_hit_data_point_access(item: impl AsRef<crate::core::id::ExternalId>) {
+    let ext_id: &crate::core::id::ExternalId = item.as_ref();
 
     increment(
         "home_cache_hit",
@@ -17,8 +17,8 @@ pub fn cache_hit_data_point_access(item: impl AsRef<support::ExternalId>) {
     );
 }
 
-pub fn cache_miss_data_point_access(item: impl AsRef<support::ExternalId>) {
-    let ext_id: &support::ExternalId = item.as_ref();
+pub fn cache_miss_data_point_access(item: impl AsRef<crate::core::id::ExternalId>) {
+    let ext_id: &crate::core::id::ExternalId = item.as_ref();
 
     increment(
         "home_cache_miss",

@@ -6,7 +6,7 @@ use actix_web::{
     web::{self, Query},
 };
 use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
-use support::ValueObject;
+use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 
 use crate::{

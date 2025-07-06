@@ -4,7 +4,7 @@ use crate::t;
 use r#macro::Id;
 use crate::core::unit::DegreeCelsius;
 
-use support::ValueObject;
+use crate::core::ValueObject;
 
 use crate::home::state::macros::result;
 

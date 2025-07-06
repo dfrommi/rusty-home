@@ -1,8 +1,8 @@
+use crate::core::ValueObject;
+use crate::core::time::DateTimeRange;
+use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Context, Result, bail};
-use crate::core::ValueObject;
-use crate::t;
-use crate::core::time::DateTimeRange;
 
 use crate::home::state::macros::result;
 
@@ -17,6 +17,14 @@ pub enum Resident {
 
 impl ValueObject for Resident {
     type ValueType = bool;
+
+    fn to_f64(value: &Self::ValueType) -> f64 {
+        if *value { 1.0 } else { 0.0 }
+    }
+
+    fn from_f64(value: f64) -> Self::ValueType {
+        value > 0.0
+    }
 }
 
 //TODO maybe combination via Baysian to detect resident state

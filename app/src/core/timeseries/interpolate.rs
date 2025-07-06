@@ -1,14 +1,10 @@
-use crate::core::time::DateTime;
+use crate::core::{ValueObject, time::DateTime};
 
 use super::DataFrame;
 
-pub trait Estimatable
-where
-    Self::Type: Clone,
-{
-    type Type;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type>;
+pub trait Estimatable: ValueObject {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::ValueType>)
+    -> Option<Self::ValueType>;
 }
 
 pub mod algo {

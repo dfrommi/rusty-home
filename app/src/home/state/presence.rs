@@ -1,5 +1,5 @@
-use r#macro::Id;
 use crate::core::time::DateTime;
+use r#macro::Id;
 
 use crate::core::timeseries::{
     DataFrame,
@@ -20,9 +20,7 @@ pub enum Presence {
 }
 
 impl Estimatable for Presence {
-    type Type = bool;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
     }
 }

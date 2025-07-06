@@ -21,8 +21,14 @@ pub use incoming_data::process_incoming_data_source;
 use time::DateTime;
 use timeseries::DataPoint;
 
-pub trait ValueObject {
+pub trait ValueObject
+where
+    Self::ValueType: Clone,
+{
     type ValueType;
+
+    fn to_f64(value: &Self::ValueType) -> f64;
+    fn from_f64(value: f64) -> Self::ValueType;
 }
 
 #[derive(Debug, Clone, derive_more::From)]

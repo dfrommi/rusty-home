@@ -2,21 +2,21 @@ pub mod dataframe;
 pub mod datapoint;
 pub mod interpolate;
 
+use crate::core::time::{DateTime, DateTimeRange, Duration};
 pub use dataframe::DataFrame;
 pub use datapoint::DataPoint;
 use interpolate::Estimatable;
-use crate::core::time::{DateTime, DateTimeRange, Duration};
 
 use anyhow::{Result, bail};
 
 pub struct TimeSeries<T: Estimatable> {
     context: T,
-    values: DataFrame<T::Type>,
+    values: DataFrame<T::ValueType>,
     num_estimated: usize,
 }
 
 impl<C: Estimatable> TimeSeries<C> {
-    pub fn new(context: C, df: &DataFrame<C::Type>, range: DateTimeRange) -> Result<Self> {
+    pub fn new(context: C, df: &DataFrame<C::ValueType>, range: DateTimeRange) -> Result<Self> {
         //not using retain_range as it could lead to empty dataframe before interpolation
         let mut dps_in_range = df
             .iter()
@@ -52,11 +52,11 @@ impl<C: Estimatable> TimeSeries<C> {
         merge: F,
     ) -> Result<Self>
     where
-        F: Fn(&U::Type, &V::Type) -> C::Type,
+        F: Fn(&U::ValueType, &V::ValueType) -> C::ValueType,
         U: Estimatable,
         V: Estimatable,
     {
-        let mut dps: Vec<DataPoint<C::Type>> = Vec::new();
+        let mut dps: Vec<DataPoint<C::ValueType>> = Vec::new();
 
         for first_dp in first_series.values.iter() {
             if let Some(second_dp) = second_series.at(first_dp.timestamp) {
@@ -85,7 +85,7 @@ impl<C: Estimatable> TimeSeries<C> {
 
     pub fn reduce<F>(context: C, all_series: Vec<TimeSeries<C>>, reduce: F) -> Result<TimeSeries<C>>
     where
-        F: Fn(&C::Type, &C::Type) -> C::Type,
+        F: Fn(&C::ValueType, &C::ValueType) -> C::ValueType,
         C: Clone,
     {
         if all_series.is_empty() {
@@ -104,7 +104,7 @@ impl<C: Estimatable> TimeSeries<C> {
 
     pub fn map<T: Estimatable, F>(self, context: T, f: F) -> TimeSeries<T>
     where
-        F: Fn(&DataPoint<C::Type>) -> T::Type,
+        F: Fn(&DataPoint<C::ValueType>) -> T::ValueType,
         C: Clone,
     {
         TimeSeries::new(context, &self.values.map(f), self.range())
@@ -119,7 +119,7 @@ impl<C: Estimatable> TimeSeries<C> {
     }
 
     //linear interpolation or last seen
-    pub fn at(&self, at: DateTime) -> Option<DataPoint<C::Type>> {
+    pub fn at(&self, at: DateTime) -> Option<DataPoint<C::ValueType>> {
         Self::interpolate_or_guess(&self.context, at, &self.values).map(|v| DataPoint {
             timestamp: at,
             value: v,
@@ -129,8 +129,8 @@ impl<C: Estimatable> TimeSeries<C> {
     fn interpolate_or_guess(
         context: &C,
         at: DateTime,
-        data: &DataFrame<C::Type>,
-    ) -> Option<C::Type> {
+        data: &DataFrame<C::ValueType>,
+    ) -> Option<C::ValueType> {
         context
             .interpolate(at, data)
             //reconsider implicit last-seen. Needed to avoid empty time-series in some cases
@@ -140,7 +140,7 @@ impl<C: Estimatable> TimeSeries<C> {
 
 //DataFrame delegates
 impl<T: Estimatable> TimeSeries<T> {
-    pub fn inner(&self) -> &DataFrame<T::Type> {
+    pub fn inner(&self) -> &DataFrame<T::ValueType> {
         &self.values
     }
 
@@ -152,15 +152,15 @@ impl<T: Estimatable> TimeSeries<T> {
         self.values.range()
     }
 
-    pub fn first(&self) -> &DataPoint<T::Type> {
+    pub fn first(&self) -> &DataPoint<T::ValueType> {
         self.values.first()
     }
 
-    pub fn last(&self) -> &DataPoint<T::Type> {
+    pub fn last(&self) -> &DataPoint<T::ValueType> {
         self.values.last()
     }
 
-    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T::Type, Duration)>> {
+    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T::ValueType, Duration)>> {
         self.values.with_duration_until_next_dp()
     }
 }
@@ -170,10 +170,10 @@ impl<T: Estimatable> TimeSeries<T> {
 //interpolatable. Maybe introduce an area type.
 impl<T: Estimatable> TimeSeries<T>
 where
-    T::Type: From<f64>,
-    for<'a> &'a T::Type: Into<f64>,
+    T::ValueType: From<f64>,
+    for<'a> &'a T::ValueType: Into<f64>,
 {
-    pub fn mean(&self) -> T::Type {
+    pub fn mean(&self) -> T::ValueType {
         let (weighted_sum, total_duration) = self.weighted_sum_and_duration_in_type_hours();
 
         if total_duration == 0.0 {
@@ -216,7 +216,7 @@ where
         let mut iter = self.values.iter().map(|v| v.timestamp).peekable();
         while let Some(current_timestamp) = iter.next() {
             if let Some(next_timestamp) = iter.peek() {
-                let ref_value: T::Type = self
+                let ref_value: T::ValueType = self
                     .at(DateTime::midpoint(&current_timestamp, next_timestamp))
                     .expect("Unexpected error. Could not get value in the middle of two existing values")
                     .value;
@@ -242,8 +242,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::home::state::Temperature;
     use crate::core::unit::DegreeCelsius;
+    use crate::home::state::Temperature;
 
     #[test]
     fn test_mean() {
@@ -337,9 +337,9 @@ mod tests {
 
 #[cfg(test)]
 mod combined {
+    use crate::core::unit::{DegreeCelsius, Percent};
     use crate::home::state::DewPoint;
     use crate::home::state::{RelativeHumidity, Temperature};
-    use crate::core::unit::{DegreeCelsius, Percent};
 
     use super::*;
 

@@ -1,8 +1,8 @@
 use crate::core::timeseries::DataPoint;
+use crate::core::unit::DegreeCelsius;
 use crate::home::state::Temperature;
 use crate::t;
 use r#macro::Id;
-use crate::core::unit::DegreeCelsius;
 
 use crate::core::ValueObject;
 
@@ -20,6 +20,14 @@ pub enum AutomaticTemperatureIncrease {
 
 impl ValueObject for AutomaticTemperatureIncrease {
     type ValueType = bool;
+
+    fn to_f64(value: &Self::ValueType) -> f64 {
+        if *value { 1.0 } else { 0.0 }
+    }
+
+    fn from_f64(value: f64) -> Self::ValueType {
+        value > 0.0
+    }
 }
 
 //TODO detect active heating and summer mode

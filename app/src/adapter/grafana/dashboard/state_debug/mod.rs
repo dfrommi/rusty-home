@@ -140,14 +140,14 @@ async fn get_rows<T>(
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
     T: Estimatable + Clone + AsRef<ExternalId>,
-    T::Type: AsRef<f64>,
+    T::ValueType: AsRef<f64>,
 {
     let ts = api
         .series(item.clone(), time_range.range())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
-    let dps: Vec<DataPoint<<T>::Type>> = time_range
+    let dps: Vec<DataPoint<<T>::ValueType>> = time_range
         .iter()
         .filter_map(|t| ts.at(t))
         .collect::<Vec<_>>();

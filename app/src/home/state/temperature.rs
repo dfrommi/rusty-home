@@ -1,6 +1,6 @@
-use r#macro::{EnumVariants, Id};
-use crate::core::unit::DegreeCelsius;
 use crate::core::time::DateTime;
+use crate::core::unit::DegreeCelsius;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::{
     DataFrame,
@@ -21,9 +21,7 @@ pub enum Temperature {
 }
 
 impl Estimatable for Temperature {
-    type Type = DegreeCelsius;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<DegreeCelsius>) -> Option<DegreeCelsius> {
         algo::linear(at, df)
     }
 }

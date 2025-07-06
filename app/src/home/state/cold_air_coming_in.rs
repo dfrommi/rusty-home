@@ -1,7 +1,7 @@
-use crate::{core::timeseries::DataPoint, home::state::Temperature};
-use r#macro::Id;
 use crate::core::ValueObject;
 use crate::core::unit::DegreeCelsius;
+use crate::{core::timeseries::DataPoint, home::state::Temperature};
+use r#macro::Id;
 
 use crate::home::state::macros::result;
 
@@ -17,6 +17,14 @@ pub enum ColdAirComingIn {
 
 impl ValueObject for ColdAirComingIn {
     type ValueType = bool;
+
+    fn to_f64(value: &Self::ValueType) -> f64 {
+        if *value { 1.0 } else { 0.0 }
+    }
+
+    fn from_f64(value: f64) -> Self::ValueType {
+        value > 0.0
+    }
 }
 
 impl<T> DataPointAccess<ColdAirComingIn> for T

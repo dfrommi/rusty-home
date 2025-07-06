@@ -7,10 +7,10 @@ use super::*;
 use crate::home::state::{RelativeHumidity, Temperature};
 use anyhow::Result;
 
-use r#macro::{EnumVariants, Id};
 use crate::core::ValueObject;
-use crate::core::unit::{DegreeCelsius, Percent};
 use crate::core::time::{DateTime, DateTimeRange};
+use crate::core::unit::{DegreeCelsius, Percent};
+use r#macro::{EnumVariants, Id};
 use tokio::try_join;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
@@ -44,12 +44,18 @@ impl DewPoint {
 
 impl ValueObject for DewPoint {
     type ValueType = DegreeCelsius;
+
+    fn to_f64(value: &Self::ValueType) -> f64 {
+        value.into()
+    }
+
+    fn from_f64(value: f64) -> Self::ValueType {
+        value.into()
+    }
 }
 
 impl Estimatable for DewPoint {
-    type Type = DegreeCelsius;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<DegreeCelsius>) -> Option<DegreeCelsius> {
         interpolate::algo::linear(at, df)
     }
 }

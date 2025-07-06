@@ -12,12 +12,7 @@ use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange};
 use anyhow::{Context as _, Result, bail};
 use cached::proc_macro::cached;
-use derive_more::derive::AsRef;
 use sqlx::PgPool;
-
-#[derive(Debug, Clone, PartialEq, sqlx::Type, AsRef)]
-#[sqlx(transparent)]
-pub struct DbValue(f64);
 
 impl super::Database {
     fn ts_caching_range(&self) -> DateTimeRange {
@@ -31,7 +26,7 @@ impl super::Database {
         let tag_ids = get_all_tag_ids(&self.pool).await?;
 
         for tag_id in tag_ids {
-            if let Err(e) = self.get_default_dataframe::<DbValue>(tag_id).await {
+            if let Err(e) = self.get_default_dataframe(tag_id).await {
                 tracing::error!(
                     "Error preloading timeseries cache for tag {}: {:?}",
                     tag_id,
@@ -56,7 +51,7 @@ impl super::Database {
     ) -> Result<()> {
         let tags_id = get_tag_id(&self.pool, value.into(), true).await?;
 
-        let fvalue: DbValue = value.into();
+        let fvalue: f64 = value.into();
 
         sqlx::query!(
             r#"WITH latest_value AS (
@@ -70,7 +65,7 @@ impl super::Database {
             SELECT $1, $2, $3
             WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
             tags_id as i32,
-            fvalue.as_ref(),
+            fvalue,
             timestamp.into_db()
         )
         .execute(&self.pool)
@@ -83,7 +78,6 @@ impl super::Database {
 impl<T> DataPointAccess<T> for super::Database
 where
     T: Into<PersistentState> + ValueObject + Debug + Clone,
-    T::ValueType: From<DbValue> + Clone,
 {
     async fn current_data_point(
         &self,
@@ -92,10 +86,10 @@ where
         let channel: PersistentState = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
-        let df: DataFrame<T::ValueType> = self.get_default_dataframe(tag_id).await?;
+        let df: DataFrame<f64> = self.get_default_dataframe(tag_id).await?;
 
         match df.prev_or_at(t!(now)) {
-            Some(dp) => Ok(dp.clone()),
+            Some(dp) => Ok(dp.map_value(|&v| T::from_f64(v))),
             None => anyhow::bail!("No data found"),
         }
     }
@@ -104,14 +98,16 @@ where
 impl<T> TimeSeriesAccess<T> for super::Database
 where
     T: Into<PersistentState> + Estimatable + Clone + Debug,
-    T::Type: From<DbValue>,
 {
     #[tracing::instrument(skip(self))]
     async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
         let channel: PersistentState = item.clone().into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
-        let df = self.get_default_dataframe(tag_id).await?;
+        let df = self
+            .get_default_dataframe(tag_id)
+            .await?
+            .map(|dp| T::from_f64(dp.value));
 
         if range.start() < df.range().start() {
             tracing::warn!(
@@ -120,8 +116,10 @@ where
                 &range
             );
 
-            let df = query_dataframe(&self.pool, tag_id, &range).await?;
-            return TimeSeries::new(item, &From::from(&df), range);
+            let df = query_dataframe(&self.pool, tag_id, &range)
+                .await?
+                .map(|dp| T::from_f64(dp.value));
+            return TimeSeries::new(item, &df, range);
         }
 
         TimeSeries::new(item, &df, range)
@@ -135,7 +133,7 @@ impl super::Database {
     ) -> anyhow::Result<Vec<DataPoint<PersistentStateValue>>> {
         let recs = sqlx::query!(
             r#"SELECT 
-                THING_VALUE.value as "value!: DbValue", 
+                THING_VALUE.value as "value!: f64", 
                 THING_VALUE.timestamp, 
                 THING_VALUE_TAG.channel, 
                 THING_VALUE_TAG.name
@@ -177,10 +175,7 @@ impl super::Database {
     }
 
     //try to return reference or at least avoid copy of entire dataframe
-    async fn get_default_dataframe<T>(&self, tag_id: i64) -> anyhow::Result<DataFrame<T>>
-    where
-        T: From<DbValue> + Clone, //TODO remove clone, use ref
-    {
+    async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
         let df = self
             .ts_cache
             .try_get_with(tag_id, async {
@@ -196,7 +191,7 @@ impl super::Database {
             .await;
 
         match df {
-            Ok(df) => Ok(df.map(|dp| From::from(dp.value.clone()))),
+            Ok(df) => Ok(df.map(|dp| dp.value)),
             Err(e) => bail!(
                 "Error refreshing timeseries cache for tag {}: {:?}",
                 tag_id,
@@ -274,10 +269,10 @@ async fn query_dataframe(
     pool: &sqlx::PgPool,
     tag_id: i64,
     range: &DateTimeRange,
-) -> anyhow::Result<DataFrame<DbValue>> {
+) -> anyhow::Result<DataFrame<f64>> {
     //TODO rewrite to max query
     let rec = sqlx::query!(
-        r#"(SELECT value as "value!: DbValue", timestamp
+        r#"(SELECT value as "value!: f64", timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp >= $2
@@ -307,7 +302,7 @@ async fn query_dataframe(
     .fetch_all(pool)
     .await?;
 
-    let dps: Vec<DataPoint<DbValue>> = rec
+    let dps: Vec<DataPoint<f64>> = rec
         .into_iter()
         .map(|row| DataPoint {
             value: row.value,
@@ -324,145 +319,4 @@ async fn get_all_tag_ids(pool: &sqlx::PgPool) -> anyhow::Result<Vec<i64>> {
         .await?;
 
     Ok(rec.into_iter().map(|row| row.id as i64).collect())
-}
-
-//TODO inline and make generic to only convert to/from f64
-mod mapper {
-    use crate::core::unit::*;
-
-    use crate::home::state::{FanAirflow, FanSpeed};
-
-    use super::DbValue;
-
-    impl From<&bool> for DbValue {
-        fn from(value: &bool) -> Self {
-            DbValue(if *value { 1.0 } else { 0.0 })
-        }
-    }
-
-    impl From<DbValue> for bool {
-        fn from(value: DbValue) -> Self {
-            value.0 > 0.0
-        }
-    }
-
-    impl From<&DegreeCelsius> for DbValue {
-        fn from(value: &DegreeCelsius) -> Self {
-            DbValue(*value.as_ref())
-        }
-    }
-
-    impl From<DbValue> for DegreeCelsius {
-        fn from(value: DbValue) -> Self {
-            value.0.into()
-        }
-    }
-
-    impl From<&Percent> for DbValue {
-        fn from(value: &Percent) -> Self {
-            DbValue(value.0)
-        }
-    }
-
-    impl From<DbValue> for Percent {
-        fn from(value: DbValue) -> Self {
-            Self(value.0)
-        }
-    }
-
-    impl From<&Watt> for DbValue {
-        fn from(value: &Watt) -> Self {
-            DbValue(value.0)
-        }
-    }
-
-    impl From<DbValue> for Watt {
-        fn from(value: DbValue) -> Self {
-            Self(value.0)
-        }
-    }
-
-    impl From<&KiloWattHours> for DbValue {
-        fn from(value: &KiloWattHours) -> Self {
-            DbValue(value.0)
-        }
-    }
-
-    impl From<DbValue> for KiloWattHours {
-        fn from(value: DbValue) -> Self {
-            Self(value.0)
-        }
-    }
-
-    impl From<&KiloCubicMeter> for DbValue {
-        fn from(value: &KiloCubicMeter) -> Self {
-            DbValue(value.0)
-        }
-    }
-
-    impl From<DbValue> for KiloCubicMeter {
-        fn from(value: DbValue) -> Self {
-            Self(value.0)
-        }
-    }
-
-    impl From<&HeatingUnit> for DbValue {
-        fn from(value: &HeatingUnit) -> Self {
-            DbValue(value.0)
-        }
-    }
-
-    impl From<DbValue> for HeatingUnit {
-        fn from(value: DbValue) -> Self {
-            Self(value.0)
-        }
-    }
-
-    impl From<&FanAirflow> for DbValue {
-        fn from(value: &FanAirflow) -> Self {
-            let f_value = match value {
-                FanAirflow::Off => 0.0,
-                FanAirflow::Forward(FanSpeed::Silent) => 1.0,
-                FanAirflow::Forward(FanSpeed::Low) => 2.0,
-                FanAirflow::Forward(FanSpeed::Medium) => 3.0,
-                FanAirflow::Forward(FanSpeed::High) => 4.0,
-                FanAirflow::Forward(FanSpeed::Turbo) => 5.0,
-                FanAirflow::Reverse(FanSpeed::Silent) => -1.0,
-                FanAirflow::Reverse(FanSpeed::Low) => -2.0,
-                FanAirflow::Reverse(FanSpeed::Medium) => -3.0,
-                FanAirflow::Reverse(FanSpeed::High) => -4.0,
-                FanAirflow::Reverse(FanSpeed::Turbo) => -5.0,
-            };
-
-            DbValue(f_value)
-        }
-    }
-
-    impl From<DbValue> for FanAirflow {
-        fn from(value: DbValue) -> Self {
-            if value.0 < -4.0 {
-                FanAirflow::Reverse(FanSpeed::Turbo)
-            } else if value.0 < -3.0 {
-                FanAirflow::Reverse(FanSpeed::High)
-            } else if value.0 < -2.0 {
-                FanAirflow::Reverse(FanSpeed::Medium)
-            } else if value.0 < -1.0 {
-                FanAirflow::Reverse(FanSpeed::Low)
-            } else if value.0 < 0.0 {
-                FanAirflow::Reverse(FanSpeed::Silent)
-            } else if value.0 > 4.0 {
-                FanAirflow::Forward(FanSpeed::Turbo)
-            } else if value.0 > 3.0 {
-                FanAirflow::Forward(FanSpeed::High)
-            } else if value.0 > 2.0 {
-                FanAirflow::Forward(FanSpeed::Medium)
-            } else if value.0 > 1.0 {
-                FanAirflow::Forward(FanSpeed::Low)
-            } else if value.0 > 0.0 {
-                FanAirflow::Forward(FanSpeed::Silent)
-            } else {
-                FanAirflow::Off
-            }
-        }
-    }
 }

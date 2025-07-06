@@ -1,6 +1,6 @@
-use r#macro::{EnumVariants, Id};
-use crate::core::unit::KiloWattHours;
 use crate::core::time::DateTime;
+use crate::core::unit::KiloWattHours;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::{
     DataFrame,
@@ -29,9 +29,7 @@ pub enum TotalEnergyConsumption {
 }
 
 impl Estimatable for TotalEnergyConsumption {
-    type Type = KiloWattHours;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<KiloWattHours>) -> Option<KiloWattHours> {
         algo::linear(at, df)
     }
 }

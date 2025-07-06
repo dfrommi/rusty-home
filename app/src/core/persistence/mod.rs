@@ -5,8 +5,6 @@ mod planning_trace;
 mod state;
 mod trigger;
 
-pub use state::DbValue;
-
 use std::sync::Arc;
 
 use crate::core::time::{DateTime, Duration};
@@ -20,7 +18,7 @@ use super::timeseries::DataFrame;
 pub struct Database {
     pub pool: sqlx::PgPool,
     ts_cache_duration: Duration,
-    ts_cache: Cache<i64, Arc<DataFrame<DbValue>>>,
+    ts_cache: Cache<i64, Arc<DataFrame<f64>>>,
     cmd_cache_duration: Duration,
     cmd_cache: Cache<CommandTarget, Arc<(DateTime, Vec<CommandExecution>)>>,
 }

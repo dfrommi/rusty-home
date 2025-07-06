@@ -48,8 +48,8 @@ pub use total_radiator_consumption::TotalRadiatorConsumption;
 pub use total_water_consumption::TotalWaterConsumption;
 pub use user_controlled::UserControlled;
 
-use crate::core::unit::*;
-use crate::{core::persistence::DbValue, port::*};
+use crate::core::{ValueObject, unit::*};
+use crate::port::*;
 use r#macro::{DbMapped, PersistentStateDerive};
 
 #[derive(Debug, Clone, PersistentStateDerive, DbMapped)]
@@ -92,19 +92,27 @@ impl PersistentStateValue {
 impl From<&PersistentStateValue> for f64 {
     fn from(val: &PersistentStateValue) -> Self {
         match val {
-            PersistentStateValue::Temperature(_, value) => value.into(),
-            PersistentStateValue::RelativeHumidity(_, value) => value.into(),
-            PersistentStateValue::Opened(_, value) => bool_to_f64(*value),
-            PersistentStateValue::Powered(_, value) => bool_to_f64(*value),
-            PersistentStateValue::CurrentPowerUsage(_, value) => value.into(),
-            PersistentStateValue::TotalEnergyConsumption(_, value) => value.into(),
-            PersistentStateValue::SetPoint(_, value) => value.into(),
-            PersistentStateValue::HeatingDemand(_, value) => value.into(),
-            PersistentStateValue::ExternalAutoControl(_, value) => bool_to_f64(*value),
-            PersistentStateValue::Presence(_, value) => bool_to_f64(*value),
-            PersistentStateValue::TotalRadiatorConsumption(_, value) => value.into(),
-            PersistentStateValue::TotalWaterConsumption(_, value) => value.into(),
-            PersistentStateValue::FanActivity(_, value) => value.into(),
+            PersistentStateValue::Temperature(_, value) => Temperature::to_f64(value),
+            PersistentStateValue::RelativeHumidity(_, value) => RelativeHumidity::to_f64(value),
+            PersistentStateValue::Opened(_, value) => Opened::to_f64(value),
+            PersistentStateValue::Powered(_, value) => Powered::to_f64(value),
+            PersistentStateValue::CurrentPowerUsage(_, value) => CurrentPowerUsage::to_f64(value),
+            PersistentStateValue::TotalEnergyConsumption(_, value) => {
+                TotalEnergyConsumption::to_f64(value)
+            }
+            PersistentStateValue::SetPoint(_, value) => SetPoint::to_f64(value),
+            PersistentStateValue::HeatingDemand(_, value) => HeatingDemand::to_f64(value),
+            PersistentStateValue::ExternalAutoControl(_, value) => {
+                ExternalAutoControl::to_f64(value)
+            }
+            PersistentStateValue::Presence(_, value) => Presence::to_f64(value),
+            PersistentStateValue::TotalRadiatorConsumption(_, value) => {
+                TotalRadiatorConsumption::to_f64(value)
+            }
+            PersistentStateValue::TotalWaterConsumption(_, value) => {
+                TotalWaterConsumption::to_f64(value)
+            }
+            PersistentStateValue::FanActivity(_, value) => FanActivity::to_f64(value),
         }
     }
 }
@@ -114,87 +122,55 @@ impl From<(PersistentState, f64)> for PersistentStateValue {
         let (channel, value) = val;
         match channel {
             PersistentState::Temperature(item) => {
-                PersistentStateValue::Temperature(item, value.into())
+                PersistentStateValue::Temperature(item, Temperature::from_f64(value))
             }
             PersistentState::RelativeHumidity(item) => {
-                PersistentStateValue::RelativeHumidity(item, value.into())
+                PersistentStateValue::RelativeHumidity(item, RelativeHumidity::from_f64(value))
             }
-            PersistentState::Opened(item) => PersistentStateValue::Opened(item, f64_to_bool(value)),
+            PersistentState::Opened(item) => {
+                PersistentStateValue::Opened(item, Opened::from_f64(value))
+            }
             PersistentState::Powered(item) => {
-                PersistentStateValue::Powered(item, f64_to_bool(value))
+                PersistentStateValue::Powered(item, Powered::from_f64(value))
             }
             PersistentState::CurrentPowerUsage(item) => {
-                PersistentStateValue::CurrentPowerUsage(item, value.into())
+                PersistentStateValue::CurrentPowerUsage(item, CurrentPowerUsage::from_f64(value))
             }
             PersistentState::TotalEnergyConsumption(item) => {
-                PersistentStateValue::TotalEnergyConsumption(item, value.into())
+                PersistentStateValue::TotalEnergyConsumption(
+                    item,
+                    TotalEnergyConsumption::from_f64(value),
+                )
             }
-            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, value.into()),
+            PersistentState::SetPoint(item) => {
+                PersistentStateValue::SetPoint(item, SetPoint::from_f64(value))
+            }
             PersistentState::HeatingDemand(item) => {
-                PersistentStateValue::HeatingDemand(item, value.into())
+                PersistentStateValue::HeatingDemand(item, HeatingDemand::from_f64(value))
             }
             PersistentState::ExternalAutoControl(item) => {
-                PersistentStateValue::ExternalAutoControl(item, f64_to_bool(value))
+                PersistentStateValue::ExternalAutoControl(
+                    item,
+                    ExternalAutoControl::from_f64(value),
+                )
             }
             PersistentState::Presence(item) => {
-                PersistentStateValue::Presence(item, f64_to_bool(value))
+                PersistentStateValue::Presence(item, Presence::from_f64(value))
             }
             PersistentState::TotalRadiatorConsumption(item) => {
-                PersistentStateValue::TotalRadiatorConsumption(item, value.into())
+                PersistentStateValue::TotalRadiatorConsumption(
+                    item,
+                    TotalRadiatorConsumption::from_f64(value),
+                )
             }
             PersistentState::TotalWaterConsumption(item) => {
-                PersistentStateValue::TotalWaterConsumption(item, value.into())
+                PersistentStateValue::TotalWaterConsumption(
+                    item,
+                    TotalWaterConsumption::from_f64(value),
+                )
             }
             PersistentState::FanActivity(item) => {
-                PersistentStateValue::FanActivity(item, value.into())
-            }
-        }
-    }
-}
-
-fn bool_to_f64(value: bool) -> f64 {
-    if value { 1.0 } else { 0.0 }
-}
-
-fn f64_to_bool(value: f64) -> bool {
-    value > 0.0
-}
-
-//TODO macro
-impl From<(PersistentState, DbValue)> for PersistentStateValue {
-    fn from(val: (PersistentState, DbValue)) -> Self {
-        let (channel, value) = val;
-        match channel {
-            PersistentState::Temperature(item) => {
-                PersistentStateValue::Temperature(item, value.into())
-            }
-            PersistentState::RelativeHumidity(item) => {
-                PersistentStateValue::RelativeHumidity(item, value.into())
-            }
-            PersistentState::Opened(item) => PersistentStateValue::Opened(item, value.into()),
-            PersistentState::Powered(item) => PersistentStateValue::Powered(item, value.into()),
-            PersistentState::CurrentPowerUsage(item) => {
-                PersistentStateValue::CurrentPowerUsage(item, value.into())
-            }
-            PersistentState::TotalEnergyConsumption(item) => {
-                PersistentStateValue::TotalEnergyConsumption(item, value.into())
-            }
-            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, value.into()),
-            PersistentState::HeatingDemand(item) => {
-                PersistentStateValue::HeatingDemand(item, value.into())
-            }
-            PersistentState::ExternalAutoControl(item) => {
-                PersistentStateValue::ExternalAutoControl(item, value.into())
-            }
-            PersistentState::Presence(item) => PersistentStateValue::Presence(item, value.into()),
-            PersistentState::TotalRadiatorConsumption(item) => {
-                PersistentStateValue::TotalRadiatorConsumption(item, value.into())
-            }
-            PersistentState::TotalWaterConsumption(item) => {
-                PersistentStateValue::TotalWaterConsumption(item, value.into())
-            }
-            PersistentState::FanActivity(item) => {
-                PersistentStateValue::FanActivity(item, value.into())
+                PersistentStateValue::FanActivity(item, FanActivity::from_f64(value))
             }
         }
     }

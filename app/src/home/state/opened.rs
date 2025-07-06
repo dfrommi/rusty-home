@@ -1,6 +1,6 @@
+use crate::core::ValueObject;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
-use crate::core::ValueObject;
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -36,6 +36,14 @@ pub mod raw {
 
 impl ValueObject for Opened {
     type ValueType = bool;
+
+    fn to_f64(value: &Self::ValueType) -> f64 {
+        if *value { 1.0 } else { 0.0 }
+    }
+
+    fn from_f64(value: f64) -> Self::ValueType {
+        value > 0.0
+    }
 }
 
 impl Opened {
@@ -114,17 +122,13 @@ where
 }
 
 impl Estimatable for raw::Opened {
-    type Type = bool;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
     }
 }
 
 impl Estimatable for Opened {
-    type Type = bool;
-
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
     }
 }

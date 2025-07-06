@@ -1,9 +1,9 @@
-use crate::home::command::{Command, CommandTarget, Fan};
-use crate::home::state::{ChannelValue, FanActivity, FanAirflow, FanSpeed};
-use serde_json::json;
-use crate::t;
 use crate::core::time::Duration;
 use crate::core::unit::DegreeCelsius;
+use crate::home::command::{Command, CommandTarget, Fan};
+use crate::home::state::{FanActivity, FanAirflow, FanSpeed, PersistentStateValue};
+use crate::t;
+use serde_json::json;
 
 use super::{HaHttpClient, HaServiceTarget};
 use crate::{Database, core::CommandExecutor};
@@ -220,7 +220,7 @@ impl HaCommandExecutor {
         //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
         self.db
             .add_state(
-                &ChannelValue::FanActivity(channel, airflow.clone()),
+                &PersistentStateValue::FanActivity(channel, airflow.clone()),
                 &t!(now),
             )
             .await?;

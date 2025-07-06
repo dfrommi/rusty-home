@@ -1,15 +1,17 @@
 use std::{cmp::Ordering, sync::Arc};
 
+use crate::core::id::ExternalId;
+use crate::core::time::DateTime;
 use crate::{
     core::timeseries::DataPoint,
-    home::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption},
+    home::state::{
+        HeatingDemand, PersistentState, RelativeHumidity, Temperature, TotalEnergyConsumption,
+    },
 };
 use actix_web::{
     Responder,
     web::{self, Query},
 };
-use crate::core::id::ExternalId;
-use crate::core::time::DateTime;
 
 use crate::{
     adapter::grafana::{GrafanaApiError, support::csv_response},
@@ -106,14 +108,18 @@ where
         + TimeSeriesAccess<RelativeHumidity>,
 {
     let external_id = ExternalId::new(path.0.as_str(), path.1.as_str());
-    let channel = Channel::try_from(&external_id)
+    let channel = PersistentState::try_from(&external_id)
         .map_err(|_| GrafanaApiError::ChannelNotFound(external_id.clone()))?;
 
     let mut rows = match channel {
-        Channel::Temperature(item) => get_rows(item, api.as_ref(), &time_range).await?,
-        Channel::RelativeHumidity(item) => get_rows(item, api.as_ref(), &time_range).await?,
-        Channel::TotalEnergyConsumption(item) => get_rows(item, api.as_ref(), &time_range).await?,
-        Channel::HeatingDemand(item) => get_rows(item, api.as_ref(), &time_range).await?,
+        PersistentState::Temperature(item) => get_rows(item, api.as_ref(), &time_range).await?,
+        PersistentState::RelativeHumidity(item) => {
+            get_rows(item, api.as_ref(), &time_range).await?
+        }
+        PersistentState::TotalEnergyConsumption(item) => {
+            get_rows(item, api.as_ref(), &time_range).await?
+        }
+        PersistentState::HeatingDemand(item) => get_rows(item, api.as_ref(), &time_range).await?,
         _ => {
             return Err(GrafanaApiError::ChannelUnsupported(external_id));
         }

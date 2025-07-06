@@ -1,13 +1,13 @@
 mod db_mapped;
 mod enum_variants;
 mod id_item;
-mod state_channel_derive;
+mod persistent_state_derive;
 
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(StateChannel)]
+#[proc_macro_derive(PersistentStateDerive)]
 pub fn state_channel_derive(input: TokenStream) -> TokenStream {
-    state_channel_derive::derive(input)
+    persistent_state_derive::derive(input)
 }
 
 #[proc_macro_derive(DbMapped)]

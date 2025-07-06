@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use crate::core::timeseries::DataPoint;
+use crate::core::unit::DegreeCelsius;
 use crate::home::command::{Command, CommandSource, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
-use crate::core::unit::DegreeCelsius;
 
 use crate::{Database, core::planner::SimpleAction};
 

@@ -2,18 +2,18 @@ use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     core::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable},
-    home::state::{Channel, ChannelValue},
+    home::state::{PersistentState, PersistentStateValue},
     port::{DataPointAccess, TimeSeriesAccess},
     t,
 };
 
+use crate::core::ValueObject;
+use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange};
 use anyhow::{Context as _, Result, bail};
 use cached::proc_macro::cached;
 use derive_more::derive::AsRef;
 use sqlx::PgPool;
-use crate::core::id::ExternalId;
-use crate::core::ValueObject;
 
 #[derive(Debug, Clone, PartialEq, sqlx::Type, AsRef)]
 #[sqlx(transparent)]
@@ -49,7 +49,11 @@ impl super::Database {
         self.ts_cache.invalidate(&tag_id).await;
     }
 
-    pub async fn add_state(&self, value: &ChannelValue, timestamp: &DateTime) -> Result<()> {
+    pub async fn add_state(
+        &self,
+        value: &PersistentStateValue,
+        timestamp: &DateTime,
+    ) -> Result<()> {
         let tags_id = get_tag_id(&self.pool, value.into(), true).await?;
 
         let fvalue: DbValue = value.into();
@@ -78,14 +82,14 @@ impl super::Database {
 
 impl<T> DataPointAccess<T> for super::Database
 where
-    T: Into<Channel> + ValueObject + Debug + Clone,
+    T: Into<PersistentState> + ValueObject + Debug + Clone,
     T::ValueType: From<DbValue> + Clone,
 {
     async fn current_data_point(
         &self,
         item: T,
     ) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
-        let channel: Channel = item.into();
+        let channel: PersistentState = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
         let df: DataFrame<T::ValueType> = self.get_default_dataframe(tag_id).await?;
@@ -99,12 +103,12 @@ where
 
 impl<T> TimeSeriesAccess<T> for super::Database
 where
-    T: Into<Channel> + Estimatable + Clone + Debug,
+    T: Into<PersistentState> + Estimatable + Clone + Debug,
     T::Type: From<DbValue>,
 {
     #[tracing::instrument(skip(self))]
     async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
-        let channel: Channel = item.clone().into();
+        let channel: PersistentState = item.clone().into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
         let df = self.get_default_dataframe(tag_id).await?;
@@ -128,7 +132,7 @@ impl super::Database {
     pub async fn get_all_data_points_in_range(
         &self,
         range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<ChannelValue>>> {
+    ) -> anyhow::Result<Vec<DataPoint<PersistentStateValue>>> {
         let recs = sqlx::query!(
             r#"SELECT 
                 THING_VALUE.value as "value!: DbValue", 
@@ -146,14 +150,14 @@ impl super::Database {
         .fetch_all(&self.pool)
         .await?;
 
-        let dps: Vec<DataPoint<ChannelValue>> = recs
+        let dps: Vec<DataPoint<PersistentStateValue>> = recs
             .into_iter()
             .filter_map(|row| {
                 let external_id = ExternalId::new(row.channel.as_str(), row.name.as_str());
 
-                match Channel::try_from(external_id) {
+                match PersistentState::try_from(external_id) {
                     Ok(target) => Some(DataPoint {
-                        value: ChannelValue::from((target, row.value)),
+                        value: PersistentStateValue::from((target, row.value)),
                         timestamp: row.timestamp.into(),
                     }),
                     Err(e) => {
@@ -202,10 +206,14 @@ impl super::Database {
     }
 }
 
-#[cached(result = true, key = "Channel", convert = r#"{ channel.clone() }"#)]
+#[cached(
+    result = true,
+    key = "PersistentState",
+    convert = r#"{ channel.clone() }"#
+)]
 pub async fn get_tag_id(
     db_pool: &PgPool,
-    channel: Channel,
+    channel: PersistentState,
     create_if_missing: bool,
 ) -> anyhow::Result<i64> {
     let id: &ExternalId = channel.as_ref();

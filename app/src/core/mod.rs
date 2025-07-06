@@ -11,7 +11,7 @@ pub mod unit;
 
 use std::collections::HashMap;
 
-use crate::home::state::ChannelValue;
+use crate::home::state::PersistentStateValue;
 use crate::home::trigger::UserTrigger;
 pub use command::CommandExecutor;
 pub use command::execute_commands;
@@ -27,7 +27,7 @@ pub trait ValueObject {
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {
-    StateValue(DataPoint<ChannelValue>),
+    StateValue(DataPoint<PersistentStateValue>),
     UserTrigger(UserTrigger),
     ItemAvailability(ItemAvailability),
 }

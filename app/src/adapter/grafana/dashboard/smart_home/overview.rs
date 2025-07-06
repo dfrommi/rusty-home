@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::home::command::{Command, CommandSource};
+use crate::home::state::PersistentState;
 use actix_web::{HttpResponse, http::header, web};
 use anyhow::Context;
-use crate::home::state::Channel;
 use infrastructure::TraceContext;
 
 use crate::{
@@ -211,7 +211,7 @@ async fn get_states(
     states.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     let rows = states.into_iter().map(|dp| {
-        let target = Channel::from(&dp.value);
+        let target = PersistentState::from(&dp.value);
 
         Row {
             timestamp: dp.timestamp.to_human_readable(),

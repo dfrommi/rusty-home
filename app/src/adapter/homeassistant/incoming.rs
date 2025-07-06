@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
+use crate::core::unit::{DegreeCelsius, Percent};
 use crate::{
     core::{time::DateTime, timeseries::DataPoint},
-    home::state::{ChannelValue, FanAirflow},
+    home::state::{FanAirflow, PersistentStateValue},
 };
 use anyhow::bail;
-use crate::core::unit::{DegreeCelsius, Percent};
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};
@@ -109,21 +109,25 @@ fn to_persistent_data_point(
     let dp: Option<IncomingData> = match channel {
         HaChannel::Temperature(channel) => Some(
             DataPoint::new(
-                ChannelValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
+                PersistentStateValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
                 timestamp,
             )
             .into(),
         ),
         HaChannel::RelativeHumidity(channel) => Some(
             DataPoint::new(
-                ChannelValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
+                PersistentStateValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
                 timestamp,
             )
             .into(),
         ),
-        HaChannel::Powered(channel) => {
-            Some(DataPoint::new(ChannelValue::Powered(channel, ha_value == "on"), timestamp).into())
-        }
+        HaChannel::Powered(channel) => Some(
+            DataPoint::new(
+                PersistentStateValue::Powered(channel, ha_value == "on"),
+                timestamp,
+            )
+            .into(),
+        ),
         HaChannel::SetPoint(channel) => {
             let v = match (
                 ha_value,
@@ -136,7 +140,7 @@ fn to_persistent_data_point(
 
             Some(
                 DataPoint::new(
-                    ChannelValue::SetPoint(channel, DegreeCelsius::from(v)),
+                    PersistentStateValue::SetPoint(channel, DegreeCelsius::from(v)),
                     timestamp,
                 )
                 .into(),
@@ -144,24 +148,28 @@ fn to_persistent_data_point(
         }
         HaChannel::HeatingDemand(channel) => Some(
             DataPoint::new(
-                ChannelValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
+                PersistentStateValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
                 timestamp,
             )
             .into(),
         ),
         HaChannel::ClimateAutoMode(channel) => Some(
             DataPoint::new(
-                ChannelValue::ExternalAutoControl(channel, ha_value == "auto"),
+                PersistentStateValue::ExternalAutoControl(channel, ha_value == "auto"),
                 timestamp,
             )
             .into(),
         ),
         HaChannel::PresenceFromEsp(channel) => Some(
-            DataPoint::new(ChannelValue::Presence(channel, ha_value == "on"), timestamp).into(),
+            DataPoint::new(
+                PersistentStateValue::Presence(channel, ha_value == "on"),
+                timestamp,
+            )
+            .into(),
         ),
         HaChannel::PresenceFromDeviceTracker(channel) => Some(
             DataPoint::new(
-                ChannelValue::Presence(channel, ha_value == "home"),
+                PersistentStateValue::Presence(channel, ha_value == "home"),
                 timestamp,
             )
             .into(),
@@ -194,7 +202,7 @@ fn to_persistent_data_point(
             if ha_value == "off" {
                 Some(
                     DataPoint::new(
-                        ChannelValue::FanActivity(channel, FanAirflow::Off),
+                        PersistentStateValue::FanActivity(channel, FanAirflow::Off),
                         timestamp,
                     )
                     .into(),

@@ -1,13 +1,13 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Get the name of the input enum, e.g., ChannelValue
     let name = input.ident;
-    let target_enum_name = format_ident!("Channel");
+    let target_enum_name = format_ident!("PersistentState");
     let variants = super::enum_variants(input.data);
 
     // Collect the Channel enum variants and the implementations

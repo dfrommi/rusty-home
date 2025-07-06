@@ -1,9 +1,9 @@
 use crate::core::time::DateTime;
+use crate::core::unit::{KiloWattHours, Watt};
 use crate::t;
-use crate::{core::timeseries::DataPoint, home::state::ChannelValue};
+use crate::{core::timeseries::DataPoint, home::state::PersistentStateValue};
 use anyhow::bail;
 use infrastructure::MqttInMessage;
-use crate::core::unit::{KiloWattHours, Watt};
 use tokio::sync::mpsc;
 
 use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};
@@ -79,7 +79,7 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
                         DataPoint::new(
-                            ChannelValue::CurrentPowerUsage(
+                            PersistentStateValue::CurrentPowerUsage(
                                 power.clone(),
                                 Watt(energy_report.power),
                             ),
@@ -87,7 +87,7 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                         )
                         .into(),
                         DataPoint::new(
-                            ChannelValue::TotalEnergyConsumption(
+                            PersistentStateValue::TotalEnergyConsumption(
                                 energy.clone(),
                                 KiloWattHours(energy_report.total),
                             ),
@@ -115,12 +115,18 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(ChannelValue::Powered(powered.clone(), true), t!(now))
-                            .into(),
+                        DataPoint::new(
+                            PersistentStateValue::Powered(powered.clone(), true),
+                            t!(now),
+                        )
+                        .into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(ChannelValue::Powered(powered.clone(), false), t!(now))
-                            .into(),
+                        DataPoint::new(
+                            PersistentStateValue::Powered(powered.clone(), false),
+                            t!(now),
+                        )
+                        .into(),
                     ]),
                     _ => bail!(
                         "Unexpected payload for PowerToggle {}: {}",

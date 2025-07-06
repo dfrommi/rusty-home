@@ -48,12 +48,12 @@ pub use total_radiator_consumption::TotalRadiatorConsumption;
 pub use total_water_consumption::TotalWaterConsumption;
 pub use user_controlled::UserControlled;
 
-use crate::{core::persistence::DbValue, port::*};
-use r#macro::{DbMapped, StateChannel};
 use crate::core::unit::*;
+use crate::{core::persistence::DbValue, port::*};
+use r#macro::{DbMapped, PersistentStateDerive};
 
-#[derive(Debug, Clone, StateChannel, DbMapped)]
-pub enum ChannelValue {
+#[derive(Debug, Clone, PersistentStateDerive, DbMapped)]
+pub enum PersistentStateValue {
     Temperature(Temperature, DegreeCelsius),
     RelativeHumidity(RelativeHumidity, Percent),
     Opened(OpenedRaw, bool),
@@ -69,52 +69,62 @@ pub enum ChannelValue {
     FanActivity(FanActivity, FanAirflow),
 }
 
-impl ChannelValue {
+impl PersistentStateValue {
     pub fn value_to_string(&self) -> String {
         match self {
-            ChannelValue::Temperature(_, value) => value.to_string(),
-            ChannelValue::RelativeHumidity(_, value) => value.to_string(),
-            ChannelValue::Opened(_, value) => value.to_string(),
-            ChannelValue::Powered(_, value) => value.to_string(),
-            ChannelValue::CurrentPowerUsage(_, value) => value.to_string(),
-            ChannelValue::TotalEnergyConsumption(_, value) => value.to_string(),
-            ChannelValue::SetPoint(_, value) => value.to_string(),
-            ChannelValue::HeatingDemand(_, value) => value.to_string(),
-            ChannelValue::ExternalAutoControl(_, value) => value.to_string(),
-            ChannelValue::Presence(_, value) => value.to_string(),
-            ChannelValue::TotalRadiatorConsumption(_, value) => value.to_string(),
-            ChannelValue::TotalWaterConsumption(_, value) => value.to_string(),
-            ChannelValue::FanActivity(_, value) => value.to_string(),
+            PersistentStateValue::Temperature(_, value) => value.to_string(),
+            PersistentStateValue::RelativeHumidity(_, value) => value.to_string(),
+            PersistentStateValue::Opened(_, value) => value.to_string(),
+            PersistentStateValue::Powered(_, value) => value.to_string(),
+            PersistentStateValue::CurrentPowerUsage(_, value) => value.to_string(),
+            PersistentStateValue::TotalEnergyConsumption(_, value) => value.to_string(),
+            PersistentStateValue::SetPoint(_, value) => value.to_string(),
+            PersistentStateValue::HeatingDemand(_, value) => value.to_string(),
+            PersistentStateValue::ExternalAutoControl(_, value) => value.to_string(),
+            PersistentStateValue::Presence(_, value) => value.to_string(),
+            PersistentStateValue::TotalRadiatorConsumption(_, value) => value.to_string(),
+            PersistentStateValue::TotalWaterConsumption(_, value) => value.to_string(),
+            PersistentStateValue::FanActivity(_, value) => value.to_string(),
         }
     }
 }
 
 //TODO macro
-impl From<(Channel, DbValue)> for ChannelValue {
-    fn from(val: (Channel, DbValue)) -> Self {
+impl From<(PersistentState, DbValue)> for PersistentStateValue {
+    fn from(val: (PersistentState, DbValue)) -> Self {
         let (channel, value) = val;
         match channel {
-            Channel::Temperature(item) => ChannelValue::Temperature(item, value.into()),
-            Channel::RelativeHumidity(item) => ChannelValue::RelativeHumidity(item, value.into()),
-            Channel::Opened(item) => ChannelValue::Opened(item, value.into()),
-            Channel::Powered(item) => ChannelValue::Powered(item, value.into()),
-            Channel::CurrentPowerUsage(item) => ChannelValue::CurrentPowerUsage(item, value.into()),
-            Channel::TotalEnergyConsumption(item) => {
-                ChannelValue::TotalEnergyConsumption(item, value.into())
+            PersistentState::Temperature(item) => {
+                PersistentStateValue::Temperature(item, value.into())
             }
-            Channel::SetPoint(item) => ChannelValue::SetPoint(item, value.into()),
-            Channel::HeatingDemand(item) => ChannelValue::HeatingDemand(item, value.into()),
-            Channel::ExternalAutoControl(item) => {
-                ChannelValue::ExternalAutoControl(item, value.into())
+            PersistentState::RelativeHumidity(item) => {
+                PersistentStateValue::RelativeHumidity(item, value.into())
             }
-            Channel::Presence(item) => ChannelValue::Presence(item, value.into()),
-            Channel::TotalRadiatorConsumption(item) => {
-                ChannelValue::TotalRadiatorConsumption(item, value.into())
+            PersistentState::Opened(item) => PersistentStateValue::Opened(item, value.into()),
+            PersistentState::Powered(item) => PersistentStateValue::Powered(item, value.into()),
+            PersistentState::CurrentPowerUsage(item) => {
+                PersistentStateValue::CurrentPowerUsage(item, value.into())
             }
-            Channel::TotalWaterConsumption(item) => {
-                ChannelValue::TotalWaterConsumption(item, value.into())
+            PersistentState::TotalEnergyConsumption(item) => {
+                PersistentStateValue::TotalEnergyConsumption(item, value.into())
             }
-            Channel::FanActivity(item) => ChannelValue::FanActivity(item, value.into()),
+            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, value.into()),
+            PersistentState::HeatingDemand(item) => {
+                PersistentStateValue::HeatingDemand(item, value.into())
+            }
+            PersistentState::ExternalAutoControl(item) => {
+                PersistentStateValue::ExternalAutoControl(item, value.into())
+            }
+            PersistentState::Presence(item) => PersistentStateValue::Presence(item, value.into()),
+            PersistentState::TotalRadiatorConsumption(item) => {
+                PersistentStateValue::TotalRadiatorConsumption(item, value.into())
+            }
+            PersistentState::TotalWaterConsumption(item) => {
+                PersistentStateValue::TotalWaterConsumption(item, value.into())
+            }
+            PersistentState::FanActivity(item) => {
+                PersistentStateValue::FanActivity(item, value.into())
+            }
         }
     }
 }
@@ -155,12 +165,12 @@ mod macros {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::time::DateTime;
+    use crate::t;
     use crate::{
         core::timeseries::{DataFrame, DataPoint},
         home::state::*,
     };
-    use crate::t;
-    use crate::core::time::DateTime;
 
     use crate::core::timeseries::TimeSeries;
 

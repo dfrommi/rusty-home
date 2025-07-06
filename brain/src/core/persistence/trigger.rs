@@ -3,7 +3,8 @@ use crate::{
     home::trigger::{UserTrigger, UserTriggerTarget},
 };
 use anyhow::Context;
-use support::{t, time::DateTime};
+use crate::t;
+use crate::core::time::DateTime;
 
 impl super::Database {
     #[tracing::instrument(skip(self))]
@@ -59,7 +60,7 @@ impl super::Database {
 #[cfg(test)]
 mod tests {
     use crate::home::trigger::*;
-    use support::t;
+    use crate::t;
 
     use crate::Database;
 

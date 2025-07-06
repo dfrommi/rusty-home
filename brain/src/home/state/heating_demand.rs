@@ -1,5 +1,6 @@
 use r#macro::{EnumVariants, Id};
-use support::{time::DateTime, unit::Percent};
+use support::unit::Percent;
+use crate::core::time::DateTime;
 
 use crate::core::timeseries::{
     DataFrame,

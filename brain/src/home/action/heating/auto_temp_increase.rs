@@ -1,8 +1,9 @@
 use std::fmt::Display;
 
 use crate::home::command::Command;
+use crate::t;
 use anyhow::Result;
-use support::{t, unit::DegreeCelsius};
+use support::unit::DegreeCelsius;
 
 use crate::{
     Database,

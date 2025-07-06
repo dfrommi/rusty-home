@@ -4,9 +4,9 @@ use crate::home::command::{
 };
 use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, SetPoint};
 use anyhow::Result;
-use support::{t, unit::DegreeCelsius};
+use support::unit::DegreeCelsius;
 
-use crate::Database;
+use crate::{Database, t};
 use crate::{home::state::EnergySaving, port::DataPointAccess};
 
 impl Command {

@@ -5,7 +5,7 @@ pub mod interpolate;
 pub use dataframe::DataFrame;
 pub use datapoint::DataPoint;
 use interpolate::Estimatable;
-use support::time::{DateTime, DateTimeRange, Duration};
+use crate::core::time::{DateTime, DateTimeRange, Duration};
 
 use anyhow::{Result, bail};
 

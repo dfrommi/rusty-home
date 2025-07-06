@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use sqlx::postgres::{PgListener, PgNotification};
-use support::time::Duration;
+use crate::core::time::Duration;
 
 const THING_VALUE_ADDED_EVENT: &str = "thing_values_insert";
 const THING_COMMAND_ADDED_EVENT: &str = "thing_command_insert";

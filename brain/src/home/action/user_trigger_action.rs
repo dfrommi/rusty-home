@@ -7,7 +7,8 @@ use crate::{
     Database,
     core::planner::{Action, ActionEvaluationResult},
 };
-use support::{t, time::Duration};
+use crate::t;
+use crate::core::time::Duration;
 
 use super::{DataPointAccess, trigger_once_and_keep_running};
 

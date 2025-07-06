@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    core::timeseries::DataPoint,
+    core::{time::DateTime, timeseries::DataPoint},
     home::state::{ChannelValue, FanAirflow},
 };
 use anyhow::bail;
-use support::{
-    time::DateTime,
-    unit::{DegreeCelsius, Percent},
-};
+use support::unit::{DegreeCelsius, Percent};
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};

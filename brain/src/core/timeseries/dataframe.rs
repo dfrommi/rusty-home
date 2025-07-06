@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use anyhow::ensure;
-use support::{
+use crate::{
+    core::time::{DateTime, DateTimeRange, Duration},
     t,
-    time::{DateTime, DateTimeRange, Duration},
 };
+use anyhow::ensure;
 
 use super::DataPoint;
 

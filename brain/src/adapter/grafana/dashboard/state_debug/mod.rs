@@ -8,7 +8,8 @@ use actix_web::{
     Responder,
     web::{self, Query},
 };
-use support::{ExternalId, time::DateTime};
+use support::ExternalId;
+use crate::core::time::DateTime;
 
 use crate::{
     adapter::grafana::{GrafanaApiError, support::csv_response},

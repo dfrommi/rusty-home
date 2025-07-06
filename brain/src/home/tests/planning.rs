@@ -1,5 +1,5 @@
 use crate::home::command::{Command, CommandSource, PowerToggle};
-use ::support::time::{DateTime, FIXED_NOW};
+use crate::core::time::{DateTime, FIXED_NOW};
 use support::TestDatabase;
 
 use crate::home::plan_for_home;
@@ -55,7 +55,7 @@ mod support {
     use std::sync::Mutex;
 
     use crate::home::command::{Command, CommandSource};
-    use support::time::{DateTime, DateTimeRange};
+    use crate::core::time::{DateTime, DateTimeRange};
 
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 

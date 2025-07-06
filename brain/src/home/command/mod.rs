@@ -2,10 +2,8 @@ mod command_state;
 
 use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
-use support::{
-    time::{DateTime, Duration},
-    unit::DegreeCelsius,
-};
+use support::unit::DegreeCelsius;
+use crate::core::time::{DateTime, Duration};
 
 use crate::home::state::FanAirflow;
 
@@ -213,7 +211,7 @@ pub enum Fan {
 mod test {
     use assert_json_diff::assert_json_eq;
     use serde_json::json;
-    use support::t;
+    use crate::t;
 
     use super::*;
 

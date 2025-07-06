@@ -10,9 +10,9 @@ use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 use support::{
     ValueObject,
-    time::{DateTime, DateTimeRange},
     unit::{DegreeCelsius, Percent},
 };
+use crate::core::time::{DateTime, DateTimeRange};
 use tokio::try_join;
 
 #[derive(Debug, Clone, Id, EnumVariants)]

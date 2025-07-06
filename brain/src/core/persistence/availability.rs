@@ -1,5 +1,6 @@
 use sqlx::postgres::types::PgInterval;
-use support::{t, time::Duration};
+use crate::t;
+use crate::core::time::Duration;
 
 use crate::core::ItemAvailability;
 

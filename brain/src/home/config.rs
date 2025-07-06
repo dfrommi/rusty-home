@@ -1,6 +1,6 @@
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
 use crate::home::trigger::{HomekitTarget, RemoteTarget};
-use support::t;
+use crate::t;
 
 use crate::home::action::{
     FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,

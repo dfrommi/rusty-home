@@ -1,25 +1,25 @@
 #[macro_export]
 macro_rules! t {
     (now) => {{
-        $crate::time::DateTime::now()
+        crate::core::time::DateTime::now()
     }};
 
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
-        $crate::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
+        crate::core::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
     }};
 
     ($hour:literal : $minute:literal) => {{
-        $crate::time::Time::at($hour, $minute).unwrap()
+        crate::core::time::Time::at($hour, $minute).unwrap()
     }};
 
     ($amount:literal seconds) => {{
-        $crate::time::Duration::seconds($amount)
+        crate::core::time::Duration::seconds($amount)
     }};
     ($amount:literal minutes) => {{
-        $crate::time::Duration::minutes($amount)
+        crate::core::time::Duration::minutes($amount)
     }};
     ($amount:literal hours) => {{
-        $crate::time::Duration::hours($amount)
+        crate::core::time::Duration::hours($amount)
     }};
 
     ($amount:literal seconds ago) => {{
@@ -45,7 +45,7 @@ macro_rules! t {
 
 #[cfg(test)]
 mod tests {
-    use crate::time::*;
+    use crate::core::time::*;
 
     #[test]
     fn test_now() {

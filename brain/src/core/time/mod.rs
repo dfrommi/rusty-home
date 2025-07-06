@@ -1,4 +1,4 @@
-mod builder;
+pub mod builder;
 mod datetime;
 mod duration;
 mod range;

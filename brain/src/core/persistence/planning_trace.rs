@@ -1,5 +1,6 @@
 use sqlx::types::chrono;
-use support::{t, time::DateTime};
+use crate::t;
+use crate::core::time::DateTime;
 
 use crate::core::planner::{PlanningTrace, PlanningTraceStep};
 
@@ -40,7 +41,7 @@ impl super::Database {
 
     pub async fn get_latest_planning_trace(
         &self,
-        before: support::time::DateTime,
+        before: crate::core::time::DateTime,
     ) -> anyhow::Result<PlanningTrace> {
         let rec = sqlx::query_as!(
             PlanningTraceRow,
@@ -77,7 +78,7 @@ impl super::Database {
 
     pub async fn get_trace_ids(
         &self,
-        range: support::time::DateTimeRange,
+        range: crate::core::time::DateTimeRange,
     ) -> anyhow::Result<Vec<(String, DateTime)>> {
         let recs = sqlx::query!(
             r#"SELECT trace_id, timestamp
@@ -104,7 +105,7 @@ impl super::Database {
 
     pub async fn get_planning_traces_in_range(
         &self,
-        range: support::time::DateTimeRange,
+        range: crate::core::time::DateTimeRange,
     ) -> anyhow::Result<Vec<PlanningTrace>> {
         let recs = sqlx::query_as!(
             PlanningTraceRow,

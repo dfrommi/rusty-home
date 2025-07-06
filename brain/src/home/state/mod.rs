@@ -129,7 +129,7 @@ mod macros {
             let result = crate::core::timeseries::DataPoint::new($result, $timestamp);
 
             tracing::trace!(
-                timestamp = %support::t!(now),
+                timestamp = %crate::t!(now),
                 item.r#type = %$item.int_type(),
                 item.name = %$item.int_name(),
                 result.value = %result.value,
@@ -159,7 +159,8 @@ mod tests {
         core::timeseries::{DataFrame, DataPoint},
         home::state::*,
     };
-    use support::{t, time::DateTime};
+    use crate::t;
+    use crate::core::time::DateTime;
 
     use crate::core::timeseries::TimeSeries;
 
@@ -220,7 +221,7 @@ mod tests {
         async fn series(
             &self,
             item: Temperature,
-            range: support::time::DateTimeRange,
+            range: crate::core::time::DateTimeRange,
         ) -> anyhow::Result<TimeSeries<Temperature>> {
             TimeSeries::new(item, &self.temperature_df.clone().unwrap(), range)
         }

@@ -23,8 +23,8 @@ pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
-use support::t;
-use support::time::DateTime;
+use crate::t;
+use crate::core::time::DateTime;
 pub use user_trigger_action::UserTriggerAction;
 
 use crate::Database;

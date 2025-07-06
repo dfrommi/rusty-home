@@ -1,7 +1,7 @@
 use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
-use support::t;
+use crate::t;
 
 use crate::Database;
 

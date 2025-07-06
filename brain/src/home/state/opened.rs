@@ -1,7 +1,6 @@
-use support::{
-    ValueObject, t,
-    time::{DateTime, DateTimeRange},
-};
+use crate::core::time::{DateTime, DateTimeRange};
+use crate::t;
+use support::ValueObject;
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -132,7 +131,7 @@ impl Estimatable for Opened {
 
 #[cfg(test)]
 mod tests {
-    use support::time::DateTime;
+    use crate::core::time::DateTime;
 
     use super::*;
 

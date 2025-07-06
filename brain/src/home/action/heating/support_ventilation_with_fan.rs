@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed};
-use support::t;
+use crate::t;
 
 use crate::core::planner::SimpleAction;
 

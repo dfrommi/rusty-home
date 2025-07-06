@@ -13,6 +13,8 @@ tracing = { workspace = true }
 sqlx = { workspace = true }
 #Only for compatibility with sqlx-mapping
 chrono = { workspace = true }
+iso8601-duration = { workspace = true }
+chrono-humanize = { workspace = true }
 moka = { workspace = true }
 
 config = { workspace = true }

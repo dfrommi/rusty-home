@@ -6,7 +6,8 @@ use actix_web::{
     web::{self, Query},
 };
 use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
-use support::{ValueObject, time::DateTimeRange};
+use support::ValueObject;
+use crate::core::time::DateTimeRange;
 
 use crate::{
     adapter::grafana::{

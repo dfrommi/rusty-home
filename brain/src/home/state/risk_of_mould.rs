@@ -1,11 +1,11 @@
+use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
+use anyhow::Result;
 use r#macro::Id;
 use support::{
-    ValueObject, t,
+    ValueObject,
     unit::{DegreeCelsius, Percent},
 };
-
-use anyhow::Result;
 
 use crate::home::state::macros::result;
 

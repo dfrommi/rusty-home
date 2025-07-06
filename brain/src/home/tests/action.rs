@@ -1,6 +1,6 @@
 use crate::home::command::Thermostat;
 use crate::home::trigger::{HomekitTarget, UserTriggerTarget};
-use support::time::{DateTime, FIXED_NOW};
+use crate::core::time::{DateTime, FIXED_NOW};
 
 use crate::{
     core::planner::{Action, ActionEvaluationResult},

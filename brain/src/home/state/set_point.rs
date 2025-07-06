@@ -1,7 +1,10 @@
 use r#macro::Id;
 use support::{time::DateTime, unit::DegreeCelsius};
 
-use crate::core::timeseries::interpolate::{Estimatable, algo};
+use crate::core::timeseries::{
+    DataFrame,
+    interpolate::{Estimatable, algo},
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum SetPoint {
@@ -15,7 +18,7 @@ pub enum SetPoint {
 impl Estimatable for SetPoint {
     type Type = DegreeCelsius;
 
-    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
         algo::last_seen(at, df)
     }
 }

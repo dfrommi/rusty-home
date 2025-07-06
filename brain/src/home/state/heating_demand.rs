@@ -1,7 +1,10 @@
 use r#macro::{EnumVariants, Id};
-use support::{DataFrame, time::DateTime, unit::Percent};
+use support::{time::DateTime, unit::Percent};
 
-use crate::core::timeseries::interpolate::{Estimatable, algo};
+use crate::core::timeseries::{
+    DataFrame,
+    interpolate::{Estimatable, algo},
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum HeatingDemand {

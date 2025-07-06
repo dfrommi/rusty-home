@@ -1,13 +1,13 @@
+pub mod dataframe;
+pub mod datapoint;
 pub mod interpolate;
 
+pub use dataframe::DataFrame;
+pub use datapoint::DataPoint;
 use interpolate::Estimatable;
-use support::DataFrame;
-use support::{
-    time::{DateTime, DateTimeRange, Duration},
-    DataPoint,
-};
+use support::time::{DateTime, DateTimeRange, Duration};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 pub struct TimeSeries<T: Estimatable> {
     context: T,

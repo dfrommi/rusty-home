@@ -126,7 +126,7 @@ mod macros {
         };
 
         ($result:expr, $timestamp:expr, $item:expr, { $(,)* $($dps:ident),* }, $($arg:tt)+ ) => {
-            let result = support::DataPoint::new($result, $timestamp);
+            let result = crate::core::timeseries::DataPoint::new($result, $timestamp);
 
             tracing::trace!(
                 timestamp = %support::t!(now),
@@ -155,8 +155,11 @@ mod macros {
 
 #[cfg(test)]
 mod tests {
-    use crate::home::state::*;
-    use support::{DataFrame, DataPoint, t, time::DateTime, unit::*};
+    use crate::{
+        core::timeseries::{DataFrame, DataPoint},
+        home::state::*,
+    };
+    use support::{t, time::DateTime};
 
     use crate::core::timeseries::TimeSeries;
 

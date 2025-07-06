@@ -1,7 +1,10 @@
 use r#macro::Id;
 use support::time::DateTime;
 
-use crate::core::timeseries::interpolate::{Estimatable, algo};
+use crate::core::timeseries::{
+    DataFrame,
+    interpolate::{Estimatable, algo},
+};
 
 //TODO impl anyoneSleeping. Requires impl of enum from crate
 
@@ -19,7 +22,7 @@ pub enum Presence {
 impl Estimatable for Presence {
     type Type = bool;
 
-    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
         algo::last_seen(at, df)
     }
 }

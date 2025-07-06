@@ -1,6 +1,9 @@
+use crate::{
+    core::timeseries::DataPoint,
+    home::trigger::{UserTrigger, UserTriggerTarget},
+};
 use anyhow::Context;
-use crate::home::trigger::{UserTrigger, UserTriggerTarget};
-use support::{DataPoint, t, time::DateTime};
+use support::{t, time::DateTime};
 
 impl super::Database {
     #[tracing::instrument(skip(self))]

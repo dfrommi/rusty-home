@@ -1,3 +1,5 @@
+mod command_state;
+
 use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
 use support::{

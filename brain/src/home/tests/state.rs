@@ -1,9 +1,12 @@
 use support::{
-    DataPoint, ValueObject,
+    ValueObject,
     time::{DateTime, FIXED_NOW},
 };
 
-use crate::{Database, home::state::AutomaticTemperatureIncrease, port::DataPointAccess};
+use crate::{
+    Database, core::timeseries::DataPoint, home::state::AutomaticTemperatureIncrease,
+    port::DataPointAccess,
+};
 
 use super::{infrastructure, runtime};
 

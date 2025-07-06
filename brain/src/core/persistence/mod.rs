@@ -12,9 +12,11 @@ use std::sync::Arc;
 use crate::home::command::{CommandExecution, CommandTarget};
 use moka::future::Cache;
 use support::{
-    DataFrame, t,
+    t,
     time::{DateTime, Duration},
 };
+
+use super::timeseries::DataFrame;
 
 #[derive(Clone)]
 pub struct Database {

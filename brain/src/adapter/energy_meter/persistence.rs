@@ -1,6 +1,6 @@
-use support::{DataPoint, time::DateTime};
+use support::time::DateTime;
 
-use crate::Database;
+use crate::{Database, core::timeseries::DataPoint};
 
 use super::{EnergyReading, Faucet, Radiator};
 

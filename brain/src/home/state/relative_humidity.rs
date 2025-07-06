@@ -1,7 +1,10 @@
 use r#macro::{EnumVariants, Id};
 use support::{time::DateTime, unit::Percent};
 
-use crate::core::timeseries::interpolate::{Estimatable, algo};
+use crate::core::timeseries::{
+    DataFrame,
+    interpolate::{Estimatable, algo},
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
@@ -18,7 +21,7 @@ pub enum RelativeHumidity {
 impl Estimatable for RelativeHumidity {
     type Type = Percent;
 
-    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
         algo::linear(at, df)
     }
 }

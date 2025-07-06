@@ -1,4 +1,6 @@
-use support::{time::DateTime, DataFrame};
+use support::time::DateTime;
+
+use super::DataFrame;
 
 pub trait Estimatable
 where

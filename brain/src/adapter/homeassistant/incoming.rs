@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use crate::home::state::{ChannelValue, FanAirflow};
+use crate::{
+    core::timeseries::DataPoint,
+    home::state::{ChannelValue, FanAirflow},
+};
 use anyhow::bail;
 use support::{
-    DataPoint,
     time::DateTime,
     unit::{DegreeCelsius, Percent},
 };

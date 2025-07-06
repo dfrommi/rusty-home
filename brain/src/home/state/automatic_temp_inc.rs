@@ -1,8 +1,9 @@
+use crate::core::timeseries::DataPoint;
 use crate::home::state::Temperature;
 use r#macro::Id;
 use support::{t, unit::DegreeCelsius};
 
-use support::{DataPoint, ValueObject};
+use support::ValueObject;
 
 use crate::home::state::macros::result;
 

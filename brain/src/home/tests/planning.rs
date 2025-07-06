@@ -1,5 +1,5 @@
-use ::support::time::{DateTime, FIXED_NOW};
 use crate::home::command::{Command, CommandSource, PowerToggle};
+use ::support::time::{DateTime, FIXED_NOW};
 use support::TestDatabase;
 
 use crate::home::plan_for_home;
@@ -131,7 +131,7 @@ mod support {
         }
 
         pub async fn is_reflected_in_state(&self, command: &Command) -> anyhow::Result<bool> {
-            infrastructure().api().is_reflected_in_state(command).await
+            command.is_reflected_in_state(&infrastructure().api()).await
         }
 
         pub async fn get_latest_command(

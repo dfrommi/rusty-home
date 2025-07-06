@@ -9,26 +9,26 @@ use support::{t, unit::DegreeCelsius};
 use crate::Database;
 use crate::{home::state::EnergySaving, port::DataPointAccess};
 
-impl Database {
-    pub async fn is_reflected_in_state(&self, command: &Command) -> Result<bool> {
-        match command {
+impl Command {
+    pub async fn is_reflected_in_state(&self, api: &Database) -> Result<bool> {
+        match self {
             Command::SetPower { device, power_on } => {
-                is_set_power_reflected_in_state(device, *power_on, self).await
+                is_set_power_reflected_in_state(device, *power_on, api).await
             }
             Command::SetHeating {
                 device,
                 target_state,
-            } => is_set_heating_reflected_in_state(device, target_state, self).await,
+            } => is_set_heating_reflected_in_state(device, target_state, api).await,
             Command::PushNotify {
                 recipient,
                 notification,
                 action,
-            } => is_push_notify_reflected_in_state(recipient, notification, action, self).await,
+            } => is_push_notify_reflected_in_state(recipient, notification, action, api).await,
             Command::SetEnergySaving { device, on } => {
-                is_set_energy_saving_reflected_in_state(device, *on, self).await
+                is_set_energy_saving_reflected_in_state(device, *on, api).await
             }
             Command::ControlFan { device, speed } => {
-                is_fan_control_reflected_in_state(device, speed, self).await
+                is_fan_control_reflected_in_state(device, speed, api).await
             }
         }
     }

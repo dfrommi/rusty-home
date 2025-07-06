@@ -1,6 +1,6 @@
+use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Context, Result, bail};
-use crate::home::state::Presence;
-use support::{DataPoint, ValueObject, t, time::DateTimeRange};
+use support::{ValueObject, t, time::DateTimeRange};
 
 use crate::home::state::macros::result;
 

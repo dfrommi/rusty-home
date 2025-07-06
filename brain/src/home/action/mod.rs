@@ -11,8 +11,8 @@ mod user_trigger_action;
 use std::fmt::Debug;
 use std::fmt::Display;
 
-use anyhow::Result;
 use crate::home::command::Command;
+use anyhow::Result;
 
 use crate::home::command::CommandSource;
 pub use cool_down_when_occupied::CoolDownWhenOccupied;
@@ -157,7 +157,7 @@ async fn trigger_once_and_keep_running(
 
     //cover for delay between sending command and receiving state change -> external change happened
     let just_triggered = this_as_last_execution.created > t!(30 seconds ago);
-    let is_reflected_in_state = api.is_reflected_in_state(command).await?;
+    let is_reflected_in_state = command.is_reflected_in_state(api).await?;
     let is_effectively_reflected = just_triggered || is_reflected_in_state;
 
     tracing::trace!(

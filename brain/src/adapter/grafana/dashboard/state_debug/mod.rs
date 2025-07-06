@@ -1,11 +1,14 @@
 use std::{cmp::Ordering, sync::Arc};
 
+use crate::{
+    core::timeseries::DataPoint,
+    home::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption},
+};
 use actix_web::{
     Responder,
     web::{self, Query},
 };
-use crate::home::state::{Channel, HeatingDemand, RelativeHumidity, Temperature, TotalEnergyConsumption};
-use support::{DataPoint, ExternalId, time::DateTime};
+use support::{ExternalId, time::DateTime};
 
 use crate::{
     adapter::grafana::{GrafanaApiError, support::csv_response},

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use crate::home::command::*;
+use crate::{home::command::*, port::CommandExecutionResult};
 use anyhow::Result;
+use infrastructure::TraceContext;
 use schema::*;
 use sqlx::PgPool;
 use support::{
@@ -10,6 +11,37 @@ use support::{
 };
 
 impl super::Database {
+    pub async fn execute(
+        &self,
+        command: Command,
+        source: crate::home::command::CommandSource,
+    ) -> anyhow::Result<CommandExecutionResult> {
+        let target: CommandTarget = command.clone().into();
+        let last_execution = self
+            .get_latest_command(target, t!(48 hours ago))
+            .await?
+            .filter(|e| e.source == source && e.command == command)
+            .map(|e| e.created);
+
+        //wait until roundtrip is completed. State might not have been updated yet
+        let was_just_executed = last_execution.map_or(false, |dt| dt > t!(30 seconds ago));
+
+        if was_just_executed {
+            return Ok(CommandExecutionResult::Skipped);
+        }
+
+        let was_latest_execution = last_execution.is_some();
+        let is_reflected_in_state = command.is_reflected_in_state(self).await?;
+
+        if !was_latest_execution || !is_reflected_in_state {
+            self.save_command(command, source, TraceContext::current_correlation_id())
+                .await?;
+            Ok(CommandExecutionResult::Triggered)
+        } else {
+            Ok(CommandExecutionResult::Skipped)
+        }
+    }
+
     #[tracing::instrument(skip_all, fields(command_target))]
     pub async fn get_latest_command(
         &self,
@@ -46,7 +78,7 @@ impl super::Database {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn save_command(
+    async fn save_command(
         &self,
         command: Command,
         source: CommandSource,

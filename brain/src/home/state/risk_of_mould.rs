@@ -1,16 +1,15 @@
-use crate::home::state::RelativeHumidity;
+use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
 use r#macro::Id;
 use support::{
-    t,
+    ValueObject, t,
     unit::{DegreeCelsius, Percent},
-    DataPoint, ValueObject,
 };
 
 use anyhow::Result;
 
 use crate::home::state::macros::result;
 
-use super::{dewpoint::DewPoint, DataPointAccess, TimeSeriesAccess};
+use super::{DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Id)]
 pub enum RiskOfMould {

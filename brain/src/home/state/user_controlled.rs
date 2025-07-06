@@ -1,6 +1,7 @@
 use r#macro::Id;
-use support::{DataPoint, ValueObject, t, time::DateTime, unit::DegreeCelsius};
+use support::{ValueObject, t, time::DateTime, unit::DegreeCelsius};
 
+use crate::core::timeseries::DataPoint;
 use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
 
 use crate::{

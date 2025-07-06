@@ -1,10 +1,10 @@
 use support::{
-    DataPoint, ValueObject, t,
+    ValueObject, t,
     time::{DateTime, DateTimeRange},
 };
 
 use crate::core::timeseries::{
-    TimeSeries,
+    DataFrame, DataPoint, TimeSeries,
     interpolate::{Estimatable, algo},
 };
 
@@ -117,7 +117,7 @@ where
 impl Estimatable for raw::Opened {
     type Type = bool;
 
-    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
         algo::last_seen(at, df)
     }
 }
@@ -125,7 +125,7 @@ impl Estimatable for raw::Opened {
 impl Estimatable for Opened {
     type Type = bool;
 
-    fn interpolate(&self, at: DateTime, df: &support::DataFrame<Self::Type>) -> Option<Self::Type> {
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::Type>) -> Option<Self::Type> {
         algo::last_seen(at, df)
     }
 }

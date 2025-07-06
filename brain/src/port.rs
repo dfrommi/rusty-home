@@ -2,11 +2,11 @@
 
 use anyhow::Result;
 use support::{
-    DataPoint, ValueObject, t,
+    ValueObject, t,
     time::{DateTime, DateTimeRange},
 };
 
-use crate::core::timeseries::{TimeSeries, interpolate::Estimatable};
+use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 
 pub trait DataPointAccess<T: ValueObject> {
     async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>>;

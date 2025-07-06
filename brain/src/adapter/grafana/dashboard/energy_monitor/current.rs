@@ -1,12 +1,15 @@
 use std::cmp::Ordering;
 
+use crate::{
+    core::timeseries::DataPoint,
+    home::state::{CurrentPowerUsage, HeatingDemand},
+};
 use actix_web::{
     HttpResponse, Responder,
     http::header,
     web::{self},
 };
-use crate::home::state::{CurrentPowerUsage, HeatingDemand};
-use support::{DataPoint, ValueObject};
+use support::ValueObject;
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 

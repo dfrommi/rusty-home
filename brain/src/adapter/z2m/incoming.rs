@@ -1,8 +1,8 @@
+use crate::core::timeseries::DataPoint;
 use crate::home::state::ChannelValue;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use infrastructure::MqttInMessage;
 use support::{
-    DataPoint,
     time::DateTime,
     unit::{DegreeCelsius, KiloWattHours, Percent, Watt},
 };

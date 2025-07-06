@@ -4,7 +4,6 @@ pub mod incoming_data;
 pub mod metrics;
 pub mod persistence;
 pub mod planner;
-pub mod service;
 pub mod timeseries;
 
 use std::collections::HashMap;
@@ -16,8 +15,8 @@ pub use command::execute_commands;
 pub use incoming_data::IncomingDataSource;
 pub use incoming_data::process_incoming_data_source;
 
-use support::DataPoint;
 use support::time::DateTime;
+use timeseries::DataPoint;
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {

@@ -1,6 +1,6 @@
-use crate::home::state::Powered;
+use crate::{core::timeseries::DataPoint, home::state::Powered};
 use r#macro::Id;
-use support::{DataPoint, ValueObject};
+use support::ValueObject;
 
 use crate::home::{
     command::{Command, CommandExecution, EnergySavingDevice},

@@ -18,7 +18,7 @@ pub struct Settings {
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let s = Config::builder()
-            .add_source(File::with_name("brain.toml"))
+            .add_source(File::with_name("config.toml"))
             .build()?;
 
         s.try_deserialize()

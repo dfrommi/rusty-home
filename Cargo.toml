@@ -1,5 +1,5 @@
 [workspace]
-members = ["brain"]
+members = ["app"]
 resolver = "2"
 
 [workspace.dependencies]

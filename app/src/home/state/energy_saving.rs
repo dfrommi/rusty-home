@@ -1,6 +1,6 @@
 use crate::core::ValueObject;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
-use r#macro::Id;
+use r#macro::{EnumVariants, Id};
 
 use crate::home::{
     command::{Command, CommandExecution, EnergySavingDevice},
@@ -9,21 +9,9 @@ use crate::home::{
 
 use super::DataPointAccess;
 
-#[derive(Debug, Clone, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum EnergySaving {
     LivingRoomTv,
-}
-
-impl ValueObject for EnergySaving {
-    type ValueType = bool;
-
-    fn to_f64(value: &Self::ValueType) -> f64 {
-        if *value { 1.0 } else { 0.0 }
-    }
-
-    fn from_f64(value: f64) -> Self::ValueType {
-        value > 0.0
-    }
 }
 
 impl DataPointAccess<EnergySaving> for crate::Database {

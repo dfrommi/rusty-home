@@ -7,13 +7,12 @@ use super::*;
 use crate::home::state::{RelativeHumidity, Temperature};
 use anyhow::Result;
 
-use crate::core::ValueObject;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 use tokio::try_join;
 
-#[derive(Debug, Clone, Id, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
     BathroomShower,
     LivingRoomDoor,
@@ -39,18 +38,6 @@ impl DewPoint {
             DewPoint::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
             DewPoint::RoomOfRequirementDoor => RelativeHumidity::RoomOfRequirementsDoor,
         }
-    }
-}
-
-impl ValueObject for DewPoint {
-    type ValueType = DegreeCelsius;
-
-    fn to_f64(value: &Self::ValueType) -> f64 {
-        value.into()
-    }
-
-    fn from_f64(value: f64) -> Self::ValueType {
-        value.into()
     }
 }
 

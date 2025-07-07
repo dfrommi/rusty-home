@@ -7,7 +7,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     // Get the name of the input enum, e.g., ChannelValue
     let name = input.ident;
-    let target_enum_name = format_ident!("PersistentState");
+    let target_enum_name = format_ident!(
+        "{}",
+        name.to_string()
+            .strip_suffix("Value")
+            .expect("Expected input enum to end with Value")
+    );
     let variants = super::enum_variants(input.data);
 
     // Collect the Channel enum variants and the implementations

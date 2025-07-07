@@ -1,18 +1,18 @@
-mod db_mapped;
 mod enum_variants;
+mod enum_with_value;
 mod id_item;
-mod persistent_state_derive;
+mod state_type_info;
 
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(PersistentStateDerive)]
-pub fn state_channel_derive(input: TokenStream) -> TokenStream {
-    persistent_state_derive::derive(input)
+#[proc_macro_derive(EnumWithValue)]
+pub fn enum_with_value_derive(input: TokenStream) -> TokenStream {
+    enum_with_value::derive(input)
 }
 
-#[proc_macro_derive(DbMapped)]
-pub fn db_mapped_derive(input: TokenStream) -> TokenStream {
-    db_mapped::db_mapped(input)
+#[proc_macro_derive(StateTypeInfoDerive)]
+pub fn state_type_info_derive(input: TokenStream) -> TokenStream {
+    state_type_info::derive(input)
 }
 
 #[proc_macro_derive(Id)]

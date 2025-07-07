@@ -2,7 +2,7 @@ use crate::core::ValueObject;
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use crate::t;
-use r#macro::Id;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::DataPoint;
 use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
@@ -17,7 +17,7 @@ use crate::{
 
 use super::DataPointAccess;
 
-#[derive(Debug, Clone, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum UserControlled {
     Dehumidifier,
     LivingRoomThermostat,
@@ -25,18 +25,6 @@ pub enum UserControlled {
     KitchenThermostat,
     RoomOfRequirementsThermostat,
     BathroomThermostat,
-}
-
-impl ValueObject for UserControlled {
-    type ValueType = bool;
-
-    fn to_f64(value: &Self::ValueType) -> f64 {
-        if *value { 1.0 } else { 0.0 }
-    }
-
-    fn from_f64(value: f64) -> Self::ValueType {
-        value > 0.0
-    }
 }
 
 //TODO try to simplify

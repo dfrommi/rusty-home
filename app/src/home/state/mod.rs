@@ -50,9 +50,33 @@ pub use user_controlled::UserControlled;
 
 use crate::core::{ValueObject, unit::*};
 use crate::port::*;
-use r#macro::{DbMapped, PersistentStateDerive};
+use r#macro::{EnumWithValue, StateTypeInfoDerive};
 
-#[derive(Debug, Clone, PersistentStateDerive, DbMapped)]
+#[derive(Debug, Clone, EnumWithValue, StateTypeInfoDerive)]
+pub enum HomeStateValue {
+    AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
+    ColdAirComingIn(ColdAirComingIn, bool),
+    CurrentPowerUsage(CurrentPowerUsage, Watt),
+    DewPoint(DewPoint, DegreeCelsius),
+    EnergySaving(EnergySaving, bool),
+    ExternalAutoControl(ExternalAutoControl, bool),
+    FanActivity(FanActivity, FanAirflow),
+    HeatingDemand(HeatingDemand, Percent),
+    Opened(OpenedRaw, bool),
+    Powered(Powered, bool),
+    Presence(Presence, bool),
+    RelativeHumidity(RelativeHumidity, Percent),
+    Resident(Resident, bool),
+    RiskOfMould(RiskOfMould, bool),
+    SetPoint(SetPoint, DegreeCelsius),
+    Temperature(Temperature, DegreeCelsius),
+    TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
+    TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
+    TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
+    UserControlled(UserControlled, bool),
+}
+
+#[derive(Debug, Clone, EnumWithValue)]
 pub enum PersistentStateValue {
     Temperature(Temperature, DegreeCelsius),
     RelativeHumidity(RelativeHumidity, Percent),

@@ -31,9 +31,6 @@ impl<T: SimpleAction> Action for T {
             return Ok(ActionEvaluationResult::Skip);
         }
 
-        Ok(ActionEvaluationResult::Execute(
-            self.command(),
-            self.source(),
-        ))
+        Ok(ActionEvaluationResult::Execute(self.command(), self.source()))
     }
 }

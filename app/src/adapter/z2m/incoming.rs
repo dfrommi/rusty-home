@@ -17,11 +17,7 @@ pub struct Z2mIncomingDataSource {
 }
 
 impl Z2mIncomingDataSource {
-    pub fn new(
-        base_topic: String,
-        config: DeviceConfig<Z2mChannel>,
-        mqtt_rx: mpsc::Receiver<MqttInMessage>,
-    ) -> Self {
+    pub fn new(base_topic: String, config: DeviceConfig<Z2mChannel>, mqtt_rx: mpsc::Receiver<MqttInMessage>) -> Self {
         Self {
             base_topic: base_topic.trim_matches('/').to_owned(),
             device_config: config,
@@ -59,18 +55,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::Temperature(
-                            t.clone(),
-                            DegreeCelsius(payload.temperature),
-                        ),
+                        PersistentStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentStateValue::RelativeHumidity(
-                            h.clone(),
-                            Percent(payload.humidity),
-                        ),
+                        PersistentStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
                         payload.last_seen,
                     )
                     .into(),
@@ -94,10 +84,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::CurrentPowerUsage(
-                            power.clone(),
-                            Watt(payload.current_power_w),
-                        ),
+                        PersistentStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
                         payload.last_seen,
                     )
                     .into(),

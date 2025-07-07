@@ -29,11 +29,7 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
     async fn recv(&mut self) -> Option<EnergyReadingAddedEvent> {
         if self.initial_load.is_none() {
             self.initial_load = match self.db.get_latest_total_readings_ids().await {
-                Ok(v) => Some(
-                    v.iter()
-                        .map(|id| EnergyReadingAddedEvent { id: *id })
-                        .collect(),
-                ),
+                Ok(v) => Some(v.iter().map(|id| EnergyReadingAddedEvent { id: *id }).collect()),
                 Err(e) => {
                     tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
                     Some(vec![])

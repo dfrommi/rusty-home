@@ -10,24 +10,15 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "bathroom/temp_sensor",
-            Z2mChannel::ClimateSensor(
-                Temperature::BathroomShower,
-                RelativeHumidity::BathroomShower,
-            ),
+            Z2mChannel::ClimateSensor(Temperature::BathroomShower, RelativeHumidity::BathroomShower),
         ),
         (
             "kitchen/temp_sensor",
-            Z2mChannel::ClimateSensor(
-                Temperature::KitchenOuterWall,
-                RelativeHumidity::KitchenOuterWall,
-            ),
+            Z2mChannel::ClimateSensor(Temperature::KitchenOuterWall, RelativeHumidity::KitchenOuterWall),
         ),
         (
             "bedroom/outer_wall",
-            Z2mChannel::ClimateSensor(
-                Temperature::BedroomOuterWall,
-                RelativeHumidity::BedroomOuterWall,
-            ),
+            Z2mChannel::ClimateSensor(Temperature::BedroomOuterWall, RelativeHumidity::BedroomOuterWall),
         ),
         (
             "bathroom/dehumidifier",
@@ -36,10 +27,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         // WINDOW CONTACTS
         //
-        (
-            "bedroom/window",
-            Z2mChannel::ContactSensor(Opened::BedroomWindow),
-        ),
+        ("bedroom/window", Z2mChannel::ContactSensor(Opened::BedroomWindow)),
         (
             "living_room/balcony_door",
             Z2mChannel::ContactSensor(Opened::LivingRoomBalconyDoor),
@@ -56,10 +44,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             "living_room/window_side",
             Z2mChannel::ContactSensor(Opened::LivingRoomWindowSide),
         ),
-        (
-            "kitchen/window",
-            Z2mChannel::ContactSensor(Opened::KitchenWindow),
-        ),
+        ("kitchen/window", Z2mChannel::ContactSensor(Opened::KitchenWindow)),
         (
             "room_of_requirements/window_left",
             Z2mChannel::ContactSensor(Opened::RoomOfRequirementsWindowLeft),
@@ -77,17 +62,11 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "kitchen/multiplug",
-            Z2mChannel::PowerPlug(
-                CurrentPowerUsage::KitchenMultiPlug,
-                TotalEnergyConsumption::KitchenMultiPlug,
-            ),
+            Z2mChannel::PowerPlug(CurrentPowerUsage::KitchenMultiPlug, TotalEnergyConsumption::KitchenMultiPlug),
         ),
         (
             "living_room/couch_plug",
-            Z2mChannel::PowerPlug(
-                CurrentPowerUsage::CouchPlug,
-                TotalEnergyConsumption::CouchPlug,
-            ),
+            Z2mChannel::PowerPlug(CurrentPowerUsage::CouchPlug, TotalEnergyConsumption::CouchPlug),
         ),
         (
             "room_of_requirements/makerspace",
@@ -110,9 +89,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         // BUTTON PRESS
         //
-        (
-            "bedroom/remote",
-            Z2mChannel::RemoteClick(RemoteTarget::BedroomDoor),
-        ),
+        ("bedroom/remote", Z2mChannel::RemoteClick(RemoteTarget::BedroomDoor)),
     ]
 }

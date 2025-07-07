@@ -1,6 +1,6 @@
-use actix_web::{http::header, HttpResponse};
+use actix_web::{HttpResponse, http::header};
 use anyhow::Context;
-use serde::{de::IntoDeserializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::IntoDeserializer};
 
 use super::{GrafanaApiError, GrafanaResponse};
 

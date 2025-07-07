@@ -1,5 +1,5 @@
-use crate::home::command::{Command, CommandSource, PowerToggle};
 use crate::core::time::{DateTime, FIXED_NOW};
+use crate::home::command::{Command, CommandSource, PowerToggle};
 use support::TestDatabase;
 
 use crate::home::plan_for_home;
@@ -54,8 +54,8 @@ fn test_planning_execution() {
 mod support {
     use std::sync::Mutex;
 
-    use crate::home::command::{Command, CommandSource};
     use crate::core::time::{DateTime, DateTimeRange};
+    use crate::home::command::{Command, CommandSource};
 
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 
@@ -78,31 +78,19 @@ mod support {
             Ok(())
         }
 
-        pub async fn get_latest_planning_trace(
-            &self,
-            _: DateTime,
-        ) -> anyhow::Result<PlanningTrace> {
+        pub async fn get_latest_planning_trace(&self, _: DateTime) -> anyhow::Result<PlanningTrace> {
             Ok(PlanningTrace::current(vec![]))
         }
 
-        pub async fn get_planning_traces_in_range(
-            &self,
-            _: DateTimeRange,
-        ) -> anyhow::Result<Vec<PlanningTrace>> {
+        pub async fn get_planning_traces_in_range(&self, _: DateTimeRange) -> anyhow::Result<Vec<PlanningTrace>> {
             Ok(vec![])
         }
 
-        pub async fn get_planning_traces_by_trace_id(
-            &self,
-            _: &str,
-        ) -> anyhow::Result<Option<PlanningTrace>> {
+        pub async fn get_planning_traces_by_trace_id(&self, _: &str) -> anyhow::Result<Option<PlanningTrace>> {
             Ok(None)
         }
 
-        pub async fn get_trace_ids(
-            &self,
-            _: DateTimeRange,
-        ) -> anyhow::Result<Vec<(String, DateTime)>> {
+        pub async fn get_trace_ids(&self, _: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
             Ok(vec![])
         }
     }
@@ -119,10 +107,7 @@ mod support {
             source: CommandSource,
             _: Option<String>,
         ) -> anyhow::Result<()> {
-            println!(
-                "Pretend executing command in test: {:?} with source: {:?}",
-                command, source
-            );
+            println!("Pretend executing command in test: {:?} with source: {:?}", command, source);
 
             let mut executed_actions = self.executed_actions.lock().unwrap();
             executed_actions.push((command, source));
@@ -139,10 +124,7 @@ mod support {
             target: impl Into<crate::home::command::CommandTarget>,
             since: DateTime,
         ) -> anyhow::Result<Option<crate::home::command::CommandExecution>> {
-            infrastructure()
-                .api()
-                .get_latest_command(target, since)
-                .await
+            infrastructure().api().get_latest_command(target, since).await
         }
 
         pub async fn get_all_commands_for_target(
@@ -150,10 +132,7 @@ mod support {
             target: impl Into<crate::home::command::CommandTarget>,
             since: DateTime,
         ) -> anyhow::Result<Vec<crate::home::command::CommandExecution>> {
-            infrastructure()
-                .api()
-                .get_all_commands_for_target(target, since)
-                .await
+            infrastructure().api().get_all_commands_for_target(target, since).await
         }
 
         pub async fn get_all_commands(

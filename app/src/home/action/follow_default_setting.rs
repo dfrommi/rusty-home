@@ -41,18 +41,13 @@ impl Action for FollowDefaultSetting {
                 notification,
                 recipient,
             },
-            CommandTarget::SetEnergySaving { device } => {
-                Command::SetEnergySaving { device, on: true }
-            }
+            CommandTarget::SetEnergySaving { device } => Command::SetEnergySaving { device, on: true },
             CommandTarget::ControlFan { device } => Command::ControlFan {
                 device,
                 speed: FanAirflow::Off,
             },
         };
 
-        Ok(ActionEvaluationResult::Execute(
-            command,
-            super::action_source(self),
-        ))
+        Ok(ActionEvaluationResult::Execute(command, super::action_source(self)))
     }
 }

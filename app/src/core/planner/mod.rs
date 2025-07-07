@@ -13,11 +13,7 @@ use crate::Database;
 pub use action::{Action, ActionEvaluationResult, SimpleAction};
 pub use trace::{PlanningTrace, PlanningTraceStep};
 
-pub async fn perform_planning<G, A>(
-    active_goals: &[G],
-    config: &[(G, Vec<A>)],
-    api: &Database,
-) -> anyhow::Result<()>
+pub async fn perform_planning<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &Database) -> anyhow::Result<()>
 where
     G: Eq + Display,
     A: Action,

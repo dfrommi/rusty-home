@@ -9,9 +9,7 @@ where
     R: PartialEq,
 {
     pub fn new() -> Self {
-        Self {
-            resources: Vec::new(),
-        }
+        Self { resources: Vec::new() }
     }
 
     pub fn lock(&mut self, resource: R) {

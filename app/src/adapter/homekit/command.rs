@@ -1,31 +1,22 @@
 use std::collections::HashMap;
 
+use crate::core::id::ExternalId;
+use crate::core::unit::Percent;
 use crate::home::state::{FanActivity, FanAirflow, Powered};
 use crate::home::trigger::{Homekit, UserTrigger};
 use anyhow::bail;
 use infrastructure::MqttInMessage;
-use crate::core::id::ExternalId;
-use crate::core::unit::Percent;
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
 use crate::home::state::EnergySaving;
 
 use super::MqttStateValue;
 
-pub async fn process_commands(
-    base_topic: String,
-    mut rx: Receiver<MqttInMessage>,
-    api: crate::Database,
-) {
+pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: crate::Database) {
     let mut debounce_tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
 
     while let Some(msg) = rx.recv().await {
-        let topic_parts: Vec<&str> = msg
-            .topic
-            .strip_prefix(&base_topic)
-            .unwrap_or("")
-            .split('/')
-            .collect();
+        let topic_parts: Vec<&str> = msg.topic.strip_prefix(&base_topic).unwrap_or("").split('/').collect();
 
         if topic_parts.len() != 3 {
             tracing::warn!("Received malformed topic: {}", msg.topic);
@@ -63,30 +54,22 @@ pub async fn process_commands(
     }
 }
 
-fn to_command(
-    type_name: &str,
-    item_name: &str,
-    value: MqttStateValue,
-) -> anyhow::Result<UserTrigger> {
+fn to_command(type_name: &str, item_name: &str, value: MqttStateValue) -> anyhow::Result<UserTrigger> {
     let external_id = ExternalId::new(type_name, item_name);
 
     if let Ok(powered) = Powered::try_from(&external_id) {
         return match powered {
-            Powered::Dehumidifier => Ok(UserTrigger::Homekit(Homekit::DehumidifierPower(
-                value.try_into()?,
-            ))),
-            Powered::InfraredHeater => Ok(UserTrigger::Homekit(Homekit::InfraredHeaterPower(
-                value.try_into()?,
-            ))),
+            Powered::Dehumidifier => Ok(UserTrigger::Homekit(Homekit::DehumidifierPower(value.try_into()?))),
+            Powered::InfraredHeater => Ok(UserTrigger::Homekit(Homekit::InfraredHeaterPower(value.try_into()?))),
             _ => bail!("Powered-item {} not supported", item_name),
         };
     }
 
     if let Ok(energy_saving) = EnergySaving::try_from(&external_id) {
         return match energy_saving {
-            EnergySaving::LivingRoomTv => Ok(UserTrigger::Homekit(
-                Homekit::LivingRoomTvEnergySaving(value.try_into()?),
-            )),
+            EnergySaving::LivingRoomTv => {
+                Ok(UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(value.try_into()?)))
+            }
         };
     }
 
@@ -99,15 +82,11 @@ fn to_command(
         };
 
         if item_name == FanActivity::LivingRoomCeilingFan.ext_name() {
-            return Ok(UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(
-                activity,
-            )));
+            return Ok(UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(activity)));
         }
 
         if item_name == FanActivity::BedroomCeilingFan.ext_name() {
-            return Ok(UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(
-                activity,
-            )));
+            return Ok(UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(activity)));
         }
     }
 

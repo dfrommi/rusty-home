@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use actix_web::web::{self, Path, Query};
-use crate::home::state::{HeatingDemand, SetPoint, Temperature};
 use crate::core::time::DateTime;
+use crate::home::state::{HeatingDemand, SetPoint, Temperature};
+use actix_web::web::{self, Path, Query};
 
 use crate::{
-    adapter::grafana::{support::csv_response, GrafanaApiError, GrafanaResponse},
+    adapter::grafana::{GrafanaApiError, GrafanaResponse, support::csv_response},
     home::state::Opened,
     port::TimeSeriesAccess,
 };
@@ -118,11 +118,7 @@ where
     csv_response(&rows)
 }
 
-async fn temperature_stats<T>(
-    api: web::Data<T>,
-    room: Path<Room>,
-    query: Query<TimeRangeQuery>,
-) -> GrafanaResponse
+async fn temperature_stats<T>(api: web::Data<T>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
 where
     T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<SetPoint>,
 {
@@ -157,11 +153,7 @@ where
     csv_response(&rows)
 }
 
-async fn environment_stats<T>(
-    api: web::Data<T>,
-    room: Path<Room>,
-    query: Query<TimeRangeQuery>,
-) -> GrafanaResponse
+async fn environment_stats<T>(api: web::Data<T>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
 where
     T: TimeSeriesAccess<HeatingDemand>,
 {

@@ -5,17 +5,11 @@ use anyhow::Result;
 use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
-use crate::{
-    Database, core::planner::action::ActionEvaluationResult, port::CommandExecutionResult,
-};
+use crate::{Database, core::planner::action::ActionEvaluationResult, port::CommandExecutionResult};
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
-pub async fn plan_and_execute<G, A>(
-    active_goals: &[G],
-    config: &[(G, Vec<A>)],
-    api: &Database,
-) -> Result<PlanningTrace>
+pub async fn plan_and_execute<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &Database) -> Result<PlanningTrace>
 where
     G: Eq + Display,
     A: Action,
@@ -43,8 +37,7 @@ where
         tasks.push(process_action(context, api));
     }
 
-    let results: Result<Vec<Context<A>>> =
-        futures::future::join_all(tasks).await.into_iter().collect();
+    let results: Result<Vec<Context<A>>> = futures::future::join_all(tasks).await.into_iter().collect();
 
     let steps = results?.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
@@ -54,10 +47,7 @@ where
     skip_all,
     fields(action = %context.action, otel.name = %context.action),
 )]
-async fn process_action<'a, A>(
-    mut context: Context<'a, A>,
-    api: &Database,
-) -> Result<Context<'a, A>>
+async fn process_action<'a, A>(mut context: Context<'a, A>, api: &Database) -> Result<Context<'a, A>>
 where
     A: Action,
 {
@@ -80,20 +70,13 @@ where
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<'a, A>(
-    context: &mut Context<'a, A>,
-    api: &Database,
-) -> ActionEvaluationResult
+async fn evaluate_action<'a, A>(context: &mut Context<'a, A>, api: &Database) -> ActionEvaluationResult
 where
     A: Action,
 {
     let result = if context.goal_active {
         context.action.evaluate(api).await.unwrap_or_else(|e| {
-            tracing::warn!(
-                "Error evaluating action {}, assuming not fulfilled: {:?}",
-                context.action,
-                e
-            );
+            tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
             ActionEvaluationResult::Skip
         })
     } else {

@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
+use crate::home::command::{Command, PowerToggle};
 use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 use anyhow::Result;
-use crate::home::command::{Command, PowerToggle};
 
 use super::DataPointAccess;
 

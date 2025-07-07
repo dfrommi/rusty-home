@@ -10,9 +10,7 @@ use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
 use crate::{
     Database,
     home::{
-        command::{
-            Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat,
-        },
+        command::{Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat},
         state::macros::result,
     },
 };
@@ -205,8 +203,7 @@ async fn current_data_point_for_thermostat(
         );
     }
 
-    let is_expired =
-        get_expiration(&latest_command).map_or(false, |expiration| expiration < t!(now));
+    let is_expired = get_expiration(&latest_command).map_or(false, |expiration| expiration < t!(now));
 
     let comand_setting_followed = matches(&latest_command, auto_mode_on.value, set_point.value);
 
@@ -245,11 +242,7 @@ async fn current_data_point_for_thermostat(
     }
 }
 
-fn matches(
-    command_execution: &CommandExecution,
-    auto_mode_enabled: bool,
-    set_point: DegreeCelsius,
-) -> bool {
+fn matches(command_execution: &CommandExecution, auto_mode_enabled: bool, set_point: DegreeCelsius) -> bool {
     match command_execution.command {
         Command::SetHeating {
             target_state: HeatingTargetState::Auto,
@@ -270,10 +263,7 @@ fn matches(
 pub fn get_expiration(command_execution: &CommandExecution) -> Option<DateTime> {
     match &command_execution.command {
         Command::SetHeating {
-            target_state:
-                HeatingTargetState::Heat {
-                    duration: until, ..
-                },
+            target_state: HeatingTargetState::Heat { duration: until, .. },
             ..
         } => Some(command_execution.created + until.clone()),
         _ => None,

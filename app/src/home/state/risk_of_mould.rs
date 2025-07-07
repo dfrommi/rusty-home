@@ -65,10 +65,7 @@ where
 }
 
 impl RiskOfMould {
-    async fn get_reference_dewpoint(
-        &self,
-        api: &impl TimeSeriesAccess<DewPoint>,
-    ) -> Result<DegreeCelsius> {
+    async fn get_reference_dewpoint(&self, api: &impl TimeSeriesAccess<DewPoint>) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
                 DewPoint::LivingRoomDoor,

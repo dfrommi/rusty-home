@@ -8,6 +8,8 @@ use infrastructure::TraceContext;
 use schema::*;
 use sqlx::PgPool;
 
+// Command Execution & Processing
+// High-level command execution logic with deduplication and state validation
 impl super::Database {
     pub async fn execute(
         &self,
@@ -40,122 +42,6 @@ impl super::Database {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(command_target))]
-    pub async fn get_latest_command(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Option<CommandExecution>> {
-        let target: CommandTarget = target.into();
-        tracing::Span::current().record("command_target", tracing::field::display(&target));
-
-        //This is inefficient and modifies and copies data too often. Needs to be optimized
-        let mut all_commands = self.get_commands_using_cache(&target, since).await?;
-        Ok(all_commands.pop())
-    }
-
-    #[tracing::instrument(skip_all, fields(command_target))]
-    pub async fn get_all_commands_for_target(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution>> {
-        let target: CommandTarget = target.into();
-        tracing::Span::current().record("command_target", tracing::field::display(&target));
-
-        self.get_commands_using_cache(&target, since).await
-    }
-
-    pub async fn get_all_commands(
-        &self,
-        from: DateTime,
-        until: DateTime,
-    ) -> Result<Vec<CommandExecution>> {
-        //no cache, just used from dashboard
-        query_all_commands(&self.pool, None, &from, &until).await
-    }
-
-    #[tracing::instrument(skip(self))]
-    async fn save_command(
-        &self,
-        command: Command,
-        source: CommandSource,
-        correlation_id: Option<String>,
-    ) -> Result<()> {
-        let db_command = serde_json::json!(command);
-        let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
-
-        sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
-            db_command,
-            t!(now).into_db(),
-            DbCommandState::Pending as DbCommandState,
-            db_source_type as DbCommandSource,
-            db_source_id,
-            correlation_id
-        )
-        .execute(&self.pool)
-        .await?;
-
-        self.invalidate_command_cache(&command.into()).await;
-
-        Ok(())
-    }
-
-    fn cmd_caching_range(&self) -> DateTimeRange {
-        let now = t!(now);
-        DateTimeRange::new(now - self.cmd_cache_duration.clone(), now)
-    }
-
-    pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
-        tracing::debug!("Invalidating command cache for target {:?}", target);
-        self.cmd_cache.invalidate(target).await;
-    }
-
-    pub async fn get_commands_using_cache(
-        &self,
-        target: &CommandTarget,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution>> {
-        let cached = self
-            .cmd_cache
-            .try_get_with(target.clone(), async {
-                tracing::debug!("No command-cache entry found for target {:?}", target);
-                let range = self.cmd_caching_range();
-
-                query_all_commands(&self.pool, Some(target.clone()), range.start(), range.end())
-                    .await
-                    .map(|cmds| Arc::new((range.start().clone(), cmds)))
-            })
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Error initializing command cache for target {:?}: {:?}",
-                    target,
-                    e
-                )
-            })?;
-
-        if since < cached.0 {
-            tracing::info!(
-                ?since,
-                offset = %since.elapsed().to_iso_string(),
-                cache_start = %cached.0,
-                "Requested time range is before cached commands, querying database"
-            );
-            return query_all_commands(&self.pool, Some(target.clone()), &since, &t!(now)).await;
-        }
-
-        let commands: Vec<CommandExecution> = cached
-            .1
-            .iter()
-            .filter(|&cmd| cmd.created >= since)
-            .cloned()
-            .collect();
-
-        Ok(commands)
-    }
-
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
     pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.pool.begin().await?;
@@ -179,18 +65,11 @@ impl super::Database {
 
                 mark_other_commands_superseeded(&mut *tx, id).await?;
 
-                let command_res: std::result::Result<Command, serde_json::Error> =
-                    serde_json::from_value(rec.command);
+                let command_res: std::result::Result<Command, serde_json::Error> = serde_json::from_value(rec.command);
 
                 let result = match command_res {
                     Ok(command) => {
-                        set_command_status_in_tx(
-                            &mut *tx,
-                            id,
-                            DbCommandState::InProgress,
-                            Option::None,
-                        )
-                        .await?;
+                        set_command_status_in_tx(&mut *tx, id, DbCommandState::InProgress, Option::None).await?;
 
                         let source = CommandSource::from((rec.source_type, rec.source_id));
 
@@ -220,23 +99,126 @@ impl super::Database {
             }
         }
     }
+}
+
+// Command Querying & History
+// Methods for retrieving command history and state information
+impl super::Database {
+    #[tracing::instrument(skip_all, fields(command_target))]
+    pub async fn get_latest_command(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Option<CommandExecution>> {
+        let target: CommandTarget = target.into();
+        tracing::Span::current().record("command_target", tracing::field::display(&target));
+
+        //This is inefficient and modifies and copies data too often. Needs to be optimized
+        let mut all_commands = self.get_commands_using_cache(&target, since).await?;
+        Ok(all_commands.pop())
+    }
+
+    #[tracing::instrument(skip_all, fields(command_target))]
+    pub async fn get_all_commands_for_target(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Vec<CommandExecution>> {
+        let target: CommandTarget = target.into();
+        tracing::Span::current().record("command_target", tracing::field::display(&target));
+
+        self.get_commands_using_cache(&target, since).await
+    }
+
+    pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
+        //no cache, just used from dashboard
+        query_all_commands(&self.pool, None, &from, &until).await
+    }
+}
+
+// Command Persistence & State Management
+// Methods for saving commands and managing their execution state
+impl super::Database {
+    #[tracing::instrument(skip(self))]
+    async fn save_command(
+        &self,
+        command: Command,
+        source: CommandSource,
+        correlation_id: Option<String>,
+    ) -> Result<()> {
+        let db_command = serde_json::json!(command);
+        let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
+
+        sqlx::query!(
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
+            db_command,
+            t!(now).into_db(),
+            DbCommandState::Pending as DbCommandState,
+            db_source_type as DbCommandSource,
+            db_source_id,
+            correlation_id
+        )
+        .execute(&self.pool)
+        .await?;
+
+        self.invalidate_command_cache(&command.into()).await;
+
+        Ok(())
+    }
 
     pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
         set_command_status_in_tx(&self.pool, command_id, DbCommandState::Success, None).await
     }
 
-    pub async fn set_command_state_error(
+    pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
+        set_command_status_in_tx(&self.pool, command_id, DbCommandState::Error, Some(error_message)).await
+    }
+}
+
+// Command Caching
+// Methods for managing command cache to improve query performance
+impl super::Database {
+    fn cmd_caching_range(&self) -> DateTimeRange {
+        let now = t!(now);
+        DateTimeRange::new(now - self.cmd_cache_duration.clone(), now)
+    }
+
+    pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
+        tracing::debug!("Invalidating command cache for target {:?}", target);
+        self.cmd_cache.invalidate(target).await;
+    }
+
+    pub async fn get_commands_using_cache(
         &self,
-        command_id: i64,
-        error_message: &str,
-    ) -> Result<()> {
-        set_command_status_in_tx(
-            &self.pool,
-            command_id,
-            DbCommandState::Error,
-            Some(error_message),
-        )
-        .await
+        target: &CommandTarget,
+        since: DateTime,
+    ) -> Result<Vec<CommandExecution>> {
+        let cached = self
+            .cmd_cache
+            .try_get_with(target.clone(), async {
+                tracing::debug!("No command-cache entry found for target {:?}", target);
+                let range = self.cmd_caching_range();
+
+                query_all_commands(&self.pool, Some(target.clone()), range.start(), range.end())
+                    .await
+                    .map(|cmds| Arc::new((range.start().clone(), cmds)))
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;
+
+        if since < cached.0 {
+            tracing::info!(
+                ?since,
+                offset = %since.elapsed().to_iso_string(),
+                cache_start = %cached.0,
+                "Requested time range is before cached commands, querying database"
+            );
+            return query_all_commands(&self.pool, Some(target.clone()), &since, &t!(now)).await;
+        }
+
+        let commands: Vec<CommandExecution> = cached.1.iter().filter(|&cmd| cmd.created >= since).cloned().collect();
+
+        Ok(commands)
     }
 }
 
@@ -300,7 +282,8 @@ async fn mark_other_commands_superseeded(
     executor: impl sqlx::Executor<'_, Database = sqlx::Postgres>,
     excluded_command_id: i64,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(r#"
+    sqlx::query!(
+        r#"
         WITH excluded_command AS (
             SELECT command->'type' as type, command->'device' as device FROM THING_COMMAND WHERE id = $1
         )
@@ -309,11 +292,12 @@ async fn mark_other_commands_superseeded(
         WHERE id != $1
         AND status = $4
         AND command->'type' = (SELECT type FROM excluded_command)
-        AND command->'device' = (SELECT device FROM excluded_command)"#, 
+        AND command->'device' = (SELECT device FROM excluded_command)"#,
         excluded_command_id,
         DbCommandState::Error as DbCommandState,
-        format!("Command was superseded by {}", excluded_command_id), 
-        DbCommandState::Pending as DbCommandState)
+        format!("Command was superseded by {}", excluded_command_id),
+        DbCommandState::Pending as DbCommandState
+    )
     .execute(executor)
     .await?;
 
@@ -358,9 +342,7 @@ pub mod mapper {
                 DbCommandState::Pending => CommandState::Pending,
                 DbCommandState::InProgress => CommandState::InProgress,
                 DbCommandState::Success => CommandState::Success,
-                DbCommandState::Error => {
-                    CommandState::Error(error.unwrap_or("unknown error".to_string()))
-                }
+                DbCommandState::Error => CommandState::Error(error.unwrap_or("unknown error".to_string())),
             }
         }
     }
@@ -421,14 +403,9 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(
-            &db_pool,
-            Some(PowerToggle::Dehumidifier.into()),
-            &t!(8 minutes ago),
-            &t!(now),
-        )
-        .await
-        .unwrap();
+        let result = query_all_commands(&db_pool, Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+            .await
+            .unwrap();
 
         //THEN
         assert_eq!(result.len(), 2);
@@ -494,14 +471,9 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(
-            &db_pool,
-            Some(PowerToggle::Dehumidifier.into()),
-            &t!(8 minutes ago),
-            &t!(now),
-        )
-        .await
-        .unwrap();
+        let result = query_all_commands(&db_pool, Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+            .await
+            .unwrap();
 
         //THEN
         assert_eq!(result.len(), 0);

@@ -1,11 +1,13 @@
+use crate::core::time::DateTime;
+use crate::t;
 use crate::{
     core::timeseries::DataPoint,
     home::trigger::{UserTrigger, UserTriggerTarget},
 };
 use anyhow::Context;
-use crate::t;
-use crate::core::time::DateTime;
 
+// User Trigger Management
+// Methods for storing and retrieving user-triggered events and interactions
 impl super::Database {
     #[tracing::instrument(skip(self))]
     pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
@@ -46,10 +48,7 @@ impl super::Database {
         .await?;
 
         let result = match rec {
-            Some(row) => Some(DataPoint::new(
-                serde_json::from_value(row.trigger)?,
-                row.timestamp.into(),
-            )),
+            Some(row) => Some(DataPoint::new(serde_json::from_value(row.trigger)?, row.timestamp.into())),
             None => None,
         };
 

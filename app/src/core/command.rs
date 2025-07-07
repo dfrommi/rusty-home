@@ -64,8 +64,7 @@ async fn handle_execution_result(command_id: i64, res: Result<bool>, repo: &Data
         }
         Err(e) => {
             tracing::error!("Command {} failed: {:?}", command_id, e);
-            repo.set_command_state_error(command_id, &e.to_string())
-                .await
+            repo.set_command_state_error(command_id, &e.to_string()).await
         }
     };
 

@@ -79,10 +79,7 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
                         DataPoint::new(
-                            PersistentStateValue::CurrentPowerUsage(
-                                power.clone(),
-                                Watt(energy_report.power),
-                            ),
+                            PersistentStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
                             tele_message.time,
                         )
                         .into(),
@@ -115,24 +112,12 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(
-                            PersistentStateValue::Powered(powered.clone(), true),
-                            t!(now),
-                        )
-                        .into(),
+                        DataPoint::new(PersistentStateValue::Powered(powered.clone(), true), t!(now)).into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(
-                            PersistentStateValue::Powered(powered.clone(), false),
-                            t!(now),
-                        )
-                        .into(),
+                        DataPoint::new(PersistentStateValue::Powered(powered.clone(), false), t!(now)).into(),
                     ]),
-                    _ => bail!(
-                        "Unexpected payload for PowerToggle {}: {}",
-                        device_id,
-                        msg.payload
-                    ),
+                    _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, msg.payload),
                 }
             }
         }

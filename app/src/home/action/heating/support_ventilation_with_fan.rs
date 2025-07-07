@@ -54,9 +54,7 @@ impl SimpleAction for SupportVentilationWithFan {
             tracing::trace!("Window is open, but for less than a minute");
             return Ok(false);
         } else if elapsed > t!(10 minutes) {
-            tracing::trace!(
-                "Window is open, but for more than 10 minutes. Stopping active support"
-            );
+            tracing::trace!("Window is open, but for more than 10 minutes. Stopping active support");
             return Ok(false);
         }
 

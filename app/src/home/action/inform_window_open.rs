@@ -1,12 +1,10 @@
 use std::fmt::Display;
 
+use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::home::command::{
-    Command, CommandSource, Notification, NotificationAction, NotificationRecipient,
-};
+use crate::home::command::{Command, CommandSource, Notification, NotificationAction, NotificationRecipient};
 use crate::home::state::Presence;
 use crate::t;
-use crate::core::time::DateTime;
 
 use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 
@@ -76,11 +74,7 @@ where
     .into_iter()
     .collect();
 
-    let active_values: Vec<DateTime> = result?
-        .into_iter()
-        .filter(|v| v.value)
-        .map(|v| v.timestamp)
-        .collect();
+    let active_values: Vec<DateTime> = result?.into_iter().filter(|v| v.value).map(|v| v.timestamp).collect();
 
     match (active_values.iter().min(), active_values.iter().max()) {
         (Some(min), Some(max)) => Ok(Some((*min, *max))),

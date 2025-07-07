@@ -97,21 +97,13 @@ impl From<&PersistentStateValue> for f64 {
             PersistentStateValue::Opened(_, value) => Opened::to_f64(value),
             PersistentStateValue::Powered(_, value) => Powered::to_f64(value),
             PersistentStateValue::CurrentPowerUsage(_, value) => CurrentPowerUsage::to_f64(value),
-            PersistentStateValue::TotalEnergyConsumption(_, value) => {
-                TotalEnergyConsumption::to_f64(value)
-            }
+            PersistentStateValue::TotalEnergyConsumption(_, value) => TotalEnergyConsumption::to_f64(value),
             PersistentStateValue::SetPoint(_, value) => SetPoint::to_f64(value),
             PersistentStateValue::HeatingDemand(_, value) => HeatingDemand::to_f64(value),
-            PersistentStateValue::ExternalAutoControl(_, value) => {
-                ExternalAutoControl::to_f64(value)
-            }
+            PersistentStateValue::ExternalAutoControl(_, value) => ExternalAutoControl::to_f64(value),
             PersistentStateValue::Presence(_, value) => Presence::to_f64(value),
-            PersistentStateValue::TotalRadiatorConsumption(_, value) => {
-                TotalRadiatorConsumption::to_f64(value)
-            }
-            PersistentStateValue::TotalWaterConsumption(_, value) => {
-                TotalWaterConsumption::to_f64(value)
-            }
+            PersistentStateValue::TotalRadiatorConsumption(_, value) => TotalRadiatorConsumption::to_f64(value),
+            PersistentStateValue::TotalWaterConsumption(_, value) => TotalWaterConsumption::to_f64(value),
             PersistentStateValue::FanActivity(_, value) => FanActivity::to_f64(value),
         }
     }
@@ -121,57 +113,33 @@ impl From<(PersistentState, f64)> for PersistentStateValue {
     fn from(val: (PersistentState, f64)) -> Self {
         let (channel, value) = val;
         match channel {
-            PersistentState::Temperature(item) => {
-                PersistentStateValue::Temperature(item, Temperature::from_f64(value))
-            }
+            PersistentState::Temperature(item) => PersistentStateValue::Temperature(item, Temperature::from_f64(value)),
             PersistentState::RelativeHumidity(item) => {
                 PersistentStateValue::RelativeHumidity(item, RelativeHumidity::from_f64(value))
             }
-            PersistentState::Opened(item) => {
-                PersistentStateValue::Opened(item, Opened::from_f64(value))
-            }
-            PersistentState::Powered(item) => {
-                PersistentStateValue::Powered(item, Powered::from_f64(value))
-            }
+            PersistentState::Opened(item) => PersistentStateValue::Opened(item, Opened::from_f64(value)),
+            PersistentState::Powered(item) => PersistentStateValue::Powered(item, Powered::from_f64(value)),
             PersistentState::CurrentPowerUsage(item) => {
                 PersistentStateValue::CurrentPowerUsage(item, CurrentPowerUsage::from_f64(value))
             }
             PersistentState::TotalEnergyConsumption(item) => {
-                PersistentStateValue::TotalEnergyConsumption(
-                    item,
-                    TotalEnergyConsumption::from_f64(value),
-                )
+                PersistentStateValue::TotalEnergyConsumption(item, TotalEnergyConsumption::from_f64(value))
             }
-            PersistentState::SetPoint(item) => {
-                PersistentStateValue::SetPoint(item, SetPoint::from_f64(value))
-            }
+            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, SetPoint::from_f64(value)),
             PersistentState::HeatingDemand(item) => {
                 PersistentStateValue::HeatingDemand(item, HeatingDemand::from_f64(value))
             }
             PersistentState::ExternalAutoControl(item) => {
-                PersistentStateValue::ExternalAutoControl(
-                    item,
-                    ExternalAutoControl::from_f64(value),
-                )
+                PersistentStateValue::ExternalAutoControl(item, ExternalAutoControl::from_f64(value))
             }
-            PersistentState::Presence(item) => {
-                PersistentStateValue::Presence(item, Presence::from_f64(value))
-            }
+            PersistentState::Presence(item) => PersistentStateValue::Presence(item, Presence::from_f64(value)),
             PersistentState::TotalRadiatorConsumption(item) => {
-                PersistentStateValue::TotalRadiatorConsumption(
-                    item,
-                    TotalRadiatorConsumption::from_f64(value),
-                )
+                PersistentStateValue::TotalRadiatorConsumption(item, TotalRadiatorConsumption::from_f64(value))
             }
             PersistentState::TotalWaterConsumption(item) => {
-                PersistentStateValue::TotalWaterConsumption(
-                    item,
-                    TotalWaterConsumption::from_f64(value),
-                )
+                PersistentStateValue::TotalWaterConsumption(item, TotalWaterConsumption::from_f64(value))
             }
-            PersistentState::FanActivity(item) => {
-                PersistentStateValue::FanActivity(item, FanActivity::from_f64(value))
-            }
+            PersistentState::FanActivity(item) => PersistentStateValue::FanActivity(item, FanActivity::from_f64(value)),
         }
     }
 }
@@ -246,14 +214,8 @@ mod tests {
         }
 
         pub fn temperature_series(&mut self, values: &[(f64, DateTime)]) -> &mut Self {
-            self.temperature_df = Some(
-                DataFrame::new(
-                    values
-                        .iter()
-                        .map(|(v, t)| DataPoint::new(DegreeCelsius(*v), *t)),
-                )
-                .unwrap(),
-            );
+            self.temperature_df =
+                Some(DataFrame::new(values.iter().map(|(v, t)| DataPoint::new(DegreeCelsius(*v), *t))).unwrap());
 
             self
         }
@@ -266,10 +228,7 @@ mod tests {
     }
 
     impl DataPointAccess<Temperature> for Api {
-        async fn current_data_point(
-            &self,
-            _: Temperature,
-        ) -> anyhow::Result<DataPoint<DegreeCelsius>> {
+        async fn current_data_point(&self, _: Temperature) -> anyhow::Result<DataPoint<DegreeCelsius>> {
             Ok(self.temperature_dp.clone().unwrap())
         }
     }

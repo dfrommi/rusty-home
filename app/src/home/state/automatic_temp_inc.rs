@@ -35,10 +35,7 @@ impl<T> DataPointAccess<AutomaticTemperatureIncrease> for T
 where
     T: DataPointAccess<Opened> + DataPointAccess<Temperature> + TimeSeriesAccess<Temperature>,
 {
-    async fn current_data_point(
-        &self,
-        item: AutomaticTemperatureIncrease,
-    ) -> anyhow::Result<DataPoint<bool>> {
+    async fn current_data_point(&self, item: AutomaticTemperatureIncrease) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
         let outside_temp = self.current_data_point(Temperature::Outside).await?;
 
@@ -50,19 +47,12 @@ where
         }
 
         let (window, temp_sensor) = match item {
-            AutomaticTemperatureIncrease::LivingRoom => {
-                (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor)
+            AutomaticTemperatureIncrease::LivingRoom => (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
+            AutomaticTemperatureIncrease::Bedroom => (Opened::BedroomWindow, Temperature::BedroomDoor),
+            AutomaticTemperatureIncrease::Kitchen => (Opened::KitchenWindow, Temperature::KitchenOuterWall),
+            AutomaticTemperatureIncrease::RoomOfRequirements => {
+                (Opened::RoomOfRequirementsWindow, Temperature::RoomOfRequirementsDoor)
             }
-            AutomaticTemperatureIncrease::Bedroom => {
-                (Opened::BedroomWindow, Temperature::BedroomDoor)
-            }
-            AutomaticTemperatureIncrease::Kitchen => {
-                (Opened::KitchenWindow, Temperature::KitchenOuterWall)
-            }
-            AutomaticTemperatureIncrease::RoomOfRequirements => (
-                Opened::RoomOfRequirementsWindow,
-                Temperature::RoomOfRequirementsDoor,
-            ),
         };
 
         let window_opened = self.current_data_point(window).await?;
@@ -89,9 +79,7 @@ where
             );
         }
 
-        let temperature = self
-            .series_since(temp_sensor, window_opened.timestamp)
-            .await?;
+        let temperature = self.series_since(temp_sensor, window_opened.timestamp).await?;
 
         //wait for a measurement. until then assume opened window still has effect
         if temperature.len_non_estimated() < 2 {
@@ -208,8 +196,6 @@ mod tests {
     }
 
     async fn increasing(api: Api) -> bool {
-        api.current(AutomaticTemperatureIncrease::LivingRoom)
-            .await
-            .unwrap()
+        api.current(AutomaticTemperatureIncrease::LivingRoom).await.unwrap()
     }
 }

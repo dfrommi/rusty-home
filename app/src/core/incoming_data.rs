@@ -16,11 +16,8 @@ pub trait IncomingDataSource<Message, Channel> {
     ) -> anyhow::Result<Vec<IncomingData>>;
 }
 
-pub async fn process_incoming_data_source<M, C>(
-    name: &str,
-    mut source: impl IncomingDataSource<M, C>,
-    db: &Database,
-) where
+pub async fn process_incoming_data_source<M, C>(name: &str, mut source: impl IncomingDataSource<M, C>, db: &Database)
+where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
 {
@@ -34,12 +31,8 @@ pub async fn process_incoming_data_source<M, C>(
     }
 }
 
-async fn handle_incoming_data<M, C>(
-    name: &str,
-    msg: &M,
-    source: &impl IncomingDataSource<M, C>,
-    db: &Database,
-) where
+async fn handle_incoming_data<M, C>(name: &str, msg: &M, source: &impl IncomingDataSource<M, C>, db: &Database)
+where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
 {
@@ -53,12 +46,7 @@ async fn handle_incoming_data<M, C>(
         return;
     }
 
-    tracing::debug!(
-        "Received {} event for devices {}: {:?}",
-        name,
-        device_id,
-        channels
-    );
+    tracing::debug!("Received {} event for devices {}: {:?}", name, device_id, channels);
 
     let mut incoming_data = vec![];
 

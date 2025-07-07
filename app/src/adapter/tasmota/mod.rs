@@ -35,27 +35,19 @@ impl Tasmota {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl Future<Output = ()> + use<> {
-        let ds = self
-            .new_incoming_data_source(&mut infrastructure.mqtt_client)
-            .await;
+        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let db = infrastructure.database.clone();
         async move { process_incoming_data_source("Tasmota", ds, &db).await }
     }
 
-    pub fn new_command_executor(
-        &self,
-        infrastructure: &Infrastructure,
-    ) -> impl CommandExecutor + use<> {
+    pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
         let tx = infrastructure.mqtt_client.new_publisher();
         let config = config::default_tasmota_command_config();
         TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
     }
 
-    async fn new_incoming_data_source(
-        &self,
-        mqtt_client: &mut infrastructure::Mqtt,
-    ) -> TasmotaIncomingDataSource {
+    async fn new_incoming_data_source(&self, mqtt_client: &mut infrastructure::Mqtt) -> TasmotaIncomingDataSource {
         let config = DeviceConfig::new(&config::default_tasmota_state_config());
         let tele_base_topic = format!("{}/tele", self.event_topic);
         let stat_base_topic = format!("{}/stat", self.event_topic);

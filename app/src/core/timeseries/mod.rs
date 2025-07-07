@@ -74,9 +74,7 @@ impl<C: Estimatable> TimeSeries<C> {
             }
         }
 
-        let range = first_series
-            .range()
-            .intersection_with(&second_series.range());
+        let range = first_series.range().intersection_with(&second_series.range());
 
         let df = DataFrame::new(dps)?;
 
@@ -126,11 +124,7 @@ impl<C: Estimatable> TimeSeries<C> {
         })
     }
 
-    fn interpolate_or_guess(
-        context: &C,
-        at: DateTime,
-        data: &DataFrame<C::ValueType>,
-    ) -> Option<C::ValueType> {
+    fn interpolate_or_guess(context: &C, at: DateTime, data: &DataFrame<C::ValueType>) -> Option<C::ValueType> {
         context
             .interpolate(at, data)
             //reconsider implicit last-seen. Needed to avoid empty time-series in some cases
@@ -234,8 +228,7 @@ where
             }
         }
 
-        DataFrame::new(datapoints)
-            .expect("Internal error: error creating DataFrame from non-empty datapoints")
+        DataFrame::new(datapoints).expect("Internal error: error creating DataFrame from non-empty datapoints")
     }
 }
 
@@ -250,9 +243,7 @@ mod tests {
         let ts = test_series();
 
         //mean value per time range, multiplied by duration, last section uses last seen value
-        let expected =
-            ((10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0)
-                / 5.0;
+        let expected = ((10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0) / 5.0;
 
         assert_eq!(ts.mean().0, expected);
     }
@@ -260,8 +251,7 @@ mod tests {
     #[test]
     fn test_area_in_type_hours() {
         let ts = test_series();
-        let expected =
-            (10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0;
+        let expected = (10.0 + 20.0) / 2.0 * 2.0 + (20.0 + 30.0) / 2.0 * 2.0 + (30.0 + 30.0) / 2.0 * 1.0;
         assert_eq!(ts.area_in_type_hours(), expected);
     }
 
@@ -275,10 +265,7 @@ mod tests {
             let dp_opt = ts.at(DateTime::from_iso("2024-09-10T16:30:00Z").unwrap());
 
             let dp = assert_some(dp_opt);
-            assert_eq!(
-                dp.timestamp,
-                DateTime::from_iso("2024-09-10T16:30:00Z").unwrap()
-            );
+            assert_eq!(dp.timestamp, DateTime::from_iso("2024-09-10T16:30:00Z").unwrap());
             assert_eq!(dp.value.0, 22.5);
         }
 
@@ -368,9 +355,7 @@ mod combined {
         .unwrap();
 
         let result =
-            TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoomDoor, |a, b| {
-                DegreeCelsius(a.0 + b.0)
-            });
+            TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoomDoor, |a, b| DegreeCelsius(a.0 + b.0));
 
         assert_eq!(result.iter().len(), 1);
     }

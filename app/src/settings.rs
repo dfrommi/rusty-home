@@ -17,9 +17,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let s = Config::builder()
-            .add_source(File::with_name("config.toml"))
-            .build()?;
+        let s = Config::builder().add_source(File::with_name("config.toml")).build()?;
 
         s.try_deserialize()
     }
@@ -42,10 +40,7 @@ pub mod test {
                 None => return Err(ConfigError::NotFound("test.toml".to_owned())),
             };
 
-            Config::builder()
-                .add_source(source)
-                .build()?
-                .try_deserialize()
+            Config::builder().add_source(source).build()?.try_deserialize()
         }
     }
 

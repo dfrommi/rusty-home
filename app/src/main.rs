@@ -33,22 +33,14 @@ pub async fn main() {
         .new_incoming_data_processor(&mut infrastructure)
         .await;
 
-    let z2m_incoming_data_processing = settings
-        .z2m
-        .new_incoming_data_processor(&mut infrastructure)
-        .await;
+    let z2m_incoming_data_processing = settings.z2m.new_incoming_data_processor(&mut infrastructure).await;
 
-    let tasmota_incoming_data_processing = settings
-        .tasmota
-        .new_incoming_data_processor(&mut infrastructure)
-        .await;
+    let tasmota_incoming_data_processing = settings.tasmota.new_incoming_data_processor(&mut infrastructure).await;
 
     let energy_meter_processing = energy_meter
         .new_incoming_data_processor(
             infrastructure.database.clone(),
-            infrastructure
-                .event_listener
-                .new_energy_reading_added_listener(),
+            infrastructure.event_listener.new_energy_reading_added_listener(),
         )
         .await;
 
@@ -142,16 +134,9 @@ where
 
 impl Infrastructure {
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
-        settings
-            .monitoring
-            .init()
-            .expect("Error initializing monitoring");
+        settings.monitoring.init().expect("Error initializing monitoring");
 
-        let db_pool = settings
-            .database
-            .new_pool()
-            .await
-            .expect("Error initializing database");
+        let db_pool = settings.database.new_pool().await.expect("Error initializing database");
         let database = Database::new(db_pool);
 
         let db_listener = settings
@@ -159,8 +144,7 @@ impl Infrastructure {
             .new_listener()
             .await
             .expect("Error initializing database listener");
-        let event_listener =
-            AppEventListener::new(DbEventListener::new(db_listener), database.clone());
+        let event_listener = AppEventListener::new(DbEventListener::new(db_listener), database.clone());
 
         let mqtt_client = settings.mqtt.new_client();
 
@@ -182,9 +166,7 @@ impl Infrastructure {
 fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
     let api = infrastructure.database.clone();
     let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
-    let mut user_trigger_events = infrastructure
-        .event_listener
-        .new_user_trigger_event_listener();
+    let mut user_trigger_events = infrastructure.event_listener.new_user_trigger_event_listener();
 
     async move {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));

@@ -79,10 +79,7 @@ async fn any_of(
     api: &impl DataPointAccess<raw::Opened>,
     opened_states: Vec<raw::Opened>,
 ) -> anyhow::Result<DataPoint<bool>> {
-    let futures: Vec<_> = opened_states
-        .into_iter()
-        .map(|o| api.current_data_point(o))
-        .collect();
+    let futures: Vec<_> = opened_states.into_iter().map(|o| api.current_data_point(o)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
     match res {
@@ -100,11 +97,7 @@ impl<T> TimeSeriesAccess<Opened> for T
 where
     T: TimeSeriesAccess<raw::Opened>,
 {
-    async fn series(
-        &self,
-        item: Opened,
-        range: DateTimeRange,
-    ) -> anyhow::Result<TimeSeries<Opened>> {
+    async fn series(&self, item: Opened, range: DateTimeRange) -> anyhow::Result<TimeSeries<Opened>> {
         let api_items = item.api_items();
         let context: raw::Opened = api_items[0].clone();
 

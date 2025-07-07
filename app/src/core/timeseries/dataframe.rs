@@ -43,8 +43,7 @@ impl<T> DataFrame<T> {
             DataPoint::new(f(dp), ts)
         });
 
-        DataFrame::new(values)
-            .expect("Internal error: Error creating data frame of non-empty datapoints")
+        DataFrame::new(values).expect("Internal error: Error creating data frame of non-empty datapoints")
     }
 
     pub fn insert(&mut self, dp: DataPoint<T>) {
@@ -81,11 +80,7 @@ impl<T> DataFrame<T> {
     {
         self.data
             .iter()
-            .min_by(|(_, a), (_, b)| {
-                a.value
-                    .partial_cmp(&b.value)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+            .min_by(|(_, a), (_, b)| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal))
             .expect("Internal error: map should not be empty")
             .1
     }
@@ -100,8 +95,7 @@ impl<T> DataFrame<T> {
                 current.map_value(|_| {
                     (
                         current.value.clone(),
-                        next.map_or(t!(now), |n| n.timestamp)
-                            .elapsed_since(current.timestamp),
+                        next.map_or(t!(now), |n| n.timestamp).elapsed_since(current.timestamp),
                     )
                 })
             })

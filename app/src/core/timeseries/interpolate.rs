@@ -3,8 +3,7 @@ use crate::core::{ValueObject, time::DateTime};
 use super::DataFrame;
 
 pub trait Estimatable: ValueObject {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::ValueType>)
-    -> Option<Self::ValueType>;
+    fn interpolate(&self, at: DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType>;
 }
 
 pub mod algo {
@@ -41,8 +40,8 @@ pub mod algo {
         let prev_value: f64 = (&prev.value).into();
         let next_value: f64 = (&next.value).into();
 
-        let interpolated_value = prev_value
-            + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
+        let interpolated_value =
+            prev_value + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
 
         Some(interpolated_value.into())
     }

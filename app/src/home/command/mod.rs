@@ -1,9 +1,9 @@
 mod command_state;
 
+use crate::core::time::{DateTime, Duration};
+use crate::core::unit::DegreeCelsius;
 use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
-use crate::core::unit::DegreeCelsius;
-use crate::core::time::{DateTime, Duration};
 
 use crate::home::state::FanAirflow;
 
@@ -65,12 +65,8 @@ impl From<Command> for CommandTarget {
 impl From<&Command> for CommandTarget {
     fn from(val: &Command) -> Self {
         match val {
-            Command::SetPower { device, .. } => CommandTarget::SetPower {
-                device: device.clone(),
-            },
-            Command::SetHeating { device, .. } => CommandTarget::SetHeating {
-                device: device.clone(),
-            },
+            Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
+            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
             Command::PushNotify {
                 recipient,
                 notification,
@@ -79,12 +75,8 @@ impl From<&Command> for CommandTarget {
                 recipient: recipient.clone(),
                 notification: notification.clone(),
             },
-            Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving {
-                device: device.clone(),
-            },
-            Command::ControlFan { device, .. } => CommandTarget::ControlFan {
-                device: device.clone(),
-            },
+            Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving { device: device.clone() },
+            Command::ControlFan { device, .. } => CommandTarget::ControlFan { device: device.clone() },
         }
     }
 }
@@ -209,9 +201,9 @@ pub enum Fan {
 
 #[cfg(test)]
 mod test {
+    use crate::t;
     use assert_json_diff::assert_json_eq;
     use serde_json::json;
-    use crate::t;
 
     use super::*;
 

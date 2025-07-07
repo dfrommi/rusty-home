@@ -5,11 +5,7 @@ use crate::{Database, core::timeseries::DataPoint};
 use super::{EnergyReading, Faucet, Radiator};
 
 impl Database {
-    pub async fn add_yearly_energy_reading(
-        &self,
-        reading: EnergyReading,
-        timestamp: DateTime,
-    ) -> anyhow::Result<()> {
+    pub async fn add_yearly_energy_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<()> {
         //TODO derive automatically from enum
         let (type_, item, value): (&str, &str, f64) = match reading {
             EnergyReading::Heating(item, value) => ("heating", item.into(), value),
@@ -77,10 +73,7 @@ impl Database {
         Ok(readings)
     }
 
-    pub async fn get_total_reading_by_id(
-        &self,
-        id: i64,
-    ) -> anyhow::Result<DataPoint<EnergyReading>> {
+    pub async fn get_total_reading_by_id(&self, id: i64) -> anyhow::Result<DataPoint<EnergyReading>> {
         let row = sqlx::query!(
             r#"SELECT DISTINCT ON (type, name) 
                 type as "reading_type!", 
@@ -109,10 +102,7 @@ fn try_into_reading(type_: &str, name: &str, value: f64) -> anyhow::Result<Energ
         "heating" => Ok(EnergyReading::Heating(name.try_into()?, value)),
         "cold_water" => Ok(EnergyReading::ColdWater(name.try_into().unwrap(), value)),
         "hot_water" => Ok(EnergyReading::HotWater(name.try_into().unwrap(), value)),
-        _ => Err(anyhow::anyhow!(
-            "Received unsupported energy reading type {}",
-            type_
-        )),
+        _ => Err(anyhow::anyhow!("Received unsupported energy reading type {}", type_)),
     }
 }
 

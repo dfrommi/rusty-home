@@ -1,6 +1,6 @@
-use sqlx::types::chrono;
-use crate::t;
 use crate::core::time::DateTime;
+use crate::t;
+use sqlx::types::chrono;
 
 use crate::core::planner::{PlanningTrace, PlanningTraceStep};
 
@@ -16,14 +16,12 @@ impl TryInto<PlanningTrace> for PlanningTraceRow {
 
     fn try_into(self) -> Result<PlanningTrace, Self::Error> {
         let steps: Vec<PlanningTraceStep> = serde_json::from_value(self.steps)?;
-        Ok(PlanningTrace::new(
-            self.timestamp.into(),
-            self.trace_id,
-            steps,
-        ))
+        Ok(PlanningTrace::new(self.timestamp.into(), self.trace_id, steps))
     }
 }
 
+// Planning Trace Persistence
+// Methods for storing planning execution traces
 impl super::Database {
     #[tracing::instrument(skip_all)]
     pub async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
@@ -38,7 +36,11 @@ impl super::Database {
 
         Ok(())
     }
+}
 
+// Planning Trace Retrieval
+// Methods for querying and retrieving planning execution traces
+impl super::Database {
     pub async fn get_latest_planning_trace(
         &self,
         before: crate::core::time::DateTime,
@@ -61,10 +63,7 @@ impl super::Database {
         }
     }
 
-    pub async fn get_planning_traces_by_trace_id(
-        &self,
-        trace_id: &str,
-    ) -> anyhow::Result<Option<PlanningTrace>> {
+    pub async fn get_planning_traces_by_trace_id(&self, trace_id: &str) -> anyhow::Result<Option<PlanningTrace>> {
         let recs = sqlx::query_as!(
             PlanningTraceRow,
             r#"SELECT * FROM planning_trace WHERE trace_id = $1"#,
@@ -96,10 +95,7 @@ impl super::Database {
 
         Ok(recs
             .into_iter()
-            .filter_map(|rec| {
-                rec.trace_id
-                    .map(|trace_id| (trace_id, rec.timestamp.into()))
-            })
+            .filter_map(|rec| rec.trace_id.map(|trace_id| (trace_id, rec.timestamp.into())))
             .collect())
     }
 
@@ -119,8 +115,6 @@ impl super::Database {
         .fetch_all(&self.pool)
         .await?;
 
-        recs.into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, _>>()
+        recs.into_iter().map(TryInto::try_into).collect::<Result<Vec<_>, _>>()
     }
 }

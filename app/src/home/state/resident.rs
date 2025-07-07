@@ -41,10 +41,7 @@ where
     }
 }
 
-async fn sleeping(
-    in_bed: Presence,
-    api: &impl TimeSeriesAccess<Presence>,
-) -> Result<DataPoint<bool>> {
+async fn sleeping(in_bed: Presence, api: &impl TimeSeriesAccess<Presence>) -> Result<DataPoint<bool>> {
     let now = t!(now);
     let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
 
@@ -66,22 +63,15 @@ async fn sleeping(
         .await?
         .with_duration_until_next_dp();
 
-    let in_bed_start_range = DateTimeRange::new(
-        *in_bed_full_range.start(),
-        in_bed_full_range.end().at(t!(3:00)).unwrap(),
-    );
+    let in_bed_start_range =
+        DateTimeRange::new(*in_bed_full_range.start(), in_bed_full_range.end().at(t!(3:00)).unwrap());
 
-    let in_bed_stop_range = DateTimeRange::new(
-        in_bed_full_range.end().at(t!(5:00)).unwrap(),
-        *in_bed_full_range.end(),
-    );
+    let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(5:00)).unwrap(), *in_bed_full_range.end());
 
     //Some has always true value
     let sleeping_started = ts
         .iter()
-        .find(|dp| {
-            in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds)
-        })
+        .find(|dp| in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds))
         .map(|dp| dp.map_value(|v| v.1.clone()));
 
     //Some has always true value
@@ -130,11 +120,7 @@ async fn sleeping(
         }
 
         (None, Some(stopped_dp)) => {
-            bail!(
-                "Internal error: {} sleeping stopped, but not started: {:?}",
-                in_bed,
-                stopped_dp
-            );
+            bail!("Internal error: {} sleeping stopped, but not started: {:?}", in_bed, stopped_dp);
         }
     };
 }

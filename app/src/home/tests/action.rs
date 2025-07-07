@@ -1,13 +1,13 @@
+use crate::core::time::{DateTime, FIXED_NOW};
 use crate::home::command::Thermostat;
 use crate::home::trigger::{HomekitTarget, UserTriggerTarget};
-use crate::core::time::{DateTime, FIXED_NOW};
 
 use crate::{
     core::planner::{Action, ActionEvaluationResult},
     home::{
         action::{
-            DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping, HeatingZone, HomeAction,
-            KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, UserTriggerAction,
+            DeferHeatingUntilVentilationDone, ExtendHeatingUntilSleeping, HeatingZone, HomeAction, KeepUserOverride,
+            NoHeatingDuringAutomaticTemperatureIncrease, UserTriggerAction,
         },
         state::UserControlled,
     },
@@ -36,10 +36,7 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
 
 #[test]
 fn user_override_kept_continuously() {
-    let action = KeepUserOverride::new(
-        UserControlled::BedroomThermostat,
-        Thermostat::Bedroom.into(),
-    );
+    let action = KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into());
 
     let result = get_state_at("2024-11-11T21:12:01+01:00", action);
 
@@ -92,8 +89,7 @@ fn heating_before_sleeping_extended_over_midnight() {
 
 #[test]
 fn user_trigger_not_started() {
-    let action =
-        UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower));
+    let action = UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower));
 
     let result = get_state_at("2025-01-05T21:05:00.584641+01:00", action);
 

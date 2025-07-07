@@ -17,9 +17,7 @@ fn as_kv(k: &str, v: &str) -> KeyValue {
 
 #[cached]
 fn counter(name: &'static str) -> opentelemetry::metrics::Counter<u64> {
-    opentelemetry::global::meter("home")
-        .u64_counter(name)
-        .build()
+    opentelemetry::global::meter("home").u64_counter(name).build()
 }
 
 #[cached]

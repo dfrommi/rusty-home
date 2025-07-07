@@ -81,16 +81,14 @@ impl CoolDownWhenOccupied {
             let sabine_sleeping = api.current_data_point(Resident::SabineSleeping).await?;
 
             match (dennis_sleeping.value, sabine_sleeping.value) {
-                (false, false) => DataPoint::new(
-                    false,
-                    std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp),
-                ),
+                (false, false) => {
+                    DataPoint::new(false, std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp))
+                }
                 (true, false) => dennis_sleeping,
                 (false, true) => sabine_sleeping,
-                (true, true) => DataPoint::new(
-                    true,
-                    std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp),
-                ),
+                (true, true) => {
+                    DataPoint::new(true, std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp))
+                }
             }
         };
 
@@ -100,13 +98,7 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(
-            &self.command(),
-            &self.source(),
-            anyone_sleeping.timestamp,
-            api,
-        )
-        .await
+        trigger_once_and_keep_running(&self.command(), &self.source(), anyone_sleeping.timestamp, api).await
     }
 
     async fn trigger_when_on_couch(&self, api: &Database) -> anyhow::Result<bool> {
@@ -114,10 +106,7 @@ impl CoolDownWhenOccupied {
         let time_since_change = on_couch.timestamp.elapsed();
 
         if !on_couch.value && time_since_change > t!(5 minutes) {
-            tracing::trace!(
-                "No cooldown needed, because nobody is on the couch for {}",
-                time_since_change
-            );
+            tracing::trace!("No cooldown needed, because nobody is on the couch for {}", time_since_change);
             return Ok(false);
         }
 
@@ -129,7 +118,6 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(&self.command(), &self.source(), on_couch.timestamp, api)
-            .await
+        trigger_once_and_keep_running(&self.command(), &self.source(), on_couch.timestamp, api).await
     }
 }

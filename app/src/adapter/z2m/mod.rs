@@ -33,18 +33,13 @@ impl Zigbee2Mqtt {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl Future<Output = ()> + use<> {
-        let ds = self
-            .new_incoming_data_source(&mut infrastructure.mqtt_client)
-            .await;
+        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let db = infrastructure.database.clone();
         async move { process_incoming_data_source("Z2M", ds, &db).await }
     }
 
-    async fn new_incoming_data_source(
-        &self,
-        mqtt: &mut infrastructure::Mqtt,
-    ) -> Z2mIncomingDataSource {
+    async fn new_incoming_data_source(&self, mqtt: &mut infrastructure::Mqtt) -> Z2mIncomingDataSource {
         let config = DeviceConfig::new(&config::default_z2m_state_config());
         let rx = mqtt
             .subscribe(format!("{}/#", self.event_topic))

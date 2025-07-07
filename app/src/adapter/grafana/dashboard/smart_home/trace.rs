@@ -4,9 +4,7 @@ use actix_web::web;
 
 use crate::{
     Database,
-    adapter::grafana::{
-        GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response,
-    },
+    adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
     core::planner::PlanningTrace,
 };
 
@@ -22,10 +20,7 @@ pub fn routes(api: Arc<Database>) -> actix_web::Scope {
         .app_data(web::Data::from(api))
 }
 
-async fn get_trace_ids(
-    api: web::Data<Database>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
+async fn get_trace_ids(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         label: String,

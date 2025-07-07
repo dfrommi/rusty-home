@@ -18,11 +18,7 @@ pub struct HaIncomingDataSource {
 }
 
 impl HaIncomingDataSource {
-    pub fn new(
-        client: HaHttpClient,
-        listener: HaMqttClient,
-        config: DeviceConfig<HaChannel>,
-    ) -> Self {
+    pub fn new(client: HaHttpClient, listener: HaMqttClient, config: DeviceConfig<HaChannel>) -> Self {
         Self {
             client,
             listener,
@@ -68,22 +64,14 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
             StateValue::Available(state_value) => {
                 tracing::info!("Received supported event {}", device_id);
 
-                let dp_result = to_persistent_data_point(
-                    channel.clone(),
-                    state_value,
-                    &msg.attributes,
-                    msg.last_changed,
-                );
+                let dp_result =
+                    to_persistent_data_point(channel.clone(), state_value, &msg.attributes, msg.last_changed);
 
                 match dp_result {
                     Ok(Some(dp)) => vec![dp],
                     Ok(None) => vec![],
                     Err(e) => {
-                        tracing::error!(
-                            "Error processing homeassistant event of {}: {:?}",
-                            device_id,
-                            e
-                        );
+                        tracing::error!("Error processing homeassistant event of {}: {:?}", device_id, e);
                         vec![]
                     }
                 }
@@ -121,30 +109,17 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::Powered(channel) => Some(
-            DataPoint::new(
-                PersistentStateValue::Powered(channel, ha_value == "on"),
-                timestamp,
-            )
-            .into(),
-        ),
+        HaChannel::Powered(channel) => {
+            Some(DataPoint::new(PersistentStateValue::Powered(channel, ha_value == "on"), timestamp).into())
+        }
         HaChannel::SetPoint(channel) => {
-            let v = match (
-                ha_value,
-                attributes.get("temperature").and_then(|v| v.as_f64()),
-            ) {
+            let v = match (ha_value, attributes.get("temperature").and_then(|v| v.as_f64())) {
                 ("off", _) => 0.0,
                 (_, Some(f_value)) => f_value,
                 _ => bail!("No temperature found in attributes or not a number"),
             };
 
-            Some(
-                DataPoint::new(
-                    PersistentStateValue::SetPoint(channel, DegreeCelsius::from(v)),
-                    timestamp,
-                )
-                .into(),
-            )
+            Some(DataPoint::new(PersistentStateValue::SetPoint(channel, DegreeCelsius::from(v)), timestamp).into())
         }
         HaChannel::HeatingDemand(channel) => Some(
             DataPoint::new(
@@ -160,20 +135,12 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::PresenceFromEsp(channel) => Some(
-            DataPoint::new(
-                PersistentStateValue::Presence(channel, ha_value == "on"),
-                timestamp,
-            )
-            .into(),
-        ),
-        HaChannel::PresenceFromDeviceTracker(channel) => Some(
-            DataPoint::new(
-                PersistentStateValue::Presence(channel, ha_value == "home"),
-                timestamp,
-            )
-            .into(),
-        ),
+        HaChannel::PresenceFromEsp(channel) => {
+            Some(DataPoint::new(PersistentStateValue::Presence(channel, ha_value == "on"), timestamp).into())
+        }
+        HaChannel::PresenceFromDeviceTracker(channel) => {
+            Some(DataPoint::new(PersistentStateValue::Presence(channel, ha_value == "home"), timestamp).into())
+        }
         HaChannel::WindcalmFanSpeed(channel) => {
             //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
             //trigger, otherwise assume command worked an directly set state from command
@@ -200,13 +167,7 @@ fn to_persistent_data_point(
             */
 
             if ha_value == "off" {
-                Some(
-                    DataPoint::new(
-                        PersistentStateValue::FanActivity(channel, FanAirflow::Off),
-                        timestamp,
-                    )
-                    .into(),
-                )
+                Some(DataPoint::new(PersistentStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
             } else {
                 None
             }

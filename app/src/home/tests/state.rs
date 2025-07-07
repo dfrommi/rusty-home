@@ -1,10 +1,7 @@
 use crate::core::ValueObject;
 use crate::core::time::{DateTime, FIXED_NOW};
 
-use crate::{
-    Database, core::timeseries::DataPoint, home::state::AutomaticTemperatureIncrease,
-    port::DataPointAccess,
-};
+use crate::{Database, core::timeseries::DataPoint, home::state::AutomaticTemperatureIncrease, port::DataPointAccess};
 
 use super::{infrastructure, runtime};
 
@@ -26,10 +23,7 @@ mod automatic_temp_increase {
 
     #[test]
     fn not_enough_temperature_measurements() {
-        let dp = get_state_at(
-            "2025-01-21T18:06:24.086+01:00",
-            AutomaticTemperatureIncrease::LivingRoom,
-        );
+        let dp = get_state_at("2025-01-21T18:06:24.086+01:00", AutomaticTemperatureIncrease::LivingRoom);
 
         assert!(dp.value);
     }

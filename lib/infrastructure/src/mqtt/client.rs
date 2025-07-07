@@ -154,26 +154,19 @@ impl Mqtt {
 
                         //deduplicate as some senders publish multiple times (homekit)
                         if let Some((t, p)) = last_seen.get(&mqtt_in_message.topic) {
-                            if t.elapsed() < Duration::from_millis(250)
-                                && p == &mqtt_in_message.payload
-                            {
+                            if t.elapsed() < Duration::from_millis(250) && p == &mqtt_in_message.payload {
                                 continue;
                             }
                         }
 
-                        last_seen.insert(
-                            mqtt_in_message.topic.clone(),
-                            (Instant::now(), mqtt_in_message.payload.clone()),
-                        );
+                        last_seen
+                            .insert(mqtt_in_message.topic.clone(), (Instant::now(), mqtt_in_message.payload.clone()));
 
                         for id in subscription_ids {
                             match self.subsciptions.get(id - 1) {
                                 Some(tx) => {
                                     if let Err(e) = tx.send(mqtt_in_message.clone()).await {
-                                        tracing::error!(
-                                            "Failed to forward MQTT message to subscriber: {}",
-                                            e
-                                        );
+                                        tracing::error!("Failed to forward MQTT message to subscriber: {}", e);
                                     }
                                 }
                                 None => {

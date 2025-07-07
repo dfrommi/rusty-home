@@ -1,7 +1,7 @@
+use crate::t;
 use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
-use crate::t;
 
 use crate::Database;
 
@@ -27,10 +27,7 @@ struct WaterReadingDTO {
     is_hot: bool,
 }
 
-async fn handle_heating_reading(
-    api: web::Data<Database>,
-    Json(dto): Json<HeatingReadingDTO>,
-) -> impl Responder {
+async fn handle_heating_reading(api: web::Data<Database>, Json(dto): Json<HeatingReadingDTO>) -> impl Responder {
     let radiator = match dto.label.as_str() {
         "Wohnzimmer (groß)" => Radiator::LivingRoomBig,
         "Wohnzimmer (klein)" => Radiator::LivingRoomSmall,
@@ -58,10 +55,7 @@ async fn handle_heating_reading(
     HttpResponse::NoContent()
 }
 
-async fn handle_water_reading(
-    api: web::Data<Database>,
-    Json(dto): Json<WaterReadingDTO>,
-) -> impl Responder {
+async fn handle_water_reading(api: web::Data<Database>, Json(dto): Json<WaterReadingDTO>) -> impl Responder {
     let faucet = match dto.label.as_str() {
         "Küche" => Faucet::Kitchen,
         "Bad" => Faucet::Bathroom,

@@ -9,16 +9,15 @@ use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
 use crate::home::state::{
-    ExternalAutoControl, FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint,
-    Temperature,
+    ExternalAutoControl, FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
 };
 use infrastructure::Mqtt;
 
 use std::collections::HashMap;
 
+use crate::core::time::DateTime;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
-use crate::core::time::DateTime;
 
 use crate::Infrastructure;
 use crate::core::CommandExecutor;
@@ -38,20 +37,15 @@ impl HomeAssitant {
         &self,
         infrastructure: &mut Infrastructure,
     ) -> impl Future<Output = ()> + use<> {
-        let ds = self
-            .new_incoming_data_source(&mut infrastructure.mqtt_client)
-            .await;
+        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let db = infrastructure.database.clone();
         async move { process_incoming_data_source("HomeAssitant", ds, &db).await }
     }
 
-    pub fn new_command_executor(
-        &self,
-        infrastructure: &Infrastructure,
-    ) -> impl CommandExecutor + use<> {
-        let http_client = HaHttpClient::new(&self.url, &self.token)
-            .expect("Error initializing Home Assistant REST client");
+    pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
+        let http_client =
+            HaHttpClient::new(&self.url, &self.token).expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(
             http_client,
             infrastructure.database.clone(),
@@ -67,8 +61,7 @@ impl HomeAssitant {
             .expect("Error subscribing to MQTT topic");
 
         let mqtt_client = HaMqttClient::new(rx);
-        let http_client =
-            HaHttpClient::new(&self.url, &self.token).expect("Error creating HA HTTP client");
+        let http_client = HaHttpClient::new(&self.url, &self.token).expect("Error creating HA HTTP client");
 
         HaIncomingDataSource::new(http_client, mqtt_client, config)
     }

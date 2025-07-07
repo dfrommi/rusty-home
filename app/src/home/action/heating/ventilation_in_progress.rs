@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use anyhow::Result;
 use crate::home::command::Command;
+use anyhow::Result;
 
 use crate::{
     core::planner::SimpleAction,

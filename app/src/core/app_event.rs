@@ -53,9 +53,7 @@ impl AppEventListener {
         self.command_added_tx.subscribe()
     }
 
-    pub fn new_energy_reading_added_listener(
-        &self,
-    ) -> broadcast::Receiver<EnergyReadingAddedEvent> {
+    pub fn new_energy_reading_added_listener(&self) -> broadcast::Receiver<EnergyReadingAddedEvent> {
         self.energy_reading_added_tx.subscribe()
     }
 
@@ -102,10 +100,7 @@ impl AppEventListener {
                     }
 
                     DbEvent::EnergyReadingInsert { id } => {
-                        if let Err(e) = self
-                            .energy_reading_added_tx
-                            .send(EnergyReadingAddedEvent { id })
-                        {
+                        if let Err(e) = self.energy_reading_added_tx.send(EnergyReadingAddedEvent { id }) {
                             tracing::error!("Error sending energy reading added event: {:?}", e);
                         }
                     }

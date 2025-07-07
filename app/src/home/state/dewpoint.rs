@@ -65,10 +65,8 @@ where
     T: DataPointAccess<Temperature> + DataPointAccess<RelativeHumidity>,
 {
     async fn current_data_point(&self, item: DewPoint) -> Result<DataPoint<DegreeCelsius>> {
-        let temperature: DataPoint<DegreeCelsius> =
-            self.current_data_point(item.temperature()).await?;
-        let humidity: DataPoint<Percent> =
-            self.current_data_point(item.relative_humidity()).await?;
+        let temperature: DataPoint<DegreeCelsius> = self.current_data_point(item.temperature()).await?;
+        let humidity: DataPoint<Percent> = self.current_data_point(item.relative_humidity()).await?;
         let dewpoint = dewpoint(&temperature, &humidity);
 
         Ok(dewpoint)
@@ -83,10 +81,7 @@ where
         let (t_series, h_series) = {
             let temp = item.temperature();
             let humidity = item.relative_humidity();
-            try_join!(
-                self.series(temp, range.clone()),
-                self.series(humidity, range.clone())
-            )?
+            try_join!(self.series(temp, range.clone()), self.series(humidity, range.clone()))?
         };
 
         TimeSeries::combined(&t_series, &h_series, item, calculate_dew_point)
@@ -106,10 +101,7 @@ fn dewpoint(
 }
 
 #[allow(dead_code)] //more parameters than currently needed are calculated
-pub fn calculate_dew_point(
-    temperature: &DegreeCelsius,
-    relative_humidity: &Percent,
-) -> DegreeCelsius {
+pub fn calculate_dew_point(temperature: &DegreeCelsius, relative_humidity: &Percent) -> DegreeCelsius {
     let t: f64 = temperature.into();
     let r: f64 = relative_humidity.into();
 

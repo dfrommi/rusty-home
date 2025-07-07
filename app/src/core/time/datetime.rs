@@ -11,9 +11,7 @@ task_local! {
     pub static FIXED_NOW: DateTime;
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct DateTime {
     delegate: chrono::DateTime<chrono::Local>,
@@ -34,7 +32,12 @@ impl DateTime {
         let mid_timestamp = (start_timestamp + end_timestamp) / 2;
 
         chrono::DateTime::from_timestamp_millis(mid_timestamp)
-            .unwrap_or_else(|| panic!("Error calculating midpoint for {:?} and {:?}. Should not fail with reasonable dates", start, end))
+            .unwrap_or_else(|| {
+                panic!(
+                    "Error calculating midpoint for {:?} and {:?}. Should not fail with reasonable dates",
+                    start, end
+                )
+            })
             .into()
     }
 
@@ -70,9 +73,7 @@ impl DateTime {
             .delegate
             .with_time(time.delegate)
             .earliest()
-            .ok_or_else(|| {
-                anyhow::anyhow!("Error parsing time {:?} for date-time {:?}", time, self)
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("Error parsing time {:?} for date-time {:?}", time, self))?;
 
         Ok(dt.into())
     }
@@ -151,10 +152,7 @@ mod constructor {
 
         let midpoint = DateTime::midpoint(&start, &end);
 
-        assert_eq!(
-            midpoint,
-            DateTime::from_iso("2024-11-03T16:23:46Z").unwrap()
-        );
+        assert_eq!(midpoint, DateTime::from_iso("2024-11-03T16:23:46Z").unwrap());
     }
 
     #[test]
@@ -164,9 +162,6 @@ mod constructor {
 
         let midpoint = DateTime::midpoint(&start, &end);
 
-        assert_eq!(
-            midpoint,
-            DateTime::from_iso("2024-11-03T16:23:46Z").unwrap()
-        );
+        assert_eq!(midpoint, DateTime::from_iso("2024-11-03T16:23:46Z").unwrap());
     }
 }

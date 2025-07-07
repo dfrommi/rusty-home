@@ -1,11 +1,11 @@
 #![allow(async_fn_in_trait)]
 
+use crate::core::ValueObject;
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
 };
 use anyhow::Result;
-use crate::core::ValueObject;
 
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 

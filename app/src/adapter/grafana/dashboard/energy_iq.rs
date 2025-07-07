@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use crate::core::time::{DateTime, DateTimeRange, Duration};
+use crate::core::unit::Percent;
+use crate::home::state::{HeatingDemand, Temperature};
 use actix_web::{
     Responder,
     web::{self, Query},
 };
-use crate::home::state::{HeatingDemand, Temperature};
-use crate::core::unit::Percent;
-use crate::core::time::{DateTime, DateTimeRange, Duration};
 
 use crate::{
     adapter::grafana::{GrafanaApiError, support::csv_response},
@@ -21,14 +21,8 @@ where
     T: TimeSeriesAccess<HeatingDemand> + TimeSeriesAccess<Temperature> + 'static,
 {
     web::scope("/energy_iq")
-        .route(
-            "/consumption/series",
-            web::get().to(heating_series_aggregated_sum::<T>),
-        )
-        .route(
-            "/temperature/delta",
-            web::get().to(outside_temperature_series::<T>),
-        )
+        .route("/consumption/series", web::get().to(heating_series_aggregated_sum::<T>))
+        .route("/temperature/delta", web::get().to(outside_temperature_series::<T>))
         .app_data(web::Data::from(api))
 }
 
@@ -111,9 +105,7 @@ where
         .inner()
         .iter()
         .map(|dp| {
-            let ref_value = ts_ref
-                .at(dp.timestamp - query.offset())
-                .map(|dp| dp.value.0);
+            let ref_value = ts_ref.at(dp.timestamp - query.offset()).map(|dp| dp.value.0);
             let value = match ref_value {
                 Some(v) => dp.value.0 - v,
                 None => 0.0,
@@ -160,9 +152,7 @@ async fn combined_series(
 
     let mut result = mapped_ts.remove(0);
     for ts in mapped_ts {
-        result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoom, |a, b| {
-            Percent(a.0 + b.0)
-        })?;
+        result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoom, |a, b| Percent(a.0 + b.0))?;
     }
 
     Ok(result)

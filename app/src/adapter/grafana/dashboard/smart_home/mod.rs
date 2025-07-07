@@ -82,18 +82,12 @@ mod tests {
     fn test_split_action() {
         assert_eq!(
             split_action("FollowDefaultSetting[SetPower[Dehumidifier]]"),
-            (
-                "FollowDefaultSetting".to_string(),
-                Some("SetPower[Dehumidifier]".to_string())
-            )
+            ("FollowDefaultSetting".to_string(), Some("SetPower[Dehumidifier]".to_string()))
         );
         assert_eq!(split_action("Dehumidify"), ("Dehumidify".to_string(), None));
         assert_eq!(
             split_action("IrHeaterAutoTurnOff[Bedroom]"),
-            (
-                "IrHeaterAutoTurnOff".to_string(),
-                Some("Bedroom".to_string())
-            )
+            ("IrHeaterAutoTurnOff".to_string(), Some("Bedroom".to_string()))
         );
     }
 }

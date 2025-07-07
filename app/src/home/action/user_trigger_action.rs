@@ -1,14 +1,12 @@
+use crate::core::time::Duration;
 use crate::home::command::{Command, CommandSource};
 use crate::home::state::Powered;
-use crate::home::trigger::{
-    ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget,
-};
+use crate::home::trigger::{ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
+use crate::t;
 use crate::{
     Database,
     core::planner::{Action, ActionEvaluationResult},
 };
-use crate::t;
-use crate::core::time::Duration;
 
 use super::{DataPointAccess, trigger_once_and_keep_running};
 
@@ -34,14 +32,13 @@ impl Action for UserTriggerAction {
             }
         };
 
-        let (latest_trigger, trigger_time) =
-            match api.latest_since(&self.target, start_of_range).await? {
-                Some(dp) => (dp.value, dp.timestamp),
-                None => {
-                    tracing::trace!("No user-trigger found, skipping");
-                    return Ok(ActionEvaluationResult::Skip);
-                }
-            };
+        let (latest_trigger, trigger_time) = match api.latest_since(&self.target, start_of_range).await? {
+            Some(dp) => (dp.value, dp.timestamp),
+            None => {
+                tracing::trace!("No user-trigger found, skipping");
+                return Ok(ActionEvaluationResult::Skip);
+            }
+        };
 
         let command = match into_command(latest_trigger) {
             Some(c) => c,
@@ -60,11 +57,7 @@ impl Action for UserTriggerAction {
             return Ok(ActionEvaluationResult::Skip);
         }
 
-        tracing::trace!(
-            ?command,
-            ?source,
-            "User-trigger action ready to be executed"
-        );
+        tracing::trace!(?command, ?source, "User-trigger action ready to be executed");
 
         Ok(ActionEvaluationResult::Execute(command, source))
     }
@@ -85,9 +78,7 @@ impl UserTriggerAction {
     {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
-            | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => {
-                Some(t!(30 minutes))
-            }
+            | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
             UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomTvEnergySaving) => {
                 match api.current_data_point(Powered::LivingRoomTv).await {
@@ -100,9 +91,7 @@ impl UserTriggerAction {
                 }
             }
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed)
-            | UserTriggerTarget::Homekit(HomekitTarget::BedroomCeilingFanSpeed) => {
-                Some(t!(10 hours))
-            }
+            | UserTriggerTarget::Homekit(HomekitTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
         }
     }
 }
@@ -111,18 +100,14 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
     use crate::home::command::*;
 
     match trigger {
-        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => {
-            Some(Command::SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: true,
-            })
-        }
-        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::BottomSingle)) => {
-            Some(Command::SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            })
-        }
+        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => Some(Command::SetPower {
+            device: PowerToggle::InfraredHeater,
+            power_on: true,
+        }),
+        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::BottomSingle)) => Some(Command::SetPower {
+            device: PowerToggle::InfraredHeater,
+            power_on: false,
+        }),
         UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => Some(Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: on,
@@ -131,18 +116,14 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
             device: PowerToggle::Dehumidifier,
             power_on: on,
         }),
-        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) if !on => {
-            Some(Command::SetEnergySaving {
-                device: EnergySavingDevice::LivingRoomTv,
-                on: false,
-            })
-        }
-        UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(speed)) => {
-            Some(Command::ControlFan {
-                device: Fan::LivingRoomCeilingFan,
-                speed,
-            })
-        }
+        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) if !on => Some(Command::SetEnergySaving {
+            device: EnergySavingDevice::LivingRoomTv,
+            on: false,
+        }),
+        UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
+            device: Fan::LivingRoomCeilingFan,
+            speed,
+        }),
         UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
             device: Fan::BedroomCeilingFan,
             speed,
@@ -161,10 +142,7 @@ mod tests {
     #[test]
     fn test_display() {
         assert_eq!(
-            UserTriggerAction::new(UserTriggerTarget::Homekit(
-                HomekitTarget::InfraredHeaterPower
-            ))
-            .to_string(),
+            UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower)).to_string(),
             "UserTriggerAction[Homekit[InfraredHeaterPower]]"
         );
     }

@@ -1,8 +1,8 @@
 use std::{fmt::Display, sync::Mutex};
 
-use infrastructure::TraceContext;
-use crate::t;
 use crate::core::time::DateTime;
+use crate::t;
+use infrastructure::TraceContext;
 
 use crate::Database;
 
@@ -39,11 +39,7 @@ impl PartialEq for PlanningTraceStep {
 }
 
 impl PlanningTrace {
-    pub fn new(
-        timestamp: DateTime,
-        trace_id: Option<String>,
-        steps: Vec<PlanningTraceStep>,
-    ) -> Self {
+    pub fn new(timestamp: DateTime, trace_id: Option<String>, steps: Vec<PlanningTraceStep>) -> Self {
         Self {
             timestamp,
             trace_id,
@@ -97,10 +93,7 @@ fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
         }
 
         Err(e) => {
-            tracing::error!(
-                "Error locking previous action result, logging impacted: {:?}",
-                e
-            );
+            tracing::error!("Error locking previous action result, logging impacted: {:?}", e);
             false
         }
     }

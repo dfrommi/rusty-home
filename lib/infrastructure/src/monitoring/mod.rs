@@ -11,11 +11,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use opentelemetry::KeyValue;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{ExporterBuildError, WithExportConfig};
-use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::Resource;
 use std::error::Error;
-use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::EnvFilter;
 
 pub use trace::TraceContext;
 
@@ -68,8 +68,7 @@ impl MonitoringConfig {
 
             let logger_provider = init_logs(resource.clone(), otlp_config.url.clone())?;
             let logging_filter: EnvFilter = self.logs.clone().try_into()?;
-            let logging_layer =
-                OpenTelemetryTracingBridge::new(&logger_provider).with_filter(logging_filter);
+            let logging_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(logging_filter);
 
             let tracer_provider = init_traces(resource.clone(), otlp_config.url.clone())?;
             let tracer = tracer_provider.tracer(self.app_name.to_owned());
@@ -97,10 +96,7 @@ impl MonitoringConfig {
     }
 }
 
-fn init_traces(
-    resource: Resource,
-    url: Option<String>,
-) -> Result<SdkTracerProvider, ExporterBuildError> {
+fn init_traces(resource: Resource, url: Option<String>) -> Result<SdkTracerProvider, ExporterBuildError> {
     match url {
         Some(url) => {
             let exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -139,11 +135,10 @@ fn init_metrics(
                 .build())
         }
         None => {
-            let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
-                opentelemetry_stdout::MetricExporter::default(),
-            )
-            .with_interval(std::time::Duration::from_secs(5))
-            .build();
+            let reader =
+                opentelemetry_sdk::metrics::PeriodicReader::builder(opentelemetry_stdout::MetricExporter::default())
+                    .with_interval(std::time::Duration::from_secs(5))
+                    .build();
 
             Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()
                 .with_reader(reader)
@@ -153,10 +148,7 @@ fn init_metrics(
     }
 }
 
-fn init_logs(
-    resource: Resource,
-    url: Option<String>,
-) -> Result<SdkLoggerProvider, ExporterBuildError> {
+fn init_logs(resource: Resource, url: Option<String>) -> Result<SdkLoggerProvider, ExporterBuildError> {
     match url {
         Some(url) => {
             let exporter = opentelemetry_otlp::LogExporter::builder()

@@ -9,7 +9,6 @@ pub fn db_mapped(input: TokenStream) -> TokenStream {
     let variants = super::enum_variants(input.data);
 
     let mut type_info_impls = Vec::new();
-    let mut into_dbvalue_impls = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
@@ -19,9 +18,7 @@ pub fn db_mapped(input: TokenStream) -> TokenStream {
             let value_type = &fields.unnamed[1].ty;
 
             let is_bool = match &value_type {
-                syn::Type::Path(type_path) => {
-                    type_path.path.segments.last().unwrap().ident == "bool"
-                }
+                syn::Type::Path(type_path) => type_path.path.segments.last().unwrap().ident == "bool",
                 _ => false,
             };
 
@@ -55,11 +52,6 @@ pub fn db_mapped(input: TokenStream) -> TokenStream {
                 }
             };
             type_info_impls.push(impl_block);
-
-            // Generate the Into<f64> implementation
-            into_dbvalue_impls.push(quote! {
-                #name::#variant_name(_, v) => v.into()
-            });
         }
     }
 

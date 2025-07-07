@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use anyhow::{Ok, Result};
-use crate::home::command::Command;
-use crate::t;
 use crate::core::time::DailyTimeRange;
 use crate::core::unit::DegreeCelsius;
+use crate::home::command::Command;
+use crate::t;
+use anyhow::{Ok, Result};
 
 use crate::{
     Database,
@@ -93,7 +93,6 @@ impl SimpleAction for DeferHeatingUntilVentilationDone {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(&self.command(), &self.source(), *time_range.start(), api)
-            .await
+        trigger_once_and_keep_running(&self.command(), &self.source(), *time_range.start(), api).await
     }
 }

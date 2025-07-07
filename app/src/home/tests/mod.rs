@@ -37,9 +37,6 @@ fn infrastructure() -> &'static TestInfrastructure {
             settings.live_database.new_pool().await.unwrap()
         });
 
-        TestInfrastructure {
-            runtime,
-            pool: db_pool,
-        }
+        TestInfrastructure { runtime, pool: db_pool }
     })
 }

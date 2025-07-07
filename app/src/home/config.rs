@@ -9,9 +9,8 @@ use crate::home::action::{
 use crate::home::state::UserControlled;
 
 use super::action::{
-    CoolDownWhenOccupied, DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping,
-    HomeAction, KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease,
-    NoHeatingDuringVentilation, RequestClosingWindow,
+    CoolDownWhenOccupied, DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction,
+    KeepUserOverride, NoHeatingDuringAutomaticTemperatureIncrease, NoHeatingDuringVentilation, RequestClosingWindow,
 };
 use super::goal::{HomeGoal, Room};
 

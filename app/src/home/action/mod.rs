@@ -14,7 +14,9 @@ use std::fmt::Display;
 use crate::home::command::Command;
 use anyhow::Result;
 
+use crate::core::time::DateTime;
 use crate::home::command::CommandSource;
+use crate::t;
 pub use cool_down_when_occupied::CoolDownWhenOccupied;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
@@ -23,8 +25,6 @@ pub use inform_window_open::InformWindowOpen;
 pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
-use crate::t;
-use crate::core::time::DateTime;
 pub use user_trigger_action::UserTriggerAction;
 
 use crate::Database;
@@ -59,49 +59,29 @@ impl Action for HomeAction {
     async fn evaluate(&self, api: &Database) -> Result<ActionEvaluationResult> {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
-            HomeAction::RequestClosingWindow(request_closing_window) => {
-                request_closing_window.evaluate(api).await
-            }
-            HomeAction::InformWindowOpen(inform_window_open) => {
-                inform_window_open.evaluate(api).await
-            }
+            HomeAction::RequestClosingWindow(request_closing_window) => request_closing_window.evaluate(api).await,
+            HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.evaluate(api).await,
             HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
                 no_heating_during_ventilation.evaluate(api).await
             }
             HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
                 no_heating_during_automatic_temperature_increase,
-            ) => {
-                no_heating_during_automatic_temperature_increase
-                    .evaluate(api)
-                    .await
-            }
-            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => {
-                ir_heater_auto_turn_off.evaluate(api).await
-            }
-            HomeAction::KeepUserOverride(keep_user_override) => {
-                keep_user_override.evaluate(api).await
-            }
+            ) => no_heating_during_automatic_temperature_increase.evaluate(api).await,
+            HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => ir_heater_auto_turn_off.evaluate(api).await,
+            HomeAction::KeepUserOverride(keep_user_override) => keep_user_override.evaluate(api).await,
             HomeAction::ExtendHeatingUntilSleeping(extend_heating_until_sleeping) => {
                 extend_heating_until_sleeping.evaluate(api).await
             }
             HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
                 defer_heating_until_ventilation_done.evaluate(api).await
             }
-            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
-                reduce_noise_at_night.evaluate(api).await
-            }
-            HomeAction::FollowDefaultSetting(follow_default_setting) => {
-                follow_default_setting.evaluate(api).await
-            }
-            HomeAction::UserTriggerAction(user_trigger_action) => {
-                user_trigger_action.evaluate(api).await
-            }
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.evaluate(api).await,
+            HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.evaluate(api).await,
+            HomeAction::UserTriggerAction(user_trigger_action) => user_trigger_action.evaluate(api).await,
             HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                 support_ventilation_with_fan.evaluate(api).await
             }
-            HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => {
-                cool_down_when_occupied.evaluate(api).await
-            }
+            HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => cool_down_when_occupied.evaluate(api).await,
         }
     }
 }
@@ -117,9 +97,7 @@ async fn trigger_once_and_keep_running(
         .get_all_commands_for_target(command.clone(), oneshot_range_start)
         .await?;
 
-    let already_triggered = executions
-        .iter()
-        .any(|e| e.source == *source && e.command == *command);
+    let already_triggered = executions.iter().any(|e| e.source == *source && e.command == *command);
 
     //first trigger still pending -> start it
     if !already_triggered {

@@ -1,13 +1,13 @@
 use std::cmp::Ordering;
 
+use crate::core::ValueObject;
+use crate::core::time::DateTimeRange;
+use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
 use actix_web::{
     HttpResponse, Responder,
     http::header,
     web::{self, Query},
 };
-use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
-use crate::core::ValueObject;
-use crate::core::time::DateTimeRange;
 
 use crate::{
     adapter::grafana::{
@@ -36,22 +36,14 @@ where
     .await
 }
 
-pub async fn total_heating<T>(
-    api: web::Data<T>,
-    time_range: Query<TimeRangeQuery>,
-) -> impl Responder
+pub async fn total_heating<T>(api: web::Data<T>, time_range: Query<TimeRangeQuery>) -> impl Responder
 where
     T: TimeSeriesAccess<HeatingDemand>,
 {
-    total_values_response(
-        api.as_ref(),
-        HeatingDemand::variants(),
-        time_range.range(),
-        |item, ts| {
-            let value = ts.area_in_type_hours();
-            (value, value * room_of(item).heating_factor())
-        },
-    )
+    total_values_response(api.as_ref(), HeatingDemand::variants(), time_range.range(), |item, ts| {
+        let value = ts.area_in_type_hours();
+        (value, value * room_of(item).heating_factor())
+    })
     .await
 }
 
@@ -79,8 +71,7 @@ where
         let result = api.series(item.clone(), time_range.clone()).await;
 
         if let Err(e) = result {
-            return HttpResponse::InternalServerError()
-                .body(format!("Error retrieving data: {}", e));
+            return HttpResponse::InternalServerError().body(format!("Error retrieving data: {}", e));
         }
         let result = result.unwrap();
 

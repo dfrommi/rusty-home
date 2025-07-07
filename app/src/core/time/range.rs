@@ -58,22 +58,14 @@ impl DailyTimeRange {
         let now = t!(now);
         let end = now.at(self.end).unwrap();
 
-        if end >= now {
-            end
-        } else {
-            end.on_next_day()
-        }
+        if end >= now { end } else { end.on_next_day() }
     }
 
     pub fn active(&self) -> Option<DateTimeRange> {
         let now = t!(now);
         let dt_range = self.active_or_previous_at(now);
 
-        if dt_range.contains(now) {
-            Some(dt_range)
-        } else {
-            None
-        }
+        if dt_range.contains(now) { Some(dt_range) } else { None }
     }
 
     pub fn active_or_previous(&self) -> DateTimeRange {
@@ -83,10 +75,7 @@ impl DailyTimeRange {
     pub fn active_or_previous_at(&self, reference: DateTime) -> DateTimeRange {
         //TODO handle switch to winter time
         //workaround for switch to summer time by adjusting the range. Not ideal, but does the job
-        let start = reference
-            .at(self.start)
-            .or_else(|_| reference.at(t!(2:00)))
-            .unwrap();
+        let start = reference.at(self.start).or_else(|_| reference.at(t!(2:00))).unwrap();
         let mut end = start.at(self.end).or_else(|_| start.at(t!(3:00))).unwrap();
 
         if start > end {
@@ -240,8 +229,7 @@ mod tests {
 
     #[test]
     fn test_active_or_previous_dst() {
-        let range = t!(02:15 - 02:45)
-            .active_or_previous_at(DateTime::from_iso("2025-03-30T12:30:00+01:00").unwrap());
+        let range = t!(02:15 - 02:45).active_or_previous_at(DateTime::from_iso("2025-03-30T12:30:00+01:00").unwrap());
 
         assert_eq!(range.start(), &t!(2:00).today());
         assert_eq!(range.end(), &t!(3:00).today());

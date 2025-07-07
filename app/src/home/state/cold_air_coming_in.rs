@@ -42,16 +42,10 @@ where
         }
 
         let window_opened = match item {
-            ColdAirComingIn::LivingRoom => {
-                self.current_data_point(Opened::LivingRoomWindowOrDoor)
-                    .await
-            }
+            ColdAirComingIn::LivingRoom => self.current_data_point(Opened::LivingRoomWindowOrDoor).await,
             ColdAirComingIn::Bedroom => self.current_data_point(Opened::BedroomWindow).await,
             ColdAirComingIn::Kitchen => self.current_data_point(Opened::KitchenWindow).await,
-            ColdAirComingIn::RoomOfRequirements => {
-                self.current_data_point(Opened::RoomOfRequirementsWindow)
-                    .await
-            }
+            ColdAirComingIn::RoomOfRequirements => self.current_data_point(Opened::RoomOfRequirementsWindow).await,
         }?;
 
         result!(window_opened.value, window_opened.timestamp, item,

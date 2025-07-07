@@ -1,6 +1,6 @@
-use sqlx::postgres::types::PgInterval;
-use crate::t;
 use crate::core::time::Duration;
+use crate::t;
+use sqlx::postgres::types::PgInterval;
 
 use crate::core::ItemAvailability;
 
@@ -10,6 +10,8 @@ pub struct OfflineItem {
     pub duration: Duration,
 }
 
+// Item Availability & Health Monitoring
+// Methods for tracking and monitoring the availability status of items/devices
 impl super::Database {
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
         let recs = sqlx::query!(
@@ -22,8 +24,7 @@ impl super::Database {
         let mut offline_items = vec![];
 
         for rec in recs.iter() {
-            let considered_offline_after =
-                convert_pginterval_to_duration(&rec.considered_offline_after);
+            let considered_offline_after = convert_pginterval_to_duration(&rec.considered_offline_after);
             let duration = std::cmp::max(
                 t!(now).elapsed_since(rec.last_seen.into()),
                 t!(now).elapsed_since(rec.entry_updated.into()),

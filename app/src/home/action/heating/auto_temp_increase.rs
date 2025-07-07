@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
+use crate::core::unit::DegreeCelsius;
 use crate::home::command::Command;
 use crate::t;
 use anyhow::Result;
-use crate::core::unit::DegreeCelsius;
 
 use crate::{
     Database,
@@ -34,11 +34,7 @@ impl NoHeatingDuringAutomaticTemperatureIncrease {
 
 impl Display for NoHeatingDuringAutomaticTemperatureIncrease {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "NoHeatingDuringAutomaticTemperatureIncrease[{}]",
-            self.heating_zone
-        )
+        write!(f, "NoHeatingDuringAutomaticTemperatureIncrease[{}]", self.heating_zone)
     }
 }
 
@@ -59,10 +55,7 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
 
     async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
-            HeatingZone::LivingRoom => (
-                AutomaticTemperatureIncrease::LivingRoom,
-                Opened::LivingRoomWindowOrDoor,
-            ),
+            HeatingZone::LivingRoom => (AutomaticTemperatureIncrease::LivingRoom, Opened::LivingRoomWindowOrDoor),
             HeatingZone::Bedroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
             HeatingZone::Kitchen => (AutomaticTemperatureIncrease::Kitchen, Opened::KitchenWindow),
             HeatingZone::RoomOfRequirements => (
@@ -72,22 +65,14 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
             HeatingZone::Bathroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
         };
 
-        let (window_opened, temp_increase) = tokio::try_join!(
-            api.current_data_point(window_opened),
-            api.current(temp_increase)
-        )?;
+        let (window_opened, temp_increase) =
+            tokio::try_join!(api.current_data_point(window_opened), api.current(temp_increase))?;
 
         //window still open or no temp increase
         if !temp_increase || window_opened.value {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(
-            &self.command(),
-            &self.source(),
-            window_opened.timestamp,
-            api,
-        )
-        .await
+        trigger_once_and_keep_running(&self.command(), &self.source(), window_opened.timestamp, api).await
     }
 }

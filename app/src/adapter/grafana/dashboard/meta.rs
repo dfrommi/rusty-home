@@ -1,6 +1,6 @@
 use actix_web::web;
 
-use crate::adapter::grafana::{display::DashboardDisplay, support::csv_response, GrafanaResponse};
+use crate::adapter::grafana::{GrafanaResponse, display::DashboardDisplay, support::csv_response};
 
 use super::Room;
 

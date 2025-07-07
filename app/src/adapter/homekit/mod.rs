@@ -1,9 +1,9 @@
 mod command;
 mod state;
 
+use crate::core::unit::Percent;
 use crate::home::state::FanSpeed;
 use serde::Deserialize;
-use crate::core::unit::Percent;
 
 use crate::Infrastructure;
 
@@ -15,10 +15,7 @@ pub struct Homekit {
 }
 
 impl Homekit {
-    pub fn export_state(
-        &self,
-        infrastructure: &Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
+    pub fn export_state(&self, infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
         let mqtt_api = infrastructure.database.clone();
         let mqtt_sender = infrastructure.mqtt_client.new_publisher();
         let state_topic = self.base_topic_status.clone();
@@ -27,10 +24,7 @@ impl Homekit {
         async move { state::export_state(&mqtt_api, state_topic, mqtt_sender, mqtt_trigger).await }
     }
 
-    pub async fn process_commands(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
+    pub async fn process_commands(&self, infrastructure: &mut Infrastructure) -> impl Future<Output = ()> + use<> {
         let mqtt_command_receiver = infrastructure
             .mqtt_client
             .subscribe(format!("{}/#", &self.base_topic_set))
@@ -48,11 +42,7 @@ struct MqttStateValue(String);
 
 impl From<bool> for MqttStateValue {
     fn from(val: bool) -> Self {
-        MqttStateValue(if val {
-            "1".to_string()
-        } else {
-            "0".to_string()
-        })
+        MqttStateValue(if val { "1".to_string() } else { "0".to_string() })
     }
 }
 

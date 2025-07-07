@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
+use crate::core::ValueObject;
+use crate::core::id::ExternalId;
+use crate::core::unit::Percent;
 use crate::home::state::{FanActivity, FanAirflow, Powered};
 use infrastructure::MqttOutMessage;
-use crate::core::id::ExternalId;
-use crate::core::ValueObject;
-use crate::core::unit::Percent;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
 use crate::{core::app_event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};
@@ -36,11 +36,8 @@ pub async fn export_state<T>(
     }
 }
 
-async fn send_with_defaults<'a, 'b: 'a, API, T>(
-    sender: &'a mut MqttStateSender,
-    state: T,
-    api: &'b API,
-) where
+async fn send_with_defaults<'a, 'b: 'a, API, T>(sender: &'a mut MqttStateSender, state: T, api: &'b API)
+where
     T: AsRef<ExternalId> + ValueObject + Clone,
     T::ValueType: Into<MqttStateValue>,
     API: DataPointAccess<T>,
@@ -62,11 +59,8 @@ async fn send_with_defaults<'a, 'b: 'a, API, T>(
     sender.send(external_id, value).await;
 }
 
-async fn send_fan_activity<'a, 'b: 'a, API>(
-    sender: &'a mut MqttStateSender,
-    state: FanActivity,
-    api: &'b API,
-) where
+async fn send_fan_activity<'a, 'b: 'a, API>(sender: &'a mut MqttStateSender, state: FanActivity, api: &'b API)
+where
     API: DataPointAccess<FanActivity>,
 {
     let external_id: &ExternalId = state.as_ref();
@@ -112,12 +106,7 @@ impl MqttStateSender {
     {
         let value: MqttStateValue = value.into();
 
-        let topic = format!(
-            "{}/{}/{}",
-            self.base_topic,
-            external_id.ext_type(),
-            external_id.ext_name()
-        );
+        let topic = format!("{}/{}/{}", self.base_topic, external_id.ext_type(), external_id.ext_name());
         let payload = value.0;
 
         if self.last_sent.get(&topic) == Some(&payload) {

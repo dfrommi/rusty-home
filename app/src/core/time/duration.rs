@@ -129,9 +129,8 @@ mod duration_format {
                 E: serde::de::Error,
             {
                 // Parse the ISO 8601 string into a `iso8601-duration::Duration`
-                let iso_duration = Iso8601Duration::parse(value).map_err(|e| {
-                    E::custom(format!("Error parsing {} to duration: {:?}", value, e))
-                })?;
+                let iso_duration = Iso8601Duration::parse(value)
+                    .map_err(|e| E::custom(format!("Error parsing {} to duration: {:?}", value, e)))?;
 
                 match iso_duration.to_chrono() {
                     Some(duration) => Ok(duration),

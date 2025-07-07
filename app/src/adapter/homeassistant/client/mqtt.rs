@@ -18,9 +18,7 @@ impl HaMqttClient {
         match self.state_rx.recv().await {
             Some(msg) => {
                 match serde_json::from_str::<HaEvent>(&msg.payload) {
-                    Ok(HaEvent::StateChanged {
-                        new_state: event, ..
-                    }) => {
+                    Ok(HaEvent::StateChanged { new_state: event, .. }) => {
                         return Some(event);
                     }
                     Ok(HaEvent::Unknown(_)) => {

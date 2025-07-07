@@ -14,6 +14,8 @@ use anyhow::{Context as _, Result, bail};
 use cached::proc_macro::cached;
 use sqlx::PgPool;
 
+// Time Series Cache Management
+// Methods for managing the time series cache to optimize data retrieval performance
 impl super::Database {
     fn ts_caching_range(&self) -> DateTimeRange {
         let now = t!(now);
@@ -27,11 +29,7 @@ impl super::Database {
 
         for tag_id in tag_ids {
             if let Err(e) = self.get_default_dataframe(tag_id).await {
-                tracing::error!(
-                    "Error preloading timeseries cache for tag {}: {:?}",
-                    tag_id,
-                    e
-                );
+                tracing::error!("Error preloading timeseries cache for tag {}: {:?}", tag_id, e);
             }
         }
 
@@ -44,11 +42,30 @@ impl super::Database {
         self.ts_cache.invalidate(&tag_id).await;
     }
 
-    pub async fn add_state(
-        &self,
-        value: &PersistentStateValue,
-        timestamp: &DateTime,
-    ) -> Result<()> {
+    //try to return reference or at least avoid copy of entire dataframe
+    async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
+        let df = self
+            .ts_cache
+            .try_get_with(tag_id, async {
+                tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
+
+                query_dataframe(&self.pool, tag_id, &self.ts_caching_range())
+                    .await
+                    .map(Arc::new)
+            })
+            .await;
+
+        match df {
+            Ok(df) => Ok(df.map(|dp| dp.value)),
+            Err(e) => bail!("Error refreshing timeseries cache for tag {}: {:?}", tag_id, e),
+        }
+    }
+}
+
+// State Value Operations
+// Methods for adding and retrieving state values from the database
+impl super::Database {
+    pub async fn add_state(&self, value: &PersistentStateValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.pool, value.into(), true).await?;
 
         let fvalue: f64 = value.into();
@@ -73,16 +90,57 @@ impl super::Database {
 
         Ok(())
     }
+
+    pub async fn get_all_data_points_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<DataPoint<PersistentStateValue>>> {
+        let recs = sqlx::query!(
+            r#"SELECT 
+                THING_VALUE.value as "value!: f64", 
+                THING_VALUE.timestamp, 
+                THING_VALUE_TAG.channel, 
+                THING_VALUE_TAG.name
+            FROM THING_VALUE
+            JOIN THING_VALUE_TAG ON THING_VALUE_TAG.id = THING_VALUE.tag_id
+            WHERE THING_VALUE.timestamp >= $1
+            AND THING_VALUE.timestamp <= $2
+            ORDER BY THING_VALUE.timestamp ASC"#,
+            range.start().into_db(),
+            range.end().into_db(),
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let dps: Vec<DataPoint<PersistentStateValue>> = recs
+            .into_iter()
+            .filter_map(|row| {
+                let external_id = ExternalId::new(row.channel.as_str(), row.name.as_str());
+
+                match PersistentState::try_from(external_id) {
+                    Ok(target) => Some(DataPoint {
+                        value: PersistentStateValue::from((target, row.value)),
+                        timestamp: row.timestamp.into(),
+                    }),
+                    Err(e) => {
+                        tracing::warn!("Received unsupported channel {}/{}: {:?}", row.channel, row.name, e);
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        Ok(dps)
+    }
 }
 
+// DataPointAccess and TimeSeriesAccess Trait Implementations
+// Generic trait implementations for accessing current data points and time series data
 impl<T> DataPointAccess<T> for super::Database
 where
     T: Into<PersistentState> + ValueObject + Debug + Clone,
 {
-    async fn current_data_point(
-        &self,
-        item: T,
-    ) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
+    async fn current_data_point(&self, item: T) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
         let channel: PersistentState = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
@@ -126,91 +184,8 @@ where
     }
 }
 
-impl super::Database {
-    pub async fn get_all_data_points_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<PersistentStateValue>>> {
-        let recs = sqlx::query!(
-            r#"SELECT 
-                THING_VALUE.value as "value!: f64", 
-                THING_VALUE.timestamp, 
-                THING_VALUE_TAG.channel, 
-                THING_VALUE_TAG.name
-            FROM THING_VALUE
-            JOIN THING_VALUE_TAG ON THING_VALUE_TAG.id = THING_VALUE.tag_id
-            WHERE THING_VALUE.timestamp >= $1
-            AND THING_VALUE.timestamp <= $2
-            ORDER BY THING_VALUE.timestamp ASC"#,
-            range.start().into_db(),
-            range.end().into_db(),
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let dps: Vec<DataPoint<PersistentStateValue>> = recs
-            .into_iter()
-            .filter_map(|row| {
-                let external_id = ExternalId::new(row.channel.as_str(), row.name.as_str());
-
-                match PersistentState::try_from(external_id) {
-                    Ok(target) => Some(DataPoint {
-                        value: PersistentStateValue::from((target, row.value)),
-                        timestamp: row.timestamp.into(),
-                    }),
-                    Err(e) => {
-                        tracing::warn!(
-                            "Received unsupported channel {}/{}: {:?}",
-                            row.channel,
-                            row.name,
-                            e
-                        );
-                        None
-                    }
-                }
-            })
-            .collect();
-
-        Ok(dps)
-    }
-
-    //try to return reference or at least avoid copy of entire dataframe
-    async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
-        let df = self
-            .ts_cache
-            .try_get_with(tag_id, async {
-                tracing::debug!(
-                    "No cached data found for tag {}, fetching from database",
-                    tag_id
-                );
-
-                query_dataframe(&self.pool, tag_id, &self.ts_caching_range())
-                    .await
-                    .map(Arc::new)
-            })
-            .await;
-
-        match df {
-            Ok(df) => Ok(df.map(|dp| dp.value)),
-            Err(e) => bail!(
-                "Error refreshing timeseries cache for tag {}: {:?}",
-                tag_id,
-                e
-            ),
-        }
-    }
-}
-
-#[cached(
-    result = true,
-    key = "PersistentState",
-    convert = r#"{ channel.clone() }"#
-)]
-pub async fn get_tag_id(
-    db_pool: &PgPool,
-    channel: PersistentState,
-    create_if_missing: bool,
-) -> anyhow::Result<i64> {
+#[cached(result = true, key = "PersistentState", convert = r#"{ channel.clone() }"#)]
+pub async fn get_tag_id(db_pool: &PgPool, channel: PersistentState, create_if_missing: bool) -> anyhow::Result<i64> {
     let id: &ExternalId = channel.as_ref();
 
     let tag_id = if create_if_missing {
@@ -234,13 +209,7 @@ pub async fn get_tag_id(
         )
         .fetch_one(db_pool)
         .await
-        .with_context(|| {
-            format!(
-                "Error getting or creating tag id for {}/{}",
-                id.ext_type(),
-                id.ext_name()
-            )
-        })
+        .with_context(|| format!("Error getting or creating tag id for {}/{}", id.ext_type(), id.ext_name()))
     } else {
         sqlx::query_scalar!(
             r#"SELECT id FROM thing_value_tag
@@ -252,24 +221,14 @@ pub async fn get_tag_id(
         )
         .fetch_one(db_pool)
         .await
-        .with_context(|| {
-            format!(
-                "Error getting tag id for {}/{}",
-                id.ext_type(),
-                id.ext_name()
-            )
-        })
+        .with_context(|| format!("Error getting tag id for {}/{}", id.ext_type(), id.ext_name()))
     }?;
 
     Ok(tag_id as i64)
 }
 
 #[tracing::instrument(skip_all, fields(tag_id = tag_id))]
-async fn query_dataframe(
-    pool: &sqlx::PgPool,
-    tag_id: i64,
-    range: &DateTimeRange,
-) -> anyhow::Result<DataFrame<f64>> {
+async fn query_dataframe(pool: &sqlx::PgPool, tag_id: i64, range: &DateTimeRange) -> anyhow::Result<DataFrame<f64>> {
     //TODO rewrite to max query
     let rec = sqlx::query!(
         r#"(SELECT value as "value!: f64", timestamp

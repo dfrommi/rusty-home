@@ -1,11 +1,8 @@
 use crate::home::command::{
-    CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle,
-    Thermostat,
+    CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle, Thermostat,
 };
 
-use crate::home::state::{
-    FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
-};
+use crate::home::state::{FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature};
 
 use super::{HaChannel, HaServiceTarget};
 
@@ -27,14 +24,8 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             Thermostat::RoomOfRequirements.into(),
             HaServiceTarget::ClimateControl("climate.arbeitszimmer"),
         ),
-        (
-            Thermostat::Kitchen.into(),
-            HaServiceTarget::ClimateControl("climate.kuche"),
-        ),
-        (
-            Thermostat::Bathroom.into(),
-            HaServiceTarget::ClimateControl("climate.bad"),
-        ),
+        (Thermostat::Kitchen.into(), HaServiceTarget::ClimateControl("climate.kuche")),
+        (Thermostat::Bathroom.into(), HaServiceTarget::ClimateControl("climate.bad")),
         (
             CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,
@@ -87,10 +78,7 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "sensor.schlafzimmer_temperature",
             HaChannel::Temperature(Temperature::BedroomDoor),
         ),
-        (
-            "sensor.home_temperature",
-            HaChannel::Temperature(Temperature::Outside),
-        ),
+        ("sensor.home_temperature", HaChannel::Temperature(Temperature::Outside)),
         //
         // HUMIDITY
         //
@@ -113,52 +101,25 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         //POWERED STATE
         //
-        (
-            "light.hue_go",
-            HaChannel::Powered(Powered::LivingRoomNotificationLight),
-        ),
-        (
-            "media_player.lg_webos_smart_tv",
-            HaChannel::Powered(Powered::LivingRoomTv),
-        ),
+        ("light.hue_go", HaChannel::Powered(Powered::LivingRoomNotificationLight)),
+        ("media_player.lg_webos_smart_tv", HaChannel::Powered(Powered::LivingRoomTv)),
         //
         // HEATING DEMAND
         //
-        (
-            "sensor.wohnzimmer_heating",
-            HaChannel::HeatingDemand(HeatingDemand::LivingRoom),
-        ),
-        (
-            "sensor.schlafzimmer_heating",
-            HaChannel::HeatingDemand(HeatingDemand::Bedroom),
-        ),
+        ("sensor.wohnzimmer_heating", HaChannel::HeatingDemand(HeatingDemand::LivingRoom)),
+        ("sensor.schlafzimmer_heating", HaChannel::HeatingDemand(HeatingDemand::Bedroom)),
         (
             "sensor.arbeitszimmer_heating",
             HaChannel::HeatingDemand(HeatingDemand::RoomOfRequirements),
         ),
-        (
-            "sensor.kuche_heating",
-            HaChannel::HeatingDemand(HeatingDemand::Kitchen),
-        ),
-        (
-            "sensor.bad_heating",
-            HaChannel::HeatingDemand(HeatingDemand::Bathroom),
-        ),
+        ("sensor.kuche_heating", HaChannel::HeatingDemand(HeatingDemand::Kitchen)),
+        ("sensor.bad_heating", HaChannel::HeatingDemand(HeatingDemand::Bathroom)),
         //
         // SET POINT
         //
-        (
-            "climate.wohnzimmer",
-            HaChannel::SetPoint(SetPoint::LivingRoom),
-        ),
-        (
-            "climate.schlafzimmer",
-            HaChannel::SetPoint(SetPoint::Bedroom),
-        ),
-        (
-            "climate.arbeitszimmer",
-            HaChannel::SetPoint(SetPoint::RoomOfRequirements),
-        ),
+        ("climate.wohnzimmer", HaChannel::SetPoint(SetPoint::LivingRoom)),
+        ("climate.schlafzimmer", HaChannel::SetPoint(SetPoint::Bedroom)),
+        ("climate.arbeitszimmer", HaChannel::SetPoint(SetPoint::RoomOfRequirements)),
         ("climate.kuche", HaChannel::SetPoint(SetPoint::Kitchen)),
         ("climate.bad", HaChannel::SetPoint(SetPoint::Bathroom)),
         //
@@ -166,9 +127,7 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         (
             "climate.arbeitszimmer",
-            HaChannel::ClimateAutoMode(
-                crate::home::state::ExternalAutoControl::RoomOfRequirementsThermostat,
-            ),
+            HaChannel::ClimateAutoMode(crate::home::state::ExternalAutoControl::RoomOfRequirementsThermostat),
         ),
         (
             "climate.bad",
@@ -184,9 +143,7 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         ),
         (
             "climate.wohnzimmer",
-            HaChannel::ClimateAutoMode(
-                crate::home::state::ExternalAutoControl::LivingRoomThermostat,
-            ),
+            HaChannel::ClimateAutoMode(crate::home::state::ExternalAutoControl::LivingRoomThermostat),
         ),
         //
         // PRESENCE

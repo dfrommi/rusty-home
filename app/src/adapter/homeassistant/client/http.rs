@@ -23,11 +23,7 @@ impl HaHttpClient {
 
 impl HaHttpClient {
     pub async fn get_current_state(&self) -> anyhow::Result<Vec<StateChangedEvent>> {
-        let response = self
-            .client
-            .get(format!("{}/api/states", self.base_url))
-            .send()
-            .await?;
+        let response = self.client.get(format!("{}/api/states", self.base_url)).send().await?;
 
         response
             .json::<Vec<StateChangedEvent>>()
@@ -44,18 +40,10 @@ impl HaHttpClient {
     ) -> anyhow::Result<()> {
         let url = format!("{}/api/services/{}/{}", self.base_url, domain, service);
 
-        tracing::info!(
-            "Calling HA service {}: {:?}",
-            url,
-            serde_json::to_string(&service_data)?
-        );
+        tracing::info!("Calling HA service {}: {:?}", url, serde_json::to_string(&service_data)?);
 
         let response = self.client.post(url).json(&service_data).send().await?;
-        tracing::info!(
-            "Response: {} - {}",
-            response.status(),
-            response.text().await?
-        );
+        tracing::info!("Response: {} - {}", response.status(), response.text().await?);
 
         Ok(())
     }

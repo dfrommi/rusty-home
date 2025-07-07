@@ -3,7 +3,7 @@ use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::Ident;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 pub fn derive_id_item(input: TokenStream) -> TokenStream {
     // Parse the input tokens

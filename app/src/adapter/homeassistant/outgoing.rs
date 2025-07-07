@@ -15,11 +15,7 @@ pub struct HaCommandExecutor {
 }
 
 impl HaCommandExecutor {
-    pub fn new(
-        client: HaHttpClient,
-        db: Database,
-        config: &[(CommandTarget, HaServiceTarget)],
-    ) -> Self {
+    pub fn new(client: HaHttpClient, db: Database, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
         for (cmd, ha) in config {
@@ -40,13 +36,10 @@ impl CommandExecutor for HaCommandExecutor {
         let command_target: CommandTarget = command.clone().into();
 
         //could be more efficient, but would require eq and hash on CommandTarget
-        let ha_target = self.config.iter().find_map(|(cmd, ha)| {
-            if cmd == &command_target {
-                Some(ha)
-            } else {
-                None
-            }
-        });
+        let ha_target = self
+            .config
+            .iter()
+            .find_map(|(cmd, ha)| if cmd == &command_target { Some(ha) } else { None });
 
         if ha_target.is_none() {
             return Ok(false);
@@ -54,25 +47,17 @@ impl CommandExecutor for HaCommandExecutor {
 
         let ha_target = ha_target.unwrap();
 
-        self.dispatch_service_call(command, ha_target)
-            .await
-            .map(|_| true)
+        self.dispatch_service_call(command, ha_target).await.map(|_| true)
     }
 }
 
 impl HaCommandExecutor {
-    async fn dispatch_service_call(
-        &self,
-        command: &Command,
-        ha_target: &HaServiceTarget,
-    ) -> anyhow::Result<()> {
+    async fn dispatch_service_call(&self, command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<()> {
         use crate::home::command::*;
         use HaServiceTarget::*;
 
         match (ha_target, command) {
-            (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => {
-                self.light_turn_on_off(id, *power_on).await
-            }
+            (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => self.light_turn_on_off(id, *power_on).await,
             (
                 ClimateControl(id),
                 Command::SetHeating {
@@ -90,11 +75,7 @@ impl HaCommandExecutor {
             (
                 ClimateControl(id),
                 Command::SetHeating {
-                    target_state:
-                        HeatingTargetState::Heat {
-                            temperature,
-                            duration,
-                        },
+                    target_state: HeatingTargetState::Heat { temperature, duration },
                     ..
                 },
             ) => self.tado_set_climate_timer(id, temperature, duration).await,
@@ -114,9 +95,7 @@ impl HaCommandExecutor {
                     ..
                 },
             ) => self.dismiss_window_opened_notification(mobile_id).await,
-            (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => {
-                self.lg_tv_energy_saving_mode(id, *on).await
-            }
+            (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => self.lg_tv_energy_saving_mode(id, *on).await,
             (WindcalmFanSpeed(id), Command::ControlFan { device, speed }) => {
                 self.windcalm_fan_speed(id, device, speed).await
             }
@@ -169,12 +148,7 @@ impl HaCommandExecutor {
             .await
     }
 
-    async fn windcalm_fan_speed(
-        &self,
-        id: &str,
-        fan: &Fan,
-        airflow: &FanAirflow,
-    ) -> anyhow::Result<()> {
+    async fn windcalm_fan_speed(&self, id: &str, fan: &Fan, airflow: &FanAirflow) -> anyhow::Result<()> {
         fn to_percent(fan_speed: &FanSpeed) -> usize {
             match fan_speed {
                 FanSpeed::Silent => 1,
@@ -219,10 +193,7 @@ impl HaCommandExecutor {
 
         //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
         self.db
-            .add_state(
-                &PersistentStateValue::FanActivity(channel, airflow.clone()),
-                &t!(now),
-            )
+            .add_state(&PersistentStateValue::FanActivity(channel, airflow.clone()), &t!(now))
             .await?;
 
         Ok(())

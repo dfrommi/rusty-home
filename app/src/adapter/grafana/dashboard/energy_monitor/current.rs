@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::core::ValueObject;
 use crate::{
     core::timeseries::DataPoint,
     home::state::{CurrentPowerUsage, HeatingDemand},
@@ -9,7 +10,6 @@ use actix_web::{
     http::header,
     web::{self},
 };
-use crate::core::ValueObject;
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 
@@ -27,10 +27,7 @@ where
     current_values_response(api.as_ref(), HeatingDemand::variants()).await
 }
 
-async fn current_values_response<T, U: DataPointAccess<T>>(
-    api: &U,
-    items: &[T],
-) -> impl Responder + use<T, U>
+async fn current_values_response<T, U: DataPointAccess<T>>(api: &U, items: &[T]) -> impl Responder + use<T, U>
 where
     T: ValueObject + DashboardDisplay + Clone,
     T::ValueType: PartialOrd + AsRef<f64>,

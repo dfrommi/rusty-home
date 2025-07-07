@@ -1,10 +1,10 @@
+use crate::core::unit::DegreeCelsius;
 use crate::home::command::{
-    Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification,
-    NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
+    Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification, NotificationAction,
+    NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
 use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, SetPoint};
 use anyhow::Result;
-use crate::core::unit::DegreeCelsius;
 
 use crate::{Database, t};
 use crate::{home::state::EnergySaving, port::DataPointAccess};
@@ -12,24 +12,17 @@ use crate::{home::state::EnergySaving, port::DataPointAccess};
 impl Command {
     pub async fn is_reflected_in_state(&self, api: &Database) -> Result<bool> {
         match self {
-            Command::SetPower { device, power_on } => {
-                is_set_power_reflected_in_state(device, *power_on, api).await
+            Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, api).await,
+            Command::SetHeating { device, target_state } => {
+                is_set_heating_reflected_in_state(device, target_state, api).await
             }
-            Command::SetHeating {
-                device,
-                target_state,
-            } => is_set_heating_reflected_in_state(device, target_state, api).await,
             Command::PushNotify {
                 recipient,
                 notification,
                 action,
             } => is_push_notify_reflected_in_state(recipient, notification, action, api).await,
-            Command::SetEnergySaving { device, on } => {
-                is_set_energy_saving_reflected_in_state(device, *on, api).await
-            }
-            Command::ControlFan { device, speed } => {
-                is_fan_control_reflected_in_state(device, speed, api).await
-            }
+            Command::SetEnergySaving { device, on } => is_set_energy_saving_reflected_in_state(device, *on, api).await,
+            Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, api).await,
         }
     }
 }
@@ -43,15 +36,11 @@ where
     API: DataPointAccess<SetPoint> + DataPointAccess<ExternalAutoControl>,
 {
     let (set_point, auto_mode) = match device {
-        Thermostat::LivingRoom => (
-            SetPoint::LivingRoom,
-            ExternalAutoControl::LivingRoomThermostat,
-        ),
+        Thermostat::LivingRoom => (SetPoint::LivingRoom, ExternalAutoControl::LivingRoomThermostat),
         Thermostat::Bedroom => (SetPoint::Bedroom, ExternalAutoControl::BedroomThermostat),
-        Thermostat::RoomOfRequirements => (
-            SetPoint::RoomOfRequirements,
-            ExternalAutoControl::RoomOfRequirementsThermostat,
-        ),
+        Thermostat::RoomOfRequirements => {
+            (SetPoint::RoomOfRequirements, ExternalAutoControl::RoomOfRequirementsThermostat)
+        }
         Thermostat::Kitchen => (SetPoint::Kitchen, ExternalAutoControl::KitchenThermostat),
         Thermostat::Bathroom => (SetPoint::Bathroom, ExternalAutoControl::BathroomThermostat),
     };
@@ -60,20 +49,14 @@ where
 
     match target_state {
         crate::home::command::HeatingTargetState::Auto => Ok(auto_mode),
-        crate::home::command::HeatingTargetState::Off => {
-            Ok(!auto_mode && set_point == DegreeCelsius(0.0))
-        }
+        crate::home::command::HeatingTargetState::Off => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
         crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
             Ok(!auto_mode && &set_point == temperature)
         }
     }
 }
 
-async fn is_set_power_reflected_in_state<API>(
-    device: &PowerToggle,
-    power_on: bool,
-    api: &API,
-) -> Result<bool>
+async fn is_set_power_reflected_in_state<API>(device: &PowerToggle, power_on: bool, api: &API) -> Result<bool>
 where
     API: DataPointAccess<Powered>,
 {
@@ -110,11 +93,7 @@ async fn is_push_notify_reflected_in_state(
 }
 
 //Energy saving not reflected on HA. Trying to guess from actions
-async fn is_set_energy_saving_reflected_in_state<API>(
-    device: &EnergySavingDevice,
-    on: bool,
-    api: &API,
-) -> Result<bool>
+async fn is_set_energy_saving_reflected_in_state<API>(device: &EnergySavingDevice, on: bool, api: &API) -> Result<bool>
 where
     API: DataPointAccess<EnergySaving>,
 {
@@ -127,11 +106,7 @@ where
     Ok(is_energy_saving == on)
 }
 
-async fn is_fan_control_reflected_in_state<API>(
-    device: &Fan,
-    airflow: &FanAirflow,
-    api: &API,
-) -> Result<bool>
+async fn is_fan_control_reflected_in_state<API>(device: &Fan, airflow: &FanAirflow, api: &API) -> Result<bool>
 where
     API: DataPointAccess<FanActivity>,
 {

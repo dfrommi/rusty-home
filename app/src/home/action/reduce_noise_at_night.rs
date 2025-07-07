@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
+use crate::core::time::DailyTimeRange;
 use crate::home::command::{Command, PowerToggle};
 use crate::t;
-use crate::core::time::DailyTimeRange;
 
 use crate::core::planner::SimpleAction;
 

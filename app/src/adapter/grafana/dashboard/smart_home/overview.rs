@@ -8,9 +8,7 @@ use infrastructure::TraceContext;
 
 use crate::{
     Database,
-    adapter::grafana::{
-        GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response,
-    },
+    adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
 };
 
 use super::TraceView;
@@ -25,10 +23,7 @@ pub fn routes(api: Arc<Database>) -> actix_web::Scope {
         .app_data(web::Data::from(api))
 }
 
-async fn get_trace(
-    api: web::Data<Database>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
+async fn get_trace(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         state: String,
@@ -44,25 +39,20 @@ async fn get_trace(
         .map_err(GrafanaApiError::DataAccessError)?
         .into();
 
-    let rows = traces
-        .into_iter()
-        .filter_map(|trace| match trace.state.as_str() {
-            "DISABLED" | "UNFULFILLED" => None,
+    let rows = traces.into_iter().filter_map(|trace| match trace.state.as_str() {
+        "DISABLED" | "UNFULFILLED" => None,
 
-            _ => Some(Row {
-                state: trace.state,
-                name: trace.name,
-                target: trace.target,
-            }),
-        });
+        _ => Some(Row {
+            state: trace.state,
+            name: trace.name,
+            target: trace.target,
+        }),
+    });
 
     csv_response(rows)
 }
 
-async fn get_trace_states(
-    api: web::Data<Database>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
+async fn get_trace_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     let traces = api
         .get_planning_traces_in_range(time_range.range())
         .await
@@ -103,10 +93,7 @@ async fn get_trace_states(
         ))
 }
 
-async fn get_commands(
-    api: web::Data<Database>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
+async fn get_commands(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         icon: String,
@@ -150,49 +137,33 @@ async fn get_commands(
 
 fn command_as_string(command: &Command) -> (&str, String, String) {
     match command {
-        Command::SetPower { device, power_on } => (
-            "SetPower",
-            device.to_string(),
-            if *power_on { "on" } else { "off" }.to_string(),
-        ),
-        Command::SetHeating {
-            device,
-            target_state,
-        } => (
+        Command::SetPower { device, power_on } => {
+            ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
+        }
+        Command::SetHeating { device, target_state } => (
             "SetHeating",
             device.to_string(),
             match target_state {
                 crate::home::command::HeatingTargetState::Auto => "auto".to_string(),
                 crate::home::command::HeatingTargetState::Off => "off".to_string(),
-                crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
-                    temperature.to_string()
-                }
+                crate::home::command::HeatingTargetState::Heat { temperature, .. } => temperature.to_string(),
             },
         ),
         Command::PushNotify {
             action,
             notification,
             recipient,
-        } => (
-            "PushNotify",
-            format!("{} @ {}", notification, recipient),
-            action.to_string(),
-        ),
+        } => ("PushNotify", format!("{} @ {}", notification, recipient), action.to_string()),
         Command::SetEnergySaving { device, on } => (
             "SetEnergySaving",
             device.to_string(),
             if *on { "on" } else { "off" }.to_string(),
         ),
-        Command::ControlFan { device, speed } => {
-            ("ControlFan", device.to_string(), speed.to_string())
-        }
+        Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
     }
 }
 
-async fn get_states(
-    api: web::Data<Database>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
+async fn get_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         timestamp: String,

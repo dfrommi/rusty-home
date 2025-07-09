@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! t {
     (now) => {{
-        crate::core::time::DateTime::now()
+        $crate::core::time::DateTime::now()
     }};
 
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{

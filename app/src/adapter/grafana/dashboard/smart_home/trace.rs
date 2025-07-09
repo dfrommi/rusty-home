@@ -33,7 +33,7 @@ async fn get_trace_ids(api: web::Data<Database>, time_range: web::Query<TimeRang
         .map_err(GrafanaApiError::DataAccessError)?;
 
     let rows = traces.into_iter().map(|(trace_id, timestamp)| Row {
-        label: format!("{} - {}", timestamp, trace_id),
+        label: format!("{timestamp} - {trace_id}"),
         trace_id,
     });
 

@@ -55,7 +55,7 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             #variant_name_ext => #enum_name::#variant_name
         });
 
-        let display_name = format!("{}[{}]", enum_name, variant_name);
+        let display_name = format!("{enum_name}[{variant_name}]");
         display_impls.push(quote! {
             #enum_name::#variant_name => write!(f, #display_name)
         });

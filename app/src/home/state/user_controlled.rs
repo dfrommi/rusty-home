@@ -1,4 +1,3 @@
-use crate::core::ValueObject;
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use crate::t;
@@ -191,7 +190,7 @@ async fn current_data_point_for_thermostat(
         );
     }
 
-    let is_expired = get_expiration(&latest_command).map_or(false, |expiration| expiration < t!(now));
+    let is_expired = get_expiration(&latest_command).is_some_and(|expiration| expiration < t!(now));
 
     let comand_setting_followed = matches(&latest_command, auto_mode_on.value, set_point.value);
 

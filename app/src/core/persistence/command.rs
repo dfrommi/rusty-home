@@ -24,7 +24,7 @@ impl super::Database {
             .map(|e| e.created);
 
         //wait until roundtrip is completed. State might not have been updated yet
-        let was_just_executed = last_execution.map_or(false, |dt| dt > t!(30 seconds ago));
+        let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
 
         if was_just_executed {
             return Ok(CommandExecutionResult::Skipped);
@@ -87,7 +87,7 @@ impl super::Database {
                             &mut *tx,
                             id,
                             DbCommandState::Error,
-                            Option::Some(format!("Error reading stored command: {}", e).as_str()),
+                            Option::Some(format!("Error reading stored command: {e}").as_str()),
                         )
                         .await?;
                         None
@@ -201,7 +201,7 @@ impl super::Database {
 
                 query_all_commands(&self.pool, Some(target.clone()), range.start(), range.end())
                     .await
-                    .map(|cmds| Arc::new((range.start().clone(), cmds)))
+                    .map(|cmds| Arc::new((*range.start(), cmds)))
             })
             .await
             .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;

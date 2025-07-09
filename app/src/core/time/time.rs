@@ -26,7 +26,7 @@ impl Time {
     pub fn at(hour: u32, minute: u32) -> anyhow::Result<Self> {
         Ok(Self {
             delegate: chrono::NaiveTime::from_hms_opt(hour, minute, 0)
-                .context(format!("Error parsing time {}:{}", hour, minute))?,
+                .context(format!("Error parsing time {hour}:{minute}"))?,
         })
     }
 

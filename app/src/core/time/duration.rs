@@ -130,13 +130,12 @@ mod duration_format {
             {
                 // Parse the ISO 8601 string into a `iso8601-duration::Duration`
                 let iso_duration = Iso8601Duration::parse(value)
-                    .map_err(|e| E::custom(format!("Error parsing {} to duration: {:?}", value, e)))?;
+                    .map_err(|e| E::custom(format!("Error parsing {value} to duration: {e:?}")))?;
 
                 match iso_duration.to_chrono() {
                     Some(duration) => Ok(duration),
                     None => Err(E::custom(format!(
-                        "Duration too long. Must not contain years and/or months. Received {}",
-                        value
+                        "Duration too long. Must not contain years and/or months. Received {value}"
                     ))),
                 }
             }

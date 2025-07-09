@@ -71,7 +71,7 @@ where
         let result = api.series(item.clone(), time_range.clone()).await;
 
         if let Err(e) = result {
-            return HttpResponse::InternalServerError().body(format!("Error retrieving data: {}", e));
+            return HttpResponse::InternalServerError().body(format!("Error retrieving data: {e}"));
         }
         let result = result.unwrap();
 

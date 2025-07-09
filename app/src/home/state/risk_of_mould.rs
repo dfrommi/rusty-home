@@ -1,4 +1,3 @@
-use crate::core::ValueObject;
 use crate::core::unit::{DegreeCelsius, Percent};
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};

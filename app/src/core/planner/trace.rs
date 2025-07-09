@@ -56,8 +56,8 @@ impl PlanningTrace {
 impl PlanningTraceStep {
     pub fn new(action: &impl Display, goal: &impl Display) -> Self {
         Self {
-            action: format!("{}", action),
-            goal: format!("{}", goal),
+            action: format!("{action}"),
+            goal: format!("{goal}"),
             goal_active: false,
             locked: false,
             fulfilled: None,
@@ -84,7 +84,7 @@ fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
     match PREVIOUS_ACTION.lock() {
         Ok(mut previous) => {
             let current = Some(current.clone());
-            if &*previous != &current {
+            if *previous != current {
                 *previous = current;
                 true
             } else {

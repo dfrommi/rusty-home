@@ -288,11 +288,11 @@ fn to_ha_duration_format(duration: &Duration) -> String {
     let mm = (total_seconds % 3600) / 60;
     let ss = total_seconds % 60;
 
-    format!("{:02}:{:02}:{:02}", hh, mm, ss)
+    format!("{hh:02}:{mm:02}:{ss:02}")
 }
 
 fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> serde_json::Value {
-    let luna_url = format!("luna://{}", uri);
+    let luna_url = format!("luna://{uri}");
 
     json!({
         "entity_id": vec![entity_id.to_string()],

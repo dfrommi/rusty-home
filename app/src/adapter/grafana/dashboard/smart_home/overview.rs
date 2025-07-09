@@ -153,7 +153,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             action,
             notification,
             recipient,
-        } => ("PushNotify", format!("{} @ {}", notification, recipient), action.to_string()),
+        } => ("PushNotify", format!("{notification} @ {recipient}"), action.to_string()),
         Command::SetEnergySaving { device, on } => (
             "SetEnergySaving",
             device.to_string(),

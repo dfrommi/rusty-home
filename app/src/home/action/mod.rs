@@ -34,7 +34,7 @@ use crate::home::state::*;
 use crate::port::*;
 
 fn action_source(action: &impl Display) -> CommandSource {
-    CommandSource::System(format!("planning:{}:start", action))
+    CommandSource::System(format!("planning:{action}:start"))
 }
 
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]

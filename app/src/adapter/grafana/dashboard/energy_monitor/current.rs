@@ -34,7 +34,7 @@ where
 {
     let values = get_all_states(api, items).await;
     if let Err(e) = values {
-        return HttpResponse::InternalServerError().body(format!("Error: {}", e));
+        return HttpResponse::InternalServerError().body(format!("Error: {e}"));
     }
 
     let mut values = values.unwrap();

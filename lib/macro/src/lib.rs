@@ -10,7 +10,7 @@ pub fn enum_with_value_derive(input: TokenStream) -> TokenStream {
     enum_with_value::derive(input)
 }
 
-#[proc_macro_derive(StateTypeInfoDerive)]
+#[proc_macro_derive(StateTypeInfoDerive, attributes(persistent))]
 pub fn state_type_info_derive(input: TokenStream) -> TokenStream {
     state_type_info::derive(input)
 }

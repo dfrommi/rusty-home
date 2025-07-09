@@ -1,7 +1,7 @@
 use crate::core::time::DateTime;
 use crate::core::unit::{KiloWattHours, Watt};
 use crate::t;
-use crate::{core::timeseries::DataPoint, home::state::PersistentStateValue};
+use crate::{core::timeseries::DataPoint, home::state::PersistentHomeStateValue};
 use anyhow::bail;
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
@@ -79,12 +79,12 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
                         DataPoint::new(
-                            PersistentStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
+                            PersistentHomeStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
                             tele_message.time,
                         )
                         .into(),
                         DataPoint::new(
-                            PersistentStateValue::TotalEnergyConsumption(
+                            PersistentHomeStateValue::TotalEnergyConsumption(
                                 energy.clone(),
                                 KiloWattHours(energy_report.total),
                             ),
@@ -112,10 +112,10 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(PersistentStateValue::Powered(powered.clone(), true), t!(now)).into(),
+                        DataPoint::new(PersistentHomeStateValue::Powered(powered.clone(), true), t!(now)).into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(PersistentStateValue::Powered(powered.clone(), false), t!(now)).into(),
+                        DataPoint::new(PersistentHomeStateValue::Powered(powered.clone(), false), t!(now)).into(),
                     ]),
                     _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, msg.payload),
                 }

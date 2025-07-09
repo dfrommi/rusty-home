@@ -1,7 +1,7 @@
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
-use crate::home::state::PersistentStateValue;
+use crate::home::state::PersistentHomeStateValue;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
@@ -55,12 +55,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
+                        PersistentHomeStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
+                        PersistentHomeStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
                         payload.last_seen,
                     )
                     .into(),
@@ -72,7 +72,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::Opened(opened.clone(), !payload.contact),
+                        PersistentHomeStateValue::Opened(opened.clone(), !payload.contact),
                         payload.last_seen,
                     )
                     .into(),
@@ -84,12 +84,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
+                        PersistentHomeStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentStateValue::TotalEnergyConsumption(
+                        PersistentHomeStateValue::TotalEnergyConsumption(
                             energy.clone(),
                             KiloWattHours(payload.total_energy_kwh),
                         ),
@@ -104,7 +104,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: WaterLeakSensor = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentStateValue::Presence(presence.clone(), payload.water_leak),
+                        PersistentHomeStateValue::Presence(presence.clone(), payload.water_leak),
                         payload.last_seen,
                     )
                     .into(),

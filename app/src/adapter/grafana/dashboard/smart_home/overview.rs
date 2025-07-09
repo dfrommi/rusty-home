@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::home::command::{Command, CommandSource};
-use crate::home::state::PersistentState;
+use crate::home::state::PersistentHomeState;
 use actix_web::{HttpResponse, http::header, web};
 use anyhow::Context;
 use infrastructure::TraceContext;
@@ -182,7 +182,7 @@ async fn get_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQu
     states.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     let rows = states.into_iter().map(|dp| {
-        let target = PersistentState::from(&dp.value);
+        let target = PersistentHomeState::from(&dp.value);
 
         Row {
             timestamp: dp.timestamp.to_human_readable(),

@@ -11,7 +11,7 @@ pub mod unit;
 
 use std::collections::HashMap;
 
-use crate::home::state::PersistentStateValue;
+use crate::home::state::PersistentHomeStateValue;
 use crate::home::trigger::UserTrigger;
 pub use command::CommandExecutor;
 pub use command::execute_commands;
@@ -33,7 +33,7 @@ where
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {
-    StateValue(DataPoint<PersistentStateValue>),
+    StateValue(DataPoint<PersistentHomeStateValue>),
     UserTrigger(UserTrigger),
     ItemAvailability(ItemAvailability),
 }

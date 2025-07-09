@@ -1,5 +1,5 @@
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
-use crate::home::state::{PersistentStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
+use crate::home::state::{PersistentHomeStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use tokio::sync::broadcast::Receiver;
 
 use crate::{
@@ -68,10 +68,10 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
     }
 }
 
-impl From<&EnergyReading> for PersistentStateValue {
+impl From<&EnergyReading> for PersistentHomeStateValue {
     fn from(val: &EnergyReading) -> Self {
         match val {
-            EnergyReading::Heating(item, value) => PersistentStateValue::TotalRadiatorConsumption(
+            EnergyReading::Heating(item, value) => PersistentHomeStateValue::TotalRadiatorConsumption(
                 match item {
                     Radiator::LivingRoomBig => TotalRadiatorConsumption::LivingRoomBig,
                     Radiator::LivingRoomSmall => TotalRadiatorConsumption::LivingRoomSmall,
@@ -82,14 +82,14 @@ impl From<&EnergyReading> for PersistentStateValue {
                 },
                 HeatingUnit(*value),
             ),
-            EnergyReading::ColdWater(item, value) => PersistentStateValue::TotalWaterConsumption(
+            EnergyReading::ColdWater(item, value) => PersistentHomeStateValue::TotalWaterConsumption(
                 match item {
                     Faucet::Kitchen => TotalWaterConsumption::KitchenCold,
                     Faucet::Bathroom => TotalWaterConsumption::BathroomCold,
                 },
                 KiloCubicMeter(*value),
             ),
-            EnergyReading::HotWater(item, value) => PersistentStateValue::TotalWaterConsumption(
+            EnergyReading::HotWater(item, value) => PersistentHomeStateValue::TotalWaterConsumption(
                 match item {
                     Faucet::Kitchen => TotalWaterConsumption::KitchenWarm,
                     Faucet::Bathroom => TotalWaterConsumption::BathroomWarm,

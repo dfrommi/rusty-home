@@ -19,12 +19,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut target_variants = Vec::new();
     let mut item_to_target_impls = Vec::new();
     let mut source_to_target_impl = Vec::new();
+    let mut value_to_f64_matches = Vec::new();
+    let mut tuple_to_value_matches = Vec::new();
+    let mut value_to_string_matches = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
 
         if let syn::Fields::Unnamed(fields) = variant.fields {
             let item_type = &fields.unnamed[0].ty;
+            let _value_type = &fields.unnamed[1].ty;
 
             // Generate the variant for the Channel enum
             target_variants.push(quote! {
@@ -50,6 +54,21 @@ pub fn derive(input: TokenStream) -> TokenStream {
             source_to_target_impl.push(quote! {
                 #name::#variant_name(id, _) => #target_enum_name::#variant_name(id.clone())
             });
+
+            // Generate matches for From<&EnumValue> for f64
+            value_to_f64_matches.push(quote! {
+                #name::#variant_name(_, value) => <#item_type as crate::core::ValueObject>::to_f64(value)
+            });
+
+            // Generate matches for From<(Enum, f64)> for EnumValue
+            tuple_to_value_matches.push(quote! {
+                #target_enum_name::#variant_name(item) => #name::#variant_name(item, <#item_type as crate::core::ValueObject>::from_f64(value))
+            });
+
+            // Generate matches for value_to_string
+            value_to_string_matches.push(quote! {
+                #name::#variant_name(_, value) => value.to_string()
+            });
         }
     }
 
@@ -68,6 +87,34 @@ pub fn derive(input: TokenStream) -> TokenStream {
             fn from(val: &#name) -> Self {
                 match val {
                     #(#source_to_target_impl),*
+                }
+            }
+        }
+
+        // Implement From<&EnumValue> for f64
+        impl From<&#name> for f64 {
+            fn from(val: &#name) -> Self {
+                match val {
+                    #(#value_to_f64_matches),*
+                }
+            }
+        }
+
+        // Implement From<(Enum, f64)> for EnumValue
+        impl From<(#target_enum_name, f64)> for #name {
+            fn from(val: (#target_enum_name, f64)) -> Self {
+                let (channel, value) = val;
+                match channel {
+                    #(#tuple_to_value_matches),*
+                }
+            }
+        }
+
+        // Implement value_to_string method
+        impl #name {
+            pub fn value_to_string(&self) -> String {
+                match self {
+                    #(#value_to_string_matches),*
                 }
             }
         }

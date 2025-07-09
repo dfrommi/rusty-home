@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     core::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable},
-    home::state::{PersistentState, PersistentStateValue},
+    home::state::{PersistentHomeState, PersistentHomeStateValue},
     port::{DataPointAccess, TimeSeriesAccess},
     t,
 };
@@ -65,7 +65,7 @@ impl super::Database {
 // State Value Operations
 // Methods for adding and retrieving state values from the database
 impl super::Database {
-    pub async fn add_state(&self, value: &PersistentStateValue, timestamp: &DateTime) -> Result<()> {
+    pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.pool, value.into(), true).await?;
 
         let fvalue: f64 = value.into();
@@ -94,7 +94,7 @@ impl super::Database {
     pub async fn get_all_data_points_in_range(
         &self,
         range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<PersistentStateValue>>> {
+    ) -> anyhow::Result<Vec<DataPoint<PersistentHomeStateValue>>> {
         let recs = sqlx::query!(
             r#"SELECT 
                 THING_VALUE.value as "value!: f64", 
@@ -112,14 +112,14 @@ impl super::Database {
         .fetch_all(&self.pool)
         .await?;
 
-        let dps: Vec<DataPoint<PersistentStateValue>> = recs
+        let dps: Vec<DataPoint<PersistentHomeStateValue>> = recs
             .into_iter()
             .filter_map(|row| {
                 let external_id = ExternalId::new(row.channel.as_str(), row.name.as_str());
 
-                match PersistentState::try_from(external_id) {
+                match PersistentHomeState::try_from(external_id) {
                     Ok(target) => Some(DataPoint {
-                        value: PersistentStateValue::from((target, row.value)),
+                        value: PersistentHomeStateValue::from((target, row.value)),
                         timestamp: row.timestamp.into(),
                     }),
                     Err(e) => {
@@ -138,10 +138,10 @@ impl super::Database {
 // Generic trait implementations for accessing current data points and time series data
 impl<T> DataPointAccess<T> for super::Database
 where
-    T: Into<PersistentState> + ValueObject + Debug + Clone,
+    T: Into<PersistentHomeState> + ValueObject + Debug + Clone,
 {
     async fn current_data_point(&self, item: T) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
-        let channel: PersistentState = item.into();
+        let channel: PersistentHomeState = item.into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
         let df: DataFrame<f64> = self.get_default_dataframe(tag_id).await?;
@@ -155,11 +155,11 @@ where
 
 impl<T> TimeSeriesAccess<T> for super::Database
 where
-    T: Into<PersistentState> + Estimatable + Clone + Debug,
+    T: Into<PersistentHomeState> + Estimatable + Clone + Debug,
 {
     #[tracing::instrument(skip(self))]
     async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
-        let channel: PersistentState = item.clone().into();
+        let channel: PersistentHomeState = item.clone().into();
         let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
 
         let df = self
@@ -184,8 +184,8 @@ where
     }
 }
 
-#[cached(result = true, key = "PersistentState", convert = r#"{ channel.clone() }"#)]
-pub async fn get_tag_id(db_pool: &PgPool, channel: PersistentState, create_if_missing: bool) -> anyhow::Result<i64> {
+#[cached(result = true, key = "PersistentHomeState", convert = r#"{ channel.clone() }"#)]
+pub async fn get_tag_id(db_pool: &PgPool, channel: PersistentHomeState, create_if_missing: bool) -> anyhow::Result<i64> {
     let id: &ExternalId = channel.as_ref();
 
     let tag_id = if create_if_missing {

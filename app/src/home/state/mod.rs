@@ -48,7 +48,7 @@ pub use total_radiator_consumption::TotalRadiatorConsumption;
 pub use total_water_consumption::TotalWaterConsumption;
 pub use user_controlled::UserControlled;
 
-use crate::core::{ValueObject, unit::*};
+use crate::core::unit::*;
 use crate::port::*;
 use r#macro::{EnumWithValue, StateTypeInfoDerive};
 
@@ -56,116 +56,37 @@ use r#macro::{EnumWithValue, StateTypeInfoDerive};
 pub enum HomeStateValue {
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),
+    #[persistent]
     CurrentPowerUsage(CurrentPowerUsage, Watt),
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
+    #[persistent]
     ExternalAutoControl(ExternalAutoControl, bool),
+    #[persistent]
     FanActivity(FanActivity, FanAirflow),
+    #[persistent]
     HeatingDemand(HeatingDemand, Percent),
+    #[persistent]
     Opened(OpenedRaw, bool),
+    #[persistent]
     Powered(Powered, bool),
+    #[persistent]
     Presence(Presence, bool),
+    #[persistent]
     RelativeHumidity(RelativeHumidity, Percent),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
+    #[persistent]
     SetPoint(SetPoint, DegreeCelsius),
+    #[persistent]
     Temperature(Temperature, DegreeCelsius),
+    #[persistent]
     TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
+    #[persistent]
     TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
+    #[persistent]
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
     UserControlled(UserControlled, bool),
-}
-
-#[derive(Debug, Clone, EnumWithValue)]
-pub enum PersistentStateValue {
-    Temperature(Temperature, DegreeCelsius),
-    RelativeHumidity(RelativeHumidity, Percent),
-    Opened(OpenedRaw, bool),
-    Powered(Powered, bool),
-    CurrentPowerUsage(CurrentPowerUsage, Watt),
-    TotalEnergyConsumption(TotalEnergyConsumption, KiloWattHours),
-    SetPoint(SetPoint, DegreeCelsius),
-    HeatingDemand(HeatingDemand, Percent),
-    ExternalAutoControl(ExternalAutoControl, bool),
-    Presence(Presence, bool),
-    TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
-    TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
-    FanActivity(FanActivity, FanAirflow),
-}
-
-impl PersistentStateValue {
-    pub fn value_to_string(&self) -> String {
-        match self {
-            PersistentStateValue::Temperature(_, value) => value.to_string(),
-            PersistentStateValue::RelativeHumidity(_, value) => value.to_string(),
-            PersistentStateValue::Opened(_, value) => value.to_string(),
-            PersistentStateValue::Powered(_, value) => value.to_string(),
-            PersistentStateValue::CurrentPowerUsage(_, value) => value.to_string(),
-            PersistentStateValue::TotalEnergyConsumption(_, value) => value.to_string(),
-            PersistentStateValue::SetPoint(_, value) => value.to_string(),
-            PersistentStateValue::HeatingDemand(_, value) => value.to_string(),
-            PersistentStateValue::ExternalAutoControl(_, value) => value.to_string(),
-            PersistentStateValue::Presence(_, value) => value.to_string(),
-            PersistentStateValue::TotalRadiatorConsumption(_, value) => value.to_string(),
-            PersistentStateValue::TotalWaterConsumption(_, value) => value.to_string(),
-            PersistentStateValue::FanActivity(_, value) => value.to_string(),
-        }
-    }
-}
-
-impl From<&PersistentStateValue> for f64 {
-    fn from(val: &PersistentStateValue) -> Self {
-        match val {
-            PersistentStateValue::Temperature(_, value) => Temperature::to_f64(value),
-            PersistentStateValue::RelativeHumidity(_, value) => RelativeHumidity::to_f64(value),
-            PersistentStateValue::Opened(_, value) => Opened::to_f64(value),
-            PersistentStateValue::Powered(_, value) => Powered::to_f64(value),
-            PersistentStateValue::CurrentPowerUsage(_, value) => CurrentPowerUsage::to_f64(value),
-            PersistentStateValue::TotalEnergyConsumption(_, value) => TotalEnergyConsumption::to_f64(value),
-            PersistentStateValue::SetPoint(_, value) => SetPoint::to_f64(value),
-            PersistentStateValue::HeatingDemand(_, value) => HeatingDemand::to_f64(value),
-            PersistentStateValue::ExternalAutoControl(_, value) => ExternalAutoControl::to_f64(value),
-            PersistentStateValue::Presence(_, value) => Presence::to_f64(value),
-            PersistentStateValue::TotalRadiatorConsumption(_, value) => TotalRadiatorConsumption::to_f64(value),
-            PersistentStateValue::TotalWaterConsumption(_, value) => TotalWaterConsumption::to_f64(value),
-            PersistentStateValue::FanActivity(_, value) => FanActivity::to_f64(value),
-        }
-    }
-}
-
-impl From<(PersistentState, f64)> for PersistentStateValue {
-    fn from(val: (PersistentState, f64)) -> Self {
-        let (channel, value) = val;
-        match channel {
-            PersistentState::Temperature(item) => PersistentStateValue::Temperature(item, Temperature::from_f64(value)),
-            PersistentState::RelativeHumidity(item) => {
-                PersistentStateValue::RelativeHumidity(item, RelativeHumidity::from_f64(value))
-            }
-            PersistentState::Opened(item) => PersistentStateValue::Opened(item, Opened::from_f64(value)),
-            PersistentState::Powered(item) => PersistentStateValue::Powered(item, Powered::from_f64(value)),
-            PersistentState::CurrentPowerUsage(item) => {
-                PersistentStateValue::CurrentPowerUsage(item, CurrentPowerUsage::from_f64(value))
-            }
-            PersistentState::TotalEnergyConsumption(item) => {
-                PersistentStateValue::TotalEnergyConsumption(item, TotalEnergyConsumption::from_f64(value))
-            }
-            PersistentState::SetPoint(item) => PersistentStateValue::SetPoint(item, SetPoint::from_f64(value)),
-            PersistentState::HeatingDemand(item) => {
-                PersistentStateValue::HeatingDemand(item, HeatingDemand::from_f64(value))
-            }
-            PersistentState::ExternalAutoControl(item) => {
-                PersistentStateValue::ExternalAutoControl(item, ExternalAutoControl::from_f64(value))
-            }
-            PersistentState::Presence(item) => PersistentStateValue::Presence(item, Presence::from_f64(value)),
-            PersistentState::TotalRadiatorConsumption(item) => {
-                PersistentStateValue::TotalRadiatorConsumption(item, TotalRadiatorConsumption::from_f64(value))
-            }
-            PersistentState::TotalWaterConsumption(item) => {
-                PersistentStateValue::TotalWaterConsumption(item, TotalWaterConsumption::from_f64(value))
-            }
-            PersistentState::FanActivity(item) => PersistentStateValue::FanActivity(item, FanActivity::from_f64(value)),
-        }
-    }
 }
 
 mod macros {

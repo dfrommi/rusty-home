@@ -1,47 +1,12 @@
 use crate::core::time::DateTime;
-use crate::port::CommandExecutionAccess;
+use crate::home::command::*;
 use crate::t;
-use crate::{home::command::*, port::CommandExecutionResult};
 use anyhow::Result;
-use infrastructure::TraceContext;
 use schema::*;
-use sqlx::PgPool;
 
 // Command Execution & Processing
 // High-level command execution logic with deduplication and state validation
 impl super::Database {
-    pub async fn execute(
-        &self,
-        command: Command,
-        source: crate::home::command::CommandSource,
-    ) -> anyhow::Result<CommandExecutionResult> {
-        let target: CommandTarget = command.clone().into();
-        let api = crate::core::HomeApi::new(self.clone());
-        let last_execution = api
-            .get_latest_command(target, t!(48 hours ago))
-            .await?
-            .filter(|e| e.source == source && e.command == command)
-            .map(|e| e.created);
-
-        //wait until roundtrip is completed. State might not have been updated yet
-        let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
-
-        if was_just_executed {
-            return Ok(CommandExecutionResult::Skipped);
-        }
-
-        let was_latest_execution = last_execution.is_some();
-        let is_reflected_in_state = command.is_reflected_in_state(&api).await?;
-
-        if !was_latest_execution || !is_reflected_in_state {
-            self.save_command(command, source, TraceContext::current_correlation_id())
-                .await?;
-            Ok(CommandExecutionResult::Triggered)
-        } else {
-            Ok(CommandExecutionResult::Skipped)
-        }
-    }
-
     //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
     pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.pool.begin().await?;
@@ -101,23 +66,13 @@ impl super::Database {
     }
 }
 
-// Command Querying & History
-// Methods for retrieving command history and state information
-
-impl super::Database {
-    pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
-        //no cache, just used from dashboard
-        query_all_commands(&self.pool, None, &from, &until).await
-    }
-}
-
 // Command Persistence & State Management
 // Methods for saving commands and managing their execution state
 impl super::Database {
     #[tracing::instrument(skip(self))]
-    async fn save_command(
+    pub async fn save_command(
         &self,
-        command: Command,
+        command: &Command,
         source: CommandSource,
         correlation_id: Option<String>,
     ) -> Result<()> {
@@ -156,19 +111,9 @@ impl super::Database {
         from: &DateTime,
         until: &DateTime,
     ) -> Result<Vec<CommandExecution>> {
-        query_all_commands(&self.pool, target, from, until).await
-    }
-}
+        let db_target = target.map(|j| serde_json::json!(j));
 
-async fn query_all_commands(
-    db_pool: &PgPool,
-    target: Option<CommandTarget>,
-    from: &DateTime,
-    until: &DateTime,
-) -> Result<Vec<CommandExecution>> {
-    let db_target = target.map(|j| serde_json::json!(j));
-
-    let records = sqlx::query!(
+        let records = sqlx::query!(
             r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id, correlation_id
                 from THING_COMMAND 
                 where (command @> $1 or $1 is null)
@@ -179,23 +124,24 @@ async fn query_all_commands(
             from.into_db(),
             until.into_db(),
         )
-        .fetch_all(db_pool)
+        .fetch_all(&self.pool)
         .await?;
 
-    records
-        .into_iter()
-        .map(|row| {
-            let source = CommandSource::from((row.source_type, row.source_id));
-            Ok(CommandExecution {
-                id: row.id,
-                command: serde_json::from_value(row.command)?,
-                state: CommandState::from((row.status, row.error)),
-                created: row.created.into(),
-                source,
-                correlation_id: row.correlation_id,
+        records
+            .into_iter()
+            .map(|row| {
+                let source = CommandSource::from((row.source_type, row.source_id));
+                Ok(CommandExecution {
+                    id: row.id,
+                    command: serde_json::from_value(row.command)?,
+                    state: CommandState::from((row.status, row.error)),
+                    created: row.created.into(),
+                    source,
+                    correlation_id: row.correlation_id,
+                })
             })
-        })
-        .collect()
+            .collect()
+    }
 }
 
 async fn set_command_status_in_tx(
@@ -258,16 +204,6 @@ pub mod schema {
         System,
         User,
     }
-
-    #[derive(Debug, Clone, sqlx::FromRow)]
-    pub struct DbThingCommandRow {
-        pub id: i64,
-        pub command: serde_json::Value,
-        pub timestamp: chrono::DateTime<chrono::Utc>,
-        pub status: DbCommandState,
-        pub error: Option<String>,
-        pub source: DbCommandSource,
-    }
 }
 
 pub mod mapper {
@@ -306,6 +242,7 @@ pub mod mapper {
 
 #[cfg(test)]
 mod get_all_commands_since {
+    use super::super::Database;
     use super::*;
     use crate::home::command::PowerToggle;
     use crate::t;
@@ -314,13 +251,15 @@ mod get_all_commands_since {
     #[sqlx::test(migrations = "../migrations")]
     async fn test_command_found(db_pool: PgPool) {
         //GIVEN
+        let db = Database::new(db_pool);
+
         for (power_on, timestampe) in [
             (true, t!(4 minutes ago)),
             (false, t!(6 minutes ago)),
             (true, t!(10 minutes ago)),
         ] {
             insert_command(
-                &db_pool,
+                &db,
                 &Command::SetPower {
                     device: PowerToggle::Dehumidifier,
                     power_on,
@@ -331,7 +270,7 @@ mod get_all_commands_since {
         }
 
         insert_command(
-            &db_pool,
+            &db,
             &Command::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
@@ -341,7 +280,8 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(&db_pool, Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+        let result = db
+            .query_all_commands(Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
             .await
             .unwrap();
 
@@ -366,8 +306,10 @@ mod get_all_commands_since {
     #[sqlx::test(migrations = "../migrations")]
     async fn test_command_without_target_filter(db_pool: PgPool) {
         //GIVEN
+        let db = Database::new(db_pool);
+
         insert_command(
-            &db_pool,
+            &db,
             &Command::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
                 power_on: true,
@@ -377,7 +319,7 @@ mod get_all_commands_since {
         .await;
 
         insert_command(
-            &db_pool,
+            &db,
             &Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
@@ -387,9 +329,7 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(&db_pool, None, &t!(1 hours ago), &t!(now))
-            .await
-            .unwrap();
+        let result = db.query_all_commands(None, &t!(1 hours ago), &t!(now)).await.unwrap();
 
         //THEN
         assert_eq!(result.len(), 2);
@@ -398,8 +338,10 @@ mod get_all_commands_since {
     #[sqlx::test(migrations = "../migrations")]
     async fn test_no_command(db_pool: PgPool) {
         //GIVEN
+        let db = Database::new(db_pool);
+
         insert_command(
-            &db_pool,
+            &db,
             &Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
@@ -409,7 +351,8 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = query_all_commands(&db_pool, Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+        let result = db
+            .query_all_commands(Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
             .await
             .unwrap();
 
@@ -417,7 +360,7 @@ mod get_all_commands_since {
         assert_eq!(result.len(), 0);
     }
 
-    async fn insert_command(db_pool: &PgPool, command: &Command, at: DateTime) {
+    async fn insert_command(db: &Database, command: &Command, at: DateTime) {
         sqlx::query!(
             r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
             serde_json::to_value(command).unwrap(),
@@ -426,7 +369,7 @@ mod get_all_commands_since {
             DbCommandSource::System as DbCommandSource,
             "unit-test".to_owned()
         )
-        .execute(db_pool)
+        .execute(&db.pool)
         .await
         .unwrap();
     }

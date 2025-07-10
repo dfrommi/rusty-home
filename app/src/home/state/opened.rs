@@ -175,7 +175,7 @@ mod tests {
                     raw::Opened::LivingRoomWindowRight => self.right,
                     raw::Opened::LivingRoomWindowSide => self.side,
                     raw::Opened::LivingRoomBalconyDoor => self.balcony,
-                    _ => panic!("Unexpected item {:?}", item),
+                    _ => panic!("Unexpected item {item:?}"),
                 },
                 timestamp: DateTime::now(),
             })

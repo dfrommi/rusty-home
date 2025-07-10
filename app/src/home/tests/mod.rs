@@ -4,7 +4,7 @@ mod state;
 
 use std::sync::OnceLock;
 
-use crate::{Database, settings};
+use crate::{Database, core::HomeApi, settings};
 use tokio::runtime::Runtime;
 
 struct TestInfrastructure {
@@ -13,9 +13,9 @@ struct TestInfrastructure {
 }
 
 impl TestInfrastructure {
-    pub fn api(&self) -> Database {
+    pub fn api(&self) -> HomeApi {
         //new instance to avoid caching
-        Database::new(self.pool.clone())
+        HomeApi::new(Database::new(self.pool.clone()))
     }
 }
 

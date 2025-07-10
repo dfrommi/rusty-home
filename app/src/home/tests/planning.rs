@@ -16,7 +16,7 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
         plan_for_home(api).await;
 
         let executed_actions = command_api.executed_actions();
-        println!("TEST2: Executed actions: {:?}", executed_actions);
+        println!("TEST2: Executed actions: {executed_actions:?}");
         executed_actions
     };
     runtime().block_on(FIXED_NOW.scope(fake_now, f))
@@ -27,7 +27,7 @@ fn test_planning() {
     let actions = plan_at("2024-12-24T12:50:01+01:00");
 
     for (action, source) in actions.iter() {
-        println!("{:?} - {:?}", source, action);
+        println!("{source:?} - {action:?}");
     }
 
     assert_eq!(actions.len(), 0);
@@ -38,7 +38,7 @@ fn test_planning_execution() {
     let actions = plan_at("2024-12-31T19:49:07.50+01:00");
 
     for (action, source) in actions.iter() {
-        println!("{:?} - {:?}", source, action);
+        println!("{source:?} - {action:?}");
     }
 
     assert_eq!(actions.len(), 1);
@@ -75,7 +75,7 @@ mod support {
     //Tracer
     impl TestDatabase {
         pub async fn add_planning_trace(&self, results: &PlanningTrace) -> anyhow::Result<()> {
-            println!("{:?}", results);
+            println!("{results:?}");
             Ok(())
         }
 
@@ -108,7 +108,7 @@ mod support {
             source: CommandSource,
             _: Option<String>,
         ) -> anyhow::Result<()> {
-            println!("Pretend executing command in test: {:?} with source: {:?}", command, source);
+            println!("Pretend executing command in test: {command:?} with source: {source:?}");
 
             let mut executed_actions = self.executed_actions.lock().unwrap();
             executed_actions.push((command, source));

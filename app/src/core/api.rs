@@ -4,13 +4,13 @@ use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange, Duration};
 use super::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable};
 use crate::core::ItemAvailability;
-use crate::home::command::CommandSource;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataPointAccess, TimeSeriesAccess};
 use crate::t;
 use anyhow::Result;
+use infrastructure::TraceContext;
 use moka::future::Cache;
 use std::{fmt::Debug, sync::Arc};
 
@@ -37,7 +37,12 @@ impl HomeApi {
                 .build(),
         }
     }
+}
 
+//
+// CACHING
+//
+impl HomeApi {
     // Cache Management Methods
     fn ts_caching_range(&self) -> DateTimeRange {
         let now = t!(now);
@@ -81,129 +86,24 @@ impl HomeApi {
             .try_get_with(tag_id, async {
                 tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
                 let range = self.ts_caching_range();
-                self.db.get_dataframe_for_tag(tag_id, &range).await
+                self.db.get_dataframe_for_tag(tag_id, &range).await.map(Arc::new)
             })
             .await
             .map_err(|e| anyhow::anyhow!("Error initializing timeseries cache for tag {}: {:?}", tag_id, e))?;
 
         Ok((*df).clone())
     }
+}
 
-    async fn get_commands_using_cache(&self, target: &CommandTarget, since: DateTime) -> Result<Vec<CommandExecution>> {
-        let cached = self
-            .cmd_cache
-            .try_get_with(target.clone(), async {
-                tracing::debug!("No command-cache entry found for target {:?}", target);
-                let range = self.cmd_caching_range();
-
-                self.db
-                    .query_all_commands(Some(target.clone()), range.start(), range.end())
-                    .await
-                    .map(|cmds| Arc::new((*range.start(), cmds)))
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;
-
-        if since < cached.0 {
-            tracing::info!(
-                ?since,
-                offset = %since.elapsed().to_iso_string(),
-                cache_start = %cached.0,
-                "Requested time range is before cached commands, querying database"
-            );
-            return self.db.query_all_commands(Some(target.clone()), &since, &t!(now)).await;
-        }
-
-        let commands: Vec<CommandExecution> = cached.1.iter().filter(|&cmd| cmd.created >= since).cloned().collect();
-
-        Ok(commands)
-    }
-
+//
+//STATE
+//
+impl HomeApi {
     pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
         self.db.add_state(value, timestamp).await
     }
-
-    // Command Management Methods
-    pub async fn execute(&self, command: Command, source: CommandSource) -> anyhow::Result<CommandExecutionResult> {
-        let result = self.db.execute(command.clone(), source).await?;
-
-        // Invalidate command cache after saving command
-        self.invalidate_command_cache(&command.into()).await;
-
-        Ok(result)
-    }
-
-    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
-        self.db.get_command_for_processing().await
-    }
-
-    pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
-        self.db.set_command_state_success(command_id).await
-    }
-
-    pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
-        self.db.set_command_state_error(command_id, error_message).await
-    }
-
-    // User Trigger Methods
-    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        self.db.add_user_trigger(trigger).await
-    }
-
-    pub async fn latest_since(
-        &self,
-        target: &UserTriggerTarget,
-        since: DateTime,
-    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
-        self.db.latest_since(target, since).await
-    }
-
-    // Planning Trace Methods
-    pub async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
-        self.db.add_planning_trace(result).await
-    }
-
-    // Availability Methods
-    pub async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()> {
-        self.db.add_item_availability(item).await
-    }
 }
 
-// Grafana-specific methods (read-only queries for dashboards)
-impl HomeApi {
-    pub async fn get_all_data_points_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<PersistentHomeStateValue>>> {
-        self.db.get_all_data_points_in_range(range).await
-    }
-
-    pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
-        self.db.get_all_commands(from, until).await
-    }
-
-    pub async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace> {
-        self.db.get_latest_planning_trace(before).await
-    }
-
-    pub async fn get_planning_traces_by_trace_id(&self, trace_id: &str) -> anyhow::Result<Option<PlanningTrace>> {
-        self.db.get_planning_traces_by_trace_id(trace_id).await
-    }
-
-    pub async fn get_trace_ids(&self, range: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
-        self.db.get_trace_ids(range).await
-    }
-
-    pub async fn get_planning_traces_in_range(&self, range: DateTimeRange) -> anyhow::Result<Vec<PlanningTrace>> {
-        self.db.get_planning_traces_in_range(range).await
-    }
-
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
-        self.db.get_offline_items().await
-    }
-}
-
-// Trait Implementations
 impl<T> DataPointAccess<T> for HomeApi
 where
     T: Into<PersistentHomeState> + ValueObject + Debug + Clone,
@@ -241,11 +141,69 @@ where
                 &range
             );
 
-            let df = (*self.db.get_dataframe_for_tag(tag_id, &range).await?).map(|dp| T::from_f64(dp.value));
+            let df = self
+                .db
+                .get_dataframe_for_tag(tag_id, &range)
+                .await?
+                .map(|dp| T::from_f64(dp.value));
             return TimeSeries::new(item, &df, range);
         }
 
         TimeSeries::new(item, &df, range)
+    }
+}
+
+//
+//COMMAND
+//
+impl HomeApi {
+    pub async fn execute(
+        &self,
+        command: Command,
+        source: crate::home::command::CommandSource,
+    ) -> Result<CommandExecutionResult> {
+        let target: CommandTarget = command.clone().into();
+        let last_execution = self
+            .get_latest_command(target, t!(48 hours ago))
+            .await?
+            .filter(|e| e.source == source && e.command == command)
+            .map(|e| e.created);
+
+        //wait until roundtrip is completed. State might not have been updated yet
+        let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
+
+        if was_just_executed {
+            return Ok(CommandExecutionResult::Skipped);
+        }
+
+        let was_latest_execution = last_execution.is_some();
+        let is_reflected_in_state = command.is_reflected_in_state(self).await?;
+
+        let result = if !was_latest_execution || !is_reflected_in_state {
+            self.db
+                .save_command(&command, source, TraceContext::current_correlation_id())
+                .await?;
+            Ok(CommandExecutionResult::Triggered)
+        } else {
+            Ok(CommandExecutionResult::Skipped)
+        };
+
+        // Invalidate command cache after saving command
+        self.invalidate_command_cache(&command.into()).await;
+
+        result
+    }
+
+    pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
+        self.db.get_command_for_processing().await
+    }
+
+    pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
+        self.db.set_command_state_success(command_id).await
+    }
+
+    pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
+        self.db.set_command_state_error(command_id, error_message).await
     }
 }
 
@@ -267,5 +225,108 @@ impl CommandExecutionAccess for HomeApi {
     ) -> Result<Vec<CommandExecution>> {
         let target = target.into();
         self.get_commands_using_cache(&target, since).await
+    }
+}
+
+impl HomeApi {
+    async fn get_commands_using_cache(&self, target: &CommandTarget, since: DateTime) -> Result<Vec<CommandExecution>> {
+        let cached = self
+            .cmd_cache
+            .try_get_with(target.clone(), async {
+                tracing::debug!("No command-cache entry found for target {:?}", target);
+                let range = self.cmd_caching_range();
+
+                self.db
+                    .query_all_commands(Some(target.clone()), range.start(), range.end())
+                    .await
+                    .map(|cmds| Arc::new((*range.start(), cmds)))
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;
+
+        if since < cached.0 {
+            tracing::info!(
+                ?since,
+                offset = %since.elapsed().to_iso_string(),
+                cache_start = %cached.0,
+                "Requested time range is before cached commands, querying database"
+            );
+            return self.db.query_all_commands(Some(target.clone()), &since, &t!(now)).await;
+        }
+
+        let commands: Vec<CommandExecution> = cached.1.iter().filter(|&cmd| cmd.created >= since).cloned().collect();
+
+        Ok(commands)
+    }
+}
+
+//
+//USER TRIGGER
+//
+impl HomeApi {
+    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+        self.db.add_user_trigger(trigger).await
+    }
+
+    pub async fn latest_since(
+        &self,
+        target: &UserTriggerTarget,
+        since: DateTime,
+    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
+        self.db.latest_since(target, since).await
+    }
+}
+
+//
+//PLANNING TRACE
+//
+impl HomeApi {
+    pub async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
+        self.db.add_planning_trace(result).await
+    }
+}
+
+//
+// AVAILABILITY
+//
+impl HomeApi {
+    pub async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()> {
+        self.db.add_item_availability(item).await
+    }
+}
+
+//
+// GRAFANA ONLY
+//
+impl HomeApi {
+    pub async fn get_all_data_points_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<DataPoint<PersistentHomeStateValue>>> {
+        self.db.get_all_data_points_in_range(range).await
+    }
+
+    pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
+        self.db.query_all_commands(None, &from, &until).await
+    }
+
+    pub async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace> {
+        self.db.get_latest_planning_trace(before).await
+    }
+
+    pub async fn get_planning_traces_by_trace_id(&self, trace_id: &str) -> anyhow::Result<Option<PlanningTrace>> {
+        self.db.get_planning_traces_by_trace_id(trace_id).await
+    }
+
+    pub async fn get_trace_ids(&self, range: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
+        self.db.get_trace_ids(range).await
+    }
+
+    pub async fn get_planning_traces_in_range(&self, range: DateTimeRange) -> anyhow::Result<Vec<PlanningTrace>> {
+        self.db.get_planning_traces_in_range(range).await
+    }
+
+    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
+        self.db.get_offline_items().await
     }
 }

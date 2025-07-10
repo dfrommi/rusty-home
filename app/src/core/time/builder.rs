@@ -9,11 +9,11 @@ macro_rules! t {
     }};
 
     ($hour:literal : $minute:literal) => {{
-        crate::core::time::Time::at($hour, $minute).unwrap()
+        $crate::core::time::Time::at($hour, $minute).unwrap()
     }};
 
     ($amount:literal seconds) => {{
-        crate::core::time::Duration::seconds($amount)
+        $crate::core::time::Duration::seconds($amount)
     }};
     ($amount:literal minutes) => {{
         crate::core::time::Duration::minutes($amount)

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use crate::{
     core::timeseries::{DataFrame, DataPoint},
@@ -16,19 +16,60 @@ use sqlx::PgPool;
 // Helper methods for cache management
 impl super::Database {
     pub async fn get_all_tag_ids(&self) -> anyhow::Result<Vec<i64>> {
-        get_all_tag_ids(&self.pool).await
-    }
+        let rec = sqlx::query!(r#"SELECT id FROM thing_value_tag"#)
+            .fetch_all(&self.pool)
+            .await?;
 
-    pub async fn get_dataframe_for_tag(
-        &self,
-        tag_id: i64,
-        range: &DateTimeRange,
-    ) -> anyhow::Result<Arc<DataFrame<f64>>> {
-        query_dataframe(&self.pool, tag_id, range).await.map(Arc::new)
+        Ok(rec.into_iter().map(|row| row.id as i64).collect())
     }
 
     pub async fn get_tag_id(&self, channel: PersistentHomeState, create_if_missing: bool) -> anyhow::Result<i64> {
         get_tag_id(&self.pool, channel, create_if_missing).await
+    }
+
+    #[tracing::instrument(skip_all, fields(tag_id = tag_id))]
+    pub async fn get_dataframe_for_tag(&self, tag_id: i64, range: &DateTimeRange) -> anyhow::Result<DataFrame<f64>> {
+        //TODO rewrite to max query
+        let rec = sqlx::query!(
+            r#"(SELECT value as "value!: f64", timestamp
+              FROM THING_VALUE
+              WHERE TAG_ID = $1
+              AND timestamp >= $2
+              AND timestamp <= $3
+              AND timestamp <= $4)
+            UNION ALL
+            (SELECT value, timestamp
+              FROM THING_VALUE
+              WHERE TAG_ID = $1
+              AND timestamp < $2
+              AND timestamp <= $4
+              ORDER BY timestamp DESC
+              LIMIT 1)
+            UNION ALL
+            (SELECT value, timestamp
+              FROM THING_VALUE
+              WHERE TAG_ID = $1
+              AND timestamp > $3
+              AND timestamp <= $4
+              ORDER BY timestamp ASC
+              LIMIT 1)"#,
+            tag_id as i32,
+            range.start().into_db(),
+            range.end().into_db(),
+            t!(now).into_db(), //For timeshift in tests
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let dps: Vec<DataPoint<f64>> = rec
+            .into_iter()
+            .map(|row| DataPoint {
+                value: row.value,
+                timestamp: row.timestamp.unwrap().into(),
+            })
+            .collect();
+
+        DataFrame::new(dps)
     }
 }
 
@@ -149,57 +190,4 @@ pub async fn get_tag_id(
     }?;
 
     Ok(tag_id as i64)
-}
-
-#[tracing::instrument(skip_all, fields(tag_id = tag_id))]
-async fn query_dataframe(pool: &sqlx::PgPool, tag_id: i64, range: &DateTimeRange) -> anyhow::Result<DataFrame<f64>> {
-    //TODO rewrite to max query
-    let rec = sqlx::query!(
-        r#"(SELECT value as "value!: f64", timestamp
-              FROM THING_VALUE
-              WHERE TAG_ID = $1
-              AND timestamp >= $2
-              AND timestamp <= $3
-              AND timestamp <= $4)
-            UNION ALL
-            (SELECT value, timestamp
-              FROM THING_VALUE
-              WHERE TAG_ID = $1
-              AND timestamp < $2
-              AND timestamp <= $4
-              ORDER BY timestamp DESC
-              LIMIT 1)
-            UNION ALL
-            (SELECT value, timestamp
-              FROM THING_VALUE
-              WHERE TAG_ID = $1
-              AND timestamp > $3
-              AND timestamp <= $4
-              ORDER BY timestamp ASC
-              LIMIT 1)"#,
-        tag_id as i32,
-        range.start().into_db(),
-        range.end().into_db(),
-        t!(now).into_db(), //For timeshift in tests
-    )
-    .fetch_all(pool)
-    .await?;
-
-    let dps: Vec<DataPoint<f64>> = rec
-        .into_iter()
-        .map(|row| DataPoint {
-            value: row.value,
-            timestamp: row.timestamp.unwrap().into(),
-        })
-        .collect();
-
-    DataFrame::new(dps)
-}
-
-async fn get_all_tag_ids(pool: &sqlx::PgPool) -> anyhow::Result<Vec<i64>> {
-    let rec = sqlx::query!(r#"SELECT id FROM thing_value_tag"#)
-        .fetch_all(pool)
-        .await?;
-
-    Ok(rec.into_iter().map(|row| row.id as i64).collect())
 }

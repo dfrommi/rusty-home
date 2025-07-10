@@ -1,5 +1,6 @@
 use crate::core::{HomeApi, app_event::CommandAddedEvent};
 
+use crate::Infrastructure;
 use crate::home::command::{Command, CommandExecution};
 use anyhow::Result;
 use infrastructure::TraceContext;
@@ -10,7 +11,22 @@ pub trait CommandExecutor {
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
 }
 
-pub async fn execute_commands(
+pub fn keep_command_executor_running<P: CommandExecutor, S: CommandExecutor>(
+    infrastructure: &Infrastructure,
+    primary: P,
+    secondary: S,
+) -> impl Future<Output = ()> + use<P, S> {
+    let command_repo = infrastructure.api.clone();
+    let new_cmd_available = infrastructure.event_listener.new_command_added_listener();
+
+    let cmd_executor = MultiCommandExecutor { primary, secondary };
+
+    async move {
+        process_command_executor(&command_repo, &cmd_executor, new_cmd_available).await;
+    }
+}
+
+async fn process_command_executor(
     api: &HomeApi,
     executor: &impl CommandExecutor,
     mut new_command_available: Receiver<CommandAddedEvent>,
@@ -70,5 +86,28 @@ async fn handle_execution_result(command_id: i64, res: Result<bool>, api: &HomeA
 
     if let Err(e) = set_state_res {
         tracing::error!("Error setting command state for {}: {}", command_id, e);
+    }
+}
+
+struct MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    primary: A,
+    secondary: B,
+}
+
+impl<A, B> CommandExecutor for MultiCommandExecutor<A, B>
+where
+    A: CommandExecutor,
+    B: CommandExecutor,
+{
+    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
+        match self.primary.execute_command(command).await {
+            Ok(true) => Ok(true),
+            Ok(false) => self.secondary.execute_command(command).await,
+            Err(e) => Err(e),
+        }
     }
 }

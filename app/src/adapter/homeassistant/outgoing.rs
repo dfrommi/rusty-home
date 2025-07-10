@@ -6,16 +6,16 @@ use crate::t;
 use serde_json::json;
 
 use super::{HaHttpClient, HaServiceTarget};
-use crate::{Database, core::CommandExecutor};
+use crate::core::{CommandExecutor, HomeApi};
 
 pub struct HaCommandExecutor {
     client: HaHttpClient,
-    db: Database,
+    api: HomeApi,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HaCommandExecutor {
-    pub fn new(client: HaHttpClient, db: Database, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
+    pub fn new(client: HaHttpClient, api: HomeApi, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
         for (cmd, ha) in config {
@@ -24,7 +24,7 @@ impl HaCommandExecutor {
 
         Self {
             client,
-            db,
+            api,
             config: data,
         }
     }
@@ -192,7 +192,7 @@ impl HaCommandExecutor {
         };
 
         //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
-        self.db
+        self.api
             .add_state(&PersistentHomeStateValue::FanActivity(channel, airflow.clone()), &t!(now))
             .await?;
 

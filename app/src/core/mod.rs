@@ -12,13 +12,16 @@ pub mod unit;
 
 use std::collections::HashMap;
 
+use crate::Infrastructure;
 use crate::home::state::PersistentHomeStateValue;
 use crate::home::trigger::UserTrigger;
 pub use api::HomeApi;
 pub use command::CommandExecutor;
-pub use command::execute_commands;
 pub use incoming_data::IncomingDataSource;
 pub use incoming_data::process_incoming_data_source;
+
+#[cfg(test)]
+pub use planner::plan_for_home;
 
 use time::DateTime;
 use timeseries::DataPoint;
@@ -70,6 +73,22 @@ where
         match self.config.get(key) {
             Some(v) => v,
             None => &[],
+        }
+    }
+}
+
+pub fn plan_and_execute<P: CommandExecutor, S: CommandExecutor>(
+    infrastructure: &Infrastructure,
+    primary: P,
+    secondary: S,
+) -> impl Future<Output = ()> + use<P, S> {
+    let planner = planner::keep_on_planning(infrastructure);
+    let executor = command::keep_command_executor_running(infrastructure, primary, secondary);
+
+    async move {
+        tokio::select! {
+            _ = planner => {},
+            _ = executor => {},
         }
     }
 }

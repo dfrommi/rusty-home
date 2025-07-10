@@ -46,11 +46,7 @@ impl HomeAssitant {
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
         let http_client =
             HaHttpClient::new(&self.url, &self.token).expect("Error initializing Home Assistant REST client");
-        HaCommandExecutor::new(
-            http_client,
-            infrastructure.database.clone(),
-            &config::default_ha_command_config(),
-        )
+        HaCommandExecutor::new(http_client, infrastructure.api.clone(), &config::default_ha_command_config())
     }
 
     async fn new_incoming_data_source(&self, mqtt: &mut Mqtt) -> HaIncomingDataSource {

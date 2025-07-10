@@ -1,8 +1,7 @@
+use crate::core::plan_for_home;
 use crate::core::time::{DateTime, FIXED_NOW};
 use crate::home::command::{Command, CommandSource, PowerToggle};
 use support::TestDatabase;
-
-use crate::home::plan_for_home;
 
 use super::{infrastructure, runtime};
 

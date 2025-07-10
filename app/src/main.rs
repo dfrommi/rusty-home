@@ -32,10 +32,12 @@ pub async fn main() {
         .homeassistant
         .new_incoming_data_processor(&mut infrastructure)
         .await;
+    let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
 
     let z2m_incoming_data_processing = settings.z2m.new_incoming_data_processor(&mut infrastructure).await;
 
     let tasmota_incoming_data_processing = settings.tasmota.new_incoming_data_processor(&mut infrastructure).await;
+    let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
 
     let energy_meter_processing = energy_meter
         .new_incoming_data_processor(
@@ -47,21 +49,7 @@ pub async fn main() {
     let hk_export_states = settings.homekit.export_state(&infrastructure);
     let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
 
-    let execute_commands = {
-        let command_repo = infrastructure.api.clone();
-        let new_cmd_available = infrastructure.event_listener.new_command_added_listener();
-        let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
-        let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
-
-        let cmd_executor = MultiCommandExecutor {
-            primary: ha_cmd_executor,
-            secondary: tasmota_cmd_executor,
-        };
-
-        async move {
-            core::execute_commands(&command_repo, &cmd_executor, new_cmd_available).await;
-        }
-    };
+    let plan_and_execute = { core::plan_and_execute(&infrastructure, ha_cmd_executor, tasmota_cmd_executor) };
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
@@ -89,48 +77,22 @@ pub async fn main() {
         .await
         .expect("Error preloading cache");
 
-    let planning_exec = perform_planning(&infrastructure);
     tracing::info!("Starting infrastructure processing");
     let process_infrastucture = infrastructure.process();
 
     tracing::info!("Starting main loop");
 
-    //TODO something blocking here. No execution happening
     tokio::select!(
         _ = process_infrastucture => {},
-        _ = planning_exec => {},
+        _ = plan_and_execute => {},
         _ = energy_meter_processing => {},
         _ = ha_incoming_data_processing => {},
         _ = z2m_incoming_data_processing => {},
         _ = tasmota_incoming_data_processing => {},
-        _ = execute_commands => {},
         _ = http_server_exec => {},
         _ = hk_export_states => {},
         _ = hk_process_commands => {},
     );
-}
-
-struct MultiCommandExecutor<A, B>
-where
-    A: CommandExecutor,
-    B: CommandExecutor,
-{
-    primary: A,
-    secondary: B,
-}
-
-impl<A, B> CommandExecutor for MultiCommandExecutor<A, B>
-where
-    A: CommandExecutor,
-    B: CommandExecutor,
-{
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        match self.primary.execute_command(command).await {
-            Ok(true) => Ok(true),
-            Ok(false) => self.secondary.execute_command(command).await,
-            Err(e) => Err(e),
-        }
-    }
 }
 
 impl Infrastructure {
@@ -163,25 +125,5 @@ impl Infrastructure {
             _ = self.mqtt_client.process() => {},
             _ = self.event_listener.dispatch_events() => {},
         )
-    }
-}
-
-fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
-    let api = infrastructure.api.clone();
-    let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
-    let mut user_trigger_events = infrastructure.event_listener.new_user_trigger_event_listener();
-
-    async move {
-        let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
-
-        loop {
-            tokio::select! {
-                _ = timer.tick() => {},
-                _ = state_changed_events.recv() => {},
-                _ = user_trigger_events.recv() => {},
-            };
-
-            home::plan_for_home(&api).await;
-        }
     }
 }

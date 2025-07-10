@@ -1,7 +1,7 @@
 use crate::core::time::Duration;
 use tokio::sync::broadcast;
 
-use crate::Database;
+use crate::core::HomeApi;
 
 use super::persistence::listener::{DbEvent, DbEventListener};
 
@@ -20,7 +20,7 @@ pub struct EnergyReadingAddedEvent {
 }
 
 pub struct AppEventListener {
-    database: Database,
+    api: HomeApi,
     db_listener: DbEventListener,
 
     state_changed_tx: tokio::sync::broadcast::Sender<StateChangedEvent>,
@@ -30,10 +30,10 @@ pub struct AppEventListener {
 }
 
 impl AppEventListener {
-    pub fn new(db_listener: DbEventListener, database: Database) -> Self {
+    pub fn new(db_listener: DbEventListener, api: HomeApi) -> Self {
         Self {
             db_listener,
-            database,
+            api,
             state_changed_tx: broadcast::channel(128).0,
             user_trigger_tx: broadcast::channel(16).0,
             command_added_tx: broadcast::channel(16).0,
@@ -60,7 +60,7 @@ impl AppEventListener {
     //consume as much as possible before triggering app event to debounce planning etc
     pub async fn dispatch_events(mut self) -> anyhow::Result<()> {
         self.db_listener.start_listening().await?;
-        self.database.preload_ts_cache().await?;
+        self.api.preload_ts_cache().await?;
 
         loop {
             let events = match self.db_listener.recv_multi(Duration::millis(5)).await {
@@ -79,7 +79,7 @@ impl AppEventListener {
             for event in events {
                 match event {
                     DbEvent::StateValueAdded { tag_id, .. } if !state_changed_sent => {
-                        self.database.invalidate_ts_cache(tag_id).await;
+                        self.api.invalidate_ts_cache(tag_id).await;
                         if let Err(e) = self.state_changed_tx.send(StateChangedEvent) {
                             tracing::error!("Error sending state changed event: {:?}", e);
                         }

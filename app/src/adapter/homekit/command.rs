@@ -12,7 +12,7 @@ use crate::home::state::EnergySaving;
 
 use super::MqttStateValue;
 
-pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: crate::Database) {
+pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: crate::core::HomeApi) {
     let mut debounce_tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
 
     while let Some(msg) = rx.recv().await {

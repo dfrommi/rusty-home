@@ -29,10 +29,10 @@ impl CommandExecutor for TasmotaCommandExecutor {
     #[tracing::instrument(name = "execute_command TASMOTA", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let cmd_target: CommandTarget = command.into();
-        let tasmota_target =
-            self.config
-                .iter()
-                .find_map(|(cmd, tasmota)| if cmd == &cmd_target { Some(tasmota) } else { None });
+        let tasmota_target = self
+            .config
+            .iter()
+            .find_map(|(cmd, tasmota)| if cmd == &cmd_target { Some(tasmota) } else { None });
 
         if tasmota_target.is_none() {
             return Ok(false);

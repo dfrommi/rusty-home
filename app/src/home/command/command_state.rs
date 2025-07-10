@@ -7,7 +7,7 @@ use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, 
 use crate::port::CommandExecutionAccess;
 use anyhow::Result;
 
-use crate::{core::{persistence::Database, HomeApi}, t};
+use crate::{core::HomeApi, t};
 use crate::{home::state::EnergySaving, port::DataPointAccess};
 
 impl Command {

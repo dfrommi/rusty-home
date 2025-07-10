@@ -1,4 +1,4 @@
-use crate::core::HomeApi;use std::fmt::Display;
+use std::fmt::Display;
 
 use crate::home::command::{Command, CommandTarget};
 use crate::home::state::FanAirflow;

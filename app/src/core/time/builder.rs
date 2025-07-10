@@ -5,7 +5,7 @@ macro_rules! t {
     }};
 
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
-        crate::core::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
+        $crate::core::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
     }};
 
     ($hour:literal : $minute:literal) => {{

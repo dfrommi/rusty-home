@@ -1,4 +1,4 @@
-use crate::core::{app_event::CommandAddedEvent, HomeApi};
+use crate::core::{HomeApi, app_event::CommandAddedEvent};
 
 use crate::home::command::{Command, CommandExecution};
 use anyhow::Result;

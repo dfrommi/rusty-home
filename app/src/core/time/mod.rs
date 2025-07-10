@@ -4,7 +4,7 @@ mod duration;
 mod range;
 mod time;
 
-pub use datetime::{DateTime, FIXED_NOW};
+pub use datetime::DateTime;
 pub use duration::Duration;
 pub use range::{DailyTimeRange, DateTimeRange};
 pub use time::Time;

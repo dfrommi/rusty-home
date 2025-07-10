@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use crate::core::time::{DateTime, DateTimeRange};
+use crate::core::time::DateTime;
 use crate::port::CommandExecutionAccess;
 use crate::t;
 use crate::{home::command::*, port::CommandExecutionResult};
@@ -18,7 +16,8 @@ impl super::Database {
         source: crate::home::command::CommandSource,
     ) -> anyhow::Result<CommandExecutionResult> {
         let target: CommandTarget = command.clone().into();
-        let last_execution = self
+        let api = crate::core::HomeApi::new(self.clone());
+        let last_execution = api
             .get_latest_command(target, t!(48 hours ago))
             .await?
             .filter(|e| e.source == source && e.command == command)
@@ -32,7 +31,6 @@ impl super::Database {
         }
 
         let was_latest_execution = last_execution.is_some();
-        let api = crate::core::HomeApi::new(self.clone());
         let is_reflected_in_state = command.is_reflected_in_state(&api).await?;
 
         if !was_latest_execution || !is_reflected_in_state {
@@ -105,33 +103,6 @@ impl super::Database {
 
 // Command Querying & History
 // Methods for retrieving command history and state information
-impl CommandExecutionAccess for super::Database {
-    #[tracing::instrument(skip_all, fields(command_target))]
-    async fn get_latest_command(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Option<CommandExecution>> {
-        let target: CommandTarget = target.into();
-        tracing::Span::current().record("command_target", tracing::field::display(&target));
-
-        //This is inefficient and modifies and copies data too often. Needs to be optimized
-        let mut all_commands = self.get_commands_using_cache(&target, since).await?;
-        Ok(all_commands.pop())
-    }
-
-    #[tracing::instrument(skip_all, fields(command_target))]
-    async fn get_all_commands_for_target(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution>> {
-        let target: CommandTarget = target.into();
-        tracing::Span::current().record("command_target", tracing::field::display(&target));
-
-        self.get_commands_using_cache(&target, since).await
-    }
-}
 
 impl super::Database {
     pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
@@ -165,8 +136,6 @@ impl super::Database {
         .execute(&self.pool)
         .await?;
 
-        self.invalidate_command_cache(&command.into()).await;
-
         Ok(())
     }
 
@@ -179,50 +148,15 @@ impl super::Database {
     }
 }
 
-// Command Caching
-// Methods for managing command cache to improve query performance
+// Helper methods for cache management
 impl super::Database {
-    fn cmd_caching_range(&self) -> DateTimeRange {
-        let now = t!(now);
-        DateTimeRange::new(now - self.cmd_cache_duration.clone(), now)
-    }
-
-    pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
-        tracing::debug!("Invalidating command cache for target {:?}", target);
-        self.cmd_cache.invalidate(target).await;
-    }
-
-    pub async fn get_commands_using_cache(
+    pub async fn query_all_commands(
         &self,
-        target: &CommandTarget,
-        since: DateTime,
+        target: Option<CommandTarget>,
+        from: &DateTime,
+        until: &DateTime,
     ) -> Result<Vec<CommandExecution>> {
-        let cached = self
-            .cmd_cache
-            .try_get_with(target.clone(), async {
-                tracing::debug!("No command-cache entry found for target {:?}", target);
-                let range = self.cmd_caching_range();
-
-                query_all_commands(&self.pool, Some(target.clone()), range.start(), range.end())
-                    .await
-                    .map(|cmds| Arc::new((*range.start(), cmds)))
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;
-
-        if since < cached.0 {
-            tracing::info!(
-                ?since,
-                offset = %since.elapsed().to_iso_string(),
-                cache_start = %cached.0,
-                "Requested time range is before cached commands, querying database"
-            );
-            return query_all_commands(&self.pool, Some(target.clone()), &since, &t!(now)).await;
-        }
-
-        let commands: Vec<CommandExecution> = cached.1.iter().filter(|&cmd| cmd.created >= since).cloned().collect();
-
-        Ok(commands)
+        query_all_commands(&self.pool, target, from, until).await
     }
 }
 

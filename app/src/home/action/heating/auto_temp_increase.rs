@@ -1,4 +1,5 @@
-use crate::core::HomeApi;use std::fmt::Display;
+use crate::core::HomeApi;
+use std::fmt::Display;
 
 use crate::core::unit::DegreeCelsius;
 use crate::home::command::Command;

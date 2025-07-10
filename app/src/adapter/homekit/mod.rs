@@ -16,7 +16,7 @@ pub struct Homekit {
 
 impl Homekit {
     pub fn export_state(&self, infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
-        let mqtt_api = infrastructure.database.clone();
+        let mqtt_api = infrastructure.api.clone();
         let mqtt_sender = infrastructure.mqtt_client.new_publisher();
         let state_topic = self.base_topic_status.clone();
         let mqtt_trigger = infrastructure.event_listener.new_state_changed_listener();
@@ -30,7 +30,7 @@ impl Homekit {
             .subscribe(format!("{}/#", &self.base_topic_set))
             .await
             .expect("Error subscribing to MQTT topic");
-        let api = infrastructure.database.clone();
+        let api = infrastructure.api.clone();
         let target_topic = self.base_topic_set.clone();
 
         async move { command::process_commands(target_topic, mqtt_command_receiver, api).await }

@@ -7,8 +7,8 @@ use anyhow::Context;
 use infrastructure::TraceContext;
 
 use crate::{
-    core::HomeApi,
     adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
+    core::HomeApi,
 };
 
 use super::TraceView;

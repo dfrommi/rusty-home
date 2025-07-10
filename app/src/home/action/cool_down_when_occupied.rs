@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::core::{timeseries::DataPoint, unit::DegreeCelsius, planner::SimpleAction, HomeApi};
+use crate::core::{HomeApi, planner::SimpleAction, timeseries::DataPoint, unit::DegreeCelsius};
 use crate::home::command::{Command, CommandSource, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;

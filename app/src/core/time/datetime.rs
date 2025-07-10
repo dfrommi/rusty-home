@@ -33,9 +33,7 @@ impl DateTime {
 
         chrono::DateTime::from_timestamp_millis(mid_timestamp)
             .unwrap_or_else(|| {
-                panic!(
-                    "Error calculating midpoint for {start:?} and {end:?}. Should not fail with reasonable dates"
-                )
+                panic!("Error calculating midpoint for {start:?} and {end:?}. Should not fail with reasonable dates")
             })
             .into()
     }

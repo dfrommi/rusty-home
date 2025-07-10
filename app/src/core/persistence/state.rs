@@ -1,64 +1,34 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    core::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable},
+    core::timeseries::{DataFrame, DataPoint},
     home::state::{PersistentHomeState, PersistentHomeStateValue},
-    port::{DataPointAccess, TimeSeriesAccess},
+    port::DataPointAccess,
     t,
 };
 
-use crate::core::ValueObject;
 use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange};
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result};
 use cached::proc_macro::cached;
 use sqlx::PgPool;
 
-// Time Series Cache Management
-// Methods for managing the time series cache to optimize data retrieval performance
+// Helper methods for cache management
 impl super::Database {
-    fn ts_caching_range(&self) -> DateTimeRange {
-        let now = t!(now);
-        DateTimeRange::new(now - self.ts_cache_duration.clone(), now)
+    pub async fn get_all_tag_ids(&self) -> anyhow::Result<Vec<i64>> {
+        get_all_tag_ids(&self.pool).await
     }
 
-    pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
-        tracing::debug!("Start preloading cache");
-
-        let tag_ids = get_all_tag_ids(&self.pool).await?;
-
-        for tag_id in tag_ids {
-            if let Err(e) = self.get_default_dataframe(tag_id).await {
-                tracing::error!("Error preloading timeseries cache for tag {}: {:?}", tag_id, e);
-            }
-        }
-
-        tracing::debug!("Preloading cache done");
-        Ok(())
+    pub async fn get_dataframe_for_tag(
+        &self,
+        tag_id: i64,
+        range: &DateTimeRange,
+    ) -> anyhow::Result<Arc<DataFrame<f64>>> {
+        query_dataframe(&self.pool, tag_id, range).await.map(Arc::new)
     }
 
-    pub async fn invalidate_ts_cache(&self, tag_id: i64) {
-        tracing::debug!("Invalidating timeseries cache for tag {}", tag_id);
-        self.ts_cache.invalidate(&tag_id).await;
-    }
-
-    //try to return reference or at least avoid copy of entire dataframe
-    async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
-        let df = self
-            .ts_cache
-            .try_get_with(tag_id, async {
-                tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
-
-                query_dataframe(&self.pool, tag_id, &self.ts_caching_range())
-                    .await
-                    .map(Arc::new)
-            })
-            .await;
-
-        match df {
-            Ok(df) => Ok(df.map(|dp| dp.value)),
-            Err(e) => bail!("Error refreshing timeseries cache for tag {}: {:?}", tag_id, e),
-        }
+    pub async fn get_tag_id(&self, channel: PersistentHomeState, create_if_missing: bool) -> anyhow::Result<i64> {
+        get_tag_id(&self.pool, channel, create_if_missing).await
     }
 }
 
@@ -134,58 +104,12 @@ impl super::Database {
     }
 }
 
-// DataPointAccess and TimeSeriesAccess Trait Implementations
-// Generic trait implementations for accessing current data points and time series data
-impl<T> DataPointAccess<T> for super::Database
-where
-    T: Into<PersistentHomeState> + ValueObject + Debug + Clone,
-{
-    async fn current_data_point(&self, item: T) -> Result<DataPoint<<T as ValueObject>::ValueType>> {
-        let channel: PersistentHomeState = item.into();
-        let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
-
-        let df: DataFrame<f64> = self.get_default_dataframe(tag_id).await?;
-
-        match df.prev_or_at(t!(now)) {
-            Some(dp) => Ok(dp.map_value(|&v| T::from_f64(v))),
-            None => anyhow::bail!("No data found"),
-        }
-    }
-}
-
-impl<T> TimeSeriesAccess<T> for super::Database
-where
-    T: Into<PersistentHomeState> + Estimatable + Clone + Debug,
-{
-    #[tracing::instrument(skip(self))]
-    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
-        let channel: PersistentHomeState = item.clone().into();
-        let tag_id = get_tag_id(&self.pool, channel.clone(), false).await?;
-
-        let df = self
-            .get_default_dataframe(tag_id)
-            .await?
-            .map(|dp| T::from_f64(dp.value));
-
-        if range.start() < df.range().start() {
-            tracing::warn!(
-                "Timeseries out of cache range requested for item {:?} and range {}. Doing full query",
-                tag_id,
-                &range
-            );
-
-            let df = query_dataframe(&self.pool, tag_id, &range)
-                .await?
-                .map(|dp| T::from_f64(dp.value));
-            return TimeSeries::new(item, &df, range);
-        }
-
-        TimeSeries::new(item, &df, range)
-    }
-}
-
 #[cached(result = true, key = "PersistentHomeState", convert = r#"{ channel.clone() }"#)]
-pub async fn get_tag_id(db_pool: &PgPool, channel: PersistentHomeState, create_if_missing: bool) -> anyhow::Result<i64> {
+pub async fn get_tag_id(
+    db_pool: &PgPool,
+    channel: PersistentHomeState,
+    create_if_missing: bool,
+) -> anyhow::Result<i64> {
     let id: &ExternalId = channel.as_ref();
 
     let tag_id = if create_if_missing {

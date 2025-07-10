@@ -5,7 +5,10 @@ use anyhow::Result;
 use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
-use crate::{core::{planner::action::ActionEvaluationResult, HomeApi}, port::CommandExecutionResult};
+use crate::{
+    core::{HomeApi, planner::action::ActionEvaluationResult},
+    port::CommandExecutionResult,
+};
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 

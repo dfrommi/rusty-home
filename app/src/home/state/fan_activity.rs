@@ -45,8 +45,6 @@ impl Display for FanAirflow {
 
 impl From<&FanAirflow> for f64 {
     fn from(value: &FanAirflow) -> Self {
-        
-
         match value {
             FanAirflow::Off => 0.0,
             FanAirflow::Forward(FanSpeed::Silent) => 1.0,

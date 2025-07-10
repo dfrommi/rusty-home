@@ -1,5 +1,5 @@
 use core::persistence::{Database, listener::DbEventListener};
-use core::{CommandExecutor, app_event::AppEventListener, HomeApi};
+use core::{CommandExecutor, HomeApi, app_event::AppEventListener};
 use home::command::Command;
 use infrastructure::Mqtt;
 use settings::Settings;
@@ -146,7 +146,7 @@ impl Infrastructure {
             .new_listener()
             .await
             .expect("Error initializing database listener");
-        let event_listener = AppEventListener::new(DbEventListener::new(db_listener), database.clone());
+        let event_listener = AppEventListener::new(DbEventListener::new(db_listener), api.clone());
 
         let mqtt_client = settings.mqtt.new_client();
 

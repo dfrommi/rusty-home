@@ -3,8 +3,8 @@ mod incoming;
 mod persistence;
 
 use crate::{
-    Database,
-    core::{app_event::EnergyReadingAddedEvent, process_incoming_data_source},
+    core::persistence::Database,
+    core::{app_event::EnergyReadingAddedEvent, process_incoming_data_source, HomeApi},
 };
 use incoming::EnergyMeterIncomingDataSource;
 use tokio::sync::broadcast::Receiver;
@@ -20,7 +20,8 @@ impl EnergyMeter {
     ) -> impl Future<Output = ()> + use<> {
         async move {
             let ds = EnergyMeterIncomingDataSource::new(db.clone(), rx);
-            process_incoming_data_source("EnergyReading", ds, &db).await
+            let api = HomeApi::new(db);
+            process_incoming_data_source("EnergyReading", ds, &api).await
         }
     }
 }

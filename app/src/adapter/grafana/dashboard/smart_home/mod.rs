@@ -7,7 +7,7 @@ use crate::core::planner::{PlanningTrace, PlanningTraceStep};
 mod overview;
 mod trace;
 
-pub fn routes(api: Arc<crate::Database>) -> actix_web::Scope {
+pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope {
     web::scope("/smart_home")
         .service(overview::routes(api.clone()))
         .service(trace::routes(api))

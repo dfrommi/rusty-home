@@ -27,7 +27,7 @@ pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
 pub use user_trigger_action::UserTriggerAction;
 
-use crate::Database;
+use crate::core::HomeApi;
 use crate::core::planner::Action;
 use crate::core::planner::ActionEvaluationResult;
 use crate::home::state::*;
@@ -56,7 +56,7 @@ pub enum HomeAction {
 }
 
 impl Action for HomeAction {
-    async fn evaluate(&self, api: &Database) -> Result<ActionEvaluationResult> {
+    async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult> {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
             HomeAction::RequestClosingWindow(request_closing_window) => request_closing_window.evaluate(api).await,
@@ -91,7 +91,7 @@ async fn trigger_once_and_keep_running(
     command: &Command,
     source: &CommandSource,
     oneshot_range_start: DateTime,
-    api: &Database,
+    api: &HomeApi,
 ) -> Result<bool> {
     let executions = api
         .get_all_commands_for_target(command.clone(), oneshot_range_start)

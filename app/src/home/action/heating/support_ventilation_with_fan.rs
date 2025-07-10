@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed};
@@ -37,7 +37,7 @@ impl SimpleAction for SupportVentilationWithFan {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
         let window = match self.fan {
             Fan::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
             Fan::BedroomCeilingFan => Opened::BedroomWindow,

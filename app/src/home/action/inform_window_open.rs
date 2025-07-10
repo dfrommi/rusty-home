@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
@@ -42,7 +42,7 @@ impl SimpleAction for InformWindowOpen {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
         let presence_item = match self.recipient {
             NotificationRecipient::Dennis => Presence::AtHomeDennis,
             NotificationRecipient::Sabine => Presence::AtHomeSabine,

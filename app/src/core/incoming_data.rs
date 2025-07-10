@@ -1,4 +1,4 @@
-use crate::Database;
+use crate::core::HomeApi;
 
 use super::IncomingData;
 
@@ -16,7 +16,7 @@ pub trait IncomingDataSource<Message, Channel> {
     ) -> anyhow::Result<Vec<IncomingData>>;
 }
 
-pub async fn process_incoming_data_source<M, C>(name: &str, mut source: impl IncomingDataSource<M, C>, db: &Database)
+pub async fn process_incoming_data_source<M, C>(name: &str, mut source: impl IncomingDataSource<M, C>, api: &HomeApi)
 where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
@@ -27,11 +27,11 @@ where
             None => continue,
         };
 
-        handle_incoming_data(name, &msg, &source, db).await;
+        handle_incoming_data(name, &msg, &source, api).await;
     }
 }
 
-async fn handle_incoming_data<M, C>(name: &str, msg: &M, source: &impl IncomingDataSource<M, C>, db: &Database)
+async fn handle_incoming_data<M, C>(name: &str, msg: &M, source: &impl IncomingDataSource<M, C>, api: &HomeApi)
 where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
@@ -68,19 +68,19 @@ where
     for event in incoming_data.iter() {
         match event {
             IncomingData::StateValue(dp) => {
-                if let Err(e) = db.add_state(&dp.value, &dp.timestamp).await {
+                if let Err(e) = api.add_state(&dp.value, &dp.timestamp).await {
                     tracing::error!("Error processing state {:?}: {:?}", dp, e);
                 }
             }
 
             IncomingData::UserTrigger(trigger) => {
-                if let Err(e) = db.add_user_trigger(trigger.clone()).await {
+                if let Err(e) = api.add_user_trigger(trigger.clone()).await {
                     tracing::error!("Error processing user trigger {:?}: {:?}", trigger, e);
                 }
             }
 
             IncomingData::ItemAvailability(item) => {
-                if let Err(e) = db.add_item_availability(item.clone()).await {
+                if let Err(e) = api.add_item_availability(item.clone()).await {
                     tracing::error!("Error processing item availability {:?}: {:?}", item, e);
                 }
             }

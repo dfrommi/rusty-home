@@ -1,10 +1,9 @@
-use crate::core::time::Duration;
+use crate::core::HomeApi;use crate::core::time::Duration;
 use crate::home::command::{Command, CommandSource};
 use crate::home::state::Powered;
 use crate::home::trigger::{ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
 use crate::t;
 use crate::{
-    Database,
     core::planner::{Action, ActionEvaluationResult},
 };
 
@@ -23,7 +22,7 @@ impl UserTriggerAction {
 }
 
 impl Action for UserTriggerAction {
-    async fn evaluate(&self, api: &Database) -> anyhow::Result<ActionEvaluationResult> {
+    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<ActionEvaluationResult> {
         let start_of_range = match self.default_duration(api).await {
             Some(duration) => t!(now) - duration,
             None => {

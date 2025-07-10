@@ -14,6 +14,8 @@ use moka::future::Cache;
 
 use super::timeseries::DataFrame;
 
+pub use availability::OfflineItem;
+
 #[derive(Clone)]
 pub struct Database {
     pub pool: sqlx::PgPool,

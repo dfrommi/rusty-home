@@ -1,4 +1,4 @@
-use crate::home::command::{Command, PowerToggle};
+use crate::core::HomeApi;use crate::home::command::{Command, PowerToggle};
 use crate::home::state::Powered;
 use crate::t;
 
@@ -31,7 +31,7 @@ impl SimpleAction for IrHeaterAutoTurnOff {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::Database) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
         let device = Powered::InfraredHeater;
         let current = api.current_data_point(device).await?;
 

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::{
     core::planner::{Action, ActionEvaluationResult},
@@ -25,7 +25,7 @@ impl KeepUserOverride {
 }
 
 impl Action for KeepUserOverride {
-    async fn evaluate(&self, api: &crate::Database) -> Result<ActionEvaluationResult> {
+    async fn evaluate(&self, api: &crate::core::HomeApi) -> Result<ActionEvaluationResult> {
         let fulfilled = api.current(self.user_controlled.clone()).await?;
 
         if fulfilled {

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 
 use crate::{
-    Database,
+    core::HomeApi,
     adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
     core::planner::PlanningTrace,
 };
@@ -13,14 +13,14 @@ struct ByTraceId {
     trace_id: String,
 }
 
-pub fn routes(api: Arc<Database>) -> actix_web::Scope {
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
     web::scope("/trace")
         .route("/", web::get().to(get_trace_ids))
         .route("/plan", web::get().to(get_trace))
         .app_data(web::Data::from(api))
 }
 
-async fn get_trace_ids(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_trace_ids(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         label: String,
@@ -40,7 +40,7 @@ async fn get_trace_ids(api: web::Data<Database>, time_range: web::Query<TimeRang
     csv_response(rows)
 }
 
-async fn get_trace(api: web::Data<Database>, query: web::Query<ByTraceId>) -> GrafanaResponse {
+async fn get_trace(api: web::Data<HomeApi>, query: web::Query<ByTraceId>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         state: String,

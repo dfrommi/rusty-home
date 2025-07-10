@@ -13,7 +13,7 @@ pub mod trigger;
 #[cfg(test)]
 mod tests;
 
-use crate::Database;
+use crate::core::HomeApi;
 pub use goal::get_active_goals;
 use tracing::info;
 
@@ -23,7 +23,7 @@ pub fn default_config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn plan_for_home(api: &Database) {
+pub async fn plan_for_home(api: &HomeApi) {
     info!("Start planning");
     let active_goals = get_active_goals(api).await;
     let res = crate::core::planner::perform_planning(&active_goals, default_config(), api).await;

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::core::time::DailyTimeRange;
 use crate::core::unit::DegreeCelsius;
@@ -7,7 +7,6 @@ use crate::t;
 use anyhow::{Ok, Result};
 
 use crate::{
-    Database,
     core::planner::SimpleAction,
     home::{action::HeatingZone, state::Resident},
     port::DataPointAccess,
@@ -70,7 +69,7 @@ impl SimpleAction for ExtendHeatingUntilSleeping {
     }
 
     //Strong overlap with wait_for_ventilation
-    async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         let time_range = match self.time_range().active() {
             Some(range) => range,
             None => return Ok(false),

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::core::time::DailyTimeRange;
 use crate::home::command::{Command, PowerToggle};
@@ -35,7 +35,7 @@ impl SimpleAction for ReduceNoiseAtNight {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, _: &crate::Database) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, _: &crate::core::HomeApi) -> anyhow::Result<bool> {
         Ok(self.range.contains(t!(now).time()))
     }
 }

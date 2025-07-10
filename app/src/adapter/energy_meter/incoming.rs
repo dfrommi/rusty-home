@@ -3,7 +3,7 @@ use crate::home::state::{PersistentHomeStateValue, TotalRadiatorConsumption, Tot
 use tokio::sync::broadcast::Receiver;
 
 use crate::{
-    Database,
+    core::persistence::Database,
     core::{IncomingData, IncomingDataSource, app_event::EnergyReadingAddedEvent},
 };
 

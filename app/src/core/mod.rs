@@ -1,3 +1,4 @@
+mod api;
 pub mod app_event;
 pub mod command;
 pub mod id;
@@ -13,6 +14,7 @@ use std::collections::HashMap;
 
 use crate::home::state::PersistentHomeStateValue;
 use crate::home::trigger::UserTrigger;
+pub use api::HomeApi;
 pub use command::CommandExecutor;
 pub use command::execute_commands;
 pub use incoming_data::IncomingDataSource;

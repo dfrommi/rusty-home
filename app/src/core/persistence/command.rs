@@ -32,7 +32,8 @@ impl super::Database {
         }
 
         let was_latest_execution = last_execution.is_some();
-        let is_reflected_in_state = command.is_reflected_in_state(self).await?;
+        let api = crate::core::HomeApi::new(self.clone());
+        let is_reflected_in_state = command.is_reflected_in_state(&api).await?;
 
         if !was_latest_execution || !is_reflected_in_state {
             self.save_command(command, source, TraceContext::current_correlation_id())

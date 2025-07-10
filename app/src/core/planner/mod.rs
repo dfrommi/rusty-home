@@ -8,12 +8,12 @@ use std::fmt::Display;
 
 use trace::display_planning_trace;
 
-use crate::Database;
+use crate::core::HomeApi;
 
 pub use action::{Action, ActionEvaluationResult, SimpleAction};
 pub use trace::{PlanningTrace, PlanningTraceStep};
 
-pub async fn perform_planning<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &Database) -> anyhow::Result<()>
+pub async fn perform_planning<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &HomeApi) -> anyhow::Result<()>
 where
     G: Eq + Display,
     A: Action,

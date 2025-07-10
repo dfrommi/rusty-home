@@ -1,4 +1,4 @@
-use crate::{Database, core::app_event::CommandAddedEvent};
+use crate::core::{app_event::CommandAddedEvent, HomeApi};
 
 use crate::home::command::{Command, CommandExecution};
 use anyhow::Result;
@@ -11,7 +11,7 @@ pub trait CommandExecutor {
 }
 
 pub async fn execute_commands(
-    repo: &Database,
+    api: &HomeApi,
     executor: &impl CommandExecutor,
     mut new_command_available: Receiver<CommandAddedEvent>,
 ) {
@@ -27,12 +27,12 @@ pub async fn execute_commands(
             };
         }
 
-        let command = repo.get_command_for_processing().await;
+        let command = api.get_command_for_processing().await;
 
         match command {
             Ok(Some(cmd)) => {
                 got_cmd = true;
-                process_command(cmd, repo, executor).await;
+                process_command(cmd, api, executor).await;
             }
             Ok(None) => {
                 got_cmd = false;
@@ -46,25 +46,25 @@ pub async fn execute_commands(
 }
 
 #[tracing::instrument(skip_all, fields(command = ?cmd.command))]
-async fn process_command(cmd: CommandExecution, repo: &Database, executor: &impl CommandExecutor) {
+async fn process_command(cmd: CommandExecution, api: &HomeApi, executor: &impl CommandExecutor) {
     TraceContext::continue_from(&cmd.correlation_id);
 
     let res = executor.execute_command(&cmd.command).await;
 
-    handle_execution_result(cmd.id, res, repo).await;
+    handle_execution_result(cmd.id, res, api).await;
 }
 
-async fn handle_execution_result(command_id: i64, res: Result<bool>, repo: &Database) {
+async fn handle_execution_result(command_id: i64, res: Result<bool>, api: &HomeApi) {
     let set_state_res = match res {
-        Ok(true) => repo.set_command_state_success(command_id).await,
+        Ok(true) => api.set_command_state_success(command_id).await,
         Ok(false) => {
             tracing::error!("No command executor configured for command {}", command_id);
-            repo.set_command_state_error(command_id, "No command executor configured")
+            api.set_command_state_error(command_id, "No command executor configured")
                 .await
         }
         Err(e) => {
             tracing::error!("Command {} failed: {:?}", command_id, e);
-            repo.set_command_state_error(command_id, &e.to_string()).await
+            api.set_command_state_error(command_id, &e.to_string()).await
         }
     };
 

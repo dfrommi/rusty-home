@@ -1,12 +1,9 @@
 use std::fmt::Display;
 
-use crate::core::timeseries::DataPoint;
-use crate::core::unit::DegreeCelsius;
+use crate::core::{timeseries::DataPoint, unit::DegreeCelsius, planner::SimpleAction, HomeApi};
 use crate::home::command::{Command, CommandSource, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
-
-use crate::{Database, core::planner::SimpleAction};
 
 use super::{DataPointAccess as _, Resident, trigger_once_and_keep_running};
 
@@ -41,7 +38,7 @@ impl SimpleAction for CoolDownWhenOccupied {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &Database) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let temperature = api.current(self.temperature()).await?;
         tracing::info!(temperature = ?temperature, "Cooling down temperature is {}", temperature);
 
@@ -75,7 +72,7 @@ impl CoolDownWhenOccupied {
         }
     }
 
-    async fn trigger_when_sleeping(&self, api: &Database) -> anyhow::Result<bool> {
+    async fn trigger_when_sleeping(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let anyone_sleeping = {
             let dennis_sleeping = api.current_data_point(Resident::DennisSleeping).await?;
             let sabine_sleeping = api.current_data_point(Resident::SabineSleeping).await?;
@@ -101,7 +98,7 @@ impl CoolDownWhenOccupied {
         trigger_once_and_keep_running(&self.command(), &self.source(), anyone_sleeping.timestamp, api).await
     }
 
-    async fn trigger_when_on_couch(&self, api: &Database) -> anyhow::Result<bool> {
+    async fn trigger_when_on_couch(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let on_couch = api.current_data_point(Resident::AnyoneOnCouch).await?;
         let time_since_change = on_couch.timestamp.elapsed();
 

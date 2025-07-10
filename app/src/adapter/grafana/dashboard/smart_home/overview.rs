@@ -7,13 +7,13 @@ use anyhow::Context;
 use infrastructure::TraceContext;
 
 use crate::{
-    Database,
+    core::HomeApi,
     adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
 };
 
 use super::TraceView;
 
-pub fn routes(api: Arc<Database>) -> actix_web::Scope {
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
     web::scope("/overview")
         .route("/trace", web::get().to(get_trace))
         .route("/trace/states", web::get().to(get_trace_states))
@@ -23,7 +23,7 @@ pub fn routes(api: Arc<Database>) -> actix_web::Scope {
         .app_data(web::Data::from(api))
 }
 
-async fn get_trace(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_trace(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         state: String,
@@ -52,7 +52,7 @@ async fn get_trace(api: web::Data<Database>, time_range: web::Query<TimeRangeQue
     csv_response(rows)
 }
 
-async fn get_trace_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_trace_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     let traces = api
         .get_planning_traces_in_range(time_range.range())
         .await
@@ -93,7 +93,7 @@ async fn get_trace_states(api: web::Data<Database>, time_range: web::Query<TimeR
         ))
 }
 
-async fn get_commands(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         icon: String,
@@ -163,7 +163,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
     }
 }
 
-async fn get_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         timestamp: String,
@@ -195,7 +195,7 @@ async fn get_states(api: web::Data<Database>, time_range: web::Query<TimeRangeQu
     csv_response(rows)
 }
 
-async fn get_offline_items(api: web::Data<Database>) -> GrafanaResponse {
+async fn get_offline_items(api: web::Data<HomeApi>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         source: String,

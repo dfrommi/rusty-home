@@ -37,8 +37,8 @@ impl Tasmota {
     ) -> impl Future<Output = ()> + use<> {
         let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
-        let db = infrastructure.database.clone();
-        async move { process_incoming_data_source("Tasmota", ds, &db).await }
+        let api = infrastructure.api.clone();
+        async move { process_incoming_data_source("Tasmota", ds, &api).await }
     }
 
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::home::command::{Command, CommandTarget};
 use crate::home::state::FanAirflow;
@@ -23,7 +23,7 @@ impl Display for FollowDefaultSetting {
 }
 
 impl Action for FollowDefaultSetting {
-    async fn evaluate(&self, _: &crate::Database) -> anyhow::Result<ActionEvaluationResult> {
+    async fn evaluate(&self, _: &crate::core::HomeApi) -> anyhow::Result<ActionEvaluationResult> {
         let command = match self.target.clone() {
             CommandTarget::SetPower { device } => Command::SetPower {
                 device,

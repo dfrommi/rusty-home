@@ -4,7 +4,7 @@ use crate::core::time::DateTime;
 use crate::t;
 use infrastructure::TraceContext;
 
-use crate::Database;
+use crate::core::HomeApi;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanningTrace {
@@ -67,7 +67,7 @@ impl PlanningTraceStep {
     }
 }
 
-pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &Database) {
+pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &HomeApi) {
     if planning_trace_has_changed(trace) {
         tracing::info!("Planning result:\n{:?}", trace);
 

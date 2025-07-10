@@ -5,11 +5,11 @@ use anyhow::Result;
 use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
-use crate::{Database, core::planner::action::ActionEvaluationResult, port::CommandExecutionResult};
+use crate::{core::{planner::action::ActionEvaluationResult, HomeApi}, port::CommandExecutionResult};
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
-pub async fn plan_and_execute<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &Database) -> Result<PlanningTrace>
+pub async fn plan_and_execute<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &HomeApi) -> Result<PlanningTrace>
 where
     G: Eq + Display,
     A: Action,
@@ -47,7 +47,7 @@ where
     skip_all,
     fields(action = %context.action, otel.name = %context.action),
 )]
-async fn process_action<'a, A>(mut context: Context<'a, A>, api: &Database) -> Result<Context<'a, A>>
+async fn process_action<'a, A>(mut context: Context<'a, A>, api: &HomeApi) -> Result<Context<'a, A>>
 where
     A: Action,
 {
@@ -70,7 +70,7 @@ where
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<'a, A>(context: &mut Context<'a, A>, api: &Database) -> ActionEvaluationResult
+async fn evaluate_action<'a, A>(context: &mut Context<'a, A>, api: &HomeApi) -> ActionEvaluationResult
 where
     A: Action,
 {
@@ -119,7 +119,7 @@ async fn execute_action<'a, A>(
     context: &mut Context<'a, A>,
     command: Command,
     source: CommandSource,
-    command_processor: &Database,
+    command_processor: &HomeApi,
 ) where
     A: Action,
 {

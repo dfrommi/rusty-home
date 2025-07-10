@@ -1,6 +1,5 @@
-use core::persistence::Database;
-use core::persistence::listener::DbEventListener;
-use core::{CommandExecutor, app_event::AppEventListener};
+use core::persistence::{Database, listener::DbEventListener};
+use core::{CommandExecutor, app_event::AppEventListener, HomeApi};
 use home::command::Command;
 use infrastructure::Mqtt;
 use settings::Settings;
@@ -13,6 +12,7 @@ pub mod port;
 mod settings;
 
 struct Infrastructure {
+    api: HomeApi,
     database: Database,
     event_listener: AppEventListener,
     mqtt_client: Mqtt,
@@ -48,7 +48,7 @@ pub async fn main() {
     let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
 
     let execute_commands = {
-        let command_repo = infrastructure.database.clone();
+        let command_repo = infrastructure.api.clone();
         let new_cmd_available = infrastructure.event_listener.new_command_added_listener();
         let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
         let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -64,15 +64,16 @@ pub async fn main() {
     };
 
     let http_server_exec = {
-        let http_db = infrastructure.database.clone();
+        let http_api = infrastructure.api.clone();
+        let http_database = infrastructure.database.clone();
 
         async move {
             settings
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::new_web_service(http_db.clone()),
-                        adapter::grafana::new_routes(http_db.clone()),
+                        adapter::energy_meter::new_web_service(http_database.clone()),
+                        adapter::grafana::new_routes(http_api.clone()),
                     ]
                 })
                 .await
@@ -83,7 +84,7 @@ pub async fn main() {
     //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
     //in between preloading and actual use)
     infrastructure
-        .database
+        .api
         .preload_ts_cache()
         .await
         .expect("Error preloading cache");
@@ -138,6 +139,7 @@ impl Infrastructure {
 
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
         let database = Database::new(db_pool);
+        let api = HomeApi::new(database.clone());
 
         let db_listener = settings
             .database
@@ -149,6 +151,7 @@ impl Infrastructure {
         let mqtt_client = settings.mqtt.new_client();
 
         Ok(Self {
+            api,
             database,
             event_listener,
             mqtt_client,
@@ -164,7 +167,7 @@ impl Infrastructure {
 }
 
 fn perform_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
-    let api = infrastructure.database.clone();
+    let api = infrastructure.api.clone();
     let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
     let mut user_trigger_events = infrastructure.event_listener.new_user_trigger_event_listener();
 

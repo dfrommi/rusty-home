@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use crate::core::HomeApi;use std::fmt::Display;
 
 use crate::core::unit::DegreeCelsius;
 use crate::home::command::Command;
@@ -6,7 +6,6 @@ use crate::t;
 use anyhow::Result;
 
 use crate::{
-    Database,
     core::planner::SimpleAction,
     home::{
         action::HeatingZone,
@@ -53,7 +52,7 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &Database) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
             HeatingZone::LivingRoom => (AutomaticTemperatureIncrease::LivingRoom, Opened::LivingRoomWindowOrDoor),
             HeatingZone::Bedroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),

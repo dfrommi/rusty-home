@@ -7,11 +7,11 @@ use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, 
 use crate::port::CommandExecutionAccess;
 use anyhow::Result;
 
-use crate::{Database, t};
+use crate::{core::{persistence::Database, HomeApi}, t};
 use crate::{home::state::EnergySaving, port::DataPointAccess};
 
 impl Command {
-    pub async fn is_reflected_in_state(&self, api: &Database) -> Result<bool> {
+    pub async fn is_reflected_in_state(&self, api: &HomeApi) -> Result<bool> {
         match self {
             Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, api).await,
             Command::SetHeating { device, target_state } => {
@@ -75,7 +75,7 @@ async fn is_push_notify_reflected_in_state(
     recipient: &NotificationRecipient,
     notification: &Notification,
     notify_action: &NotificationAction,
-    api: &Database,
+    api: &HomeApi,
 ) -> Result<bool> {
     let target = NotificationTarget {
         recipient: recipient.clone(),

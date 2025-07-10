@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::core::time::{DateTime, DateTimeRange};
+use crate::port::CommandExecutionAccess;
 use crate::t;
 use crate::{home::command::*, port::CommandExecutionResult};
 use anyhow::Result;
@@ -103,9 +104,9 @@ impl super::Database {
 
 // Command Querying & History
 // Methods for retrieving command history and state information
-impl super::Database {
+impl CommandExecutionAccess for super::Database {
     #[tracing::instrument(skip_all, fields(command_target))]
-    pub async fn get_latest_command(
+    async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -119,7 +120,7 @@ impl super::Database {
     }
 
     #[tracing::instrument(skip_all, fields(command_target))]
-    pub async fn get_all_commands_for_target(
+    async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -129,7 +130,9 @@ impl super::Database {
 
         self.get_commands_using_cache(&target, since).await
     }
+}
 
+impl super::Database {
     pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
         //no cache, just used from dashboard
         query_all_commands(&self.pool, None, &from, &until).await

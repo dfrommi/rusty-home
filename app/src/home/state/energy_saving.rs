@@ -7,14 +7,17 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::DataPointAccess;
+use super::{CommandExecutionAccess, DataPointAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum EnergySaving {
     LivingRoomTv,
 }
 
-impl DataPointAccess<EnergySaving> for crate::Database {
+impl<T> DataPointAccess<EnergySaving> for T
+where
+    T: DataPointAccess<Powered> + CommandExecutionAccess,
+{
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     async fn current_data_point(
         &self,

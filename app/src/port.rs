@@ -1,6 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 use crate::core::ValueObject;
+use crate::home::command::{CommandExecution, CommandTarget};
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
@@ -26,6 +27,20 @@ where
     async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T>> {
         self.series(item, DateTimeRange::new(since, t!(now))).await
     }
+}
+
+pub trait CommandExecutionAccess {
+    async fn get_latest_command(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Option<CommandExecution>>;
+
+    async fn get_all_commands_for_target(
+        &self,
+        target: impl Into<CommandTarget>,
+        since: DateTime,
+    ) -> Result<Vec<CommandExecution>>;
 }
 
 pub enum CommandExecutionResult {

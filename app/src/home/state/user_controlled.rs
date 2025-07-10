@@ -1,17 +1,15 @@
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
+use crate::port::CommandExecutionAccess;
 use crate::t;
 use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::DataPoint;
 use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
 
-use crate::{
-    Database,
-    home::{
-        command::{Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat},
-        state::macros::result,
-    },
+use crate::home::{
+    command::{Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat},
+    state::macros::result,
 };
 
 use super::DataPointAccess;
@@ -30,7 +28,13 @@ pub enum UserControlled {
 // - what is the current state and since when?
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
-impl DataPointAccess<UserControlled> for Database {
+impl<T> DataPointAccess<UserControlled> for T
+where
+    T: DataPointAccess<Powered>
+        + DataPointAccess<ExternalAutoControl>
+        + DataPointAccess<SetPoint>
+        + CommandExecutionAccess,
+{
     async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
         match item {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(self).await,
@@ -90,7 +94,9 @@ impl DataPointAccess<UserControlled> for Database {
     }
 }
 
-async fn current_data_point_for_dehumidifier(api: &Database) -> anyhow::Result<DataPoint<bool>> {
+async fn current_data_point_for_dehumidifier(
+    api: &(impl DataPointAccess<Powered> + CommandExecutionAccess),
+) -> anyhow::Result<DataPoint<bool>> {
     let item = UserControlled::Dehumidifier;
 
     let power = api.current_data_point(Powered::Dehumidifier).await?;
@@ -147,7 +153,7 @@ async fn current_data_point_for_dehumidifier(api: &Database) -> anyhow::Result<D
 }
 
 async fn current_data_point_for_thermostat(
-    api: &Database,
+    api: &(impl DataPointAccess<ExternalAutoControl> + DataPointAccess<SetPoint> + CommandExecutionAccess),
     item: UserControlled,
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,

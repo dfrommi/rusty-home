@@ -11,13 +11,12 @@ use crate::{core::app_event::StateChangedEvent, home::state::EnergySaving, port:
 
 use super::MqttStateValue;
 
-pub async fn export_state<T>(
-    api: &T,
+pub async fn export_state(
+    api: &crate::core::HomeApi,
     base_topic: String,
     tx: Sender<MqttOutMessage>,
     mut state_changed: Receiver<StateChangedEvent>,
-) where
-    T: DataPointAccess<Powered> + DataPointAccess<EnergySaving> + DataPointAccess<FanActivity>,
+)
 {
     let mut sender = MqttStateSender::new(base_topic.to_owned(), tx);
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
@@ -36,14 +35,13 @@ pub async fn export_state<T>(
     }
 }
 
-async fn send_with_defaults<'a, 'b: 'a, API, T>(sender: &'a mut MqttStateSender, state: T, api: &'b API)
+async fn send_with_defaults<'a, 'b: 'a, T>(sender: &'a mut MqttStateSender, state: T, api: &'b crate::core::HomeApi)
 where
-    T: AsRef<ExternalId> + ValueObject + Clone,
+    T: AsRef<ExternalId> + ValueObject + Clone + crate::port::DataPointAccess<T>,
     T::ValueType: Into<MqttStateValue>,
-    API: DataPointAccess<T>,
 {
     let external_id: &ExternalId = state.as_ref();
-    let value = match api.current(state.clone()).await {
+    let value = match state.current(api).await {
         Ok(v) => v,
         Err(e) => {
             tracing::error!(
@@ -59,12 +57,12 @@ where
     sender.send(external_id, value).await;
 }
 
-async fn send_fan_activity<'a, 'b: 'a, API>(sender: &'a mut MqttStateSender, state: FanActivity, api: &'b API)
+async fn send_fan_activity<'a, 'b: 'a>(sender: &'a mut MqttStateSender, state: FanActivity, api: &'b crate::core::HomeApi)
 where
-    API: DataPointAccess<FanActivity>,
+    FanActivity: crate::port::DataPointAccess<FanActivity>,
 {
     let external_id: &ExternalId = state.as_ref();
-    let value = match api.current(state.clone()).await {
+    let value = match state.current(api).await {
         Ok(v) => v,
         Err(e) => {
             tracing::error!(

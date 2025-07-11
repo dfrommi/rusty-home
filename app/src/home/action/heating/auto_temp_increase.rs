@@ -66,7 +66,7 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
         };
 
         let (window_opened, temp_increase) =
-            tokio::try_join!(api.current_data_point(window_opened), api.current(temp_increase))?;
+            tokio::try_join!(window_opened.current_data_point(api), temp_increase.current(api))?;
 
         //window still open or no temp increase
         if !temp_increase || window_opened.value {

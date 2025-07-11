@@ -14,32 +14,29 @@ pub enum EnergySaving {
     LivingRoomTv,
 }
 
-impl<T> DataPointAccess<EnergySaving> for T
-where
-    T: DataPointAccess<Powered> + CommandExecutionAccess,
-{
+impl DataPointAccess<EnergySaving> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     async fn current_data_point(
         &self,
-        item: EnergySaving,
+        api: &crate::core::HomeApi,
     ) -> anyhow::Result<DataPoint<<EnergySaving as ValueObject>::ValueType>> {
-        let is_tv_on = match item {
-            EnergySaving::LivingRoomTv => self.current_data_point(Powered::LivingRoomTv).await,
+        let is_tv_on = match self {
+            EnergySaving::LivingRoomTv => Powered::LivingRoomTv.current_data_point(api).await,
         }?;
 
         //if device is off, then we save energy
         if !is_tv_on.value {
-            result!(true, is_tv_on.timestamp, item,
+            result!(true, is_tv_on.timestamp, self,
                 @is_tv_on,
                 "Energy saving active, because TV is off"
             );
         }
 
-        let target = match item {
+        let target = match self {
             EnergySaving::LivingRoomTv => EnergySavingDevice::LivingRoomTv,
         };
 
-        let latest_command = self.get_latest_command(target, is_tv_on.timestamp).await?;
+        let latest_command = api.get_latest_command(target, is_tv_on.timestamp).await?;
 
         match latest_command {
             Some(CommandExecution {
@@ -47,7 +44,7 @@ where
                 created,
                 ..
             }) => {
-                result!(on, created, item,
+                result!(on, created, self,
                     @is_tv_on,
                     latest_command.timestamp = %created,
                     latest_command.elapsed = %created.elapsed(),
@@ -60,7 +57,7 @@ where
                 );
             }
             _ => {
-                result!(false, is_tv_on.timestamp, item,
+                result!(false, is_tv_on.timestamp, self,
                     @is_tv_on,
                     "Energy saving not active, because no energy saving command was received since TV was turned on"
                 );

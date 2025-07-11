@@ -14,7 +14,7 @@ where
 
     runtime().block_on(FIXED_NOW.scope(fake_now, async {
         let api = &infrastructure().api();
-        api.current_data_point(item.clone()).await.unwrap()
+        item.current_data_point(api).await.unwrap()
     }))
 }
 

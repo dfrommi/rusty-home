@@ -104,15 +104,15 @@ impl HomeApi {
     }
 }
 
-impl<T> DataPointAccess<T> for HomeApi
+impl<T> DataPointAccess<T> for T
 where
     T: Into<PersistentHomeState> + ValueObject + Debug + Clone,
 {
-    async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>> {
-        let channel: PersistentHomeState = item.into();
-        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>> {
+        let channel: PersistentHomeState = self.clone().into();
+        let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
-        let df: DataFrame<f64> = self.get_default_dataframe(tag_id).await?;
+        let df: DataFrame<f64> = api.get_default_dataframe(tag_id).await?;
 
         match df.prev_or_at(t!(now)) {
             Some(dp) => Ok(dp.map_value(|&v| T::from_f64(v))),
@@ -120,6 +120,7 @@ where
         }
     }
 }
+
 
 impl<T> TimeSeriesAccess<T> for HomeApi
 where

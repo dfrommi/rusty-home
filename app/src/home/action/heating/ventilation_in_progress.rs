@@ -41,13 +41,14 @@ impl SimpleAction for NoHeatingDuringVentilation {
     }
 
     async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
-        api.current(match self.heating_zone {
+        (match self.heating_zone {
             HeatingZone::LivingRoom => ColdAirComingIn::LivingRoom,
             HeatingZone::Bedroom => ColdAirComingIn::Bedroom,
             HeatingZone::Kitchen => ColdAirComingIn::Kitchen,
             HeatingZone::RoomOfRequirements => ColdAirComingIn::RoomOfRequirements,
             HeatingZone::Bathroom => ColdAirComingIn::Bedroom,
         })
+        .current(api)
         .await
     }
 }

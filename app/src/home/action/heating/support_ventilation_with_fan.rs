@@ -43,7 +43,7 @@ impl SimpleAction for SupportVentilationWithFan {
             Fan::BedroomCeilingFan => Opened::BedroomWindow,
         };
 
-        let opened_dp = api.current_data_point(window).await?;
+        let opened_dp = window.current_data_point(api).await?;
         let elapsed = opened_dp.timestamp.elapsed();
 
         if !opened_dp.value {

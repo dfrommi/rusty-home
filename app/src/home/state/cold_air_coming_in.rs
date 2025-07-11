@@ -14,28 +14,25 @@ pub enum ColdAirComingIn {
     RoomOfRequirements,
 }
 
-impl<T> DataPointAccess<ColdAirComingIn> for T
-where
-    T: DataPointAccess<Temperature> + DataPointAccess<Opened>,
-{
-    async fn current_data_point(&self, item: ColdAirComingIn) -> anyhow::Result<DataPoint<bool>> {
-        let outside_temp = self.current_data_point(Temperature::Outside).await?;
+impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+        let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
         if outside_temp.value > DegreeCelsius(22.0) {
-            result!(false, outside_temp.timestamp, item,
+            result!(false, outside_temp.timestamp, self,
                 @outside_temp,
                 "No cold air coming in, temperature outside is too high"
             );
         }
 
-        let window_opened = match item {
-            ColdAirComingIn::LivingRoom => self.current_data_point(Opened::LivingRoomWindowOrDoor).await,
-            ColdAirComingIn::Bedroom => self.current_data_point(Opened::BedroomWindow).await,
-            ColdAirComingIn::Kitchen => self.current_data_point(Opened::KitchenWindow).await,
-            ColdAirComingIn::RoomOfRequirements => self.current_data_point(Opened::RoomOfRequirementsWindow).await,
+        let window_opened = match self {
+            ColdAirComingIn::LivingRoom => Opened::LivingRoomWindowOrDoor.current_data_point(api).await,
+            ColdAirComingIn::Bedroom => Opened::BedroomWindow.current_data_point(api).await,
+            ColdAirComingIn::Kitchen => Opened::KitchenWindow.current_data_point(api).await,
+            ColdAirComingIn::RoomOfRequirements => Opened::RoomOfRequirementsWindow.current_data_point(api).await,
         }?;
 
-        result!(window_opened.value, window_opened.timestamp, item,
+        result!(window_opened.value, window_opened.timestamp, self,
             @outside_temp,
             @window_opened,
             "{}",

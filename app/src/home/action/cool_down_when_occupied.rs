@@ -39,7 +39,7 @@ impl SimpleAction for CoolDownWhenOccupied {
     }
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let temperature = api.current(self.temperature()).await?;
+        let temperature = self.temperature().current(api).await?;
         tracing::info!(temperature = ?temperature, "Cooling down temperature is {}", temperature);
 
         if temperature < DegreeCelsius(26.5) {
@@ -74,8 +74,8 @@ impl CoolDownWhenOccupied {
 
     async fn trigger_when_sleeping(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let anyone_sleeping = {
-            let dennis_sleeping = api.current_data_point(Resident::DennisSleeping).await?;
-            let sabine_sleeping = api.current_data_point(Resident::SabineSleeping).await?;
+            let dennis_sleeping = Resident::DennisSleeping.current_data_point(api).await?;
+            let sabine_sleeping = Resident::SabineSleeping.current_data_point(api).await?;
 
             match (dennis_sleeping.value, sabine_sleeping.value) {
                 (false, false) => {
@@ -99,7 +99,7 @@ impl CoolDownWhenOccupied {
     }
 
     async fn trigger_when_on_couch(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let on_couch = api.current_data_point(Resident::AnyoneOnCouch).await?;
+        let on_couch = Resident::AnyoneOnCouch.current_data_point(api).await?;
         let time_since_change = on_couch.timestamp.elapsed();
 
         if !on_couch.value && time_since_change > t!(5 minutes) {

@@ -35,6 +35,6 @@ impl SimpleAction for Dehumidify {
     }
 
     async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
-        api.current(RiskOfMould::Bathroom).await
+        RiskOfMould::Bathroom.current(api).await
     }
 }

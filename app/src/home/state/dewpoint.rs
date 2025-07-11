@@ -1,6 +1,9 @@
-use crate::core::timeseries::{
-    DataFrame, DataPoint, TimeSeries,
-    interpolate::{self, Estimatable},
+use crate::core::{
+    HomeApi,
+    timeseries::{
+        DataFrame, DataPoint, TimeSeries,
+        interpolate::{self, Estimatable},
+    },
 };
 
 use super::*;
@@ -47,13 +50,10 @@ impl Estimatable for DewPoint {
     }
 }
 
-impl<T> DataPointAccess<DewPoint> for T
-where
-    T: DataPointAccess<Temperature> + DataPointAccess<RelativeHumidity>,
-{
-    async fn current_data_point(&self, item: DewPoint) -> Result<DataPoint<DegreeCelsius>> {
-        let temperature: DataPoint<DegreeCelsius> = self.current_data_point(item.temperature()).await?;
-        let humidity: DataPoint<Percent> = self.current_data_point(item.relative_humidity()).await?;
+impl DataPointAccess<DewPoint> for DewPoint {
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<DegreeCelsius>> {
+        let temperature: DataPoint<DegreeCelsius> = self.temperature().current_data_point(api).await?;
+        let humidity: DataPoint<Percent> = self.relative_humidity().current_data_point(api).await?;
         let dewpoint = dewpoint(&temperature, &humidity);
 
         Ok(dewpoint)

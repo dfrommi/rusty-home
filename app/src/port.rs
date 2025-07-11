@@ -1,6 +1,6 @@
 #![allow(async_fn_in_trait)]
 
-use crate::core::ValueObject;
+use crate::core::{HomeApi, ValueObject};
 use crate::home::command::{CommandExecution, CommandTarget};
 use crate::{
     core::time::{DateTime, DateTimeRange},
@@ -11,10 +11,10 @@ use anyhow::Result;
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 
 pub trait DataPointAccess<T: ValueObject> {
-    async fn current_data_point(&self, item: T) -> Result<DataPoint<T::ValueType>>;
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>>;
 
-    async fn current(&self, item: T) -> Result<T::ValueType> {
-        self.current_data_point(item).await.map(|dp| dp.value)
+    async fn current(&self, api: &HomeApi) -> Result<T::ValueType> {
+        self.current_data_point(api).await.map(|dp| dp.value)
     }
 }
 

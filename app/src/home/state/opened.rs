@@ -66,20 +66,17 @@ impl Opened {
     }
 }
 
-impl<T> DataPointAccess<Opened> for T
-where
-    T: DataPointAccess<raw::Opened>,
-{
-    async fn current_data_point(&self, item: Opened) -> anyhow::Result<DataPoint<bool>> {
-        any_of(self, item.api_items()).await
+impl DataPointAccess<Opened> for Opened {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+        any_of(api, self.api_items()).await
     }
 }
 
 async fn any_of(
-    api: &impl DataPointAccess<raw::Opened>,
+    api: &crate::core::HomeApi,
     opened_states: Vec<raw::Opened>,
 ) -> anyhow::Result<DataPoint<bool>> {
-    let futures: Vec<_> = opened_states.into_iter().map(|o| api.current_data_point(o)).collect();
+    let futures: Vec<_> = opened_states.iter().map(|o| o.current_data_point(api)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
     match res {
@@ -141,7 +138,7 @@ mod tests {
             balcony: false,
         };
 
-        let result = api.current_data_point(Opened::LivingRoomWindowOrDoor).await;
+        let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
         assert!(result.unwrap().value);
     }
@@ -155,7 +152,7 @@ mod tests {
             balcony: false,
         };
 
-        let result = api.current_data_point(Opened::LivingRoomWindowOrDoor).await;
+        let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
         assert!(!result.unwrap().value);
     }

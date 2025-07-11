@@ -33,7 +33,7 @@ impl SimpleAction for IrHeaterAutoTurnOff {
 
     async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
         let device = Powered::InfraredHeater;
-        let current = api.current_data_point(device).await?;
+        let current = device.current_data_point(api).await?;
 
         //on for at least 1 hour
         Ok(current.value && current.timestamp.elapsed() > t!(1 hours))

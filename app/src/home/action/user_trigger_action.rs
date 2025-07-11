@@ -70,16 +70,14 @@ impl UserTriggerAction {
         CommandSource::User(format!("{}:{}", source_group, self.target))
     }
 
-    async fn default_duration<API>(&self, api: &API) -> Option<Duration>
-    where
-        API: DataPointAccess<Powered>,
+    async fn default_duration(&self, api: &crate::core::HomeApi) -> Option<Duration>
     {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
             | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
             UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitTarget::LivingRoomTvEnergySaving) => {
-                match api.current_data_point(Powered::LivingRoomTv).await {
+                match Powered::LivingRoomTv.current_data_point(api).await {
                     Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
                     Err(e) => {

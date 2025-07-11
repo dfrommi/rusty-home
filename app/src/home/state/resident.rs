@@ -16,20 +16,17 @@ pub enum Resident {
 }
 
 //TODO maybe combination via Baysian to detect resident state
-impl<T> DataPointAccess<Resident> for T
-where
-    T: DataPointAccess<Presence> + TimeSeriesAccess<Presence>,
-{
-    async fn current_data_point(&self, item: Resident) -> Result<DataPoint<bool>> {
-        match item {
-            Resident::DennisSleeping => sleeping(Presence::BedDennis, self).await,
-            Resident::SabineSleeping => sleeping(Presence::BedSabine, self).await,
-            Resident::AnyoneOnCouch => anyone_on_couch(self).await,
+impl DataPointAccess<Resident> for Resident {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+        match self {
+            Resident::DennisSleeping => sleeping(Presence::BedDennis, api).await,
+            Resident::SabineSleeping => sleeping(Presence::BedSabine, api).await,
+            Resident::AnyoneOnCouch => anyone_on_couch(api).await,
         }
     }
 }
 
-async fn sleeping(in_bed: Presence, api: &impl TimeSeriesAccess<Presence>) -> Result<DataPoint<bool>> {
+async fn sleeping(in_bed: Presence, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
     let now = t!(now);
     let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
 
@@ -114,11 +111,11 @@ async fn sleeping(in_bed: Presence, api: &impl TimeSeriesAccess<Presence>) -> Re
 }
 
 //TODO cover flaky on/off behaviour on movement
-async fn anyone_on_couch(api: &impl DataPointAccess<Presence>) -> Result<DataPoint<bool>> {
+async fn anyone_on_couch(api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
     let (left, center, right) = tokio::try_join!(
-        api.current_data_point(Presence::CouchLeft),
-        api.current_data_point(Presence::CouchCenter),
-        api.current_data_point(Presence::CouchRight)
+        Presence::CouchLeft.current_data_point(api),
+        Presence::CouchCenter.current_data_point(api),
+        Presence::CouchRight.current_data_point(api)
     )?;
 
     let dps = [&left, &center, &right];

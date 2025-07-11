@@ -25,9 +25,7 @@ pub enum HomeGoal {
 }
 
 //TODO select goals based on current state
-pub async fn get_active_goals<API>(api: &API) -> Vec<HomeGoal>
-where
-    API: DataPointAccess<Powered>,
+pub async fn get_active_goals(api: &crate::core::HomeApi) -> Vec<HomeGoal>
 {
     //TODO auto-detect summer mode
     let mut goals = vec![
@@ -44,7 +42,7 @@ where
         HomeGoal::ResetToDefaltSettings,
     ];
 
-    if api.current(Powered::LivingRoomTv).await.unwrap_or(false) {
+    if Powered::LivingRoomTv.current(api).await.unwrap_or(false) {
         goals.push(HomeGoal::TvControl);
     }
 

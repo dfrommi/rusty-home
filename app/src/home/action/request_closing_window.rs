@@ -35,9 +35,9 @@ impl SimpleAction for RequestClosingWindow {
 
     async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
         let result: Result<Vec<bool>> = futures::future::join_all([
-            api.current(ColdAirComingIn::Bedroom),
-            api.current(ColdAirComingIn::Kitchen),
-            api.current(ColdAirComingIn::RoomOfRequirements),
+            ColdAirComingIn::Bedroom.current(api),
+            ColdAirComingIn::Kitchen.current(api),
+            ColdAirComingIn::RoomOfRequirements.current(api),
         ])
         .await
         .into_iter()

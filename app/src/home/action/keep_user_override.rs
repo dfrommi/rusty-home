@@ -26,7 +26,7 @@ impl KeepUserOverride {
 
 impl Action for KeepUserOverride {
     async fn evaluate(&self, api: &crate::core::HomeApi) -> Result<ActionEvaluationResult> {
-        let fulfilled = api.current(self.user_controlled.clone()).await?;
+        let fulfilled = self.user_controlled.current(api).await?;
 
         if fulfilled {
             Ok(ActionEvaluationResult::Lock(self.target.clone()))

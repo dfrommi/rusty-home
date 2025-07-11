@@ -28,22 +28,16 @@ pub enum UserControlled {
 // - what is the current state and since when?
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
-impl<T> DataPointAccess<UserControlled> for T
-where
-    T: DataPointAccess<Powered>
-        + DataPointAccess<ExternalAutoControl>
-        + DataPointAccess<SetPoint>
-        + CommandExecutionAccess,
-{
-    async fn current_data_point(&self, item: UserControlled) -> anyhow::Result<DataPoint<bool>> {
-        match item {
-            UserControlled::Dehumidifier => current_data_point_for_dehumidifier(self).await,
+impl DataPointAccess<UserControlled> for UserControlled {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+        match self {
+            UserControlled::Dehumidifier => current_data_point_for_dehumidifier(api).await,
             //check expected state according to last action and compare with current state. Also
             //consider timer expiration
             UserControlled::LivingRoomThermostat => {
                 current_data_point_for_thermostat(
-                    self,
-                    item,
+                    api,
+                    &self,
                     Thermostat::LivingRoom,
                     ExternalAutoControl::LivingRoomThermostat,
                     SetPoint::LivingRoom,
@@ -52,8 +46,8 @@ where
             }
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(
-                    self,
-                    item,
+                    api,
+                    &self,
                     Thermostat::Bedroom,
                     ExternalAutoControl::BedroomThermostat,
                     SetPoint::Bedroom,
@@ -62,8 +56,8 @@ where
             }
             UserControlled::KitchenThermostat => {
                 current_data_point_for_thermostat(
-                    self,
-                    item,
+                    api,
+                    &self,
                     Thermostat::Kitchen,
                     ExternalAutoControl::KitchenThermostat,
                     SetPoint::Kitchen,
@@ -72,8 +66,8 @@ where
             }
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(
-                    self,
-                    item,
+                    api,
+                    &self,
                     Thermostat::RoomOfRequirements,
                     ExternalAutoControl::RoomOfRequirementsThermostat,
                     SetPoint::RoomOfRequirements,
@@ -82,8 +76,8 @@ where
             }
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
-                    self,
-                    item,
+                    api,
+                    &self,
                     Thermostat::Bathroom,
                     ExternalAutoControl::BathroomThermostat,
                     SetPoint::Bathroom,
@@ -95,11 +89,11 @@ where
 }
 
 async fn current_data_point_for_dehumidifier(
-    api: &(impl DataPointAccess<Powered> + CommandExecutionAccess),
+    api: &crate::core::HomeApi,
 ) -> anyhow::Result<DataPoint<bool>> {
     let item = UserControlled::Dehumidifier;
 
-    let power = api.current_data_point(Powered::Dehumidifier).await?;
+    let power = Powered::Dehumidifier.current_data_point(api).await?;
 
     //user-control only valid for 15 minutes
     if power.timestamp < t!(15 minutes ago) {
@@ -153,15 +147,15 @@ async fn current_data_point_for_dehumidifier(
 }
 
 async fn current_data_point_for_thermostat(
-    api: &(impl DataPointAccess<ExternalAutoControl> + DataPointAccess<SetPoint> + CommandExecutionAccess),
-    item: UserControlled,
+    api: &crate::core::HomeApi,
+    item: &UserControlled,
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,
     set_point: SetPoint,
 ) -> anyhow::Result<DataPoint<bool>> {
     let (auto_mode_on, set_point, latest_command) = tokio::try_join!(
-        api.current_data_point(auto_mode),
-        api.current_data_point(set_point),
+        auto_mode.current_data_point(api),
+        set_point.current_data_point(api),
         api.get_latest_command(thermostat, t!(24 hours ago))
     )?;
 

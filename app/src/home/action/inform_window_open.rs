@@ -48,7 +48,7 @@ impl SimpleAction for InformWindowOpen {
             NotificationRecipient::Sabine => Presence::AtHomeSabine,
         };
 
-        let at_home = api.current(presence_item).await?;
+        let at_home = presence_item.current(api).await?;
         if !at_home {
             return Ok(false);
         }
@@ -60,15 +60,13 @@ impl SimpleAction for InformWindowOpen {
     }
 }
 
-async fn cold_air_coming_in<T>(api: &T) -> anyhow::Result<Option<(DateTime, DateTime)>>
-where
-    T: DataPointAccess<ColdAirComingIn>,
+async fn cold_air_coming_in(api: &crate::core::HomeApi) -> anyhow::Result<Option<(DateTime, DateTime)>>
 {
     let result: anyhow::Result<Vec<DataPoint<bool>>> = futures::future::join_all([
-        api.current_data_point(ColdAirComingIn::LivingRoom),
-        api.current_data_point(ColdAirComingIn::Bedroom),
-        api.current_data_point(ColdAirComingIn::Kitchen),
-        api.current_data_point(ColdAirComingIn::RoomOfRequirements),
+        ColdAirComingIn::LivingRoom.current_data_point(api),
+        ColdAirComingIn::Bedroom.current_data_point(api),
+        ColdAirComingIn::Kitchen.current_data_point(api),
+        ColdAirComingIn::RoomOfRequirements.current_data_point(api),
     ])
     .await
     .into_iter()

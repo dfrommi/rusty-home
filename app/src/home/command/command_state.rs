@@ -28,13 +28,11 @@ impl Command {
     }
 }
 
-async fn is_set_heating_reflected_in_state<API>(
+async fn is_set_heating_reflected_in_state(
     device: &Thermostat,
     target_state: &HeatingTargetState,
-    api: &API,
+    api: &crate::core::HomeApi,
 ) -> Result<bool>
-where
-    API: DataPointAccess<SetPoint> + DataPointAccess<ExternalAutoControl>,
 {
     let (set_point, auto_mode) = match device {
         Thermostat::LivingRoom => (SetPoint::LivingRoom, ExternalAutoControl::LivingRoomThermostat),
@@ -46,7 +44,7 @@ where
         Thermostat::Bathroom => (SetPoint::Bathroom, ExternalAutoControl::BathroomThermostat),
     };
 
-    let (set_point, auto_mode) = tokio::try_join!(api.current(set_point), api.current(auto_mode))?;
+    let (set_point, auto_mode) = tokio::try_join!(set_point.current(api), auto_mode.current(api))?;
 
     match target_state {
         crate::home::command::HeatingTargetState::Auto => Ok(auto_mode),
@@ -57,9 +55,7 @@ where
     }
 }
 
-async fn is_set_power_reflected_in_state<API>(device: &PowerToggle, power_on: bool, api: &API) -> Result<bool>
-where
-    API: DataPointAccess<Powered>,
+async fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, api: &crate::core::HomeApi) -> Result<bool>
 {
     let powered_item = match device {
         PowerToggle::Dehumidifier => Powered::Dehumidifier,
@@ -67,7 +63,7 @@ where
         PowerToggle::InfraredHeater => Powered::InfraredHeater,
     };
 
-    let powered = api.current(powered_item).await?;
+    let powered = powered_item.current(api).await?;
     Ok(powered == power_on)
 }
 
@@ -94,29 +90,25 @@ async fn is_push_notify_reflected_in_state(
 }
 
 //Energy saving not reflected on HA. Trying to guess from actions
-async fn is_set_energy_saving_reflected_in_state<API>(device: &EnergySavingDevice, on: bool, api: &API) -> Result<bool>
-where
-    API: DataPointAccess<EnergySaving>,
+async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on: bool, api: &crate::core::HomeApi) -> Result<bool>
 {
     let state_device = match device {
         crate::home::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
     };
 
-    let is_energy_saving = api.current(state_device).await?;
+    let is_energy_saving = state_device.current(api).await?;
 
     Ok(is_energy_saving == on)
 }
 
-async fn is_fan_control_reflected_in_state<API>(device: &Fan, airflow: &FanAirflow, api: &API) -> Result<bool>
-where
-    API: DataPointAccess<FanActivity>,
+async fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, api: &crate::core::HomeApi) -> Result<bool>
 {
     let state_device = match device {
         crate::home::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
         crate::home::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
     };
 
-    let current_flow = api.current(state_device).await?;
+    let current_flow = state_device.current(api).await?;
 
     Ok(current_flow == *airflow)
 }

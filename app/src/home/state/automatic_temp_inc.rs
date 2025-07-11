@@ -17,22 +17,19 @@ pub enum AutomaticTemperatureIncrease {
 }
 
 //TODO detect active heating and summer mode
-impl<T> DataPointAccess<AutomaticTemperatureIncrease> for T
-where
-    T: DataPointAccess<Opened> + DataPointAccess<Temperature> + TimeSeriesAccess<Temperature>,
-{
-    async fn current_data_point(&self, item: AutomaticTemperatureIncrease) -> anyhow::Result<DataPoint<bool>> {
+impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
-        let outside_temp = self.current_data_point(Temperature::Outside).await?;
+        let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
         if outside_temp.value > DegreeCelsius(22.0) {
-            result!(false, outside_temp.timestamp, item,
+            result!(false, outside_temp.timestamp, self,
                 @outside_temp,
                 "No automatic increase, temperature outside is too high"
             );
         }
 
-        let (window, temp_sensor) = match item {
+        let (window, temp_sensor) = match self {
             AutomaticTemperatureIncrease::LivingRoom => (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
             AutomaticTemperatureIncrease::Bedroom => (Opened::BedroomWindow, Temperature::BedroomDoor),
             AutomaticTemperatureIncrease::Kitchen => (Opened::KitchenWindow, Temperature::KitchenOuterWall),
@@ -41,9 +38,9 @@ where
             }
         };
 
-        let window_opened = self.current_data_point(window).await?;
+        let window_opened = window.current_data_point(api).await?;
         if window_opened.value {
-            result!(false, window_opened.timestamp, item,
+            result!(false, window_opened.timestamp, self,
                 @window_opened,
                 "No automatic temperature increase, because window is open"
             );
@@ -52,24 +49,24 @@ where
         let opened_elapsed = window_opened.timestamp.elapsed();
 
         if opened_elapsed > t!(30 minutes) {
-            result!(false, window_opened.timestamp, item,
+            result!(false, window_opened.timestamp, self,
                 @window_opened,
                 "No automatic temperature increase anymore, because window is closed for more than 30 minutes"
             );
         }
 
         if opened_elapsed < t!(5 minutes) {
-            result!(true, window_opened.timestamp, item,
+            result!(true, window_opened.timestamp, self,
                 @window_opened,
                 "Automatic temperature increase assumed, because window is open for less than 5 minutes"
             );
         }
 
-        let temperature = self.series_since(temp_sensor, window_opened.timestamp).await?;
+        let temperature = api.series_since(temp_sensor, window_opened.timestamp).await?;
 
         //wait for a measurement. until then assume opened window still has effect
         if temperature.len_non_estimated() < 2 {
-            result!(true, window_opened.timestamp, item,
+            result!(true, window_opened.timestamp, self,
                 @window_opened,
                 "Automatic temperature increase assumed, because not enough temperature measurements exist after window was opened"
             );
@@ -88,7 +85,7 @@ where
                 let diff = current_temperature.value - start_temperature.value;
                 //temperature still increasing significantly
                 let significant_increase = diff >= DegreeCelsius(0.1);
-                result!(significant_increase, current_temperature.timestamp, item,
+                result!(significant_increase, current_temperature.timestamp, self,
                     @window_opened,
                     @current_temperature,
                     @start_temperature,
@@ -103,7 +100,7 @@ where
             }
             _ => {
                 //Should not happen, covered before
-                result!(true, any_timestamp, item,
+                result!(true, any_timestamp, self,
                     @window_opened,
                     "Automatic temperature increase assumed, because there are not enough temperature measurements"
                 );
@@ -182,6 +179,6 @@ mod tests {
     }
 
     async fn increasing(api: Api) -> bool {
-        api.current(AutomaticTemperatureIncrease::LivingRoom).await.unwrap()
+        AutomaticTemperatureIncrease::LivingRoom.current(api).await.unwrap()
     }
 }

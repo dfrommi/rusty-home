@@ -77,7 +77,7 @@ impl SimpleAction for ExtendHeatingUntilSleeping {
         };
 
         let (dennis, sabine) =
-            tokio::try_join!(api.current(Resident::DennisSleeping), api.current(Resident::SabineSleeping),)?;
+            tokio::try_join!(Resident::DennisSleeping.current(api), Resident::SabineSleeping.current(api),)?;
 
         if dennis || sabine {
             return Ok(false);

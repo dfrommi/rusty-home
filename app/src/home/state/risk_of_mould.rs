@@ -13,35 +13,32 @@ pub enum RiskOfMould {
     Bathroom,
 }
 
-impl<T> DataPointAccess<RiskOfMould> for T
-where
-    T: DataPointAccess<RelativeHumidity> + DataPointAccess<DewPoint> + TimeSeriesAccess<DewPoint>,
-{
-    async fn current_data_point(&self, item: RiskOfMould) -> Result<DataPoint<bool>> {
-        let humidity = self
-            .current_data_point(match item {
-                RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
-            })
-            .await?;
+impl DataPointAccess<RiskOfMould> for RiskOfMould {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+        let humidity = match self {
+            RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
+        }
+        .current_data_point(api)
+        .await?;
 
         if humidity.value < Percent(70.0) {
-            result!(false, humidity.timestamp, item,
+            result!(false, humidity.timestamp, self,
                 @humidity,
                 "Humidity of shower-sensor is below 70%, no risk of mould"
             );
         }
 
-        let this_dp = self
-            .current_data_point(match item {
-                RiskOfMould::Bathroom => DewPoint::BathroomShower,
-            })
-            .await?;
+        let this_dp = match self {
+            RiskOfMould::Bathroom => DewPoint::BathroomShower,
+        }
+        .current_data_point(api)
+        .await?;
 
-        let ref_dp = item.get_reference_dewpoint(self).await?;
+        let ref_dp = self.get_reference_dewpoint(api).await?;
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
-        result!(risk, this_dp.timestamp, item,
+        result!(risk, this_dp.timestamp, self,
             @humidity,
             dewpoint_item = %this_dp.value,
             dewpoint_reference = %ref_dp,
@@ -52,7 +49,7 @@ where
 }
 
 impl RiskOfMould {
-    async fn get_reference_dewpoint(&self, api: &impl TimeSeriesAccess<DewPoint>) -> Result<DegreeCelsius> {
+    async fn get_reference_dewpoint(&self, api: &crate::core::HomeApi) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
                 DewPoint::LivingRoomDoor,

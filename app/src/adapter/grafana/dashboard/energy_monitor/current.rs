@@ -13,23 +13,19 @@ use actix_web::{
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 
-pub async fn current_power<T>(api: web::Data<T>) -> impl Responder
-where
-    T: DataPointAccess<CurrentPowerUsage>,
+pub async fn current_power(api: web::Data<crate::core::HomeApi>) -> impl Responder
 {
     current_values_response(api.as_ref(), CurrentPowerUsage::variants()).await
 }
 
-pub async fn current_heating<T>(api: web::Data<T>) -> impl Responder
-where
-    T: DataPointAccess<HeatingDemand>,
+pub async fn current_heating(api: web::Data<crate::core::HomeApi>) -> impl Responder
 {
     current_values_response(api.as_ref(), HeatingDemand::variants()).await
 }
 
-async fn current_values_response<T, U: DataPointAccess<T>>(api: &U, items: &[T]) -> impl Responder + use<T, U>
+async fn current_values_response<T>(api: &crate::core::HomeApi, items: &[T]) -> impl Responder + use<T>
 where
-    T: ValueObject + DashboardDisplay + Clone,
+    T: ValueObject + DashboardDisplay + Clone + DataPointAccess<T>,
     T::ValueType: PartialOrd + AsRef<f64>,
 {
     let values = get_all_states(api, items).await;
@@ -54,14 +50,14 @@ where
 }
 
 //TODO move to repo trait
-async fn get_all_states<T: ValueObject + Clone>(
-    api: &impl DataPointAccess<T>,
+async fn get_all_states<T: ValueObject + Clone + DataPointAccess<T>>(
+    api: &crate::core::HomeApi,
     items: &[T],
 ) -> anyhow::Result<Vec<(T, DataPoint<T::ValueType>)>> {
     let mut result = vec![];
 
     for item in items {
-        let dp = api.current_data_point(item.clone()).await?;
+        let dp = item.current_data_point(api).await?;
         result.push((item.clone(), dp));
     }
 

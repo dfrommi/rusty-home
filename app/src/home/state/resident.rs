@@ -43,8 +43,9 @@ async fn sleeping(in_bed: Presence, api: &crate::core::HomeApi) -> Result<DataPo
 
     //TODO TimeSeries with date in future?
     let range_start = in_bed_full_range.start();
-    let ts = api
-        .series_since(in_bed.clone(), *range_start)
+    let ts = in_bed
+        .clone()
+        .series_since(*range_start, api)
         .await?
         .with_duration_until_next_dp();
 

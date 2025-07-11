@@ -16,13 +16,14 @@ use crate::{
 
 use super::Room;
 
-pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
+pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
 where
-    T: TimeSeriesAccess<HeatingDemand> + TimeSeriesAccess<Temperature> + 'static,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
+    Temperature: TimeSeriesAccess<Temperature>,
 {
     web::scope("/energy_iq")
-        .route("/consumption/series", web::get().to(heating_series_aggregated_sum::<T>))
-        .route("/temperature/delta", web::get().to(outside_temperature_series::<T>))
+        .route("/consumption/series", web::get().to(heating_series_aggregated_sum))
+        .route("/temperature/delta", web::get().to(outside_temperature_series))
         .app_data(web::Data::from(api))
 }
 
@@ -55,12 +56,12 @@ struct Row {
     value: f64,
 }
 
-async fn heating_series_aggregated_sum<T>(
-    api: web::Data<T>,
+async fn heating_series_aggregated_sum(
+    api: web::Data<crate::core::HomeApi>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
-    T: TimeSeriesAccess<HeatingDemand>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     let rooms = match &query.room {
         Some(room) => vec![room.clone()],
@@ -88,16 +89,16 @@ where
     csv_response(&rows)
 }
 
-async fn outside_temperature_series<T>(
-    api: web::Data<T>,
+async fn outside_temperature_series(
+    api: web::Data<crate::core::HomeApi>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
-    T: TimeSeriesAccess<Temperature>,
+    Temperature: TimeSeriesAccess<Temperature>,
 {
     let (ts, ts_ref) = tokio::try_join!(
-        api.series(Temperature::Outside, query.ts_range_no_offset()),
-        api.series(Temperature::Outside, query.ts_range()) //TODO skip future DPs
+        Temperature::Outside.series(query.ts_range_no_offset(), api.as_ref()),
+        Temperature::Outside.series(query.ts_range(), api.as_ref()) //TODO skip future DPs
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -122,12 +123,12 @@ where
 }
 
 async fn combined_series(
-    api: &impl TimeSeriesAccess<HeatingDemand>,
+    api: &crate::core::HomeApi,
     rooms: &[Room],
     time_range: DateTimeRange,
 ) -> anyhow::Result<TimeSeries<HeatingDemand>> {
     let rooms_ts = rooms.iter().map(|room| async {
-        match api.series(room.heating_demand(), time_range.clone()).await {
+        match room.heating_demand().series(time_range.clone(), api).await {
             Ok(ts) => Ok((room.clone(), ts)),
             Err(e) => Err(e),
         }

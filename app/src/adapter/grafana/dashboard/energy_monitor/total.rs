@@ -18,8 +18,7 @@ use crate::{
     port::TimeSeriesAccess,
 };
 
-pub async fn total_power(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder
-{
+pub async fn total_power(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
     let time_range: DateTimeRange = time_range.range();
 
     total_values_response(
@@ -34,8 +33,7 @@ pub async fn total_power(api: web::Data<crate::core::HomeApi>, time_range: Query
     .await
 }
 
-pub async fn total_heating(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder
-{
+pub async fn total_heating(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
     total_values_response(api.as_ref(), HeatingDemand::variants(), time_range.range(), |item, ts| {
         let value = ts.area_in_type_hours();
         (value, value * room_of(item).heating_factor())
@@ -50,7 +48,13 @@ async fn total_values_response<T, V: Fn(&T, TimeSeries<T>) -> (f64, f64)>(
     value_mapper: V,
 ) -> impl Responder + use<T, V>
 where
-    T: ValueObject + DashboardDisplay + Estimatable + Clone + std::fmt::Debug + Into<crate::home::state::PersistentHomeState>,
+    T: ValueObject
+        + DashboardDisplay
+        + Estimatable
+        + Clone
+        + std::fmt::Debug
+        + Into<crate::home::state::PersistentHomeState>
+        + TimeSeriesAccess<T>,
     T::ValueType: PartialOrd + AsRef<f64>,
 {
     struct Row {
@@ -64,7 +68,7 @@ where
     let mut rows: Vec<Row> = vec![];
 
     for item in items {
-        let result = api.series(item.clone(), time_range.clone()).await;
+        let result = item.clone().series(time_range.clone(), api).await;
 
         if let Err(e) = result {
             return HttpResponse::InternalServerError().body(format!("Error retrieving data: {e}"));

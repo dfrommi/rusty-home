@@ -60,7 +60,7 @@ impl RiskOfMould {
 
         let mut ref_sum: f64 = 0.0;
         for ref_dp in &ref_dewpoints {
-            let ts = api.series_since(ref_dp.clone(), t!(3 hours ago)).await?;
+            let ts = ref_dp.clone().series_since(t!(3 hours ago), api).await?;
             ref_sum += ts.mean().0;
         }
 

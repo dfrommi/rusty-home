@@ -16,8 +16,7 @@ pub async fn export_state(
     base_topic: String,
     tx: Sender<MqttOutMessage>,
     mut state_changed: Receiver<StateChangedEvent>,
-)
-{
+) {
     let mut sender = MqttStateSender::new(base_topic.to_owned(), tx);
     let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
 
@@ -57,8 +56,11 @@ where
     sender.send(external_id, value).await;
 }
 
-async fn send_fan_activity<'a, 'b: 'a>(sender: &'a mut MqttStateSender, state: FanActivity, api: &'b crate::core::HomeApi)
-where
+async fn send_fan_activity<'a, 'b: 'a>(
+    sender: &'a mut MqttStateSender,
+    state: FanActivity,
+    api: &'b crate::core::HomeApi,
+) where
     FanActivity: crate::port::DataPointAccess<FanActivity>,
 {
     let external_id: &ExternalId = state.as_ref();

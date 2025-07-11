@@ -88,9 +88,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
     }
 }
 
-async fn current_data_point_for_dehumidifier(
-    api: &crate::core::HomeApi,
-) -> anyhow::Result<DataPoint<bool>> {
+async fn current_data_point_for_dehumidifier(api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
     let item = UserControlled::Dehumidifier;
 
     let power = Powered::Dehumidifier.current_data_point(api).await?;

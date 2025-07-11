@@ -12,19 +12,18 @@ use crate::{
 
 use super::{Room, TimeRangeQuery, TimeRangeWithIntervalQuery};
 
-pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
+pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
 where
-    T: TimeSeriesAccess<Temperature>
-        + TimeSeriesAccess<SetPoint>
-        + TimeSeriesAccess<Opened>
-        + TimeSeriesAccess<HeatingDemand>
-        + 'static,
+    Temperature: TimeSeriesAccess<Temperature>,
+    SetPoint: TimeSeriesAccess<SetPoint>,
+    Opened: TimeSeriesAccess<Opened>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     web::scope("/heating_details/{room}")
-        .route("/temperature", web::get().to(temperature_series::<T>))
-        .route("/temperature/stats", web::get().to(temperature_stats::<T>))
-        .route("/environment", web::get().to(environment_series::<T>))
-        .route("/environment/stats", web::get().to(environment_stats::<T>))
+        .route("/temperature", web::get().to(temperature_series))
+        .route("/temperature/stats", web::get().to(temperature_stats))
+        .route("/environment", web::get().to(environment_series))
+        .route("/environment/stats", web::get().to(environment_stats))
         .app_data(web::Data::from(api))
 }
 
@@ -35,20 +34,23 @@ struct Row {
     value: f64,
 }
 
-async fn temperature_series<T>(
-    api: web::Data<T>,
+async fn temperature_series(
+    api: web::Data<crate::core::HomeApi>,
     path: Path<Room>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
 where
-    T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<SetPoint>,
+    Temperature: TimeSeriesAccess<Temperature>,
+    SetPoint: TimeSeriesAccess<SetPoint>,
 {
     let room = path.into_inner();
 
+    let inside_temp = room.inside_temperature();
+    let set_point = room.set_point();
     let (ts_outside, ts_inside, ts_set_point) = tokio::try_join!(
-        api.series(Temperature::Outside, query.range()),
-        api.series(room.inside_temperature(), query.range()),
-        api.series(room.set_point(), query.range()),
+        Temperature::Outside.series(query.range(), api.as_ref()),
+        inside_temp.series(query.range(), api.as_ref()),
+        set_point.series(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -81,19 +83,22 @@ where
     csv_response(&rows)
 }
 
-async fn environment_series<T>(
-    api: web::Data<T>,
+async fn environment_series(
+    api: web::Data<crate::core::HomeApi>,
     path: Path<Room>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
 where
-    T: TimeSeriesAccess<Opened> + TimeSeriesAccess<HeatingDemand>,
+    Opened: TimeSeriesAccess<Opened>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     let room = path.into_inner();
 
+    let window = room.window();
+    let heating_demand = room.heating_demand();
     let (ts_opened, ts_heating) = tokio::try_join!(
-        api.series(room.window(), query.range()),
-        api.series(room.heating_demand(), query.range()),
+        window.series(query.range(), api.as_ref()),
+        heating_demand.series(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -118,9 +123,14 @@ where
     csv_response(&rows)
 }
 
-async fn temperature_stats<T>(api: web::Data<T>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
+async fn temperature_stats(
+    api: web::Data<crate::core::HomeApi>,
+    room: Path<Room>,
+    query: Query<TimeRangeQuery>,
+) -> GrafanaResponse
 where
-    T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<SetPoint>,
+    Temperature: TimeSeriesAccess<Temperature>,
+    SetPoint: TimeSeriesAccess<SetPoint>,
 {
     #[derive(serde::Serialize)]
     struct Row {
@@ -128,10 +138,12 @@ where
         mean: f64,
     }
 
+    let inside_temp = room.inside_temperature();
+    let set_point = room.set_point();
     let (ts_outside, ts_inside, ts_set_point) = tokio::try_join!(
-        api.series(Temperature::Outside, query.range()),
-        api.series(room.inside_temperature(), query.range()),
-        api.series(room.set_point(), query.range()),
+        Temperature::Outside.series(query.range(), api.as_ref()),
+        inside_temp.series(query.range(), api.as_ref()),
+        set_point.series(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -153,9 +165,13 @@ where
     csv_response(&rows)
 }
 
-async fn environment_stats<T>(api: web::Data<T>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
+async fn environment_stats(
+    api: web::Data<crate::core::HomeApi>,
+    room: Path<Room>,
+    query: Query<TimeRangeQuery>,
+) -> GrafanaResponse
 where
-    T: TimeSeriesAccess<HeatingDemand>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     #[derive(serde::Serialize)]
     struct Row {
@@ -163,8 +179,9 @@ where
         sum: f64,
     }
 
-    let ts_heating = api
-        .series(room.heating_demand(), query.range())
+    let heating_demand = room.heating_demand();
+    let ts_heating = heating_demand
+        .series(query.range(), api.as_ref())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 

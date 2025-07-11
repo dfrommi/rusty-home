@@ -8,8 +8,7 @@ use crate::port::{DataPointAccess, TimeSeriesAccess};
 mod current;
 mod total;
 
-pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
-{
+pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope {
     web::scope("/energy_monitor")
         .route("/power/current", web::get().to(current::current_power))
         .route("/power/total", web::get().to(total::total_power))

@@ -32,8 +32,7 @@ async fn is_set_heating_reflected_in_state(
     device: &Thermostat,
     target_state: &HeatingTargetState,
     api: &crate::core::HomeApi,
-) -> Result<bool>
-{
+) -> Result<bool> {
     let (set_point, auto_mode) = match device {
         Thermostat::LivingRoom => (SetPoint::LivingRoom, ExternalAutoControl::LivingRoomThermostat),
         Thermostat::Bedroom => (SetPoint::Bedroom, ExternalAutoControl::BedroomThermostat),
@@ -55,8 +54,11 @@ async fn is_set_heating_reflected_in_state(
     }
 }
 
-async fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, api: &crate::core::HomeApi) -> Result<bool>
-{
+async fn is_set_power_reflected_in_state(
+    device: &PowerToggle,
+    power_on: bool,
+    api: &crate::core::HomeApi,
+) -> Result<bool> {
     let powered_item = match device {
         PowerToggle::Dehumidifier => Powered::Dehumidifier,
         PowerToggle::LivingRoomNotificationLight => Powered::LivingRoomNotificationLight,
@@ -90,8 +92,11 @@ async fn is_push_notify_reflected_in_state(
 }
 
 //Energy saving not reflected on HA. Trying to guess from actions
-async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on: bool, api: &crate::core::HomeApi) -> Result<bool>
-{
+async fn is_set_energy_saving_reflected_in_state(
+    device: &EnergySavingDevice,
+    on: bool,
+    api: &crate::core::HomeApi,
+) -> Result<bool> {
     let state_device = match device {
         crate::home::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
     };
@@ -101,8 +106,11 @@ async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on
     Ok(is_energy_saving == on)
 }
 
-async fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, api: &crate::core::HomeApi) -> Result<bool>
-{
+async fn is_fan_control_reflected_in_state(
+    device: &Fan,
+    airflow: &FanAirflow,
+    api: &crate::core::HomeApi,
+) -> Result<bool> {
     let state_device = match device {
         crate::home::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
         crate::home::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,

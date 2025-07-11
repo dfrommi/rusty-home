@@ -121,19 +121,15 @@ where
     }
 }
 
-
-impl<T> TimeSeriesAccess<T> for HomeApi
+impl<T> TimeSeriesAccess<T> for T
 where
     T: Into<PersistentHomeState> + Estimatable + Clone + Debug,
 {
-    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>> {
-        let channel: PersistentHomeState = item.clone().into();
-        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
+    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<T>> {
+        let channel: PersistentHomeState = self.clone().into();
+        let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
-        let df = self
-            .get_default_dataframe(tag_id)
-            .await?
-            .map(|dp| T::from_f64(dp.value));
+        let df = api.get_default_dataframe(tag_id).await?.map(|dp| T::from_f64(dp.value));
 
         if range.start() < df.range().start() {
             tracing::warn!(
@@ -142,15 +138,15 @@ where
                 &range
             );
 
-            let df = self
+            let df = api
                 .db
                 .get_dataframe_for_tag(tag_id, &range)
                 .await?
                 .map(|dp| T::from_f64(dp.value));
-            return TimeSeries::new(item, &df, range);
+            return TimeSeries::new(self.clone(), &df, range);
         }
 
-        TimeSeries::new(item, &df, range)
+        TimeSeries::new(self.clone(), &df, range)
     }
 }
 

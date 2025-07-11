@@ -18,14 +18,11 @@ pub trait DataPointAccess<T: ValueObject> {
     }
 }
 
-pub trait TimeSeriesAccess<T>
-where
-    T: Estimatable,
-{
-    async fn series(&self, item: T, range: DateTimeRange) -> Result<TimeSeries<T>>;
+pub trait TimeSeriesAccess<T: Estimatable> {
+    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<T>>;
 
-    async fn series_since(&self, item: T, since: DateTime) -> Result<TimeSeries<T>> {
-        self.series(item, DateTimeRange::new(since, t!(now))).await
+    async fn series_since(&self, since: DateTime, api: &HomeApi) -> Result<TimeSeries<T>> {
+        self.series(DateTimeRange::new(since, t!(now)), api).await
     }
 }
 

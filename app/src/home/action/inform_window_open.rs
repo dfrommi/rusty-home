@@ -60,8 +60,7 @@ impl SimpleAction for InformWindowOpen {
     }
 }
 
-async fn cold_air_coming_in(api: &crate::core::HomeApi) -> anyhow::Result<Option<(DateTime, DateTime)>>
-{
+async fn cold_air_coming_in(api: &crate::core::HomeApi) -> anyhow::Result<Option<(DateTime, DateTime)>> {
     let result: anyhow::Result<Vec<DataPoint<bool>>> = futures::future::join_all([
         ColdAirComingIn::LivingRoom.current_data_point(api),
         ColdAirComingIn::Bedroom.current_data_point(api),

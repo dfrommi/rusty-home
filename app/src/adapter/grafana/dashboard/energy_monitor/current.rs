@@ -13,13 +13,11 @@ use actix_web::{
 
 use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
 
-pub async fn current_power(api: web::Data<crate::core::HomeApi>) -> impl Responder
-{
+pub async fn current_power(api: web::Data<crate::core::HomeApi>) -> impl Responder {
     current_values_response(api.as_ref(), CurrentPowerUsage::variants()).await
 }
 
-pub async fn current_heating(api: web::Data<crate::core::HomeApi>) -> impl Responder
-{
+pub async fn current_heating(api: web::Data<crate::core::HomeApi>) -> impl Responder {
     current_values_response(api.as_ref(), HeatingDemand::variants()).await
 }
 

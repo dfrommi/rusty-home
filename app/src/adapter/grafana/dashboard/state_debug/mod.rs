@@ -20,18 +20,17 @@ use crate::{
 
 use super::TimeRangeWithIntervalQuery;
 
-pub fn routes<T>(api: Arc<T>) -> actix_web::Scope
+pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
 where
-    T: TimeSeriesAccess<TotalEnergyConsumption>
-        + TimeSeriesAccess<HeatingDemand>
-        + TimeSeriesAccess<Temperature>
-        + TimeSeriesAccess<RelativeHumidity>
-        + 'static,
+    TotalEnergyConsumption: TimeSeriesAccess<TotalEnergyConsumption>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
+    Temperature: TimeSeriesAccess<Temperature>,
+    RelativeHumidity: TimeSeriesAccess<RelativeHumidity>,
 {
     web::scope("/state")
         .route("", web::get().to(get_types))
         .route("/{type}", web::get().to(get_items))
-        .route("/{type}/{item}", web::get().to(state_ts::<T>))
+        .route("/{type}/{item}", web::get().to(state_ts))
         .app_data(web::Data::from(api))
 }
 
@@ -90,16 +89,16 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
     csv_response(items.collect::<Vec<_>>())
 }
 
-async fn state_ts<T>(
-    api: web::Data<T>,
+async fn state_ts(
+    api: web::Data<crate::core::HomeApi>,
     path: web::Path<(String, String)>,
     time_range: Query<TimeRangeWithIntervalQuery>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
-    T: TimeSeriesAccess<TotalEnergyConsumption>
-        + TimeSeriesAccess<HeatingDemand>
-        + TimeSeriesAccess<Temperature>
-        + TimeSeriesAccess<RelativeHumidity>,
+    TotalEnergyConsumption: TimeSeriesAccess<TotalEnergyConsumption>,
+    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
+    Temperature: TimeSeriesAccess<Temperature>,
+    RelativeHumidity: TimeSeriesAccess<RelativeHumidity>,
 {
     let external_id = ExternalId::new(path.0.as_str(), path.1.as_str());
     let channel = PersistentHomeState::try_from(&external_id)
@@ -125,15 +124,16 @@ where
 
 async fn get_rows<T>(
     item: T,
-    api: &impl TimeSeriesAccess<T>,
+    api: &crate::core::HomeApi,
     time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
-    T: Estimatable + Clone + AsRef<ExternalId>,
+    T: Estimatable + Clone + AsRef<ExternalId> + TimeSeriesAccess<T>,
     T::ValueType: AsRef<f64>,
 {
-    let ts = api
-        .series(item.clone(), time_range.range())
+    let ts = item
+        .clone()
+        .series(time_range.range(), api)
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 

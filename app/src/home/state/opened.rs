@@ -1,6 +1,7 @@
 use crate::core::ValueObject;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
+use anyhow::Result;
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -72,10 +73,7 @@ impl DataPointAccess<Opened> for Opened {
     }
 }
 
-async fn any_of(
-    api: &crate::core::HomeApi,
-    opened_states: Vec<raw::Opened>,
-) -> anyhow::Result<DataPoint<bool>> {
+async fn any_of(api: &crate::core::HomeApi, opened_states: Vec<raw::Opened>) -> anyhow::Result<DataPoint<bool>> {
     let futures: Vec<_> = opened_states.iter().map(|o| o.current_data_point(api)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
@@ -90,24 +88,24 @@ async fn any_of(
     }
 }
 
-impl<T> TimeSeriesAccess<Opened> for T
-where
-    T: TimeSeriesAccess<raw::Opened>,
-{
-    async fn series(&self, item: Opened, range: DateTimeRange) -> anyhow::Result<TimeSeries<Opened>> {
-        let api_items = item.api_items();
+impl TimeSeriesAccess<Opened> for Opened {
+    async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<TimeSeries<Opened>> {
+        let api_items = self.api_items();
         let context: raw::Opened = api_items[0].clone();
 
         let futures = api_items
             .into_iter()
-            .map(|item| self.series(item, range.clone()))
+            .map(|item| {
+                let range = range.clone();
+                async move { item.series(range, api).await }
+            })
             .collect::<Vec<_>>();
 
         let all_ts = futures::future::try_join_all(futures).await?;
         let merged = TimeSeries::reduce(context, all_ts, |&a, &b| a || b)?;
 
         //from API-opened into this opened type
-        Ok(merged.map(item, |dp| dp.value))
+        Ok(merged.map(self.clone(), |dp| dp.value))
     }
 }
 

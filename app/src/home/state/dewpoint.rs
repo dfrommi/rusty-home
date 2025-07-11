@@ -60,18 +60,15 @@ impl DataPointAccess<DewPoint> for DewPoint {
     }
 }
 
-impl<T> TimeSeriesAccess<DewPoint> for T
-where
-    T: TimeSeriesAccess<Temperature> + TimeSeriesAccess<RelativeHumidity>,
-{
-    async fn series(&self, item: DewPoint, range: DateTimeRange) -> Result<TimeSeries<DewPoint>> {
+impl TimeSeriesAccess<DewPoint> for DewPoint {
+    async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> Result<TimeSeries<DewPoint>> {
         let (t_series, h_series) = {
-            let temp = item.temperature();
-            let humidity = item.relative_humidity();
-            try_join!(self.series(temp, range.clone()), self.series(humidity, range.clone()))?
+            let temp = self.temperature();
+            let humidity = self.relative_humidity();
+            try_join!(temp.series(range.clone(), api), humidity.series(range.clone(), api))?
         };
 
-        TimeSeries::combined(&t_series, &h_series, item, calculate_dew_point)
+        TimeSeries::combined(&t_series, &h_series, self.clone(), calculate_dew_point)
     }
 }
 

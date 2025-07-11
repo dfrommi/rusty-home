@@ -62,7 +62,7 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
             );
         }
 
-        let temperature = api.series_since(temp_sensor, window_opened.timestamp).await?;
+        let temperature = temp_sensor.series_since(window_opened.timestamp, api).await?;
 
         //wait for a measurement. until then assume opened window still has effect
         if temperature.len_non_estimated() < 2 {

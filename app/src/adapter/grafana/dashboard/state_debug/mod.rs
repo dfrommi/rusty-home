@@ -1,5 +1,6 @@
 use std::{cmp::Ordering, sync::Arc};
 
+use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::{
@@ -20,7 +21,7 @@ use crate::{
 
 use super::TimeRangeWithIntervalQuery;
 
-pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
     TotalEnergyConsumption: TimeSeriesAccess<TotalEnergyConsumption>,
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
@@ -90,7 +91,7 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
 }
 
 async fn state_ts(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     path: web::Path<(String, String)>,
     time_range: Query<TimeRangeWithIntervalQuery>,
 ) -> Result<impl Responder, GrafanaApiError>
@@ -124,7 +125,7 @@ where
 
 async fn get_rows<T>(
     item: T,
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
     time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where

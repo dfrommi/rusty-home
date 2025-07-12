@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::core::HomeApi;
 use crate::home::command::Command;
 use anyhow::Result;
 
@@ -40,7 +41,7 @@ impl SimpleAction for NoHeatingDuringVentilation {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         (match self.heating_zone {
             HeatingZone::LivingRoom => ColdAirComingIn::LivingRoom,
             HeatingZone::Bedroom => ColdAirComingIn::Bedroom,

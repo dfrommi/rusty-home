@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::core::HomeApi;
 use crate::home::command::{Command, PowerToggle};
 use anyhow::Result;
 
@@ -34,7 +35,7 @@ impl SimpleAction for Dehumidify {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         RiskOfMould::Bathroom.current(api).await
     }
 }

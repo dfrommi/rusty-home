@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::core::HomeApi;
 use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
@@ -18,7 +19,7 @@ use crate::{
     port::TimeSeriesAccess,
 };
 
-pub async fn total_power(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
+pub async fn total_power(api: web::Data<HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
     let time_range: DateTimeRange = time_range.range();
 
     total_values_response(
@@ -33,7 +34,7 @@ pub async fn total_power(api: web::Data<crate::core::HomeApi>, time_range: Query
     .await
 }
 
-pub async fn total_heating(api: web::Data<crate::core::HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
+pub async fn total_heating(api: web::Data<HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
     total_values_response(api.as_ref(), HeatingDemand::variants(), time_range.range(), |item, ts| {
         let value = ts.area_in_type_hours();
         (value, value * room_of(item).heating_factor())
@@ -42,7 +43,7 @@ pub async fn total_heating(api: web::Data<crate::core::HomeApi>, time_range: Que
 }
 
 async fn total_values_response<T, V: Fn(&T, TimeSeries<T>) -> (f64, f64)>(
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
     items: &[T],
     time_range: DateTimeRange,
     value_mapper: V,

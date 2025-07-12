@@ -70,7 +70,7 @@ impl UserTriggerAction {
         CommandSource::User(format!("{}:{}", source_group, self.target))
     }
 
-    async fn default_duration(&self, api: &crate::core::HomeApi) -> Option<Duration> {
+    async fn default_duration(&self, api: &HomeApi) -> Option<Duration> {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
             | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => Some(t!(30 minutes)),

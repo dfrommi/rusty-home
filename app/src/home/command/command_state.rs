@@ -31,7 +31,7 @@ impl Command {
 async fn is_set_heating_reflected_in_state(
     device: &Thermostat,
     target_state: &HeatingTargetState,
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
 ) -> Result<bool> {
     let (set_point, auto_mode) = match device {
         Thermostat::LivingRoom => (SetPoint::LivingRoom, ExternalAutoControl::LivingRoomThermostat),
@@ -57,7 +57,7 @@ async fn is_set_heating_reflected_in_state(
 async fn is_set_power_reflected_in_state(
     device: &PowerToggle,
     power_on: bool,
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
 ) -> Result<bool> {
     let powered_item = match device {
         PowerToggle::Dehumidifier => Powered::Dehumidifier,
@@ -95,7 +95,7 @@ async fn is_push_notify_reflected_in_state(
 async fn is_set_energy_saving_reflected_in_state(
     device: &EnergySavingDevice,
     on: bool,
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
 ) -> Result<bool> {
     let state_device = match device {
         crate::home::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
@@ -109,7 +109,7 @@ async fn is_set_energy_saving_reflected_in_state(
 async fn is_fan_control_reflected_in_state(
     device: &Fan,
     airflow: &FanAirflow,
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
 ) -> Result<bool> {
     let state_device = match device {
         crate::home::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,

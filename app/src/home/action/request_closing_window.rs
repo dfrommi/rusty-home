@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::core::HomeApi;
 use crate::home::command::{Command, PowerToggle};
 use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
 use anyhow::Result;
@@ -33,7 +34,7 @@ impl SimpleAction for RequestClosingWindow {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         let result: Result<Vec<bool>> = futures::future::join_all([
             ColdAirComingIn::Bedroom.current(api),
             ColdAirComingIn::Kitchen.current(api),

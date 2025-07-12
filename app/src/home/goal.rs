@@ -1,5 +1,5 @@
+use crate::core::HomeApi;
 use crate::home::state::Powered;
-
 use crate::port::DataPointAccess;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
@@ -25,7 +25,7 @@ pub enum HomeGoal {
 }
 
 //TODO select goals based on current state
-pub async fn get_active_goals(api: &crate::core::HomeApi) -> Vec<HomeGoal> {
+pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
     //TODO auto-detect summer mode
     let mut goals = vec![
         //HomeGoal::SmarterHeating(Room::LivingRoom),

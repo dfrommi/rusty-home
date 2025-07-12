@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use infrastructure::meter::increment;
 
 const ITEM_TYPE: &str = "item_type";

@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::home::command::{Command, CommandSource, Notification, NotificationAction, NotificationRecipient};
@@ -42,7 +43,7 @@ impl SimpleAction for InformWindowOpen {
         super::action_source(self)
     }
 
-    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
+    async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let presence_item = match self.recipient {
             NotificationRecipient::Dennis => Presence::AtHomeDennis,
             NotificationRecipient::Sabine => Presence::AtHomeSabine,
@@ -60,7 +61,7 @@ impl SimpleAction for InformWindowOpen {
     }
 }
 
-async fn cold_air_coming_in(api: &crate::core::HomeApi) -> anyhow::Result<Option<(DateTime, DateTime)>> {
+async fn cold_air_coming_in(api: &HomeApi) -> anyhow::Result<Option<(DateTime, DateTime)>> {
     let result: anyhow::Result<Vec<DataPoint<bool>>> = futures::future::join_all([
         ColdAirComingIn::LivingRoom.current_data_point(api),
         ColdAirComingIn::Bedroom.current_data_point(api),

@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use crate::port::CommandExecutionAccess;
@@ -30,7 +31,7 @@ pub enum UserControlled {
 // - is the current state as expected and reached shortly after triggering the command?
 impl DataPointAccess<UserControlled> for UserControlled {
     #[mockable]
-    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         match self {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(api).await,
             //check expected state according to last action and compare with current state. Also
@@ -89,7 +90,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
     }
 }
 
-async fn current_data_point_for_dehumidifier(api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
     let item = UserControlled::Dehumidifier;
 
     let power = Powered::Dehumidifier.current_data_point(api).await?;
@@ -146,7 +147,7 @@ async fn current_data_point_for_dehumidifier(api: &crate::core::HomeApi) -> anyh
 }
 
 async fn current_data_point_for_thermostat(
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
     item: &UserControlled,
     thermostat: Thermostat,
     auto_mode: ExternalAutoControl,

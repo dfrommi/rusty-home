@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::home::state::{HeatingDemand, SetPoint, Temperature};
 use actix_web::web::{self, Path, Query};
@@ -12,7 +13,7 @@ use crate::{
 
 use super::{Room, TimeRangeQuery, TimeRangeWithIntervalQuery};
 
-pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
     Temperature: TimeSeriesAccess<Temperature>,
     SetPoint: TimeSeriesAccess<SetPoint>,
@@ -35,7 +36,7 @@ struct Row {
 }
 
 async fn temperature_series(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     path: Path<Room>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
@@ -84,7 +85,7 @@ where
 }
 
 async fn environment_series(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     path: Path<Room>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
@@ -124,7 +125,7 @@ where
 }
 
 async fn temperature_stats(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     room: Path<Room>,
     query: Query<TimeRangeQuery>,
 ) -> GrafanaResponse
@@ -166,7 +167,7 @@ where
 }
 
 async fn environment_stats(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     room: Path<Room>,
     query: Query<TimeRangeQuery>,
 ) -> GrafanaResponse

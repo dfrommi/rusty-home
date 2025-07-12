@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
@@ -18,7 +19,7 @@ pub enum Resident {
 //TODO maybe combination via Baysian to detect resident state
 impl DataPointAccess<Resident> for Resident {
     #[mockable]
-    async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         match self {
             Resident::DennisSleeping => sleeping(Presence::BedDennis, api).await,
             Resident::SabineSleeping => sleeping(Presence::BedSabine, api).await,
@@ -27,7 +28,7 @@ impl DataPointAccess<Resident> for Resident {
     }
 }
 
-async fn sleeping(in_bed: Presence, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
     let now = t!(now);
     let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
 
@@ -113,7 +114,7 @@ async fn sleeping(in_bed: Presence, api: &crate::core::HomeApi) -> Result<DataPo
 }
 
 //TODO cover flaky on/off behaviour on movement
-async fn anyone_on_couch(api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+async fn anyone_on_couch(api: &HomeApi) -> Result<DataPoint<bool>> {
     let (left, center, right) = tokio::try_join!(
         Presence::CouchLeft.current_data_point(api),
         Presence::CouchCenter.current_data_point(api),

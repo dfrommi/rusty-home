@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::unit::{DegreeCelsius, Percent};
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
@@ -15,7 +16,7 @@ pub enum RiskOfMould {
 
 impl DataPointAccess<RiskOfMould> for RiskOfMould {
     #[mockable]
-    async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         let humidity = match self {
             RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
         }
@@ -50,7 +51,7 @@ impl DataPointAccess<RiskOfMould> for RiskOfMould {
 }
 
 impl RiskOfMould {
-    async fn get_reference_dewpoint(&self, api: &crate::core::HomeApi) -> Result<DegreeCelsius> {
+    async fn get_reference_dewpoint(&self, api: &HomeApi) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
                 DewPoint::LivingRoomDoor,

@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use anyhow::Result;
@@ -57,12 +58,12 @@ impl Opened {
 
 impl DataPointAccess<Opened> for Opened {
     #[mockable]
-    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         any_of(api, self.api_items()).await
     }
 }
 
-async fn any_of(api: &crate::core::HomeApi, opened_states: Vec<raw::Opened>) -> anyhow::Result<DataPoint<bool>> {
+async fn any_of(api: &HomeApi, opened_states: Vec<raw::Opened>) -> anyhow::Result<DataPoint<bool>> {
     let futures: Vec<_> = opened_states.iter().map(|o| o.current_data_point(api)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
@@ -79,7 +80,7 @@ async fn any_of(api: &crate::core::HomeApi, opened_states: Vec<raw::Opened>) -> 
 
 impl TimeSeriesAccess<Opened> for Opened {
     #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<TimeSeries<Opened>> {
+    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<TimeSeries<Opened>> {
         let api_items = self.api_items();
         let context: raw::Opened = api_items[0].clone();
 

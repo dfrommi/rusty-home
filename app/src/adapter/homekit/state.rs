@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::core::HomeApi;
 use crate::core::ValueObject;
 use crate::core::id::ExternalId;
 use crate::core::unit::Percent;
@@ -12,7 +13,7 @@ use crate::{core::app_event::StateChangedEvent, home::state::EnergySaving, port:
 use super::MqttStateValue;
 
 pub async fn export_state(
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
     base_topic: String,
     tx: Sender<MqttOutMessage>,
     mut state_changed: Receiver<StateChangedEvent>,
@@ -34,7 +35,7 @@ pub async fn export_state(
     }
 }
 
-async fn send_with_defaults<'a, 'b: 'a, T>(sender: &'a mut MqttStateSender, state: T, api: &'b crate::core::HomeApi)
+async fn send_with_defaults<'a, 'b: 'a, T>(sender: &'a mut MqttStateSender, state: T, api: &'b HomeApi)
 where
     T: AsRef<ExternalId> + ValueObject + Clone + crate::port::DataPointAccess<T>,
     T::ValueType: Into<MqttStateValue>,
@@ -59,7 +60,7 @@ where
 async fn send_fan_activity<'a, 'b: 'a>(
     sender: &'a mut MqttStateSender,
     state: FanActivity,
-    api: &'b crate::core::HomeApi,
+    api: &'b HomeApi,
 ) where
     FanActivity: crate::port::DataPointAccess<FanActivity>,
 {

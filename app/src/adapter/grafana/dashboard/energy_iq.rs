@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange, Duration};
 use crate::core::unit::Percent;
 use crate::home::state::{HeatingDemand, Temperature};
@@ -16,7 +17,7 @@ use crate::{
 
 use super::Room;
 
-pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
     Temperature: TimeSeriesAccess<Temperature>,
@@ -57,7 +58,7 @@ struct Row {
 }
 
 async fn heating_series_aggregated_sum(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
@@ -90,7 +91,7 @@ where
 }
 
 async fn outside_temperature_series(
-    api: web::Data<crate::core::HomeApi>,
+    api: web::Data<HomeApi>,
     query: Query<QueryTimeRange>,
 ) -> Result<impl Responder, GrafanaApiError>
 where
@@ -123,7 +124,7 @@ where
 }
 
 async fn combined_series(
-    api: &crate::core::HomeApi,
+    api: &HomeApi,
     rooms: &[Room],
     time_range: DateTimeRange,
 ) -> anyhow::Result<TimeSeries<HeatingDemand>> {

@@ -63,7 +63,7 @@ impl DataPointAccess<DewPoint> for DewPoint {
 
 impl TimeSeriesAccess<DewPoint> for DewPoint {
     #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> Result<TimeSeries<DewPoint>> {
+    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<DewPoint>> {
         let (t_series, h_series) = {
             let temp = self.temperature();
             let humidity = self.relative_humidity();

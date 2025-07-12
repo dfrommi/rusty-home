@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::ValueObject;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
 use r#macro::{EnumVariants, Id, mockable};
@@ -19,7 +20,7 @@ impl DataPointAccess<EnergySaving> for EnergySaving {
     #[mockable]
     async fn current_data_point(
         &self,
-        api: &crate::core::HomeApi,
+        api: &HomeApi,
     ) -> anyhow::Result<DataPoint<<EnergySaving as ValueObject>::ValueType>> {
         let is_tv_on = match self {
             EnergySaving::LivingRoomTv => Powered::LivingRoomTv.current_data_point(api).await,

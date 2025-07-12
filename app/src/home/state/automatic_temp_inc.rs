@@ -1,3 +1,4 @@
+use crate::core::HomeApi;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::DegreeCelsius;
 use crate::home::state::Temperature;
@@ -18,7 +19,7 @@ pub enum AutomaticTemperatureIncrease {
 
 //TODO detect active heating and summer mode
 impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
-    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 

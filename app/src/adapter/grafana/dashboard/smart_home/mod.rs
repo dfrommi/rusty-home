@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::core::HomeApi;
 use actix_web::web;
 
 use crate::core::planner::{PlanningTrace, PlanningTraceStep};
@@ -7,7 +8,7 @@ use crate::core::planner::{PlanningTrace, PlanningTraceStep};
 mod overview;
 mod trace;
 
-pub fn routes(api: Arc<crate::core::HomeApi>) -> actix_web::Scope {
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
     web::scope("/smart_home")
         .service(overview::routes(api.clone()))
         .service(trace::routes(api))

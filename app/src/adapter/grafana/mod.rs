@@ -4,6 +4,7 @@ mod support;
 
 use std::sync::Arc;
 
+use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use actix_web::{
     HttpResponse, ResponseError,
@@ -13,7 +14,7 @@ use derive_more::derive::{Display, Error};
 
 use display::DashboardDisplay;
 
-pub fn new_routes(api: crate::core::HomeApi) -> actix_web::Scope {
+pub fn new_routes(api: HomeApi) -> actix_web::Scope {
     let api = Arc::new(api);
 
     web::scope("/grafana")

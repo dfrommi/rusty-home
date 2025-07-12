@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
+    core::HomeApi,
     core::planner::{Action, ActionEvaluationResult},
     home::state::UserControlled,
 };
@@ -25,7 +26,7 @@ impl KeepUserOverride {
 }
 
 impl Action for KeepUserOverride {
-    async fn evaluate(&self, api: &crate::core::HomeApi) -> Result<ActionEvaluationResult> {
+    async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult> {
         let fulfilled = self.user_controlled.current(api).await?;
 
         if fulfilled {

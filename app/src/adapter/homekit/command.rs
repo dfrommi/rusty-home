@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::unit::Percent;
 use crate::home::state::{FanActivity, FanAirflow, Powered};
@@ -12,7 +13,7 @@ use crate::home::state::EnergySaving;
 
 use super::MqttStateValue;
 
-pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: crate::core::HomeApi) {
+pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: HomeApi) {
     let mut debounce_tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
 
     while let Some(msg) = rx.recv().await {

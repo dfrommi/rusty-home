@@ -1,13 +1,12 @@
-use crate::core::HomeApi;
-use crate::core::timeseries::DataPoint;
 use crate::core::unit::DegreeCelsius;
+use crate::core::{HomeApi, timeseries::DataPoint};
 use crate::home::state::Temperature;
 use crate::t;
 use r#macro::{EnumVariants, Id};
 
 use crate::home::state::macros::result;
 
-use super::{DataPointAccess, TimeSeriesAccess, opened::Opened};
+use super::{DataPointAccess, TimeSeriesAccess, opened::OpenedArea};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AutomaticTemperatureIncrease {
@@ -31,11 +30,13 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
         }
 
         let (window, temp_sensor) = match self {
-            AutomaticTemperatureIncrease::LivingRoom => (Opened::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
-            AutomaticTemperatureIncrease::Bedroom => (Opened::BedroomWindow, Temperature::BedroomDoor),
-            AutomaticTemperatureIncrease::Kitchen => (Opened::KitchenWindow, Temperature::KitchenOuterWall),
+            AutomaticTemperatureIncrease::LivingRoom => {
+                (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor)
+            }
+            AutomaticTemperatureIncrease::Bedroom => (OpenedArea::BedroomWindow, Temperature::BedroomDoor),
+            AutomaticTemperatureIncrease::Kitchen => (OpenedArea::KitchenWindow, Temperature::KitchenOuterWall),
             AutomaticTemperatureIncrease::RoomOfRequirements => {
-                (Opened::RoomOfRequirementsWindow, Temperature::RoomOfRequirementsDoor)
+                (OpenedArea::RoomOfRequirementsWindow, Temperature::RoomOfRequirementsDoor)
             }
         };
 
@@ -112,14 +113,14 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
 
 #[cfg(test)]
 mod tests {
-    use crate::{core::HomeApi, home::state::opened::Opened};
+    use crate::{core::HomeApi, home::state::opened::OpenedArea};
 
     use super::*;
 
     #[tokio::test]
     async fn no_increase_when_window_open() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, true, t!(5 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, true, t!(5 minutes ago));
 
         assert!(!increasing(api).await);
     }
@@ -127,7 +128,7 @@ mod tests {
     #[tokio::test]
     async fn increasing_when_window_just_opened() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(4 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(4 minutes ago));
 
         assert!(increasing(api).await);
     }
@@ -135,7 +136,7 @@ mod tests {
     #[tokio::test]
     async fn not_increasing_when_window_closed_for_long_time() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(35 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(35 minutes ago));
 
         assert!(!increasing(api).await);
     }
@@ -143,7 +144,7 @@ mod tests {
     #[tokio::test]
     async fn increasing_when_not_enough_data_points() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(8 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(8 minutes ago));
         api.with_fixed_ts(
             Temperature::LivingRoomDoor,
             &[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))],
@@ -155,7 +156,7 @@ mod tests {
     #[tokio::test]
     async fn increasing_when_temperature_difference_big() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_ts(
             Temperature::LivingRoomDoor,
             &[
@@ -171,7 +172,7 @@ mod tests {
     #[tokio::test]
     async fn not_increasing_when_temperature_change_small() {
         let mut api = api_with_defaults();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_ts(
             Temperature::LivingRoomDoor,
             &[
@@ -187,7 +188,7 @@ mod tests {
     fn api_with_defaults() -> HomeApi {
         let mut api = HomeApi::for_testing();
         api.with_fixed_current_dp(Temperature::Outside, 18.0, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_ts(
             Temperature::LivingRoomDoor,
             &[

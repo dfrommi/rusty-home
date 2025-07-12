@@ -7,7 +7,7 @@ use actix_web::web::{self, Path, Query};
 
 use crate::{
     adapter::grafana::{GrafanaApiError, GrafanaResponse, support::csv_response},
-    home::state::Opened,
+    home::state::OpenedArea,
     port::TimeSeriesAccess,
 };
 
@@ -17,7 +17,7 @@ pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
     Temperature: TimeSeriesAccess<Temperature>,
     SetPoint: TimeSeriesAccess<SetPoint>,
-    Opened: TimeSeriesAccess<Opened>,
+    OpenedArea: TimeSeriesAccess<OpenedArea>,
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     web::scope("/heating_details/{room}")
@@ -90,7 +90,7 @@ async fn environment_series(
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
 where
-    Opened: TimeSeriesAccess<Opened>,
+    OpenedArea: TimeSeriesAccess<OpenedArea>,
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     let room = path.into_inner();
@@ -124,11 +124,7 @@ where
     csv_response(&rows)
 }
 
-async fn temperature_stats(
-    api: web::Data<HomeApi>,
-    room: Path<Room>,
-    query: Query<TimeRangeQuery>,
-) -> GrafanaResponse
+async fn temperature_stats(api: web::Data<HomeApi>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
 where
     Temperature: TimeSeriesAccess<Temperature>,
     SetPoint: TimeSeriesAccess<SetPoint>,
@@ -166,11 +162,7 @@ where
     csv_response(&rows)
 }
 
-async fn environment_stats(
-    api: web::Data<HomeApi>,
-    room: Path<Room>,
-    query: Query<TimeRangeQuery>,
-) -> GrafanaResponse
+async fn environment_stats(api: web::Data<HomeApi>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
 where
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {

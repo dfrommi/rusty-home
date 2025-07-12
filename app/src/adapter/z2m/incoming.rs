@@ -72,7 +72,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentHomeStateValue::OpenedRaw(opened.clone(), !payload.contact),
+                        PersistentHomeStateValue::Opened(opened.clone(), !payload.contact),
                         payload.last_seen,
                     )
                     .into(),

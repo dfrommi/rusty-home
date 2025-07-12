@@ -9,7 +9,7 @@ use anyhow::{Ok, Result};
 
 use crate::{
     core::planner::SimpleAction,
-    home::{action::HeatingZone, state::Opened},
+    home::{action::HeatingZone, state::OpenedArea},
     port::DataPointAccess,
 };
 
@@ -43,11 +43,11 @@ impl DeferHeatingUntilVentilationDone {
         t!(6:12 - 12:30)
     }
 
-    fn window(&self) -> Opened {
+    fn window(&self) -> OpenedArea {
         match self {
-            DeferHeatingUntilVentilationDone::LivingRoom => Opened::LivingRoomWindowOrDoor,
-            DeferHeatingUntilVentilationDone::Bedroom => Opened::BedroomWindow,
-            DeferHeatingUntilVentilationDone::Kitchen => Opened::KitchenWindow,
+            DeferHeatingUntilVentilationDone::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
+            DeferHeatingUntilVentilationDone::Bedroom => OpenedArea::BedroomWindow,
+            DeferHeatingUntilVentilationDone::Kitchen => OpenedArea::KitchenWindow,
         }
     }
 }

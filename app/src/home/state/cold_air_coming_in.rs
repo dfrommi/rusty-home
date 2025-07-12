@@ -1,11 +1,10 @@
-use crate::core::HomeApi;
 use crate::core::unit::DegreeCelsius;
 use crate::{core::timeseries::DataPoint, home::state::Temperature};
 use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
-use super::{DataPointAccess, Opened};
+use super::{DataPointAccess, OpenedArea};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum ColdAirComingIn {
@@ -17,7 +16,7 @@ pub enum ColdAirComingIn {
 
 impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
     #[mockable]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
+    async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
         if outside_temp.value > DegreeCelsius(22.0) {
@@ -28,10 +27,10 @@ impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
         }
 
         let window_opened = match self {
-            ColdAirComingIn::LivingRoom => Opened::LivingRoomWindowOrDoor.current_data_point(api).await,
-            ColdAirComingIn::Bedroom => Opened::BedroomWindow.current_data_point(api).await,
-            ColdAirComingIn::Kitchen => Opened::KitchenWindow.current_data_point(api).await,
-            ColdAirComingIn::RoomOfRequirements => Opened::RoomOfRequirementsWindow.current_data_point(api).await,
+            ColdAirComingIn::LivingRoom => OpenedArea::LivingRoomWindowOrDoor.current_data_point(api).await,
+            ColdAirComingIn::Bedroom => OpenedArea::BedroomWindow.current_data_point(api).await,
+            ColdAirComingIn::Kitchen => OpenedArea::KitchenWindow.current_data_point(api).await,
+            ColdAirComingIn::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow.current_data_point(api).await,
         }?;
 
         result!(window_opened.value, window_opened.timestamp, self,

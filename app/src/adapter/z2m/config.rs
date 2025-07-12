@@ -1,5 +1,5 @@
 use super::Z2mChannel;
-use crate::home::state::OpenedRaw as Opened;
+use crate::home::state::Opened;
 use crate::home::state::*;
 use crate::home::trigger::RemoteTarget;
 

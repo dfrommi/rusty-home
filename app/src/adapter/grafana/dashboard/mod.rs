@@ -6,7 +6,7 @@ use crate::home::state::SetPoint;
 use crate::home::state::Temperature;
 use serde::{Deserialize, Serialize};
 
-use crate::home::state::Opened;
+use crate::home::state::OpenedArea;
 
 use super::display::DashboardDisplay;
 
@@ -127,13 +127,13 @@ impl Room {
         }
     }
 
-    fn window(&self) -> Opened {
+    fn window(&self) -> OpenedArea {
         match self {
-            Room::LivingRoom => Opened::LivingRoomWindowOrDoor,
-            Room::Bedroom => Opened::BedroomWindow,
-            Room::Kitchen => Opened::KitchenWindow,
-            Room::RoomOfRequirements => Opened::RoomOfRequirementsWindow,
-            Room::Bathroom => Opened::BedroomWindow,
+            Room::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
+            Room::Bedroom => OpenedArea::BedroomWindow,
+            Room::Kitchen => OpenedArea::KitchenWindow,
+            Room::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
+            Room::Bathroom => OpenedArea::BedroomWindow,
         }
     }
 }

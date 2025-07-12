@@ -35,7 +35,7 @@ pub use external_auto_control::ExternalAutoControl;
 pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
 pub use opened::Opened;
-pub use opened::raw::Opened as OpenedRaw;
+pub use opened::OpenedArea;
 pub use powered::Powered;
 pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
@@ -66,9 +66,9 @@ pub enum HomeStateValue {
     FanActivity(FanActivity, FanAirflow),
     #[persistent]
     HeatingDemand(HeatingDemand, Percent),
-    Opened(Opened, bool),
+    OpenedArea(OpenedArea, bool),
     #[persistent]
-    OpenedRaw(OpenedRaw, bool),
+    Opened(Opened, bool),
     #[persistent]
     Powered(Powered, bool),
     #[persistent]

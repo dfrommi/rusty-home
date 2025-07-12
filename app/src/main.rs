@@ -1,9 +1,7 @@
 use core::persistence::{Database, listener::DbEventListener};
-use core::{CommandExecutor, HomeApi, app_event::AppEventListener};
-use home::command::Command;
+use core::{HomeApi, app_event::AppEventListener};
 use infrastructure::Mqtt;
 use settings::Settings;
-use std::future::Future;
 
 mod adapter;
 mod core;

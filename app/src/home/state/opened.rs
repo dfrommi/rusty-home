@@ -12,58 +12,54 @@ use crate::core::timeseries::{
 use super::{DataPointAccess, TimeSeriesAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
-pub enum Opened {
+pub enum OpenedArea {
     LivingRoomWindowOrDoor,
     BedroomWindow,
     KitchenWindow,
     RoomOfRequirementsWindow,
 }
 
-pub mod raw {
-    use r#macro::Id;
-
-    #[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
-    pub enum Opened {
-        KitchenWindow,
-        BedroomWindow,
-        LivingRoomWindowLeft,
-        LivingRoomWindowRight,
-        LivingRoomWindowSide,
-        LivingRoomBalconyDoor,
-        RoomOfRequirementsWindowLeft,
-        RoomOfRequirementsWindowRight,
-        RoomOfRequirementsWindowSide,
-    }
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+pub enum Opened {
+    KitchenWindow,
+    BedroomWindow,
+    LivingRoomWindowLeft,
+    LivingRoomWindowRight,
+    LivingRoomWindowSide,
+    LivingRoomBalconyDoor,
+    RoomOfRequirementsWindowLeft,
+    RoomOfRequirementsWindowRight,
+    RoomOfRequirementsWindowSide,
 }
 
-impl Opened {
-    fn api_items(&self) -> Vec<raw::Opened> {
+impl OpenedArea {
+    fn api_items(&self) -> Vec<Opened> {
         match self {
-            Opened::LivingRoomWindowOrDoor => vec![
-                raw::Opened::LivingRoomWindowLeft,
-                raw::Opened::LivingRoomWindowRight,
-                raw::Opened::LivingRoomWindowSide,
-                raw::Opened::LivingRoomBalconyDoor,
+            OpenedArea::LivingRoomWindowOrDoor => vec![
+                Opened::LivingRoomWindowLeft,
+                Opened::LivingRoomWindowRight,
+                Opened::LivingRoomWindowSide,
+                Opened::LivingRoomBalconyDoor,
             ],
-            Opened::BedroomWindow => vec![raw::Opened::BedroomWindow],
-            Opened::KitchenWindow => vec![raw::Opened::KitchenWindow],
-            Opened::RoomOfRequirementsWindow => vec![
-                raw::Opened::RoomOfRequirementsWindowLeft,
-                raw::Opened::RoomOfRequirementsWindowRight,
-                raw::Opened::RoomOfRequirementsWindowSide,
+            OpenedArea::BedroomWindow => vec![Opened::BedroomWindow],
+            OpenedArea::KitchenWindow => vec![Opened::KitchenWindow],
+            OpenedArea::RoomOfRequirementsWindow => vec![
+                Opened::RoomOfRequirementsWindowLeft,
+                Opened::RoomOfRequirementsWindowRight,
+                Opened::RoomOfRequirementsWindowSide,
             ],
         }
     }
 }
 
-impl DataPointAccess<Opened> for Opened {
+impl DataPointAccess<OpenedArea> for OpenedArea {
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         any_of(api, self.api_items()).await
     }
 }
 
-async fn any_of(api: &HomeApi, opened_states: Vec<raw::Opened>) -> anyhow::Result<DataPoint<bool>> {
+async fn any_of(api: &HomeApi, opened_states: Vec<Opened>) -> anyhow::Result<DataPoint<bool>> {
     let futures: Vec<_> = opened_states.iter().map(|o| o.current_data_point(api)).collect();
     let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
 
@@ -78,11 +74,11 @@ async fn any_of(api: &HomeApi, opened_states: Vec<raw::Opened>) -> anyhow::Resul
     }
 }
 
-impl TimeSeriesAccess<Opened> for Opened {
+impl TimeSeriesAccess<OpenedArea> for OpenedArea {
     #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<TimeSeries<Opened>> {
+    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<TimeSeries<OpenedArea>> {
         let api_items = self.api_items();
-        let context: raw::Opened = api_items[0].clone();
+        let context: Opened = api_items[0].clone();
 
         let futures = api_items
             .into_iter()
@@ -100,13 +96,13 @@ impl TimeSeriesAccess<Opened> for Opened {
     }
 }
 
-impl Estimatable for raw::Opened {
+impl Estimatable for Opened {
     fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
     }
 }
 
-impl Estimatable for Opened {
+impl Estimatable for OpenedArea {
     fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
     }
@@ -121,12 +117,12 @@ mod tests {
     #[tokio::test]
     async fn test_any_of_some_opened() {
         let mut api = HomeApi::for_testing();
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowLeft, true, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowRight, false, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowSide, true, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomBalconyDoor, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowLeft, true, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowRight, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowSide, true, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomBalconyDoor, false, t!(now));
 
-        let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
+        let result = OpenedArea::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
         assert!(result.unwrap().value);
     }
@@ -134,12 +130,12 @@ mod tests {
     #[tokio::test]
     async fn test_any_of_all_closed() {
         let mut api = HomeApi::for_testing();
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowLeft, false, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowRight, false, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowSide, false, t!(now));
-        api.with_fixed_current_dp(raw::Opened::LivingRoomBalconyDoor, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowLeft, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowRight, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowSide, false, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomBalconyDoor, false, t!(now));
 
-        let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
+        let result = OpenedArea::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
         assert!(!result.unwrap().value);
     }

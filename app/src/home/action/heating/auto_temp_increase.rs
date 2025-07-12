@@ -10,7 +10,7 @@ use crate::{
     core::planner::SimpleAction,
     home::{
         action::HeatingZone,
-        state::{AutomaticTemperatureIncrease, Opened},
+        state::{AutomaticTemperatureIncrease, OpenedArea},
     },
     port::DataPointAccess,
 };
@@ -55,14 +55,14 @@ impl SimpleAction for NoHeatingDuringAutomaticTemperatureIncrease {
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         let (temp_increase, window_opened) = match self.heating_zone {
-            HeatingZone::LivingRoom => (AutomaticTemperatureIncrease::LivingRoom, Opened::LivingRoomWindowOrDoor),
-            HeatingZone::Bedroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
-            HeatingZone::Kitchen => (AutomaticTemperatureIncrease::Kitchen, Opened::KitchenWindow),
+            HeatingZone::LivingRoom => (AutomaticTemperatureIncrease::LivingRoom, OpenedArea::LivingRoomWindowOrDoor),
+            HeatingZone::Bedroom => (AutomaticTemperatureIncrease::Bedroom, OpenedArea::BedroomWindow),
+            HeatingZone::Kitchen => (AutomaticTemperatureIncrease::Kitchen, OpenedArea::KitchenWindow),
             HeatingZone::RoomOfRequirements => (
                 AutomaticTemperatureIncrease::RoomOfRequirements,
-                Opened::RoomOfRequirementsWindow,
+                OpenedArea::RoomOfRequirementsWindow,
             ),
-            HeatingZone::Bathroom => (AutomaticTemperatureIncrease::Bedroom, Opened::BedroomWindow),
+            HeatingZone::Bathroom => (AutomaticTemperatureIncrease::Bedroom, OpenedArea::BedroomWindow),
         };
 
         let (window_opened, temp_increase) =

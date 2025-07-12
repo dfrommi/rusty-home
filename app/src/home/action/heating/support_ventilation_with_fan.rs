@@ -7,7 +7,7 @@ use crate::t;
 
 use crate::core::planner::SimpleAction;
 
-use super::{DataPointAccess, Opened};
+use super::{DataPointAccess, OpenedArea};
 
 #[derive(Debug, Clone)]
 pub struct SupportVentilationWithFan {
@@ -40,8 +40,8 @@ impl SimpleAction for SupportVentilationWithFan {
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let window = match self.fan {
-            Fan::LivingRoomCeilingFan => Opened::LivingRoomWindowOrDoor,
-            Fan::BedroomCeilingFan => Opened::BedroomWindow,
+            Fan::LivingRoomCeilingFan => OpenedArea::LivingRoomWindowOrDoor,
+            Fan::BedroomCeilingFan => OpenedArea::BedroomWindow,
         };
 
         let opened_dp = window.current_data_point(api).await?;

@@ -1,5 +1,6 @@
+use crate::adapter::homekit::HomekitCommandTarget;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
-use crate::home::trigger::{HomekitTarget, RemoteTarget};
+use crate::home::trigger::RemoteTarget;
 use crate::t;
 
 use crate::home::action::{
@@ -31,14 +32,14 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
         vec![
             SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
-            UserTriggerAction::new(HomekitTarget::LivingRoomCeilingFanSpeed.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::LivingRoomCeilingFanSpeed.into()).into(),
             //CoolDownWhenOccupied::LivingRoom.into(),
         ]
     ),
     (
         HomeGoal::SmarterHeating(Room::Bedroom),
         vec![
-            UserTriggerAction::new(HomekitTarget::InfraredHeaterPower.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
             UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
             IrHeaterAutoTurnOff::new().into(),
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
@@ -52,7 +53,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::BetterRoomClimate(Room::Bedroom),
         vec![
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
-            UserTriggerAction::new(HomekitTarget::BedroomCeilingFanSpeed.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
             //RoolDownWhenOccupied::Bedroom.into(),
         ]
     ),
@@ -92,7 +93,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::PreventMouldInBathroom,
         vec![
-            UserTriggerAction::new(HomekitTarget::DehumidifierPower.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
             KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
             ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
             Dehumidify::new().into()
@@ -101,7 +102,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::TvControl,
         vec![
-            UserTriggerAction::new(HomekitTarget::LivingRoomTvEnergySaving.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::LivingRoomTvEnergySaving.into()).into(),
             FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
                 device: crate::home::command::EnergySavingDevice::LivingRoomTv,
             }).into(),

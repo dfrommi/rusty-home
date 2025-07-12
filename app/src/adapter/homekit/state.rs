@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 
+use crate::adapter::homekit::{Homekit, HomekitState};
 use crate::core::HomeApi;
-use crate::core::ValueObject;
-use crate::core::id::ExternalId;
 use crate::core::unit::Percent;
-use crate::home::state::{FanActivity, FanAirflow, Powered};
+use crate::home::state::FanAirflow;
 use infrastructure::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
 
-use crate::{core::app_event::StateChangedEvent, home::state::EnergySaving, port::DataPointAccess};
+use crate::{core::app_event::StateChangedEvent, port::DataPointAccess};
 
-use super::MqttStateValue;
+use super::HomekitStateValue;
 
 pub async fn export_state(
     api: &HomeApi,
@@ -27,63 +26,38 @@ pub async fn export_state(
             _ = timer.tick() => {},
         }
 
-        send_with_defaults(&mut sender, Powered::Dehumidifier, api).await;
-        send_with_defaults(&mut sender, Powered::InfraredHeater, api).await;
-        send_with_defaults(&mut sender, EnergySaving::LivingRoomTv, api).await;
-        send_fan_activity(&mut sender, FanActivity::LivingRoomCeilingFan, api).await;
-        send_fan_activity(&mut sender, FanActivity::BedroomCeilingFan, api).await;
+        for (key, accessory, _) in Homekit::config() {
+            if let Err(e) = export_accessory(key, accessory, api, &mut sender).await {
+                tracing::error!("Error exporting to Homekit {}: {:?}", key, e);
+            }
+        }
     }
 }
 
-async fn send_with_defaults<'a, 'b: 'a, T>(sender: &'a mut MqttStateSender, state: T, api: &'b HomeApi)
-where
-    T: AsRef<ExternalId> + ValueObject + Clone + crate::port::DataPointAccess<T>,
-    T::ValueType: Into<MqttStateValue>,
-{
-    let external_id: &ExternalId = state.as_ref();
-    let value = match state.current(api).await {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::error!(
-                "Error getting current value of {}/{} for sending to MQTT: {:?}",
-                external_id.ext_type(),
-                external_id.ext_name(),
-                e
-            );
-            return;
+async fn export_accessory(
+    key: &str,
+    accessory: HomekitState,
+    api: &HomeApi,
+    sender: &mut MqttStateSender,
+) -> anyhow::Result<()> {
+    match accessory {
+        HomekitState::Powered(powered) => sender.send("powered", key, powered.current(api).await?).await,
+        HomekitState::EnergySaving(energy_saving) => {
+            sender
+                .send("energy_saving", key, energy_saving.current(api).await?)
+                .await
         }
-    };
-
-    sender.send(external_id, value).await;
-}
-
-async fn send_fan_activity<'a, 'b: 'a>(
-    sender: &'a mut MqttStateSender,
-    state: FanActivity,
-    api: &'b HomeApi,
-) where
-    FanActivity: crate::port::DataPointAccess<FanActivity>,
-{
-    let external_id: &ExternalId = state.as_ref();
-    let value = match state.current(api).await {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::error!(
-                "Error getting current value of {}/{} for sending to MQTT: {:?}",
-                external_id.ext_type(),
-                external_id.ext_name(),
-                e
-            );
-            return;
+        HomekitState::FanSpeed(fan_activity) => {
+            match fan_activity.current(api).await? {
+                FanAirflow::Off => sender.send("fan_speed", key, Percent(0.0)).await,
+                FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => {
+                    sender.send("fan_speed", key, fan_speed).await
+                }
+            };
         }
-    };
+    }
 
-    let percent_ext_id = ExternalId::new("fan_speed", external_id.ext_name());
-    match value {
-        FanAirflow::Off => sender.send(&percent_ext_id, Percent(0.0)).await,
-        FanAirflow::Forward(fan_speed) => sender.send(&percent_ext_id, fan_speed).await,
-        FanAirflow::Reverse(fan_speed) => sender.send(&percent_ext_id, fan_speed).await,
-    };
+    Ok(())
 }
 
 struct MqttStateSender {
@@ -101,13 +75,13 @@ impl MqttStateSender {
         }
     }
 
-    async fn send<'a, T>(&'a mut self, external_id: &ExternalId, value: T)
+    async fn send<T>(&mut self, group: &str, item: &str, value: T)
     where
-        T: Into<MqttStateValue>,
+        T: Into<HomekitStateValue>,
     {
-        let value: MqttStateValue = value.into();
+        let value: HomekitStateValue = value.into();
 
-        let topic = format!("{}/{}/{}", self.base_topic, external_id.ext_type(), external_id.ext_name());
+        let topic = format!("{}/{}/{}", self.base_topic, group, item);
         let payload = value.0;
 
         if self.last_sent.get(&topic) == Some(&payload) {

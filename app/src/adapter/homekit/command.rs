@@ -1,95 +1,91 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use super::{Homekit, HomekitCommand, HomekitCommandTarget};
 use crate::core::HomeApi;
-use crate::core::id::ExternalId;
 use crate::core::unit::Percent;
-use crate::home::state::{FanActivity, FanAirflow, Powered};
-use crate::home::trigger::{Homekit, UserTrigger};
-use anyhow::bail;
+use crate::home::state::FanAirflow;
+use crate::home::trigger::UserTrigger;
 use infrastructure::MqttInMessage;
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
-use crate::home::state::EnergySaving;
-
-use super::MqttStateValue;
+use super::HomekitStateValue;
 
 pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage>, api: HomeApi) {
     let mut debounce_tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
+    let api = Arc::new(api);
 
     while let Some(msg) = rx.recv().await {
-        let topic_parts: Vec<&str> = msg.topic.strip_prefix(&base_topic).unwrap_or("").split('/').collect();
+        let topic = msg.topic.clone();
 
-        if topic_parts.len() != 3 {
-            tracing::warn!("Received malformed topic: {}", msg.topic);
-            continue;
-        }
-
-        if let Some(handle) = debounce_tasks.remove(&msg.topic) {
-            tracing::debug!(
+        if let Some(handle) = debounce_tasks.remove(&topic) {
+            tracing::trace!(
                 "Received command for already scheduled command on topic {}, aborting previous task",
-                msg.topic,
+                topic,
             );
             handle.abort();
         }
 
-        let type_name = topic_parts[1].to_string();
-        let item_name = topic_parts[2].to_string();
-
         let schedule_api = api.clone();
-
+        let scheedule_base_topic = base_topic.clone();
         let handle = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-            match to_command(&type_name, &item_name, MqttStateValue(msg.payload)) {
-                Ok(trigger) => {
-                    tracing::info!("Executing command received via Mqtt: {:?}", trigger);
-                    if let Err(e) = schedule_api.add_user_trigger(trigger).await {
-                        tracing::error!("Error triggering user action: {:?}", e)
-                    }
-                }
-                Err(e) => tracing::error!("{}", e),
-            }
+            handle_message(&scheedule_base_topic, msg, schedule_api).await;
         });
 
-        debounce_tasks.insert(msg.topic.clone(), handle);
+        debounce_tasks.insert(topic, handle);
     }
 }
 
-fn to_command(type_name: &str, item_name: &str, value: MqttStateValue) -> anyhow::Result<UserTrigger> {
-    let external_id = ExternalId::new(type_name, item_name);
-
-    if let Ok(powered) = Powered::try_from(&external_id) {
-        return match powered {
-            Powered::Dehumidifier => Ok(UserTrigger::Homekit(Homekit::DehumidifierPower(value.try_into()?))),
-            Powered::InfraredHeater => Ok(UserTrigger::Homekit(Homekit::InfraredHeaterPower(value.try_into()?))),
-            _ => bail!("Powered-item {} not supported", item_name),
-        };
-    }
-
-    if let Ok(energy_saving) = EnergySaving::try_from(&external_id) {
-        return match energy_saving {
-            EnergySaving::LivingRoomTv => {
-                Ok(UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(value.try_into()?)))
-            }
-        };
-    }
-
-    if type_name == "fan_speed" {
-        let percent: Percent = value.clone().try_into()?;
-        let activity = if percent.0 == 0.0 {
-            FanAirflow::Off
+async fn handle_message(base_topic: &str, msg: MqttInMessage, api: Arc<HomeApi>) {
+    let config = Homekit::config();
+    let target: Option<&HomekitCommandTarget> = config.iter().find_map(|(key, _, target)| {
+        if msg.topic == format!("{}/{}", base_topic, key) {
+            return target.as_ref();
         } else {
-            FanAirflow::Forward(value.try_into()?)
+            return None;
         };
+    });
 
-        if item_name == FanActivity::LivingRoomCeilingFan.ext_name() {
-            return Ok(UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(activity)));
+    if let Some(target) = target {
+        tracing::info!("Received command for {}", target);
+        if let Err(e) = execute_target(target, HomekitStateValue(msg.payload), api).await {
+            tracing::error!("Error triggering command for {}: {:?}", target, e);
         }
+    } else {
+        tracing::warn!("No command target configured for topic {}", msg.topic);
+    }
+}
 
-        if item_name == FanActivity::BedroomCeilingFan.ext_name() {
-            return Ok(UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(activity)));
+async fn execute_target(
+    target: &HomekitCommandTarget,
+    payload: HomekitStateValue,
+    api: Arc<HomeApi>,
+) -> anyhow::Result<()> {
+    match target {
+        HomekitCommandTarget::InfraredHeaterPower => {
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(payload.try_into()?)))
+                .await
+        }
+        HomekitCommandTarget::DehumidifierPower => {
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::DehumidifierPower(payload.try_into()?)))
+                .await
+        }
+        HomekitCommandTarget::LivingRoomTvEnergySaving => {
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(
+                payload.try_into()?,
+            )))
+            .await
+        }
+        HomekitCommandTarget::LivingRoomCeilingFanSpeed | HomekitCommandTarget::BedroomCeilingFanSpeed => {
+            let percent: Percent = payload.clone().try_into()?;
+            let activity = if percent.0 == 0.0 {
+                FanAirflow::Off
+            } else {
+                FanAirflow::Forward(payload.try_into()?)
+            };
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(activity)))
+                .await
         }
     }
-
-    bail!("Device {}/{} not supported", type_name, item_name)
 }

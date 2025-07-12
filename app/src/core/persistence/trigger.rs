@@ -58,6 +58,8 @@ impl super::Database {
 
 #[cfg(test)]
 mod tests {
+    use crate::adapter::homekit::HomekitCommand;
+    use crate::adapter::homekit::HomekitCommandTarget;
     use crate::home::trigger::*;
     use crate::t;
 
@@ -68,19 +70,19 @@ mod tests {
     #[sqlx::test(migrations = "../migrations")]
     async fn test_read_write(pool: sqlx::PgPool) {
         let db = Database::new(pool);
-        db.add_user_trigger(UserTrigger::Homekit(Homekit::InfraredHeaterPower(true)))
+        db.add_user_trigger(UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(true)))
             .await
             .unwrap();
 
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
-        db.add_user_trigger(UserTrigger::Homekit(Homekit::InfraredHeaterPower(false)))
+        db.add_user_trigger(UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(false)))
             .await
             .unwrap();
 
         let latest_trigger = db
             .latest_since(
-                &UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower),
+                &UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower),
                 t!(10 seconds ago),
             )
             .await
@@ -89,7 +91,7 @@ mod tests {
         assert!(matches!(
             latest_trigger,
             Some(DataPoint {
-                value: UserTrigger::Homekit(Homekit::InfraredHeaterPower(false)),
+                value: UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(false)),
                 ..
             })
         ));

@@ -1,9 +1,9 @@
 mod command;
+mod mapper;
 mod state;
 
-use crate::core::unit::Percent;
-use crate::home::state::FanSpeed;
-use serde::Deserialize;
+use crate::home::state::{EnergySaving, FanActivity, FanAirflow, Powered};
+use serde::{Deserialize, Serialize};
 
 use crate::Infrastructure;
 
@@ -38,78 +38,65 @@ impl Homekit {
 }
 
 #[derive(Debug, Clone)]
-struct MqttStateValue(String);
+struct HomekitStateValue(String);
 
-impl From<bool> for MqttStateValue {
-    fn from(val: bool) -> Self {
-        MqttStateValue(if val { "1".to_string() } else { "0".to_string() })
-    }
+#[derive(Debug, Clone)]
+enum HomekitState {
+    Powered(Powered),
+    EnergySaving(EnergySaving),
+    FanSpeed(FanActivity),
 }
 
-impl TryInto<bool> for MqttStateValue {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<bool, Self::Error> {
-        match self.0.as_str() {
-            "0" => Ok(false),
-            "1" => Ok(true),
-            _ => anyhow::bail!("Error converting {} to bool", self.0),
-        }
-    }
+//Don't forget to add to action planning config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "command", content = "data", rename_all = "snake_case")]
+pub enum HomekitCommand {
+    InfraredHeaterPower(bool),
+    DehumidifierPower(bool),
+    LivingRoomTvEnergySaving(bool),
+    LivingRoomCeilingFanSpeed(FanAirflow),
+    BedroomCeilingFanSpeed(FanAirflow),
 }
 
-impl From<Percent> for MqttStateValue {
-    fn from(val: Percent) -> Self {
-        MqttStateValue(val.0.to_string())
-    }
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
+#[serde(tag = "command", rename_all = "snake_case")]
+#[display("Homekit[{}]", _variant)]
+pub enum HomekitCommandTarget {
+    InfraredHeaterPower,
+    DehumidifierPower,
+    LivingRoomTvEnergySaving,
+    LivingRoomCeilingFanSpeed,
+    BedroomCeilingFanSpeed,
 }
 
-impl TryInto<Percent> for MqttStateValue {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<Percent, Self::Error> {
-        match self.0.parse() {
-            Ok(v) => Ok(Percent(v)),
-            Err(_) => anyhow::bail!("Error converting {} to Percent", self.0),
-        }
-    }
-}
-
-impl From<FanSpeed> for MqttStateValue {
-    fn from(val: FanSpeed) -> Self {
-        MqttStateValue(
-            match val {
-                FanSpeed::Silent => "20",
-                FanSpeed::Low => "40",
-                FanSpeed::Medium => "60.0",
-                FanSpeed::High => "80.0",
-                FanSpeed::Turbo => "100",
-            }
-            .to_string(),
-        )
-    }
-}
-
-impl TryInto<FanSpeed> for MqttStateValue {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<FanSpeed, Self::Error> {
-        let percent: Percent = self.try_into()?;
-
-        if percent.0 == 0.0 {
-            anyhow::bail!("Fan speed is 0.0, not a fan speed, should be OFF");
-        }
-
-        Ok(if percent.0 <= 20.0 {
-            FanSpeed::Silent
-        } else if percent.0 <= 40.0 {
-            FanSpeed::Low
-        } else if percent.0 <= 60.0 {
-            FanSpeed::Medium
-        } else if percent.0 <= 80.0 {
-            FanSpeed::High
-        } else {
-            FanSpeed::Turbo
-        })
+impl Homekit {
+    fn config() -> Vec<(&'static str, HomekitState, Option<HomekitCommandTarget>)> {
+        vec![
+            (
+                "powered/infared_heater",
+                HomekitState::Powered(Powered::InfraredHeater),
+                Some(HomekitCommandTarget::InfraredHeaterPower),
+            ),
+            (
+                "powered/dehumidifier",
+                HomekitState::Powered(Powered::Dehumidifier),
+                Some(HomekitCommandTarget::DehumidifierPower),
+            ),
+            (
+                "energy_saving/living_room_tv",
+                HomekitState::EnergySaving(EnergySaving::LivingRoomTv),
+                Some(HomekitCommandTarget::LivingRoomTvEnergySaving),
+            ),
+            (
+                "fan_speed/bedroom_ceiling_fan",
+                HomekitState::FanSpeed(FanActivity::BedroomCeilingFan),
+                Some(HomekitCommandTarget::BedroomCeilingFanSpeed),
+            ),
+            (
+                "fan_speed/living_room_ceiling_fan",
+                HomekitState::FanSpeed(FanActivity::LivingRoomCeilingFan),
+                Some(HomekitCommandTarget::LivingRoomCeilingFanSpeed),
+            ),
+        ]
     }
 }

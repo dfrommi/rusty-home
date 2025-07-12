@@ -1,19 +1,19 @@
 use serde::{Deserialize, Serialize};
 
-use crate::home::state::FanAirflow;
+use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTrigger {
     Remote(Remote),
-    Homekit(Homekit),
+    Homekit(HomekitCommand),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From, derive_more::Display)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
     Remote(RemoteTarget),
-    Homekit(HomekitTarget),
+    Homekit(HomekitCommandTarget),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,27 +36,6 @@ pub enum ButtonPress {
     BottomSingle,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "command", content = "data", rename_all = "snake_case")]
-pub enum Homekit {
-    InfraredHeaterPower(bool),
-    DehumidifierPower(bool),
-    LivingRoomTvEnergySaving(bool),
-    LivingRoomCeilingFanSpeed(FanAirflow),
-    BedroomCeilingFanSpeed(FanAirflow),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
-#[serde(tag = "command", rename_all = "snake_case")]
-#[display("Homekit[{}]", _variant)]
-pub enum HomekitTarget {
-    InfraredHeaterPower,
-    DehumidifierPower,
-    LivingRoomTvEnergySaving,
-    LivingRoomCeilingFanSpeed,
-    BedroomCeilingFanSpeed,
-}
-
 #[cfg(test)]
 mod serialization {
     use super::*;
@@ -75,7 +54,7 @@ mod serialization {
     #[test]
     fn test_display_homekit() {
         assert_eq!(
-            UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower).to_string(),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower).to_string(),
             "Homekit[InfraredHeaterPower]"
         );
     }
@@ -108,7 +87,7 @@ mod serialization {
     #[test]
     fn test_serialize_homekit() {
         assert_json_eq!(
-            UserTrigger::Homekit(Homekit::InfraredHeaterPower(true)),
+            UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(true)),
             json!({
                 "type": "homekit",
                 "command": "infrared_heater_power",
@@ -117,7 +96,7 @@ mod serialization {
         );
 
         assert_json_eq!(
-            UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower),
             json!({
                 "type": "homekit",
                 "command": "infrared_heater_power"

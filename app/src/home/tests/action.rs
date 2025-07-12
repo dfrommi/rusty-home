@@ -1,6 +1,7 @@
+use crate::adapter::homekit::HomekitCommandTarget;
 use crate::core::time::{DateTime, FIXED_NOW};
 use crate::home::command::Thermostat;
-use crate::home::trigger::{HomekitTarget, UserTriggerTarget};
+use crate::home::trigger::UserTriggerTarget;
 
 use crate::{
     core::planner::{Action, ActionEvaluationResult},
@@ -89,7 +90,7 @@ fn heating_before_sleeping_extended_over_midnight() {
 
 #[test]
 fn user_trigger_not_started() {
-    let action = UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower));
+    let action = UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower));
 
     let result = get_state_at("2025-01-05T21:05:00.584641+01:00", action);
 

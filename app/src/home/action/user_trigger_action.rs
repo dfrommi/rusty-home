@@ -1,9 +1,10 @@
+use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
 use crate::core::HomeApi;
 use crate::core::planner::{Action, ActionEvaluationResult};
 use crate::core::time::Duration;
 use crate::home::command::{Command, CommandSource};
 use crate::home::state::Powered;
-use crate::home::trigger::{ButtonPress, Homekit, HomekitTarget, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
+use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
 use crate::t;
 
 use super::{DataPointAccess, trigger_once_and_keep_running};
@@ -73,9 +74,9 @@ impl UserTriggerAction {
     async fn default_duration(&self, api: &HomeApi) -> Option<Duration> {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
-            | UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
-            UserTriggerTarget::Homekit(HomekitTarget::DehumidifierPower) => Some(t!(15 minutes)),
-            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomTvEnergySaving) => {
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower) => Some(t!(15 minutes)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving) => {
                 match Powered::LivingRoomTv.current_data_point(api).await {
                     Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
@@ -85,8 +86,8 @@ impl UserTriggerAction {
                     }
                 }
             }
-            UserTriggerTarget::Homekit(HomekitTarget::LivingRoomCeilingFanSpeed)
-            | UserTriggerTarget::Homekit(HomekitTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
         }
     }
 }
@@ -103,28 +104,28 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
             device: PowerToggle::InfraredHeater,
             power_on: false,
         }),
-        UserTrigger::Homekit(Homekit::InfraredHeaterPower(on)) => Some(Command::SetPower {
+        UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(on)) => Some(Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: on,
         }),
-        UserTrigger::Homekit(Homekit::DehumidifierPower(on)) => Some(Command::SetPower {
+        UserTrigger::Homekit(HomekitCommand::DehumidifierPower(on)) => Some(Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: on,
         }),
-        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(on)) if !on => Some(Command::SetEnergySaving {
+        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(on)) if !on => Some(Command::SetEnergySaving {
             device: EnergySavingDevice::LivingRoomTv,
             on: false,
         }),
-        UserTrigger::Homekit(Homekit::LivingRoomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
+        UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
             device: Fan::LivingRoomCeilingFan,
             speed,
         }),
-        UserTrigger::Homekit(Homekit::BedroomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
+        UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
             device: Fan::BedroomCeilingFan,
             speed,
         }),
 
-        UserTrigger::Homekit(Homekit::LivingRoomTvEnergySaving(_)) => None,
+        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => None,
     }
 }
 
@@ -137,7 +138,7 @@ mod tests {
     #[test]
     fn test_display() {
         assert_eq!(
-            UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitTarget::InfraredHeaterPower)).to_string(),
+            UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower)).to_string(),
             "UserTriggerAction[Homekit[InfraredHeaterPower]]"
         );
     }

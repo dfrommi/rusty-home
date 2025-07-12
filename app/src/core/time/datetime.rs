@@ -64,15 +64,15 @@ impl DateTime {
         Time::new(self.delegate.time())
     }
 
-    pub fn at(&self, time: Time) -> anyhow::Result<Self> {
-        //TODO handle DST
-        let dt = self
-            .delegate
-            .with_time(time.delegate)
-            .earliest()
-            .ok_or_else(|| anyhow::anyhow!("Error parsing time {:?} for date-time {:?}", time, self))?;
-
-        Ok(dt.into())
+    pub fn at(&self, time: Time) -> Self {
+        match self.delegate.with_time(time.delegate) {
+            chrono::LocalResult::Single(dt) => dt.into(),
+            chrono::LocalResult::Ambiguous(early, _late) => early.into(), // Winter DST: choose earlier time
+            chrono::LocalResult::None => {
+                // Spring forward: time doesn't exist, try next minute recursively
+                self.at(time + Duration::minutes(1))
+            }
+        }
     }
 
     pub fn on_next_day(&self) -> Self {
@@ -160,5 +160,99 @@ mod constructor {
         let midpoint = DateTime::midpoint(&start, &end);
 
         assert_eq!(midpoint, DateTime::from_iso("2024-11-03T16:23:46Z").unwrap());
+    }
+
+    #[test]
+    fn test_on_next_prev_day_roundtrip() {
+        let dt = DateTime::from_iso("2024-06-15T14:30:00Z").unwrap();
+        let roundtrip = dt.on_next_day().on_prev_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_on_prev_next_day_roundtrip() {
+        let dt = DateTime::from_iso("2024-06-15T14:30:00Z").unwrap();
+        let roundtrip = dt.on_prev_day().on_next_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_on_next_prev_day_spring_forward() {
+        // Day before spring forward transition
+        let dt = DateTime::from_iso("2025-03-29T02:30:00+01:00").unwrap();
+        let roundtrip = dt.on_next_day().on_prev_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_on_next_prev_day_fall_back() {
+        // Day before fall back transition
+        let dt = DateTime::from_iso("2024-10-26T02:30:00+02:00").unwrap();
+        let roundtrip = dt.on_next_day().on_prev_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_on_next_prev_day_from_dst_transition() {
+        // From actual DST transition day (spring forward)
+        let dt = DateTime::from_iso("2025-03-30T01:30:00+01:00").unwrap();
+        let roundtrip = dt.on_next_day().on_prev_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_on_next_prev_day_from_fall_back_transition() {
+        // From actual DST transition day (fall back)
+        let dt = DateTime::from_iso("2024-10-27T01:30:00+01:00").unwrap();
+        let roundtrip = dt.on_next_day().on_prev_day();
+        assert_eq!(dt, roundtrip);
+    }
+
+    #[test]
+    fn test_at_normal_time() {
+        let dt = DateTime::from_iso("2024-06-15T12:00:00+02:00").unwrap();
+        let result = dt.at(Time::at(14, 30).unwrap());
+        assert_eq!(result, DateTime::from_iso("2024-06-15T14:30:00+02:00").unwrap());
+    }
+
+    #[test]
+    fn test_at_spring_forward_nonexistent_time() {
+        // March 30, 2025 is a spring forward day in Central Europe (2:00-3:00 doesn't exist)
+        let dt = DateTime::from_iso("2025-03-30T12:00:00+02:00").unwrap();
+        let result = dt.at(Time::at(2, 30).unwrap()); // This time doesn't exist
+        
+        // Should jump to 3:00 (first valid time after DST gap)
+        assert_eq!(result, DateTime::from_iso("2025-03-30T03:00:00+02:00").unwrap());
+    }
+
+    #[test]
+    fn test_at_fall_back_ambiguous_time() {
+        // October 27, 2024 is a fall back day in Central Europe (2:30 exists twice)
+        let dt = DateTime::from_iso("2024-10-27T12:00:00+01:00").unwrap();
+        let result = dt.at(Time::at(2, 30).unwrap());
+        
+        // Should choose the earlier occurrence (before the clock falls back)
+        assert_eq!(result, DateTime::from_iso("2024-10-27T02:30:00+01:00").unwrap());
+    }
+
+    #[test]
+    fn test_at_midnight() {
+        let dt = DateTime::from_iso("2024-06-15T12:00:00+02:00").unwrap();
+        let result = dt.at(Time::at(0, 0).unwrap());
+        assert_eq!(result, DateTime::from_iso("2024-06-15T00:00:00+02:00").unwrap());
+    }
+
+    #[test]
+    fn test_at_end_of_day() {
+        let dt = DateTime::from_iso("2024-06-15T12:00:00+02:00").unwrap();
+        let result = dt.at(Time::at(23, 59).unwrap());
+        assert_eq!(result, DateTime::from_iso("2024-06-15T23:59:00+02:00").unwrap());
+    }
+
+    #[test]
+    fn test_at_preserves_date() {
+        let dt = DateTime::from_iso("2024-12-25T12:00:00+01:00").unwrap();
+        let result = dt.at(Time::at(8, 15).unwrap());
+        assert_eq!(result, DateTime::from_iso("2024-12-25T08:15:00+01:00").unwrap());
     }
 }

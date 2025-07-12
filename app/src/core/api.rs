@@ -5,12 +5,13 @@ use super::time::{DateTime, DateTimeRange, Duration};
 use super::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable};
 use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::state::{PersistentHomeState, PersistentHomeStateValue};
+use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataPointAccess, TimeSeriesAccess};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
+use r#macro::mockable;
 use moka::future::Cache;
 use std::{fmt::Debug, sync::Arc};
 
@@ -21,6 +22,10 @@ pub struct HomeApi {
     ts_cache: Cache<i64, Arc<DataFrame<f64>>>,
     cmd_cache_duration: Duration,
     cmd_cache: Cache<CommandTarget, Arc<(DateTime, Vec<CommandExecution>)>>,
+    #[cfg(test)]
+    state_dp_mock: std::collections::HashMap<HomeState, DataPoint<f64>>,
+    #[cfg(test)]
+    state_ts_mock: std::collections::HashMap<HomeState, DataFrame<f64>>,
 }
 
 impl HomeApi {
@@ -35,6 +40,10 @@ impl HomeApi {
             cmd_cache: Cache::builder()
                 .time_to_live(std::time::Duration::from_secs(72 * 60 * 60))
                 .build(),
+            #[cfg(test)]
+            state_dp_mock: std::collections::HashMap::new(),
+            #[cfg(test)]
+            state_ts_mock: std::collections::HashMap::new(),
         }
     }
 }
@@ -106,8 +115,9 @@ impl HomeApi {
 
 impl<T> DataPointAccess<T> for T
 where
-    T: Into<PersistentHomeState> + ValueObject + Debug + Clone,
+    T: Into<PersistentHomeState> + Into<HomeState> + ValueObject + Clone,
 {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>> {
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
@@ -123,8 +133,10 @@ where
 
 impl<T> TimeSeriesAccess<T> for T
 where
-    T: Into<PersistentHomeState> + Estimatable + Clone + Debug,
+    //TODO into PersistentHomeState should automatically imply Into<HomeState>
+    T: Into<PersistentHomeState> + Into<HomeState> + Estimatable + Clone + Debug,
 {
+    #[mockable]
     async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<T>> {
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
@@ -325,5 +337,58 @@ impl HomeApi {
 
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
         self.db.get_offline_items().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl HomeApi {
+        pub fn for_testing() -> Self {
+            let pool = sqlx::PgPool::connect_lazy("postgres://dummy:dummy@localhost/dummy").unwrap();
+            Self::new(Database::new(pool))
+        }
+
+        pub fn with_fixed_current_dp<T>(&mut self, state: T, value: impl Into<T::ValueType>, timestamp: DateTime)
+        where
+            T: Into<HomeState> + ValueObject + Clone,
+        {
+            let value = value.into();
+            self.state_dp_mock
+                .insert(state.into(), DataPoint::new(T::to_f64(&value), timestamp));
+        }
+
+        pub fn with_fixed_ts<T, V>(&mut self, state: T, values: &[(V, DateTime)])
+        where
+            T: Into<HomeState> + ValueObject + Clone,
+            V: Into<T::ValueType> + Clone,
+        {
+            let dps: Vec<DataPoint<f64>> = values
+                .iter()
+                .map(|(v, ts)| DataPoint::new(T::to_f64(&v.clone().into()), *ts))
+                .collect();
+            let df = DataFrame::new(dps).expect("Error creating test timeseries");
+
+            self.state_ts_mock.insert(state.into(), df);
+        }
+
+        pub fn get_fixed_current_dp<T>(&self, state: T) -> Option<DataPoint<T::ValueType>>
+        where
+            T: Into<HomeState> + ValueObject + Clone,
+        {
+            self.state_dp_mock
+                .get(&state.into())
+                .map(|dp| DataPoint::new(T::from_f64(dp.value), dp.timestamp))
+        }
+
+        pub fn get_fixed_ts<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
+        where
+            T: Into<HomeState> + ValueObject + Clone,
+        {
+            self.state_ts_mock
+                .get(&state.into())
+                .map(|df| df.map(|dp| T::from_f64(dp.value)))
+        }
     }
 }

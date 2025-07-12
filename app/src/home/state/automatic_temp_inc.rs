@@ -111,74 +111,94 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{core::HomeApi, home::state::opened::Opened};
 
-    use super::super::tests::Api;
+    use super::*;
 
     #[tokio::test]
     async fn no_increase_when_window_open() {
-        let mut api = Api::default();
-        api.opened(true, t!(5 minutes ago));
-        api.current_temperature(12.0);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, true, t!(5 minutes ago));
 
         assert!(!increasing(api).await);
     }
 
     #[tokio::test]
     async fn increasing_when_window_just_opened() {
-        let mut api = Api::default();
-        api.opened(false, t!(4 minutes ago));
-        api.current_temperature(12.0);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(4 minutes ago));
 
         assert!(increasing(api).await);
     }
 
     #[tokio::test]
     async fn not_increasing_when_window_closed_for_long_time() {
-        let mut api = Api::default();
-        api.opened(false, t!(35 minutes ago));
-        api.current_temperature(12.0);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(35 minutes ago));
 
         assert!(!increasing(api).await);
     }
 
     #[tokio::test]
     async fn increasing_when_not_enough_data_points() {
-        let mut api = Api::default();
-        api.current_temperature(12.0);
-        api.opened(false, t!(8 minutes ago))
-            .temperature_series(&[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))]);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(8 minutes ago));
+        api.with_fixed_ts(
+            Temperature::LivingRoomDoor,
+            &[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))],
+        );
 
         assert!(increasing(api).await);
     }
 
     #[tokio::test]
     async fn increasing_when_temperature_difference_big() {
-        let mut api = Api::default();
-        api.current_temperature(12.0);
-        api.opened(false, t!(15 minutes ago)).temperature_series(&[
-            (17.0, t!(10 minutes ago)),
-            (17.5, t!(6 minutes ago)),
-            (17.9, t!(2 minutes ago)),
-        ]);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_ts(
+            Temperature::LivingRoomDoor,
+            &[
+                (17.0, t!(10 minutes ago)),
+                (17.5, t!(6 minutes ago)),
+                (17.9, t!(2 minutes ago)),
+            ],
+        );
 
         assert!(increasing(api).await);
     }
 
     #[tokio::test]
     async fn not_increasing_when_temperature_change_small() {
-        let mut api = Api::default();
-        api.current_temperature(12.0);
-        api.opened(false, t!(15 minutes ago)).temperature_series(&[
-            (17.0, t!(10 minutes ago)),
-            (17.5, t!(6 minutes ago)),
-            (17.6, t!(2 minutes ago)),
-        ]);
+        let mut api = api_with_defaults();
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_ts(
+            Temperature::LivingRoomDoor,
+            &[
+                (17.0, t!(10 minutes ago)),
+                (17.5, t!(6 minutes ago)),
+                (17.6, t!(2 minutes ago)),
+            ],
+        );
 
         assert!(!increasing(api).await);
     }
 
-    async fn increasing(api: Api) -> bool {
-        AutomaticTemperatureIncrease::LivingRoom.current(api).await.unwrap()
+    fn api_with_defaults() -> HomeApi {
+        let mut api = HomeApi::for_testing();
+        api.with_fixed_current_dp(Temperature::Outside, 18.0, t!(now));
+        api.with_fixed_current_dp(Opened::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
+        api.with_fixed_ts(
+            Temperature::LivingRoomDoor,
+            &[
+                (17.0, t!(10 minutes ago)),
+                (17.5, t!(6 minutes ago)),
+                (17.6, t!(2 minutes ago)),
+            ],
+        );
+        api
+    }
+
+    async fn increasing(api: HomeApi) -> bool {
+        AutomaticTemperatureIncrease::LivingRoom.current(&api).await.unwrap()
     }
 }

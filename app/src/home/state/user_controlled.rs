@@ -2,7 +2,7 @@ use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use crate::port::CommandExecutionAccess;
 use crate::t;
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::core::timeseries::DataPoint;
 use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
@@ -29,6 +29,7 @@ pub enum UserControlled {
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
 impl DataPointAccess<UserControlled> for UserControlled {
+    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         match self {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(api).await,

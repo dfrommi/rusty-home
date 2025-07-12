@@ -1,6 +1,6 @@
 use crate::core::ValueObject;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::{
     command::{Command, CommandExecution, EnergySavingDevice},
@@ -16,6 +16,7 @@ pub enum EnergySaving {
 
 impl DataPointAccess<EnergySaving> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
+    #[mockable]
     async fn current_data_point(
         &self,
         api: &crate::core::HomeApi,

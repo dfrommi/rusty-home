@@ -2,7 +2,7 @@ use crate::core::time::DateTimeRange;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Context, Result, bail};
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
@@ -17,6 +17,7 @@ pub enum Resident {
 
 //TODO maybe combination via Baysian to detect resident state
 impl DataPointAccess<Resident> for Resident {
+    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
         match self {
             Resident::DennisSleeping => sleeping(Presence::BedDennis, api).await,

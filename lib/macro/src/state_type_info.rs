@@ -11,9 +11,21 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut persistent_variants = Vec::new();
     let mut persistent_enum_variants = Vec::new();
     let mut persistent_conversion_matches = Vec::new();
+    let mut persistent_state_conversion_matches = Vec::new();
 
     // Check if this is HomeStateValue to generate persistent types
     let persistent_enum_name = format_ident!("Persistent{}", enum_name);
+
+    // Generate HomeState name (strip "Value" suffix if present)
+    let home_state_name = if enum_name.to_string().ends_with("Value") {
+        let name_str = enum_name.to_string();
+        let base_name = name_str.strip_suffix("Value").unwrap_or(&name_str);
+        format_ident!("{}", base_name)
+    } else {
+        enum_name.clone()
+    };
+
+    let persistent_home_state_name = format_ident!("Persistent{}", home_state_name);
 
     for variant in variants {
         if let syn::Fields::Unnamed(fields) = variant.fields {
@@ -74,6 +86,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 persistent_conversion_matches.push(quote! {
                     PersistentHomeStateValue::#variant_name(item, value) => HomeStateValue::#variant_name(item, value)
                 });
+
+                persistent_state_conversion_matches.push(quote! {
+                    #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item)
+                });
             }
         }
     }
@@ -89,6 +105,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 fn from(val: #persistent_enum_name) -> Self {
                     match val {
                         #(#persistent_conversion_matches),*
+                    }
+                }
+            }
+
+            impl From<#persistent_home_state_name> for #home_state_name {
+                fn from(val: #persistent_home_state_name) -> Self {
+                    match val {
+                        #(#persistent_state_conversion_matches),*
                     }
                 }
             }

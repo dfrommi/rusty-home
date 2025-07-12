@@ -1,7 +1,7 @@
-use crate::core::ValueObject;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use anyhow::Result;
+use r#macro::{Id, mockable};
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -10,7 +10,7 @@ use crate::core::timeseries::{
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
 pub enum Opened {
     LivingRoomWindowOrDoor,
     BedroomWindow,
@@ -35,18 +35,6 @@ pub mod raw {
     }
 }
 
-impl ValueObject for Opened {
-    type ValueType = bool;
-
-    fn to_f64(value: &Self::ValueType) -> f64 {
-        if *value { 1.0 } else { 0.0 }
-    }
-
-    fn from_f64(value: f64) -> Self::ValueType {
-        value > 0.0
-    }
-}
-
 impl Opened {
     fn api_items(&self) -> Vec<raw::Opened> {
         match self {
@@ -68,6 +56,7 @@ impl Opened {
 }
 
 impl DataPointAccess<Opened> for Opened {
+    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         any_of(api, self.api_items()).await
     }
@@ -89,6 +78,7 @@ async fn any_of(api: &crate::core::HomeApi, opened_states: Vec<raw::Opened>) -> 
 }
 
 impl TimeSeriesAccess<Opened> for Opened {
+    #[mockable]
     async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<TimeSeries<Opened>> {
         let api_items = self.api_items();
         let context: raw::Opened = api_items[0].clone();
@@ -123,18 +113,17 @@ impl Estimatable for Opened {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::time::DateTime;
+    use crate::core::HomeApi;
 
     use super::*;
 
     #[tokio::test]
     async fn test_any_of_some_opened() {
-        let api = FakeAccess {
-            left: true,
-            right: false,
-            side: true,
-            balcony: false,
-        };
+        let mut api = HomeApi::for_testing();
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowLeft, true, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowRight, false, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowSide, true, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomBalconyDoor, false, t!(now));
 
         let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
@@ -143,37 +132,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_any_of_all_closed() {
-        let api = FakeAccess {
-            left: false,
-            right: false,
-            side: false,
-            balcony: false,
-        };
+        let mut api = HomeApi::for_testing();
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowLeft, false, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowRight, false, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomWindowSide, false, t!(now));
+        api.with_fixed_current_dp(raw::Opened::LivingRoomBalconyDoor, false, t!(now));
 
         let result = Opened::LivingRoomWindowOrDoor.current_data_point(&api).await;
 
         assert!(!result.unwrap().value);
-    }
-
-    struct FakeAccess {
-        left: bool,
-        right: bool,
-        side: bool,
-        balcony: bool,
-    }
-
-    impl DataPointAccess<raw::Opened> for FakeAccess {
-        async fn current_data_point(&self, item: raw::Opened) -> anyhow::Result<DataPoint<bool>> {
-            Ok(DataPoint {
-                value: match item {
-                    raw::Opened::LivingRoomWindowLeft => self.left,
-                    raw::Opened::LivingRoomWindowRight => self.right,
-                    raw::Opened::LivingRoomWindowSide => self.side,
-                    raw::Opened::LivingRoomBalconyDoor => self.balcony,
-                    _ => panic!("Unexpected item {item:?}"),
-                },
-                timestamp: DateTime::now(),
-            })
-        }
     }
 }

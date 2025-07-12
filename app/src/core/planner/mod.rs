@@ -42,7 +42,6 @@ pub async fn plan_for_home(api: &HomeApi) {
     match res {
         Ok(res) => {
             tracing::info!("Planning done");
-            println!("{:#?}", res);
             display_planning_trace(&res, api).await;
         }
 

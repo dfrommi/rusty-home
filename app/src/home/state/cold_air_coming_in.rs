@@ -1,6 +1,6 @@
 use crate::core::unit::DegreeCelsius;
 use crate::{core::timeseries::DataPoint, home::state::Temperature};
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
@@ -15,6 +15,7 @@ pub enum ColdAirComingIn {
 }
 
 impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
+    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 

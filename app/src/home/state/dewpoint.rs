@@ -12,7 +12,7 @@ use anyhow::Result;
 
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::unit::{DegreeCelsius, Percent};
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 use tokio::try_join;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -51,6 +51,7 @@ impl Estimatable for DewPoint {
 }
 
 impl DataPointAccess<DewPoint> for DewPoint {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<DegreeCelsius>> {
         let temperature: DataPoint<DegreeCelsius> = self.temperature().current_data_point(api).await?;
         let humidity: DataPoint<Percent> = self.relative_humidity().current_data_point(api).await?;
@@ -61,6 +62,7 @@ impl DataPointAccess<DewPoint> for DewPoint {
 }
 
 impl TimeSeriesAccess<DewPoint> for DewPoint {
+    #[mockable]
     async fn series(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> Result<TimeSeries<DewPoint>> {
         let (t_series, h_series) = {
             let temp = self.temperature();

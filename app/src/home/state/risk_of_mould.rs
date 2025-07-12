@@ -2,7 +2,7 @@ use crate::core::unit::{DegreeCelsius, Percent};
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
 use anyhow::Result;
-use r#macro::Id;
+use r#macro::{Id, mockable};
 
 use crate::home::state::macros::result;
 
@@ -14,6 +14,7 @@ pub enum RiskOfMould {
 }
 
 impl DataPointAccess<RiskOfMould> for RiskOfMould {
+    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> Result<DataPoint<bool>> {
         let humidity = match self {
             RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,

@@ -126,7 +126,7 @@ fn init_metrics(
                 .with_endpoint(url)
                 .build()?;
             let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(exporter)
-                .with_interval(std::time::Duration::from_secs(5))
+                .with_interval(std::time::Duration::from_secs(15))
                 .build();
 
             Ok(opentelemetry_sdk::metrics::SdkMeterProvider::builder()

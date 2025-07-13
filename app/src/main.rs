@@ -76,6 +76,7 @@ pub async fn main() {
         .expect("Error preloading cache");
 
     tracing::info!("Starting infrastructure processing");
+    let home_state_metrics_updater = core::metrics::start_home_state_metrics_updater(&infrastructure);
     let process_infrastucture = infrastructure.process();
 
     tracing::info!("Starting main loop");
@@ -90,6 +91,7 @@ pub async fn main() {
         _ = http_server_exec => {},
         _ = hk_export_states => {},
         _ = hk_process_commands => {},
+        _ = home_state_metrics_updater => {},
     );
 }
 

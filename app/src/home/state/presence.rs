@@ -1,5 +1,5 @@
 use crate::core::time::DateTime;
-use r#macro::Id;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::{
     DataFrame,
@@ -8,7 +8,7 @@ use crate::core::timeseries::{
 
 //TODO impl anyoneSleeping. Requires impl of enum from crate
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,

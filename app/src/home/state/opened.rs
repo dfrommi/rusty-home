@@ -2,7 +2,7 @@ use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use anyhow::Result;
-use r#macro::{Id, mockable};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -11,7 +11,7 @@ use crate::core::timeseries::{
 
 use super::{DataPointAccess, TimeSeriesAccess};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum OpenedArea {
     LivingRoomWindowOrDoor,
     BedroomWindow,
@@ -19,7 +19,7 @@ pub enum OpenedArea {
     RoomOfRequirementsWindow,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum Opened {
     KitchenWindow,
     BedroomWindow,

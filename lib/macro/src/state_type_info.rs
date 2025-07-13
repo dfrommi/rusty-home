@@ -84,7 +84,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 });
 
                 persistent_conversion_matches.push(quote! {
-                    PersistentHomeStateValue::#variant_name(item, value) => HomeStateValue::#variant_name(item, value)
+                    #persistent_enum_name::#variant_name(item, value) => #enum_name::#variant_name(item, value)
                 });
 
                 persistent_state_conversion_matches.push(quote! {

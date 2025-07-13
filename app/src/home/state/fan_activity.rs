@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
-use r#macro::Id;
+use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum FanActivity {
     LivingRoomCeilingFan,
     BedroomCeilingFan,

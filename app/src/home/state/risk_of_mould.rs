@@ -3,13 +3,13 @@ use crate::core::unit::{DegreeCelsius, Percent};
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
 use anyhow::Result;
-use r#macro::{Id, mockable};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
 use super::{DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Id)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EnumVariants, Id)]
 pub enum RiskOfMould {
     Bathroom,
 }

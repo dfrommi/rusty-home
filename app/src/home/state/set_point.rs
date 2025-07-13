@@ -1,13 +1,13 @@
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
-use r#macro::Id;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::{
     DataFrame,
     interpolate::{Estimatable, algo},
 };
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum SetPoint {
     LivingRoom,
     Bedroom,

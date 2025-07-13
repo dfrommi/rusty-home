@@ -8,7 +8,8 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::{CommandExecutionAccess, DataPointAccess};
+use super::DataPointAccess;
+use crate::port::CommandExecutionAccess;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum EnergySaving {

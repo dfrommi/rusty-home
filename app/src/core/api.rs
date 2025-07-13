@@ -125,7 +125,7 @@ where
         let df: DataFrame<f64> = api.get_default_dataframe(tag_id).await?;
 
         match df.prev_or_at(t!(now)) {
-            Some(dp) => Ok(dp.map_value(|&v| T::from_f64(v))),
+            Some(dp) => Ok(dp.map_value(|&v| self.from_f64(v))),
             None => anyhow::bail!("No data found"),
         }
     }
@@ -141,7 +141,7 @@ where
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
-        let df = api.get_default_dataframe(tag_id).await?.map(|dp| T::from_f64(dp.value));
+        let df = api.get_default_dataframe(tag_id).await?.map(|dp| self.from_f64(dp.value));
 
         if range.start() < df.range().start() {
             tracing::warn!(
@@ -154,7 +154,7 @@ where
                 .db
                 .get_dataframe_for_tag(tag_id, &range)
                 .await?
-                .map(|dp| T::from_f64(dp.value));
+                .map(|dp| self.from_f64(dp.value));
             return TimeSeries::new(self.clone(), &df, range);
         }
 
@@ -356,7 +356,7 @@ mod tests {
         {
             let value = value.into();
             self.state_dp_mock
-                .insert(state.into(), DataPoint::new(T::to_f64(&value), timestamp));
+                .insert(state.into(), DataPoint::new(state.to_f64(&value), timestamp));
         }
 
         pub fn with_fixed_ts<T, V>(&mut self, state: T, values: &[(V, DateTime)])
@@ -366,7 +366,7 @@ mod tests {
         {
             let dps: Vec<DataPoint<f64>> = values
                 .iter()
-                .map(|(v, ts)| DataPoint::new(T::to_f64(&v.clone().into()), *ts))
+                .map(|(v, ts)| DataPoint::new(state.to_f64(&v.clone().into()), *ts))
                 .collect();
             let df = DataFrame::new(dps).expect("Error creating test timeseries");
 
@@ -379,7 +379,7 @@ mod tests {
         {
             self.state_dp_mock
                 .get(&state.into())
-                .map(|dp| DataPoint::new(T::from_f64(dp.value), dp.timestamp))
+                .map(|dp| DataPoint::new(state.from_f64(dp.value), dp.timestamp))
         }
 
         pub fn get_fixed_ts<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
@@ -388,7 +388,7 @@ mod tests {
         {
             self.state_ts_mock
                 .get(&state.into())
-                .map(|df| df.map(|dp| T::from_f64(dp.value)))
+                .map(|df| df.map(|dp| state.from_f64(dp.value)))
         }
     }
 }

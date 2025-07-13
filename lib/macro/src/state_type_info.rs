@@ -13,6 +13,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut persistent_conversion_matches = Vec::new();
     let mut persistent_state_conversion_matches = Vec::new();
 
+    // For HomeState implementations
+    let mut home_state_to_f64_matches = Vec::new();
+    let mut home_state_from_f64_matches = Vec::new();
+    let mut home_state_data_point_matches = Vec::new();
+
     // Check if this is HomeStateValue to generate persistent types
     let persistent_enum_name = format_ident!("Persistent{}", enum_name);
 
@@ -47,11 +52,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     impl crate::core::ValueObject for #item_type {
                         type ValueType = #value_type;
 
-                        fn to_f64(value: &#value_type) -> f64 {
+                        fn to_f64(&self, value: &#value_type) -> f64 {
                             if *value { 1.0 } else { 0.0 }
                         }
 
-                        fn from_f64(value: f64) -> #value_type {
+                        fn from_f64(&self, value: f64) -> #value_type {
                             value > 0.0
                         }
                     }
@@ -61,11 +66,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     impl crate::core::ValueObject for #item_type {
                         type ValueType = #value_type;
 
-                        fn to_f64(value: &#value_type) -> f64 {
+                        fn to_f64(&self, value: &#value_type) -> f64 {
                             value.into()
                         }
 
-                        fn from_f64(value: f64) -> #value_type {
+                        fn from_f64(&self, value: f64) -> #value_type {
                             value.into()
                         }
                     }
@@ -91,6 +96,24 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item)
                 });
             }
+
+            // Generate HomeState ValueObject and DataPointAccess matches
+            home_state_to_f64_matches.push(quote! {
+                #enum_name::#variant_name(item, v) => item.to_f64(v)
+            });
+
+            home_state_from_f64_matches.push(quote! {
+                #home_state_name::#variant_name(item) => {
+                    #enum_name::#variant_name(item.clone(), item.from_f64(value))
+                }
+            });
+
+            home_state_data_point_matches.push(quote! {
+                #home_state_name::#variant_name(item) => {
+                    let dp = item.current_data_point(api).await?;
+                    Ok(dp.map_value(|v| #enum_name::#variant_name(item.clone(), v.clone())))
+                }
+            });
         }
     }
 
@@ -121,12 +144,46 @@ pub fn derive(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
+    // Generate HomeState implementations if this is HomeStateValue
+    let home_state_implementations = if enum_name.to_string().ends_with("Value") {
+        quote! {
+            impl crate::core::ValueObject for #home_state_name {
+                type ValueType = #enum_name;
+
+                fn to_f64(&self, value: &Self::ValueType) -> f64 {
+                    match value {
+                        #(#home_state_to_f64_matches),*
+                    }
+                }
+
+                fn from_f64(&self, value: f64) -> Self::ValueType {
+                    match self {
+                        #(#home_state_from_f64_matches),*
+                    }
+                }
+            }
+
+            impl crate::port::DataPointAccess<#home_state_name> for #home_state_name {
+                async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
+                    match self {
+                        #(#home_state_data_point_matches),*
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         // Implement ValueObject for each variant
         #(#type_info_impls)*
 
         // Generate persistent types if applicable
         #persistent_generation
+
+        // Generate HomeState implementations if applicable
+        #home_state_implementations
     };
 
     TokenStream::from(expanded)

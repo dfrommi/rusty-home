@@ -3,7 +3,7 @@ use super::persistence::{Database, OfflineItem};
 use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange, Duration};
 use super::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable};
-use crate::core::ItemAvailability;
+use crate::core::{ItemAvailability, metrics};
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
@@ -90,15 +90,24 @@ impl HomeApi {
 
     //try to return reference or at least avoid copy of entire dataframe
     async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
+        let mut cache_hit: bool = true;
+
         let df = self
             .ts_cache
             .try_get_with(tag_id, async {
                 tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
+                cache_hit = false;
                 let range = self.ts_caching_range();
                 self.db.get_dataframe_for_tag(tag_id, &range).await.map(Arc::new)
             })
             .await
             .map_err(|e| anyhow::anyhow!("Error initializing timeseries cache for tag {}: {:?}", tag_id, e))?;
+
+        if cache_hit {
+            metrics::cache_hit_data_point_access(tag_id);
+        } else {
+            metrics::cache_miss_data_point_access(tag_id);
+        }
 
         Ok((*df).clone())
     }
@@ -141,7 +150,10 @@ where
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
-        let df = api.get_default_dataframe(tag_id).await?.map(|dp| self.from_f64(dp.value));
+        let df = api
+            .get_default_dataframe(tag_id)
+            .await?
+            .map(|dp| self.from_f64(dp.value));
 
         if range.start() < df.range().start() {
             tracing::warn!(

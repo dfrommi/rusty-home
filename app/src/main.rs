@@ -60,6 +60,7 @@ pub async fn main() {
                     vec![
                         adapter::energy_meter::new_web_service(http_database.clone()),
                         adapter::grafana::new_routes(http_api.clone()),
+                        adapter::mcp::new_routes(http_api.clone()),
                     ]
                 })
                 .await

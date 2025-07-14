@@ -48,6 +48,16 @@ impl ExternalId {
         }
     }
 
+    pub fn from_slash_separated(path: &str) -> anyhow::Result<Self> {
+        let parts: Vec<&str> = path.split('/').collect();
+
+        if parts.len() != 2 {
+            anyhow::bail!("Invalid path format: {}, expected 'type/name'", path);
+        }
+
+        Ok(ExternalId::new(parts[0], parts[1]))
+    }
+
     pub fn ext_type(&self) -> &str {
         &self.type_
     }

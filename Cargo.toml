@@ -15,6 +15,7 @@ derive_more = { version = "1", features = [
 
 #Async dependencies
 tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
 futures = "*"
 
 #Time dependencies
@@ -36,6 +37,10 @@ reqwest = { version = "*", features = ["json"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 
+#MCP dependencies
+rmcp = { version = "0.2.1", features = ["server", "macros"] }
+rmcp-actix-web = "0.2.1"
+
 #DB Dependencies
 sqlx = { version = "0.8", features = [
   "postgres",
@@ -46,7 +51,7 @@ sqlx = { version = "0.8", features = [
 
 #Caching dependencies
 cached = { version = "0.55", features = ["default", "async"] }
-moka = { version = "0.12", features = ["future"] }
+moka = { version = "0.11", features = ["future"] }
 
 #Tracing dependencies
 tracing = "0.1"

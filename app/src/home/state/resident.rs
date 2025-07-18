@@ -32,7 +32,7 @@ async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
     let now = t!(now);
     let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
 
-    if !in_bed_full_range.contains(now) {
+    if !in_bed_full_range.contains(&now) {
         result!(
             false,
             *in_bed_full_range.end(),
@@ -58,7 +58,7 @@ async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
     //Some has always true value
     let sleeping_started = ts
         .iter()
-        .find(|dp| in_bed_start_range.contains(dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds))
+        .find(|dp| in_bed_start_range.contains(&dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds))
         .map(|dp| dp.map_value(|v| v.1.clone()));
 
     //Some has always true value
@@ -66,7 +66,7 @@ async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
         .as_ref()
         .and_then(|started_dp| {
             ts.iter().find(|dp| {
-                in_bed_stop_range.contains(dp.timestamp)
+                in_bed_stop_range.contains(&dp.timestamp)
                     && !dp.value.0
                     && dp.value.1 > t!(5 minutes)
                     && started_dp.timestamp < dp.timestamp

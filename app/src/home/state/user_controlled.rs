@@ -39,7 +39,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::LivingRoomThermostat => {
                 current_data_point_for_thermostat(
                     api,
-                    &self,
+                    self,
                     Thermostat::LivingRoom,
                     ExternalAutoControl::LivingRoomThermostat,
                     SetPoint::LivingRoom,
@@ -49,7 +49,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(
                     api,
-                    &self,
+                    self,
                     Thermostat::Bedroom,
                     ExternalAutoControl::BedroomThermostat,
                     SetPoint::Bedroom,
@@ -59,7 +59,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::KitchenThermostat => {
                 current_data_point_for_thermostat(
                     api,
-                    &self,
+                    self,
                     Thermostat::Kitchen,
                     ExternalAutoControl::KitchenThermostat,
                     SetPoint::Kitchen,
@@ -69,7 +69,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(
                     api,
-                    &self,
+                    self,
                     Thermostat::RoomOfRequirements,
                     ExternalAutoControl::RoomOfRequirementsThermostat,
                     SetPoint::RoomOfRequirements,
@@ -79,7 +79,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
                     api,
-                    &self,
+                    self,
                     Thermostat::Bathroom,
                     ExternalAutoControl::BathroomThermostat,
                     SetPoint::Bathroom,

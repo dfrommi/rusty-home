@@ -3,7 +3,7 @@ use super::persistence::{Database, OfflineItem};
 use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange, Duration};
 use super::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable};
-use crate::core::{ItemAvailability, metrics};
+use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
@@ -18,27 +18,37 @@ use std::{fmt::Debug, sync::Arc};
 #[derive(Clone)]
 pub struct HomeApi {
     db: Database,
-    ts_cache_duration: Duration,
-    ts_cache: Cache<i64, Arc<DataFrame<f64>>>,
-    cmd_cache_duration: Duration,
-    cmd_cache: Cache<CommandTarget, Arc<(DateTime, Vec<CommandExecution>)>>,
+    caching_range: CachingRange,
+    ts_cache: Cache<i64, Arc<(DateTimeRange, DataFrame<f64>)>>,
+    cmd_cache: Cache<CommandTarget, Arc<(DateTimeRange, Vec<CommandExecution>)>>,
     #[cfg(test)]
     state_dp_mock: std::collections::HashMap<HomeState, DataPoint<f64>>,
     #[cfg(test)]
     state_ts_mock: std::collections::HashMap<HomeState, DataFrame<f64>>,
 }
 
+#[derive(Debug, Clone)]
+pub enum CachingRange {
+    OfLast(Duration),
+    Fixed(DateTime, DateTime),
+}
+
+impl Default for CachingRange {
+    fn default() -> Self {
+        CachingRange::OfLast(t!(72 hours))
+    }
+}
+
 impl HomeApi {
     pub fn new(db: Database) -> Self {
         Self {
             db,
-            ts_cache_duration: t!(48 hours),
+            caching_range: CachingRange::default(),
             ts_cache: Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(48 * 60 * 60))
+                .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
                 .build(),
-            cmd_cache_duration: t!(72 hours),
             cmd_cache: Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(72 * 60 * 60))
+                .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
                 .build(),
             #[cfg(test)]
             state_dp_mock: std::collections::HashMap::new(),
@@ -53,14 +63,15 @@ impl HomeApi {
 //
 impl HomeApi {
     // Cache Management Methods
-    fn ts_caching_range(&self) -> DateTimeRange {
-        let now = t!(now);
-        DateTimeRange::new(now - self.ts_cache_duration.clone(), now)
+    fn caching_range(&self) -> DateTimeRange {
+        match &self.caching_range {
+            CachingRange::OfLast(duration) => DateTimeRange::new(t!(now) - duration.clone(), DateTime::max_value()),
+            CachingRange::Fixed(start, end) => DateTimeRange::new(*start, *end),
+        }
     }
 
-    fn cmd_caching_range(&self) -> DateTimeRange {
-        let now = t!(now);
-        DateTimeRange::new(now - self.cmd_cache_duration.clone(), now)
+    fn is_readonly_cache(&self) -> bool {
+        DateTime::is_shifted()
     }
 
     pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
@@ -69,9 +80,7 @@ impl HomeApi {
         let tag_ids = self.db.get_all_tag_ids().await?;
 
         for tag_id in tag_ids {
-            if let Err(e) = self.get_default_dataframe(tag_id).await {
-                tracing::error!("Error preloading timeseries cache for tag {}: {:?}", tag_id, e);
-            }
+            self.get_dataframe_from_cache(tag_id, &self.caching_range()).await;
         }
 
         tracing::debug!("Preloading cache done");
@@ -89,27 +98,73 @@ impl HomeApi {
     }
 
     //try to return reference or at least avoid copy of entire dataframe
-    async fn get_default_dataframe(&self, tag_id: i64) -> anyhow::Result<DataFrame<f64>> {
-        let mut cache_hit: bool = true;
-
-        let df = self
-            .ts_cache
-            .try_get_with(tag_id, async {
-                tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
-                cache_hit = false;
-                let range = self.ts_caching_range();
-                self.db.get_dataframe_for_tag(tag_id, &range).await.map(Arc::new)
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!("Error initializing timeseries cache for tag {}: {:?}", tag_id, e))?;
-
-        if cache_hit {
-            metrics::cache_hit_data_point_access(tag_id);
+    async fn get_dataframe_from_cache(
+        &self,
+        tag_id: i64,
+        range: &DateTimeRange,
+    ) -> Option<Arc<(DateTimeRange, DataFrame<f64>)>> {
+        let cached = if self.is_readonly_cache() {
+            Ok(self.ts_cache.get(&tag_id))
         } else {
-            metrics::cache_miss_data_point_access(tag_id);
-        }
+            let df = self
+                .ts_cache
+                .try_get_with(tag_id, async {
+                    tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
+                    let cache_range = self.caching_range();
+                    self.db
+                        .get_dataframe_for_tag(tag_id, &cache_range)
+                        .await
+                        .map(|df| Arc::new((cache_range, df)))
+                })
+                .await;
+            Some(df).transpose()
+        };
 
-        Ok((*df).clone())
+        match cached {
+            Ok(Some(cached)) if cached.0.covers(range) => Some(cached),
+            Err(e) => {
+                tracing::error!("Error fetching dataframe for tag {} from cache or init cacke: {:?}", tag_id, e);
+                None
+            }
+            _ => None,
+        }
+    }
+
+    async fn get_commands_from_cache(
+        &self,
+        target: &CommandTarget,
+        range: &DateTimeRange,
+    ) -> Option<Arc<(DateTimeRange, Vec<CommandExecution>)>> {
+        let cached = if self.is_readonly_cache() {
+            Ok(self.cmd_cache.get(target))
+        } else {
+            let commands = self
+                .cmd_cache
+                .try_get_with(target.clone(), async {
+                    tracing::debug!("No command-cache entry found for target {:?}", target);
+                    let cache_range = self.caching_range();
+
+                    self.db
+                        .query_all_commands(Some(target.clone()), &cache_range)
+                        .await
+                        .map(|cmds| Arc::new((cache_range, cmds)))
+                })
+                .await;
+            Some(commands).transpose()
+        };
+
+        match cached {
+            Ok(Some(cached)) if cached.0.covers(range) => Some(cached),
+            Err(e) => {
+                tracing::error!(
+                    "Error fetching commands for target {:?} from cache or init cache: {:?}",
+                    target,
+                    e
+                );
+                None
+            }
+            _ => None,
+        }
     }
 }
 
@@ -117,6 +172,25 @@ impl HomeApi {
 //STATE
 //
 impl HomeApi {
+    async fn get_datapoint(&self, tag_id: i64, at: &DateTime) -> Result<DataPoint<f64>> {
+        let range = DateTimeRange::new(*at - t!(2 minutes), *at);
+        match self.get_dataframe(tag_id, &range).await?.prev_or_at(*at) {
+            Some(dp) => Ok(dp.clone()),
+            None => anyhow::bail!("No data point found for tag {} at {}", tag_id, at),
+        }
+    }
+
+    async fn get_dataframe(&self, tag_id: i64, range: &DateTimeRange) -> Result<DataFrame<f64>> {
+        match self.get_dataframe_from_cache(tag_id, range).await {
+            Some(df) => df.1.retain_range_with_context(range),
+            None => {
+                tracing::warn!("No cached data found for tag {}, fetching from database", tag_id);
+                let df = self.db.get_dataframe_for_tag(tag_id, range).await?;
+                Ok(df)
+            }
+        }
+    }
+
     pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
         self.db.add_state(value, timestamp).await
     }
@@ -131,12 +205,9 @@ where
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
-        let df: DataFrame<f64> = api.get_default_dataframe(tag_id).await?;
-
-        match df.prev_or_at(t!(now)) {
-            Some(dp) => Ok(dp.map_value(|&v| self.from_f64(v))),
-            None => anyhow::bail!("No data found"),
-        }
+        api.get_datapoint(tag_id, &t!(now))
+            .await
+            .map(|dp| DataPoint::new(self.from_f64(dp.value), dp.timestamp))
     }
 }
 
@@ -151,24 +222,9 @@ where
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
         let df = api
-            .get_default_dataframe(tag_id)
+            .get_dataframe(tag_id, &range)
             .await?
             .map(|dp| self.from_f64(dp.value));
-
-        if range.start() < df.range().start() {
-            tracing::warn!(
-                "Timeseries out of cache range requested for item {:?} and range {}. Doing full query",
-                tag_id,
-                &range
-            );
-
-            let df = api
-                .db
-                .get_dataframe_for_tag(tag_id, &range)
-                .await?
-                .map(|dp| self.from_f64(dp.value));
-            return TimeSeries::new(self.clone(), &df, range);
-        }
 
         TimeSeries::new(self.clone(), &df, range)
     }
@@ -178,6 +234,22 @@ where
 //COMMAND
 //
 impl HomeApi {
+    async fn get_commands(&self, target: &CommandTarget, range: &DateTimeRange) -> Result<Vec<CommandExecution>> {
+        match self.get_commands_from_cache(target, range).await {
+            Some(commands) => Ok(commands
+                .1
+                .iter()
+                .filter(|cmd| range.contains(&cmd.created))
+                .cloned()
+                .collect()),
+            None => {
+                tracing::warn!("No cached commands found for target {:?}, fetching from database", target);
+                let commands = self.db.query_all_commands(Some(target.clone()), range).await?;
+                Ok(commands)
+            }
+        }
+    }
+
     pub async fn execute(
         &self,
         command: Command,
@@ -235,7 +307,8 @@ impl CommandExecutionAccess for HomeApi {
         since: DateTime,
     ) -> Result<Option<CommandExecution>> {
         let target = target.into();
-        let commands = self.get_commands_using_cache(&target, since).await?;
+        let range = DateTimeRange::new(since, t!(now));
+        let commands = self.get_commands(&target, &range).await?;
         Ok(commands.into_iter().max_by_key(|cmd| cmd.created))
     }
 
@@ -245,39 +318,8 @@ impl CommandExecutionAccess for HomeApi {
         since: DateTime,
     ) -> Result<Vec<CommandExecution>> {
         let target = target.into();
-        self.get_commands_using_cache(&target, since).await
-    }
-}
-
-impl HomeApi {
-    async fn get_commands_using_cache(&self, target: &CommandTarget, since: DateTime) -> Result<Vec<CommandExecution>> {
-        let cached = self
-            .cmd_cache
-            .try_get_with(target.clone(), async {
-                tracing::debug!("No command-cache entry found for target {:?}", target);
-                let range = self.cmd_caching_range();
-
-                self.db
-                    .query_all_commands(Some(target.clone()), range.start(), range.end())
-                    .await
-                    .map(|cmds| Arc::new((*range.start(), cmds)))
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!("Error initializing command cache for target {:?}: {:?}", target, e))?;
-
-        if since < cached.0 {
-            tracing::info!(
-                ?since,
-                offset = %since.elapsed().to_iso_string(),
-                cache_start = %cached.0,
-                "Requested time range is before cached commands, querying database"
-            );
-            return self.db.query_all_commands(Some(target.clone()), &since, &t!(now)).await;
-        }
-
-        let commands: Vec<CommandExecution> = cached.1.iter().filter(|&cmd| cmd.created >= since).cloned().collect();
-
-        Ok(commands)
+        let range = DateTimeRange::new(since, t!(now));
+        self.get_commands(&target, &range).await
     }
 }
 
@@ -328,7 +370,7 @@ impl HomeApi {
     }
 
     pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
-        self.db.query_all_commands(None, &from, &until).await
+        self.db.query_all_commands(None, &DateTimeRange::new(from, until)).await
     }
 
     pub async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace> {
@@ -368,7 +410,7 @@ mod tests {
         {
             let value = value.into();
             self.state_dp_mock
-                .insert(state.into(), DataPoint::new(state.to_f64(&value), timestamp));
+                .insert(state.clone().into(), DataPoint::new(state.to_f64(&value), timestamp));
         }
 
         pub fn with_fixed_ts<T, V>(&mut self, state: T, values: &[(V, DateTime)])
@@ -390,7 +432,7 @@ mod tests {
             T: Into<HomeState> + ValueObject + Clone,
         {
             self.state_dp_mock
-                .get(&state.into())
+                .get(&state.clone().into())
                 .map(|dp| DataPoint::new(state.from_f64(dp.value), dp.timestamp))
         }
 
@@ -399,7 +441,7 @@ mod tests {
             T: Into<HomeState> + ValueObject + Clone,
         {
             self.state_ts_mock
-                .get(&state.into())
+                .get(&state.clone().into())
                 .map(|df| df.map(|dp| state.from_f64(dp.value)))
         }
     }

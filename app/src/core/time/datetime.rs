@@ -24,6 +24,14 @@ impl DateTime {
         }
     }
 
+    pub fn max_value() -> Self {
+        chrono::DateTime::<chrono::Local>::MAX_UTC.into()
+    }
+
+    pub fn is_shifted() -> bool {
+        FIXED_NOW.try_with(|_| ()).is_ok()
+    }
+
     pub fn midpoint(start: &DateTime, end: &DateTime) -> DateTime {
         let start_timestamp = start.delegate.timestamp_millis();
         let end_timestamp = end.delegate.timestamp_millis();
@@ -220,7 +228,7 @@ mod constructor {
         // March 30, 2025 is a spring forward day in Central Europe (2:00-3:00 doesn't exist)
         let dt = DateTime::from_iso("2025-03-30T12:00:00+02:00").unwrap();
         let result = dt.at(Time::at(2, 30).unwrap()); // This time doesn't exist
-        
+
         // Should jump to 3:00 (first valid time after DST gap)
         assert_eq!(result, DateTime::from_iso("2025-03-30T03:00:00+02:00").unwrap());
     }
@@ -230,7 +238,7 @@ mod constructor {
         // October 27, 2024 is a fall back day in Central Europe (2:30 exists twice)
         let dt = DateTime::from_iso("2024-10-27T12:00:00+01:00").unwrap();
         let result = dt.at(Time::at(2, 30).unwrap());
-        
+
         // Should choose the earlier occurrence (before the clock falls back)
         assert_eq!(result, DateTime::from_iso("2024-10-27T02:30:00+01:00").unwrap());
     }

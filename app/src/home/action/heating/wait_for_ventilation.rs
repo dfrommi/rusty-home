@@ -89,7 +89,7 @@ impl SimpleAction for DeferHeatingUntilVentilationDone {
 
         let window_opened = self.window().current_data_point(api).await?;
 
-        if time_range.contains(window_opened.timestamp) {
+        if time_range.contains(&window_opened.timestamp) {
             return Ok(false);
         }
 

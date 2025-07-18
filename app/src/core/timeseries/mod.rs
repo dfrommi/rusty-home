@@ -20,7 +20,7 @@ impl<C: Estimatable> TimeSeries<C> {
         //not using retain_range as it could lead to empty dataframe before interpolation
         let mut dps_in_range = df
             .iter()
-            .filter(|dp| range.contains(dp.timestamp))
+            .filter(|dp| range.contains(&dp.timestamp))
             .cloned()
             .collect::<Vec<_>>();
 

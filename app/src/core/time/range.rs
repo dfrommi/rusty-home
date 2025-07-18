@@ -65,7 +65,7 @@ impl DailyTimeRange {
         let now = t!(now);
         let dt_range = self.active_or_previous_at(now);
 
-        if dt_range.contains(now) { Some(dt_range) } else { None }
+        if dt_range.contains(&now) { Some(dt_range) } else { None }
     }
 
     pub fn active_or_previous(&self) -> DateTimeRange {
@@ -118,8 +118,12 @@ impl DateTimeRange {
         &self.end
     }
 
-    pub fn contains(&self, datetime: DateTime) -> bool {
-        datetime >= self.start && datetime <= self.end
+    pub fn contains(&self, datetime: &DateTime) -> bool {
+        datetime >= &self.start && datetime <= &self.end
+    }
+
+    pub fn covers(&self, other: &DateTimeRange) -> bool {
+        self.start() <= other.start() && other.end() <= self.end()
     }
 }
 

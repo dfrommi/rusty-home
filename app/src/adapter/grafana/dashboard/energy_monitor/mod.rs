@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
 use crate::core::HomeApi;
-use crate::home::state::{CurrentPowerUsage, HeatingDemand, TotalEnergyConsumption};
 use actix_web::web;
 
-use crate::port::{DataPointAccess, TimeSeriesAccess};
 
 mod current;
 mod total;

@@ -1,9 +1,9 @@
 #![allow(dead_code)]
+use crate::Infrastructure;
 use crate::core::id::ExternalId;
 use crate::core::{HomeApi, ValueObject};
 use crate::home::state::HomeState;
 use crate::port::DataPointAccess;
-use crate::Infrastructure;
 use infrastructure::meter::{increment, set};
 use std::time::Duration;
 
@@ -26,10 +26,12 @@ pub fn cache_miss_data_point_access(tag_id: i64) {
     );
 }
 
-pub fn start_home_state_metrics_updater(infrastructure: &Infrastructure) -> impl std::future::Future<Output = ()> + use<> {
+pub fn start_home_state_metrics_updater(
+    infrastructure: &Infrastructure,
+) -> impl std::future::Future<Output = ()> + use<> {
     let api = infrastructure.api.clone();
     let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
-    
+
     async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
 
@@ -38,12 +40,13 @@ pub fn start_home_state_metrics_updater(infrastructure: &Infrastructure) -> impl
                 _ = interval.tick() => {},
                 _ = state_changed_events.recv() => {},
             };
-            
+
             update_home_state_metrics(&api).await;
         }
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn update_home_state_metrics(api: &HomeApi) {
     for state in HomeState::variants() {
         if let Ok(data_point) = state.current_data_point(api).await {

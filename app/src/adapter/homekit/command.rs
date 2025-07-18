@@ -40,11 +40,11 @@ pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage
 async fn handle_message(base_topic: &str, msg: MqttInMessage, api: Arc<HomeApi>) {
     let config = Homekit::config();
     let target: Option<&HomekitCommandTarget> = config.iter().find_map(|(key, _, target)| {
-        if msg.topic == format!("{}/{}", base_topic, key) {
-            return target.as_ref();
+        if msg.topic == format!("{base_topic}/{key}") {
+            target.as_ref()
         } else {
-            return None;
-        };
+            None
+        }
     });
 
     if let Some(target) = target {

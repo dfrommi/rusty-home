@@ -16,10 +16,10 @@ macro_rules! t {
         $crate::core::time::Duration::seconds($amount)
     }};
     ($amount:literal minutes) => {{
-        crate::core::time::Duration::minutes($amount)
+        $crate::core::time::Duration::minutes($amount)
     }};
     ($amount:literal hours) => {{
-        crate::core::time::Duration::hours($amount)
+        $crate::core::time::Duration::hours($amount)
     }};
 
     ($amount:literal seconds ago) => {{

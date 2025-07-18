@@ -1,4 +1,4 @@
-use crate::core::time::DateTime;
+use crate::core::time::DateTimeRange;
 use crate::home::command::*;
 use crate::t;
 use anyhow::Result;
@@ -108,8 +108,7 @@ impl super::Database {
     pub async fn query_all_commands(
         &self,
         target: Option<CommandTarget>,
-        from: &DateTime,
-        until: &DateTime,
+        range: &DateTimeRange,
     ) -> Result<Vec<CommandExecution>> {
         let db_target = target.map(|j| serde_json::json!(j));
 
@@ -119,10 +118,12 @@ impl super::Database {
                 where (command @> $1 or $1 is null)
                 and created >= $2
                 and created <= $3
+                and created <= $4
                 order by created asc"#,
             db_target,
-            from.into_db(),
-            until.into_db(),
+            range.start().into_db(),
+            range.end().into_db(),
+            t!(now).into_db()
         )
         .fetch_all(&self.pool)
         .await?;
@@ -281,7 +282,10 @@ mod get_all_commands_since {
 
         //WHEN
         let result = db
-            .query_all_commands(Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+            .query_all_commands(
+                Some(PowerToggle::Dehumidifier.into()),
+                &DateTimeRange::new(t!(8 minutes ago), t!(now)),
+            )
             .await
             .unwrap();
 
@@ -329,7 +333,10 @@ mod get_all_commands_since {
         .await;
 
         //WHEN
-        let result = db.query_all_commands(None, &t!(1 hours ago), &t!(now)).await.unwrap();
+        let result = db
+            .query_all_commands(None, &DateTimeRange::new(t!(1 hours ago), t!(now)))
+            .await
+            .unwrap();
 
         //THEN
         assert_eq!(result.len(), 2);
@@ -352,7 +359,10 @@ mod get_all_commands_since {
 
         //WHEN
         let result = db
-            .query_all_commands(Some(PowerToggle::Dehumidifier.into()), &t!(8 minutes ago), &t!(now))
+            .query_all_commands(
+                Some(PowerToggle::Dehumidifier.into()),
+                &DateTimeRange::new(t!(8 minutes ago), t!(now)),
+            )
             .await
             .unwrap();
 

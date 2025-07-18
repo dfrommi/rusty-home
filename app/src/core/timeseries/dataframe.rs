@@ -37,6 +37,32 @@ impl<T> DataFrame<T> {
         )
     }
 
+    pub fn retain_range_with_context(&self, range: &DateTimeRange) -> anyhow::Result<Self>
+    where
+        T: Clone,
+    {
+        let mut points = Vec::new();
+
+        // Add the previous value before the range (if it exists)
+        if let Some(prev_dp) = self.prev(*range.start()) {
+            points.push(prev_dp.clone());
+        }
+
+        // Add all values within the range
+        for (timestamp, dp) in &self.data {
+            if *timestamp >= *range.start() && *timestamp <= *range.end() {
+                points.push(dp.clone());
+            }
+        }
+
+        // Add the next value after the range (if it exists)
+        if let Some(next_dp) = self.next(*range.end()) {
+            points.push(next_dp.clone());
+        }
+
+        Self::new(points)
+    }
+
     pub fn map<U>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
         let values = self.data.values().map(|dp| {
             let ts = dp.timestamp;
@@ -68,6 +94,10 @@ impl<T> DataFrame<T> {
 
     pub fn prev_or_at(&self, at: DateTime) -> Option<&DataPoint<T>> {
         self.data.range(..=at).next_back().map(|(_, v)| v)
+    }
+
+    pub fn prev(&self, at: DateTime) -> Option<&DataPoint<T>> {
+        self.data.range(..at).next_back().map(|(_, v)| v)
     }
 
     pub fn next(&self, at: DateTime) -> Option<&DataPoint<T>> {

@@ -3,8 +3,6 @@ use std::fmt::Debug;
 use crate::{
     core::timeseries::{DataFrame, DataPoint},
     home::state::{PersistentHomeState, PersistentHomeStateValue},
-    port::DataPointAccess,
-    t,
 };
 
 use crate::core::id::ExternalId;
@@ -35,14 +33,12 @@ impl super::Database {
               FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp >= $2
-              AND timestamp <= $3
-              AND timestamp <= $4)
+              AND timestamp <= $3)
             UNION ALL
             (SELECT value, timestamp
               FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp < $2
-              AND timestamp <= $4
               ORDER BY timestamp DESC
               LIMIT 1)
             UNION ALL
@@ -50,13 +46,11 @@ impl super::Database {
               FROM THING_VALUE
               WHERE TAG_ID = $1
               AND timestamp > $3
-              AND timestamp <= $4
               ORDER BY timestamp ASC
               LIMIT 1)"#,
             tag_id as i32,
             range.start().into_db(),
-            range.end().into_db(),
-            t!(now).into_db(), //For timeshift in tests
+            range.end().into_db()
         )
         .fetch_all(&self.pool)
         .await?;

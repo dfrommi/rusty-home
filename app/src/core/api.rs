@@ -2,12 +2,12 @@ use super::ValueObject;
 use super::persistence::{Database, OfflineItem};
 use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange, Duration};
-use super::timeseries::{DataFrame, DataPoint, TimeSeries, interpolate::Estimatable};
+use super::timeseries::{DataFrame, DataPoint};
 use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
-use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataFrameAccess, DataPointAccess, TimeSeriesAccess};
+use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataFrameAccess, DataPointAccess};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
@@ -30,7 +30,7 @@ pub struct HomeApi {
 #[derive(Debug, Clone)]
 pub enum CachingRange {
     OfLast(Duration),
-    Fixed(DateTime, DateTime),
+    Fixed(DateTimeRange),
 }
 
 impl Default for CachingRange {
@@ -56,6 +56,27 @@ impl HomeApi {
             state_ts_mock: std::collections::HashMap::new(),
         }
     }
+
+    // Helper method to apply timeshift filtering to results
+    fn apply_timeshift_filter<T>(&self, items: Vec<T>, get_timestamp: impl Fn(&T) -> DateTime) -> Vec<T> {
+        if DateTime::is_shifted() {
+            let now = t!(now);
+            items.into_iter().filter(|item| get_timestamp(item) <= now).collect()
+        } else {
+            items
+        }
+    }
+
+    // Helper method to apply timeshift filtering to DataFrames
+    fn apply_timeshift_filter_to_dataframe(&self, df: DataFrame<f64>) -> Result<DataFrame<f64>> {
+        if DateTime::is_shifted() {
+            let now = t!(now);
+            let filtered_points: Vec<DataPoint<f64>> = df.iter().filter(|dp| dp.timestamp <= now).cloned().collect();
+            DataFrame::new(filtered_points)
+        } else {
+            Ok(df)
+        }
+    }
 }
 
 //
@@ -64,14 +85,14 @@ impl HomeApi {
 impl HomeApi {
     // Cache Management Methods
     fn caching_range(&self) -> DateTimeRange {
+        //Caching always uses real time, never timeshifted. This allows stable caching while
+        //shifting around
         match &self.caching_range {
-            CachingRange::OfLast(duration) => DateTimeRange::new(t!(now) - duration.clone(), DateTime::max_value()),
-            CachingRange::Fixed(start, end) => DateTimeRange::new(*start, *end),
+            CachingRange::OfLast(duration) => {
+                DateTimeRange::new(DateTime::real_now() - duration.clone(), DateTime::max_value())
+            }
+            CachingRange::Fixed(range) => range.clone(),
         }
-    }
-
-    fn is_readonly_cache(&self) -> bool {
-        DateTime::is_shifted()
     }
 
     pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
@@ -103,25 +124,21 @@ impl HomeApi {
         tag_id: i64,
         range: &DateTimeRange,
     ) -> Option<Arc<(DateTimeRange, DataFrame<f64>)>> {
-        let cached = if self.is_readonly_cache() {
-            Ok(self.ts_cache.get(&tag_id))
-        } else {
-            let df = self
-                .ts_cache
-                .try_get_with(tag_id, async {
-                    tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
-                    let cache_range = self.caching_range();
-                    self.db
-                        .get_dataframe_for_tag(tag_id, &cache_range)
-                        .await
-                        .map(|df| Arc::new((cache_range, df)))
-                })
-                .await;
-            Some(df).transpose()
-        };
+        let df = self
+            .ts_cache
+            .try_get_with(tag_id, async {
+                tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
+                let cache_range = self.caching_range();
+                //TODO adjust cached range to real value with min and max of both
+                self.db
+                    .get_dataframe_for_tag(tag_id, &cache_range)
+                    .await
+                    .map(|df| Arc::new((cache_range, df)))
+            })
+            .await;
 
-        match cached {
-            Ok(Some(cached)) if cached.0.covers(range) => Some(cached),
+        match df {
+            Ok(cached) if cached.0.covers(range) => Some(cached),
             Err(e) => {
                 tracing::error!("Error fetching dataframe for tag {} from cache or init cacke: {:?}", tag_id, e);
                 None
@@ -135,26 +152,22 @@ impl HomeApi {
         target: &CommandTarget,
         range: &DateTimeRange,
     ) -> Option<Arc<(DateTimeRange, Vec<CommandExecution>)>> {
-        let cached = if self.is_readonly_cache() {
-            Ok(self.cmd_cache.get(target))
-        } else {
-            let commands = self
-                .cmd_cache
-                .try_get_with(target.clone(), async {
-                    tracing::debug!("No command-cache entry found for target {:?}", target);
-                    let cache_range = self.caching_range();
+        let commands = self
+            .cmd_cache
+            .try_get_with(target.clone(), async {
+                tracing::debug!("No command-cache entry found for target {:?}", target);
+                let cache_range = self.caching_range();
+                //TODO adjust cached range to real value with min and max of both (caching range
+                //and retrieved data)
+                self.db
+                    .query_all_commands(Some(target.clone()), &cache_range)
+                    .await
+                    .map(|cmds| Arc::new((cache_range, cmds)))
+            })
+            .await;
 
-                    self.db
-                        .query_all_commands(Some(target.clone()), &cache_range)
-                        .await
-                        .map(|cmds| Arc::new((cache_range, cmds)))
-                })
-                .await;
-            Some(commands).transpose()
-        };
-
-        match cached {
-            Ok(Some(cached)) if cached.0.covers(range) => Some(cached),
+        match commands {
+            Ok(cached) if cached.0.covers(range) => Some(cached),
             Err(e) => {
                 tracing::error!(
                     "Error fetching commands for target {:?} from cache or init cache: {:?}",
@@ -181,14 +194,14 @@ impl HomeApi {
     }
 
     async fn get_dataframe(&self, tag_id: i64, range: &DateTimeRange) -> Result<DataFrame<f64>> {
-        match self.get_dataframe_from_cache(tag_id, range).await {
-            Some(df) => df.1.retain_range_with_context(range),
+        let df = match self.get_dataframe_from_cache(tag_id, range).await {
+            Some(df) => df.1.retain_range_with_context(range)?,
             None => {
                 tracing::warn!("No cached data found for tag {}, fetching from database", tag_id);
-                let df = self.db.get_dataframe_for_tag(tag_id, range).await?;
-                Ok(df)
+                self.db.get_dataframe_for_tag(tag_id, range).await?
             }
-        }
+        };
+        self.apply_timeshift_filter_to_dataframe(df)
     }
 
     pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
@@ -233,19 +246,19 @@ where
 //
 impl HomeApi {
     async fn get_commands(&self, target: &CommandTarget, range: &DateTimeRange) -> Result<Vec<CommandExecution>> {
-        match self.get_commands_from_cache(target, range).await {
-            Some(commands) => Ok(commands
+        let commands = match self.get_commands_from_cache(target, range).await {
+            Some(commands) => commands
                 .1
                 .iter()
                 .filter(|cmd| range.contains(&cmd.created))
                 .cloned()
-                .collect()),
+                .collect(),
             None => {
                 tracing::warn!("No cached commands found for target {:?}, fetching from database", target);
-                let commands = self.db.query_all_commands(Some(target.clone()), range).await?;
-                Ok(commands)
+                self.db.query_all_commands(Some(target.clone()), range).await?
             }
-        }
+        };
+        Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 
     pub async fn execute(
@@ -334,7 +347,13 @@ impl HomeApi {
         target: &UserTriggerTarget,
         since: DateTime,
     ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
-        self.db.latest_since(target, since).await
+        let result = self.db.latest_since(target, since).await?;
+        if DateTime::is_shifted() {
+            let now = t!(now);
+            Ok(result.filter(|dp| dp.timestamp <= now))
+        } else {
+            Ok(result)
+        }
     }
 }
 
@@ -364,15 +383,27 @@ impl HomeApi {
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<PersistentHomeStateValue>>> {
-        self.db.get_all_data_points_in_range(range).await
+        let data_points = self.db.get_all_data_points_in_range(range).await?;
+        Ok(self.apply_timeshift_filter(data_points, |dp| dp.timestamp))
     }
 
     pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
-        self.db.query_all_commands(None, &DateTimeRange::new(from, until)).await
+        let commands = self
+            .db
+            .query_all_commands(None, &DateTimeRange::new(from, until))
+            .await?;
+        Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 
     pub async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace> {
-        self.db.get_latest_planning_trace(before).await
+        // Apply timeshift: if we're in timeshift mode, limit the search to timeshift "now"
+        let effective_before = if DateTime::is_shifted() {
+            let now = t!(now);
+            if before > now { now } else { before }
+        } else {
+            before
+        };
+        self.db.get_latest_planning_trace(effective_before).await
     }
 
     pub async fn get_planning_traces_by_trace_id(&self, trace_id: &str) -> anyhow::Result<Option<PlanningTrace>> {
@@ -380,11 +411,13 @@ impl HomeApi {
     }
 
     pub async fn get_trace_ids(&self, range: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
-        self.db.get_trace_ids(range).await
+        let trace_ids = self.db.get_trace_ids(range).await?;
+        Ok(self.apply_timeshift_filter(trace_ids, |item| item.1))
     }
 
     pub async fn get_planning_traces_in_range(&self, range: DateTimeRange) -> anyhow::Result<Vec<PlanningTrace>> {
-        self.db.get_planning_traces_in_range(range).await
+        let traces = self.db.get_planning_traces_in_range(range).await?;
+        Ok(self.apply_timeshift_filter(traces, |trace| trace.timestamp))
     }
 
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {

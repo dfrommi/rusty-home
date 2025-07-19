@@ -117,14 +117,12 @@ impl super::Database {
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created >= $2
-                and created <= $3
-                and created <= $4)
+                and created <= $3)
             UNION ALL
             (SELECT id, command, created, status, error, source_type, source_id, correlation_id
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created < $2
-                and created <= $4
                 order by created DESC
                 limit 1)
             UNION ALL
@@ -132,14 +130,12 @@ impl super::Database {
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created > $3
-                and created <= $4
                 order by created ASC
                 limit 1)
             order by created asc"#,
             db_target,
             range.start().into_db(),
-            range.end().into_db(),
-            t!(now).into_db()
+            range.end().into_db()        
         )
         .fetch_all(&self.pool)
         .await?;

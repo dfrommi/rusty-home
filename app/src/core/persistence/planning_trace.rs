@@ -1,5 +1,5 @@
 use crate::core::time::DateTime;
-use crate::t;
+
 use sqlx::types::chrono;
 
 use crate::core::planner::{PlanningTrace, PlanningTraceStep};
@@ -84,11 +84,9 @@ impl super::Database {
                 FROM planning_trace
                 WHERE timestamp >= $1
                 AND timestamp <= $2
-                AND timestamp <= $3
                 ORDER BY timestamp DESC"#,
             range.start().into_db(),
             range.end().into_db(),
-            t!(now).into_db(), //For timeshift in tests
         )
         .fetch_all(&self.pool)
         .await?;

@@ -37,12 +37,10 @@ impl super::Database {
             r#"SELECT trigger, timestamp FROM user_trigger
                 WHERE trigger @> $1
                 AND timestamp >= $2
-                AND timestamp <= $3
                 ORDER BY timestamp DESC
                 LIMIT 1"#,
             db_target,
             since.into_db(),
-            t!(now).into_db(), //For timeshift in tests
         )
         .fetch_optional(&self.pool)
         .await?;

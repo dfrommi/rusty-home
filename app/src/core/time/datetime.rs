@@ -24,6 +24,16 @@ impl DateTime {
         }
     }
 
+    pub fn now() -> Self {
+        FIXED_NOW
+            .try_with(|t| *t)
+            .unwrap_or_else(|_| chrono::Local::now().into())
+    }
+
+    pub fn real_now() -> Self {
+        chrono::Local::now().into()
+    }
+
     pub fn max_value() -> Self {
         chrono::DateTime::<chrono::Local>::MAX_UTC.into()
     }
@@ -48,12 +58,6 @@ impl DateTime {
 
     pub(super) fn delegate(&self) -> &chrono::DateTime<chrono::Local> {
         &self.delegate
-    }
-
-    pub fn now() -> Self {
-        FIXED_NOW
-            .try_with(|t| *t)
-            .unwrap_or_else(|_| chrono::Local::now().into())
     }
 
     pub fn from_iso(iso8601: &str) -> anyhow::Result<Self> {

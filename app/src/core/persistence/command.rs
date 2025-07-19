@@ -113,13 +113,29 @@ impl super::Database {
         let db_target = target.map(|j| serde_json::json!(j));
 
         let records = sqlx::query!(
-            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id, correlation_id
-                from THING_COMMAND 
+            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!: DbCommandSource", source_id as "source_id!", correlation_id
+                from thing_command 
                 where (command @> $1 or $1 is null)
                 and created >= $2
                 and created <= $3
+                and created <= $4)
+            UNION ALL
+            (SELECT id, command, created, status, error, source_type, source_id, correlation_id
+                from thing_command 
+                where (command @> $1 or $1 is null)
+                and created < $2
                 and created <= $4
-                order by created asc"#,
+                order by created DESC
+                limit 1)
+            UNION ALL
+            (SELECT id, command, created, status, error, source_type, source_id, correlation_id
+                from thing_command 
+                where (command @> $1 or $1 is null)
+                and created > $3
+                and created <= $4
+                order by created ASC
+                limit 1)
+            order by created asc"#,
             db_target,
             range.start().into_db(),
             range.end().into_db(),
@@ -136,7 +152,7 @@ impl super::Database {
                     id: row.id,
                     command: serde_json::from_value(row.command)?,
                     state: CommandState::from((row.status, row.error)),
-                    created: row.created.into(),
+                    created: row.created.unwrap().into(),
                     source,
                     correlation_id: row.correlation_id,
                 })
@@ -245,6 +261,7 @@ pub mod mapper {
 mod get_all_commands_since {
     use super::super::Database;
     use super::*;
+    use crate::core::time::DateTime;
     use crate::home::command::PowerToggle;
     use crate::t;
     use sqlx::PgPool;
@@ -290,16 +307,24 @@ mod get_all_commands_since {
             .unwrap();
 
         //THEN
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 3);
+        // Should include closest before (10 min ago), and commands in range (6 min ago, 4 min ago)
         assert_eq!(
             result[0].command,
+            Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            }
+        );
+        assert_eq!(
+            result[1].command,
             Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: false,
             }
         );
         assert_eq!(
-            result[1].command,
+            result[2].command,
             Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
@@ -367,7 +392,15 @@ mod get_all_commands_since {
             .unwrap();
 
         //THEN
-        assert_eq!(result.len(), 0);
+        assert_eq!(result.len(), 1);
+        // Should include closest before (10 min ago) even though it's outside the range
+        assert_eq!(
+            result[0].command,
+            Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            }
+        );
     }
 
     async fn insert_command(db: &Database, command: &Command, at: DateTime) {

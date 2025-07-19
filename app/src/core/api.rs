@@ -7,7 +7,7 @@ use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
-use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataPointAccess, TimeSeriesAccess};
+use crate::port::{CommandExecutionAccess, CommandExecutionResult, DataFrameAccess, DataPointAccess, TimeSeriesAccess};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
@@ -211,13 +211,11 @@ where
     }
 }
 
-impl<T> TimeSeriesAccess<T> for T
+impl<T> DataFrameAccess<T> for T
 where
-    //TODO into PersistentHomeState should automatically imply Into<HomeState>
-    T: Into<PersistentHomeState> + Into<HomeState> + Estimatable + Clone + Debug,
+    T: Into<PersistentHomeState> + ValueObject + Clone,
 {
-    #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<T>> {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<T::ValueType>> {
         let channel: PersistentHomeState = self.clone().into();
         let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
 
@@ -226,7 +224,7 @@ where
             .await?
             .map(|dp| self.from_f64(dp.value));
 
-        TimeSeries::new(self.clone(), &df, range)
+        Ok(df)
     }
 }
 

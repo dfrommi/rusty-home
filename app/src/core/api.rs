@@ -129,11 +129,18 @@ impl HomeApi {
             .try_get_with(tag_id, async {
                 tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
                 let cache_range = self.caching_range();
-                //TODO adjust cached range to real value with min and max of both
                 self.db
                     .get_dataframe_for_tag(tag_id, &cache_range)
                     .await
-                    .map(|df| Arc::new((cache_range, df)))
+                    .map(|df| {
+                        // Adjust cached range to actual data range, expanded by the cache range
+                        let actual_data_range = df.range();
+                        let effective_range = DateTimeRange::new(
+                            *cache_range.start().min(actual_data_range.start()),
+                            *cache_range.end().max(actual_data_range.end()),
+                        );
+                        Arc::new((effective_range, df))
+                    })
             })
             .await;
 
@@ -157,12 +164,24 @@ impl HomeApi {
             .try_get_with(target.clone(), async {
                 tracing::debug!("No command-cache entry found for target {:?}", target);
                 let cache_range = self.caching_range();
-                //TODO adjust cached range to real value with min and max of both (caching range
-                //and retrieved data)
                 self.db
                     .query_all_commands(Some(target.clone()), &cache_range)
                     .await
-                    .map(|cmds| Arc::new((cache_range, cmds)))
+                    .map(|cmds| {
+                        // Adjust cached range to actual data range, expanded by the cache range
+                        let effective_range = if cmds.is_empty() {
+                            cache_range
+                        } else {
+                            let min_timestamp = cmds.iter().map(|cmd| cmd.created).min().unwrap();
+                            let max_timestamp = cmds.iter().map(|cmd| cmd.created).max().unwrap();
+                            let actual_data_range = DateTimeRange::new(min_timestamp, max_timestamp);
+                            DateTimeRange::new(
+                                *cache_range.start().min(actual_data_range.start()),
+                                *cache_range.end().max(actual_data_range.end()),
+                            )
+                        };
+                        Arc::new((effective_range, cmds))
+                    })
             })
             .await;
 

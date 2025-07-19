@@ -99,12 +99,24 @@ impl HomeApi {
         tracing::debug!("Start preloading cache");
 
         let tag_ids = self.db.get_all_tag_ids().await?;
+        let cache_range = self.caching_range();
 
-        for tag_id in tag_ids {
-            self.get_dataframe_from_cache(tag_id, &self.caching_range()).await;
-        }
+        // Process all tag IDs in parallel
+        let futures: Vec<_> = tag_ids
+            .into_iter()
+            .map(|tag_id| {
+                let cache_range = cache_range.clone();
+                async move {
+                    self.get_dataframe_from_cache(tag_id, &cache_range).await;
+                    tag_id
+                }
+            })
+            .collect();
 
-        tracing::debug!("Preloading cache done");
+        // Wait for all parallel operations to complete
+        let results = futures::future::join_all(futures).await;
+        
+        tracing::debug!("Preloading cache done for {} tags", results.len());
         Ok(())
     }
 

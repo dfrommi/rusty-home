@@ -1,11 +1,16 @@
+use crate::core::time::DateTimeRange;
+use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::unit::DegreeCelsius;
 use crate::core::{HomeApi, timeseries::DataPoint};
 use crate::home::state::Temperature;
+use crate::port::DataFrameAccess;
 use crate::t;
 use r#macro::{EnumVariants, Id};
 
 use crate::home::state::macros::result;
 
+use super::sampled_data_frame;
 use super::{DataPointAccess, TimeSeriesAccess, opened::OpenedArea};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -108,6 +113,18 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
                 );
             }
         }
+    }
+}
+
+impl Estimatable for AutomaticTemperatureIncrease {
+    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType> {
+        interpolate::algo::last_seen(at, df)
+    }
+}
+
+impl DataFrameAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
+        sampled_data_frame(self, range, t!(30 seconds), api).await
     }
 }
 

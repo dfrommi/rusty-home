@@ -26,6 +26,8 @@ mod total_radiator_consumption;
 mod total_water_consumption;
 mod user_controlled;
 
+use std::fmt::Debug;
+
 pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use current_power_usage::CurrentPowerUsage;
@@ -48,9 +50,15 @@ pub use total_radiator_consumption::TotalRadiatorConsumption;
 pub use total_water_consumption::TotalWaterConsumption;
 pub use user_controlled::UserControlled;
 
-use crate::core::unit::*;
+use crate::core::HomeApi;
 use crate::core::ValueObject;
+use crate::core::time::DateTimeRange;
+use crate::core::time::Duration;
+use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::DataPoint;
+use crate::core::unit::*;
 use crate::port::{DataPointAccess, TimeSeriesAccess};
+use crate::t;
 use r#macro::{EnumWithValue, StateTypeInfoDerive};
 
 #[derive(Debug, Clone, EnumWithValue, StateTypeInfoDerive)]
@@ -91,7 +99,44 @@ pub enum HomeStateValue {
     UserControlled(UserControlled, bool),
 }
 
+async fn sampled_data_frame<T>(
+    item: &T,
+    range: DateTimeRange,
+    rate: Duration,
+    api: &HomeApi,
+) -> anyhow::Result<DataFrame<T::ValueType>>
+where
+    T: ValueObject + DataPointAccess<T>,
+    T::ValueType: PartialEq,
+{
+    let caching_range = DateTimeRange::new(*range.start() - t!(3 hours), *range.end() + t!(3 hours));
+    let api = api.for_processing_of_range(caching_range);
 
+    let mut result = vec![];
+    let mut previous_value: Option<T::ValueType> = None;
+
+    let mut seen_timestamps = std::collections::BTreeSet::new();
+
+    for dt in range.step_by(rate) {
+        let mut dp = dt
+            .eval_timeshifted(async { item.current_data_point(&api).await })
+            .await?;
+
+        if previous_value.as_ref() != Some(&dp.value) {
+            //Timestamp might jump back to an old value, as a consequence of calculation and taking the
+            //timestamp from the datapoints.
+            if seen_timestamps.contains(&dp.timestamp) {
+                dp = DataPoint::new(dp.value, dt);
+            }
+
+            result.push(dp.clone());
+            previous_value = Some(dp.value.clone());
+            seen_timestamps.insert(dp.timestamp);
+        }
+    }
+
+    DataFrame::new(result)
+}
 
 mod macros {
     macro_rules! result {

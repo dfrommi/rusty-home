@@ -1,19 +1,20 @@
 use crate::core::{
     HomeApi,
     timeseries::{
-        DataFrame, DataPoint, TimeSeries,
+        DataFrame, DataPoint,
         interpolate::{self, Estimatable},
     },
 };
 
 use super::*;
 use crate::home::state::{RelativeHumidity, Temperature};
+use crate::port::DataFrameAccess;
 use anyhow::Result;
+use futures::try_join;
 
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id, mockable};
-use tokio::try_join;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
@@ -55,34 +56,27 @@ impl DataPointAccess<DewPoint> for DewPoint {
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<DegreeCelsius>> {
         let temperature: DataPoint<DegreeCelsius> = self.temperature().current_data_point(api).await?;
         let humidity: DataPoint<Percent> = self.relative_humidity().current_data_point(api).await?;
-        let dewpoint = dewpoint(&temperature, &humidity);
 
-        Ok(dewpoint)
+        let temperature = &temperature;
+        let relative_humidity = &humidity;
+        let dp = calculate_dew_point(&temperature.value, &relative_humidity.value);
+
+        Ok(DataPoint {
+            value: dp,
+            timestamp: std::cmp::max(temperature.timestamp, relative_humidity.timestamp),
+        })
     }
 }
 
-impl TimeSeriesAccess<DewPoint> for DewPoint {
-    #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<DewPoint>> {
+impl DataFrameAccess<DewPoint> for DewPoint {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<DegreeCelsius>> {
         let (t_series, h_series) = {
             let temp = self.temperature();
             let humidity = self.relative_humidity();
             try_join!(temp.series(range.clone(), api), humidity.series(range.clone(), api))?
         };
 
-        TimeSeries::combined(&t_series, &h_series, self.clone(), calculate_dew_point)
-    }
-}
-
-fn dewpoint(
-    temperature: &DataPoint<DegreeCelsius>,
-    relative_humidity: &DataPoint<Percent>,
-) -> DataPoint<DegreeCelsius> {
-    let dp = calculate_dew_point(&temperature.value, &relative_humidity.value);
-
-    DataPoint {
-        value: dp,
-        timestamp: std::cmp::max(temperature.timestamp, relative_humidity.timestamp),
+        DataFrame::<DegreeCelsius>::combined(&t_series, &h_series, calculate_dew_point)
     }
 }
 

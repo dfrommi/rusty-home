@@ -1,7 +1,9 @@
 use crate::core::HomeApi;
-use crate::core::time::DateTime;
+use crate::core::time::{DateTime, DateTimeRange};
+use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::unit::DegreeCelsius;
-use crate::port::CommandExecutionAccess;
+use crate::port::{CommandExecutionAccess, DataFrameAccess};
 use crate::t;
 use r#macro::{EnumVariants, Id, mockable};
 
@@ -13,7 +15,7 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::DataPointAccess;
+use super::{sampled_data_frame, DataPointAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum UserControlled {
@@ -254,5 +256,17 @@ pub fn get_expiration(command_execution: &CommandExecution) -> Option<DateTime> 
             ..
         } => Some(command_execution.created + until.clone()),
         _ => None,
+    }
+}
+
+impl Estimatable for UserControlled {
+    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType> {
+        interpolate::algo::last_seen(at, df)
+    }
+}
+
+impl DataFrameAccess<UserControlled> for UserControlled {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
+        sampled_data_frame(self, range, t!(30 seconds), api).await
     }
 }

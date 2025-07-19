@@ -1,5 +1,6 @@
 use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange};
+use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id, mockable};
@@ -9,7 +10,7 @@ use crate::core::timeseries::{
     interpolate::{Estimatable, algo},
 };
 
-use super::{DataPointAccess, TimeSeriesAccess};
+use super::DataPointAccess;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum OpenedArea {
@@ -74,9 +75,12 @@ async fn any_of(api: &HomeApi, opened_states: Vec<Opened>) -> anyhow::Result<Dat
     }
 }
 
-impl TimeSeriesAccess<OpenedArea> for OpenedArea {
-    #[mockable]
-    async fn series(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<TimeSeries<OpenedArea>> {
+impl DataFrameAccess<OpenedArea> for OpenedArea {
+    async fn get_data_frame(
+        &self,
+        range: DateTimeRange,
+        api: &HomeApi,
+    ) -> Result<DataFrame<<OpenedArea as crate::core::ValueObject>::ValueType>> {
         let api_items = self.api_items();
         let context: Opened = api_items[0].clone();
 
@@ -89,10 +93,13 @@ impl TimeSeriesAccess<OpenedArea> for OpenedArea {
             .collect::<Vec<_>>();
 
         let all_ts = futures::future::try_join_all(futures).await?;
-        let merged = TimeSeries::reduce(context, all_ts, |&a, &b| a || b)?;
+
+        //TODO work more directly on DataFrame
+        let merged_ts = TimeSeries::reduce(context, all_ts, |&a, &b| a || b)?;
+        let merged_df = merged_ts.inner();
 
         //from API-opened into this opened type
-        Ok(merged.map(self.clone(), |dp| dp.value))
+        Ok(merged_df.map(|dp| dp.value))
     }
 }
 

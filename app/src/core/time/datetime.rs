@@ -38,6 +38,13 @@ impl DateTime {
         chrono::DateTime::<chrono::Local>::MAX_UTC.into()
     }
 
+    pub async fn eval_timeshifted<F, T>(&self, f: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        FIXED_NOW.scope(*self, f).await
+    }
+
     pub fn is_shifted() -> bool {
         FIXED_NOW.try_with(|_| ()).is_ok()
     }

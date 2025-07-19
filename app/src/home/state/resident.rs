@@ -1,5 +1,8 @@
 use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
+use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::interpolate::{self, Estimatable};
+use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Context, Result, bail};
@@ -7,7 +10,7 @@ use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
-use super::{DataPointAccess, TimeSeriesAccess};
+use super::{sampled_data_frame, DataPointAccess, TimeSeriesAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Resident {
@@ -144,4 +147,16 @@ async fn anyone_on_couch(api: &HomeApi) -> Result<DataPoint<bool>> {
             .min()
             .context("Internal error: no minimum of non-empty vec")?,
     ))
+}
+
+impl Estimatable for Resident {
+    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType> {
+        interpolate::algo::last_seen(at, df)
+    }
+}
+
+impl DataFrameAccess<Resident> for Resident {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
+        sampled_data_frame(self, range, t!(30 seconds), api).await
+    }
 }

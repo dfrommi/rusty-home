@@ -3,6 +3,11 @@ use std::fmt::Display;
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
+use crate::core::timeseries::{
+    DataFrame,
+    interpolate::{self, Estimatable},
+};
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum FanActivity {
     LivingRoomCeilingFan,
@@ -23,6 +28,12 @@ pub enum FanSpeed {
     Medium,
     High,
     Turbo,
+}
+
+impl Estimatable for FanActivity {
+    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<FanAirflow>) -> Option<FanAirflow> {
+        interpolate::algo::last_seen(at, df)
+    }
 }
 
 impl Display for FanAirflow {

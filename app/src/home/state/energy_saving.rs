@@ -1,6 +1,11 @@
+use crate::core::time::DateTimeRange;
+use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::HomeApi;
 use crate::core::ValueObject;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
+use crate::port::DataFrameAccess;
+use crate::t;
 use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::{
@@ -8,7 +13,7 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::DataPointAccess;
+use super::{sampled_data_frame, DataPointAccess};
 use crate::port::CommandExecutionAccess;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -66,5 +71,17 @@ impl DataPointAccess<EnergySaving> for EnergySaving {
                 );
             }
         }
+    }
+}
+
+impl Estimatable for EnergySaving {
+    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType> {
+        interpolate::algo::last_seen(at, df)
+    }
+}
+
+impl DataFrameAccess<EnergySaving> for EnergySaving {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
+        sampled_data_frame(self, range, t!(30 seconds), api).await
     }
 }

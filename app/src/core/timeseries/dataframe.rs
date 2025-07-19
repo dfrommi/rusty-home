@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::ensure;
 
-use super::DataPoint;
+use super::{DataPoint, TimeSeries, interpolate::Estimatable};
 
 #[derive(Debug, Clone)]
 pub struct DataFrame<T> {
@@ -23,6 +23,37 @@ impl<T> DataFrame<T> {
         ensure!(!data.is_empty(), "data frames must not be empty");
 
         Ok(Self { data })
+    }
+
+    pub fn combined<U, V, R, F>(
+        first_series: &TimeSeries<U>,
+        second_series: &TimeSeries<V>,
+        merge: F,
+    ) -> anyhow::Result<DataFrame<R>>
+    where
+        F: Fn(&U::ValueType, &V::ValueType) -> R,
+        U: Estimatable,
+        V: Estimatable,
+    {
+        let mut dps: Vec<DataPoint<R>> = Vec::new();
+
+        for first_dp in first_series.values.iter() {
+            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+                dps.push(DataPoint { value, timestamp });
+            }
+        }
+
+        for second_dp in second_series.values.iter() {
+            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
+                let value = (merge)(&first_dp.value, &second_dp.value);
+                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
+                dps.push(DataPoint { value, timestamp });
+            }
+        }
+
+        DataFrame::new(dps)
     }
 
     pub fn retain_range(&self, range: &DateTimeRange) -> anyhow::Result<Self>

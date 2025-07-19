@@ -28,12 +28,27 @@ pub struct HomeApi {
 impl HomeApi {
     pub fn new(db: Database) -> Self {
         Self {
-            cache: cache::HomeApiCache::new(db.clone()),
+            cache: cache::HomeApiCache::new(cache::CachingRange::OfLast(t!(72 hours)), db.clone()),
             db,
             #[cfg(test)]
             state_dp_mock: std::collections::HashMap::new(),
             #[cfg(test)]
             state_ts_mock: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn for_processing_of_range(&self, range: DateTimeRange) -> Self {
+        if self.cache.is_covering(&range) {
+            self.clone()
+        } else {
+            Self {
+                cache: cache::HomeApiCache::new(cache::CachingRange::Fixed(range), self.db.clone()),
+                db: self.db.clone(),
+                #[cfg(test)]
+                state_dp_mock: std::collections::HashMap::new(),
+                #[cfg(test)]
+                state_ts_mock: std::collections::HashMap::new(),
+            }
         }
     }
 

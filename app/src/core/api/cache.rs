@@ -9,7 +9,6 @@ use crate::{
         timeseries::DataFrame,
     },
     home::command::{CommandExecution, CommandTarget},
-    t,
 };
 
 #[derive(Clone)]
@@ -26,17 +25,11 @@ pub enum CachingRange {
     Fixed(DateTimeRange),
 }
 
-impl Default for CachingRange {
-    fn default() -> Self {
-        CachingRange::OfLast(t!(72 hours))
-    }
-}
-
 impl HomeApiCache {
-    pub fn new(db: Database) -> Self {
+    pub fn new(caching_range: CachingRange, db: Database) -> Self {
         Self {
             db,
-            caching_range: CachingRange::default(),
+            caching_range,
             ts_cache: Cache::builder()
                 .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
                 .build(),
@@ -44,6 +37,10 @@ impl HomeApiCache {
                 .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
                 .build(),
         }
+    }
+
+    pub fn is_covering(&self, range: &DateTimeRange) -> bool {
+        self.caching_range().covers(range)
     }
 
     // Cache Management Methods

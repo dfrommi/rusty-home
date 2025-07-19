@@ -56,28 +56,8 @@ impl<C: Estimatable> TimeSeries<C> {
         U: Estimatable,
         V: Estimatable,
     {
-        let mut dps: Vec<DataPoint<C::ValueType>> = Vec::new();
-
-        for first_dp in first_series.values.iter() {
-            if let Some(second_dp) = second_series.at(first_dp.timestamp) {
-                let value = (merge)(&first_dp.value, &second_dp.value);
-                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
-                dps.push(DataPoint { value, timestamp });
-            }
-        }
-
-        for second_dp in second_series.values.iter() {
-            if let Some(first_dp) = first_series.at(second_dp.timestamp) {
-                let value = (merge)(&first_dp.value, &second_dp.value);
-                let timestamp = std::cmp::max(first_dp.timestamp, second_dp.timestamp);
-                dps.push(DataPoint { value, timestamp });
-            }
-        }
-
+        let df = DataFrame::<C::ValueType>::combined(first_series, second_series, merge)?;
         let range = first_series.range().intersection_with(&second_series.range());
-
-        let df = DataFrame::new(dps)?;
-
         Self::new(context, &df, range)
     }
 

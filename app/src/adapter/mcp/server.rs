@@ -1,14 +1,17 @@
 use crate::core::HomeApi;
 use crate::core::id::ExternalId;
-use crate::core::time::{DateTime, Duration};
+use crate::core::time::{DateTime, DateTimeRange, Duration};
 use crate::home::state::HomeState;
-use crate::port::DataPointAccess;
+use crate::port::{DataFrameAccess, DataPointAccess};
 use rmcp::handler::server::tool::Parameters;
+use rmcp::schemars::schema::{Schema, SchemaObject};
+use rmcp::schemars::{self, JsonSchema};
+use rmcp::tool;
 use rmcp::{
     RoleServer, ServerHandler, handler::server::router::tool::ToolRouter, model::ErrorData as McpError, model::*,
     service::RequestContext, tool_handler, tool_router,
 };
-use rmcp::{schemars, tool};
+use serde_json::json;
 
 #[derive(Clone)]
 pub struct SmartHomeMcp {
@@ -41,10 +44,66 @@ pub struct DeviceState {
     same_value_duration: Duration,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct DeviceStateHistoryRequest {
+    #[serde(flatten)]
+    device: DeviceId,
+    from: DateTime,
+    to: DateTime,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeviceHistoryStateResponse {
+    device: DeviceId,
+    values: Vec<DeviceHistoryState>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeviceHistoryState {
+    value: String,
+    last_changed: DateTime,
+    same_value_duration: Duration,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeviceError {
     device: DeviceId,
     error: String,
+}
+
+impl JsonSchema for DateTime {
+    fn json_schema(_: &mut rmcp::schemars::SchemaGenerator) -> Schema {
+        let schema = json!({
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date and time format, e.g. '2023-10-01T12:00:00Z'."
+        });
+
+        let obj: SchemaObject = serde_json::from_value(schema).expect("Error creating schema object");
+        obj.into()
+    }
+
+    fn schema_name() -> String {
+        "DateTime".to_string()
+    }
+}
+
+impl JsonSchema for Duration {
+    fn schema_name() -> String {
+        "Duration".to_string()
+    }
+
+    fn json_schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
+        let schema = json!({
+            "type": "string",
+            "format": "duration",
+            "description": "Duration in ISO 8601 format, e.g. 'PT1H30M' for 1 hour and 30 minutes."
+        });
+
+        serde_json::from_value::<SchemaObject>(schema)
+            .expect("Error creating schema object")
+            .into()
+    }
 }
 
 #[tool_router]
@@ -117,6 +176,48 @@ impl SmartHomeMcp {
         }
 
         Ok(CallToolResult::success(results))
+    }
+
+    #[tool(description = "Get the history of a smart home device's state over a specified time range")]
+    async fn get_device_state_history(
+        &self,
+        Parameters(DeviceStateHistoryRequest { device, from, to }): Parameters<DeviceStateHistoryRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let ext_id: ExternalId = device.clone().into();
+
+        match HomeState::try_from(ext_id) {
+            Ok(state) => match state.get_data_frame(DateTimeRange::new(from, to), &self.api).await {
+                Ok(data_frame) => {
+                    let mut history = Vec::new();
+
+                    for dp in data_frame.iter() {
+                        history.push(DeviceHistoryState {
+                            value: dp.value.value_to_string(),
+                            last_changed: dp.timestamp,
+                            same_value_duration: dp.timestamp.elapsed(),
+                        });
+                    }
+
+                    return Ok(CallToolResult::success(vec![Content::json(DeviceHistoryStateResponse {
+                        device: device.clone(),
+                        values: history,
+                    })?]));
+                }
+
+                Err(e) => {
+                    return Ok(CallToolResult::error(vec![Content::json(DeviceError {
+                        device,
+                        error: format!("Failed to get state history: {e}"),
+                    })?]));
+                }
+            },
+            Err(_) => {
+                return Ok(CallToolResult::error(vec![Content::json(DeviceError {
+                    device: device.clone(),
+                    error: format!("Unknown device: {}/{}", device.device_type, device.device_name),
+                })?]));
+            }
+        }
     }
 }
 

@@ -17,6 +17,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut home_state_to_f64_matches = Vec::new();
     let mut home_state_from_f64_matches = Vec::new();
     let mut home_state_data_point_matches = Vec::new();
+    let mut home_state_data_frame_matches = Vec::new();
 
     // Check if this is HomeStateValue to generate persistent types
     let persistent_enum_name = format_ident!("Persistent{}", enum_name);
@@ -114,6 +115,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     Ok(dp.map_value(|v| #enum_name::#variant_name(item.clone(), v.clone())))
                 }
             });
+
+            home_state_data_frame_matches.push(quote! {
+                #home_state_name::#variant_name(item) => item
+                    .get_data_frame(range, api)
+                    .await?
+                    .map(|dp| #enum_name::#variant_name(item.clone(), dp.value.clone()))
+            });
         }
     }
 
@@ -168,6 +176,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     match self {
                         #(#home_state_data_point_matches),*
                     }
+                }
+            }
+
+            impl crate::port::DataFrameAccess<#home_state_name> for #home_state_name {
+                async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
+                    let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
+                        #(#home_state_data_frame_matches),*
+                    };
+
+                    Ok(df)
                 }
             }
         }

@@ -135,7 +135,7 @@ impl super::Database {
             order by created asc"#,
             db_target,
             range.start().into_db(),
-            range.end().into_db()        
+            range.end().into_db()
         )
         .fetch_all(&self.pool)
         .await?;

@@ -18,7 +18,7 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
 
     for variant in data_enum.variants.iter() {
         let variant_name = &variant.ident;
-        
+
         match &variant.fields {
             // Variant with no fields (current behavior)
             Fields::Unit => {
@@ -27,7 +27,7 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
             // Variant with exactly one unnamed field
             Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
                 let field_type = &fields.unnamed.first().unwrap().ty;
-                
+
                 // Generate combinations by calling variants() on the nested enum
                 nested_variants.push(quote! {
                     #field_type::variants().iter().map(|inner| #enum_name::#variant_name(inner.clone()))
@@ -41,9 +41,10 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
     }
 
     // Check if we have any nested variants (variants with fields)
-    let has_nested = data_enum.variants.iter().any(|variant| {
-        matches!(variant.fields, Fields::Unnamed(ref fields) if fields.unnamed.len() == 1)
-    });
+    let has_nested = data_enum
+        .variants
+        .iter()
+        .any(|variant| matches!(variant.fields, Fields::Unnamed(ref fields) if fields.unnamed.len() == 1));
 
     let expanded = if has_nested {
         // If we have nested variants, we need to collect all combinations
@@ -51,17 +52,17 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
             impl #enum_name {
                 pub fn variants() -> Vec<Self> {
                     let mut result = Vec::new();
-                    
+
                     // Add unit variants
                     #(
                         result.push(#unit_variants);
                     )*
-                    
+
                     // Add nested variants
                     #(
                         result.extend(#nested_variants);
                     )*
-                    
+
                     result
                 }
             }

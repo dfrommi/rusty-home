@@ -1,11 +1,11 @@
+use crate::core::HomeApi;
+use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
-use crate::core::HomeApi;
-use crate::core::ValueObject;
-use crate::{core::timeseries::DataPoint, home::state::Powered};
 use crate::port::DataFrameAccess;
 use crate::t;
+use crate::{core::timeseries::DataPoint, home::state::Powered};
 use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::{
@@ -13,7 +13,7 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::{sampled_data_frame, DataPointAccess};
+use super::{DataPointAccess, sampled_data_frame};
 use crate::port::CommandExecutionAccess;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]

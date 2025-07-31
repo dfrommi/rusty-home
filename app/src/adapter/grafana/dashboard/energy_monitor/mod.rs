@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::core::HomeApi;
 use actix_web::web;
 
-
 mod current;
 mod total;
 

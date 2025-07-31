@@ -1,4 +1,7 @@
-use std::{fmt::Display, ops::{Add, Sub}};
+use std::{
+    fmt::Display,
+    ops::{Add, Sub},
+};
 
 use anyhow::Context;
 use chrono::Timelike;
@@ -48,15 +51,15 @@ impl Time {
     fn add_seconds(&self, seconds: i64) -> Self {
         let current_seconds = self.delegate.num_seconds_from_midnight() as i64;
         let total_seconds = current_seconds + seconds;
-        
+
         // Use rem_euclid to handle negative values properly - it always returns positive remainder
         // e.g., -5.rem_euclid(24) = 19, whereas -5 % 24 = -5
         let wrapped_seconds = total_seconds.rem_euclid(24 * 60 * 60) as u32;
-        
+
         let hours = wrapped_seconds / 3600;
         let minutes = (wrapped_seconds % 3600) / 60;
         let secs = wrapped_seconds % 60;
-        
+
         Self::new(chrono::NaiveTime::from_hms_opt(hours, minutes, secs).unwrap())
     }
 }

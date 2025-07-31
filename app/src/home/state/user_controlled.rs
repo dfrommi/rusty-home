@@ -15,7 +15,7 @@ use crate::home::{
     state::macros::result,
 };
 
-use super::{sampled_data_frame, DataPointAccess};
+use super::{DataPointAccess, sampled_data_frame};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum UserControlled {

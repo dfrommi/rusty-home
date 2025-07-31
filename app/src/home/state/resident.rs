@@ -10,7 +10,7 @@ use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
-use super::{sampled_data_frame, DataPointAccess, TimeSeriesAccess};
+use super::{DataPointAccess, TimeSeriesAccess, sampled_data_frame};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Resident {

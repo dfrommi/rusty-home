@@ -2,14 +2,14 @@ use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::unit::DegreeCelsius;
-use crate::{core::timeseries::DataPoint, home::state::Temperature};
 use crate::port::DataFrameAccess;
 use crate::t;
+use crate::{core::timeseries::DataPoint, home::state::Temperature};
 use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
-use super::{sampled_data_frame, DataPointAccess, OpenedArea};
+use super::{DataPointAccess, OpenedArea, sampled_data_frame};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum ColdAirComingIn {
@@ -58,7 +58,11 @@ impl Estimatable for ColdAirComingIn {
 }
 
 impl DataFrameAccess<ColdAirComingIn> for ColdAirComingIn {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<DataFrame<bool>> {
+    async fn get_data_frame(
+        &self,
+        range: DateTimeRange,
+        api: &crate::core::HomeApi,
+    ) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }
 }

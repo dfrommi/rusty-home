@@ -11,7 +11,7 @@ use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
-use super::{sampled_data_frame, DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint};
+use super::{DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint, sampled_data_frame};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EnumVariants, Id)]
 pub enum RiskOfMould {

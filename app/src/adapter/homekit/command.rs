@@ -77,15 +77,29 @@ async fn execute_target(
             )))
             .await
         }
-        HomekitCommandTarget::LivingRoomCeilingFanSpeed | HomekitCommandTarget::BedroomCeilingFanSpeed => {
-            let percent: Percent = payload.clone().try_into()?;
-            let activity = if percent.0 == 0.0 {
-                FanAirflow::Off
-            } else {
-                FanAirflow::Forward(payload.try_into()?)
-            };
+        HomekitCommandTarget::LivingRoomCeilingFanSpeed => {
+            let activity: FanAirflow = payload.try_into()?;
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(activity)))
                 .await
         }
+        HomekitCommandTarget::BedroomCeilingFanSpeed => {
+            let activity: FanAirflow = payload.try_into()?;
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(activity)))
+                .await
+        }
+    }
+}
+
+impl TryInto<FanAirflow> for HomekitStateValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<FanAirflow, Self::Error> {
+        let percent: Percent = self.clone().try_into()?;
+        let activity = if percent.0 == 0.0 {
+            FanAirflow::Off
+        } else {
+            FanAirflow::Forward(self.try_into()?)
+        };
+        Ok(activity)
     }
 }

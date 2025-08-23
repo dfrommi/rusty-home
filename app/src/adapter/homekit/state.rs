@@ -41,18 +41,12 @@ async fn export_accessory(
     sender: &mut MqttStateSender,
 ) -> anyhow::Result<()> {
     match accessory {
-        HomekitState::Powered(powered) => sender.send("powered", key, powered.current(api).await?).await,
-        HomekitState::EnergySaving(energy_saving) => {
-            sender
-                .send("energy_saving", key, energy_saving.current(api).await?)
-                .await
-        }
+        HomekitState::Powered(powered) => sender.send(key, powered.current(api).await?).await,
+        HomekitState::EnergySaving(energy_saving) => sender.send(key, energy_saving.current(api).await?).await,
         HomekitState::FanSpeed(fan_activity) => {
             match fan_activity.current(api).await? {
-                FanAirflow::Off => sender.send("fan_speed", key, Percent(0.0)).await,
-                FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => {
-                    sender.send("fan_speed", key, fan_speed).await
-                }
+                FanAirflow::Off => sender.send(key, Percent(0.0)).await,
+                FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => sender.send(key, fan_speed).await,
             };
         }
     }
@@ -75,13 +69,13 @@ impl MqttStateSender {
         }
     }
 
-    async fn send<T>(&mut self, group: &str, item: &str, value: T)
+    async fn send<T>(&mut self, item: &str, value: T)
     where
         T: Into<HomekitStateValue>,
     {
         let value: HomekitStateValue = value.into();
 
-        let topic = format!("{}/{}/{}", self.base_topic, group, item);
+        let topic = format!("{}/{}", self.base_topic, item);
         let payload = value.0;
 
         if self.last_sent.get(&topic) == Some(&payload) {

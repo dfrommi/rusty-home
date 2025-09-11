@@ -3,15 +3,13 @@ use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange, Duration};
 use crate::home::state::HomeState;
 use crate::port::{DataFrameAccess, DataPointAccess};
-use rmcp::handler::server::tool::Parameters;
-use rmcp::schemars::schema::{Schema, SchemaObject};
-use rmcp::schemars::{self, JsonSchema};
+use rmcp::handler::server::wrapper::Parameters;
+use rmcp::schemars::{self, JsonSchema, Schema, json_schema};
 use rmcp::tool;
 use rmcp::{
     RoleServer, ServerHandler, handler::server::router::tool::ToolRouter, model::ErrorData as McpError, model::*,
     service::RequestContext, tool_handler, tool_router,
 };
-use serde_json::json;
 
 #[derive(Clone)]
 pub struct SmartHomeMcp {
@@ -73,36 +71,29 @@ pub struct DeviceError {
 
 impl JsonSchema for DateTime {
     fn json_schema(_: &mut rmcp::schemars::SchemaGenerator) -> Schema {
-        let schema = json!({
+        json_schema!({
             "type": "string",
             "format": "date-time",
             "description": "ISO 8601 date and time format, e.g. '2023-10-01T12:00:00Z'."
-        });
-
-        let obj: SchemaObject = serde_json::from_value(schema).expect("Error creating schema object");
-        obj.into()
+        })
     }
 
-    fn schema_name() -> String {
-        "DateTime".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "DateTime".into()
     }
 }
 
 impl JsonSchema for Duration {
-    fn schema_name() -> String {
-        "Duration".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Duration".into()
     }
 
-    fn json_schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-        let schema = json!({
+    fn json_schema(_: &mut rmcp::schemars::SchemaGenerator) -> Schema {
+        json_schema!({
             "type": "string",
             "format": "duration",
             "description": "Duration in ISO 8601 format, e.g. 'PT1H30M' for 1 hour and 30 minutes."
-        });
-
-        serde_json::from_value::<SchemaObject>(schema)
-            .expect("Error creating schema object")
-            .into()
+        })
     }
 }
 

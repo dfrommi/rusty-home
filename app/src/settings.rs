@@ -1,4 +1,4 @@
-use config::{Config, ConfigError, File};
+use config::{Config, ConfigError, Environment, File};
 use infrastructure::{DatabaseConfig, HttpServerConfig, MonitoringConfig, MqttConfig};
 use serde::Deserialize;
 
@@ -17,8 +17,11 @@ pub struct Settings {
 
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let s = Config::builder().add_source(File::with_name("config.toml")).build()?;
+        let builder = Config::builder()
+            .add_source(File::with_name("config.toml"))
+            .add_source(Environment::default().separator("_").list_separator(","));
 
+        let s = builder.build()?;
         s.try_deserialize()
     }
 }

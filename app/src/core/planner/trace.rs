@@ -6,7 +6,7 @@ use infrastructure::TraceContext;
 
 use crate::core::HomeApi;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct PlanningTrace {
     pub timestamp: DateTime,
     pub trace_id: Option<String>,
@@ -79,11 +79,11 @@ pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &HomeApi) {
     }
 }
 
-static PREVIOUS_ACTION: Mutex<Option<PlanningTrace>> = Mutex::new(None);
+static PREVIOUS_ACTION: Mutex<Option<Vec<PlanningTraceStep>>> = Mutex::new(None);
 fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
     match PREVIOUS_ACTION.lock() {
         Ok(mut previous) => {
-            let current = Some(current.clone());
+            let current = Some(current.steps.clone());
             if *previous != current {
                 *previous = current;
                 true

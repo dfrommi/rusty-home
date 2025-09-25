@@ -83,6 +83,7 @@ where
             ActionEvaluationResult::Skip
         })
     } else {
+        tracing::trace!("Goal {} not active, skipping action {}", context.trace.goal, context.action);
         ActionEvaluationResult::Skip
     };
 

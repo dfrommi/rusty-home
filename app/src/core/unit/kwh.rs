@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Add};
 
 use derive_more::derive::AsRef;
 
@@ -20,5 +20,13 @@ impl From<&KiloWattHours> for f64 {
 impl From<f64> for KiloWattHours {
     fn from(value: f64) -> Self {
         Self(value)
+    }
+}
+
+impl Add for KiloWattHours {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        KiloWattHours(self.0 + rhs.0)
     }
 }

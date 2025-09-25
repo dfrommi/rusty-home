@@ -1,4 +1,5 @@
 use super::Z2mChannel;
+use crate::core::unit::KiloWattHours;
 use crate::home::state::Opened;
 use crate::home::state::*;
 use crate::home::trigger::RemoteTarget;
@@ -62,17 +63,26 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "kitchen/multiplug",
-            Z2mChannel::PowerPlug(CurrentPowerUsage::KitchenMultiPlug, TotalEnergyConsumption::KitchenMultiPlug),
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::KitchenMultiPlug,
+                TotalEnergyConsumption::KitchenMultiPlug,
+                KiloWattHours(0.0),
+            ),
         ),
         (
             "living_room/couch_plug",
-            Z2mChannel::PowerPlug(CurrentPowerUsage::CouchPlug, TotalEnergyConsumption::CouchPlug),
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::CouchPlug,
+                TotalEnergyConsumption::CouchPlug,
+                KiloWattHours(0.0),
+            ),
         ),
         (
             "room_of_requirements/makerspace",
             Z2mChannel::PowerPlug(
                 CurrentPowerUsage::RoomOfRequirementsDesk,
                 TotalEnergyConsumption::RoomOfRequirementsDesk,
+                KiloWattHours(0.0),
             ),
         ),
         //

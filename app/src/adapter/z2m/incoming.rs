@@ -80,7 +80,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::PowerPlug(power, energy) => {
+            Z2mChannel::PowerPlug(power, energy, energy_offset) => {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
@@ -91,7 +91,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     DataPoint::new(
                         PersistentHomeStateValue::TotalEnergyConsumption(
                             energy.clone(),
-                            KiloWattHours(payload.total_energy_kwh),
+                            KiloWattHours(payload.total_energy_kwh) + *energy_offset,
                         ),
                         payload.last_seen,
                     )

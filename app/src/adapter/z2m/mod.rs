@@ -1,6 +1,7 @@
 mod config;
 mod incoming;
 
+use crate::core::unit::KiloWattHours;
 use crate::home::state::{CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
 use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
@@ -21,7 +22,7 @@ pub struct Zigbee2Mqtt {
 enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
-    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption),
+    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
 }

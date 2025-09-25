@@ -193,19 +193,18 @@ impl HomeApi {
         let was_latest_execution = last_execution.is_some();
         let is_reflected_in_state = command.is_reflected_in_state(self).await?;
 
-        let result = if !was_latest_execution || !is_reflected_in_state {
+        if !was_latest_execution || !is_reflected_in_state {
             self.db
                 .save_command(&command, source, TraceContext::current_correlation_id())
                 .await?;
+
+            // Invalidate command cache after saving command
+            self.invalidate_command_cache(&command.into()).await;
+
             Ok(CommandExecutionResult::Triggered)
         } else {
             Ok(CommandExecutionResult::Skipped)
-        };
-
-        // Invalidate command cache after saving command
-        self.invalidate_command_cache(&command.into()).await;
-
-        result
+        }
     }
 
     pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {

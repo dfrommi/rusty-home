@@ -68,6 +68,27 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
+            Z2mChannel::Thermostat(set_point, demand) => {
+                let payload: Thermostat = serde_json::from_str(&msg.payload)?;
+
+                vec![
+                    DataPoint::new(
+                        PersistentHomeStateValue::SetPoint(
+                            set_point.clone(),
+                            DegreeCelsius(payload.occupied_heating_setpoint),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::HeatingDemand(demand.clone(), Percent(payload.pi_heating_demand)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                ]
+            }
+
             Z2mChannel::ContactSensor(opened) => {
                 let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
@@ -153,6 +174,13 @@ fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {
 struct ClimateSensor {
     temperature: f64,
     humidity: f64,
+    last_seen: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct Thermostat {
+    occupied_heating_setpoint: f64,
+    pi_heating_demand: f64,
     last_seen: DateTime,
 }
 

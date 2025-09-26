@@ -2,7 +2,9 @@ mod config;
 mod incoming;
 
 use crate::core::unit::KiloWattHours;
-use crate::home::state::{CurrentPowerUsage, Opened, Presence, RelativeHumidity, Temperature, TotalEnergyConsumption};
+use crate::home::state::{
+    CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
+};
 use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use serde::Deserialize;
@@ -25,6 +27,7 @@ enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
+    Thermostat(SetPoint, HeatingDemand),
 }
 
 impl Zigbee2Mqtt {

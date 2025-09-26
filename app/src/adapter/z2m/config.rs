@@ -26,6 +26,13 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             Z2mChannel::ClimateSensor(Temperature::Dehumidifier, RelativeHumidity::Dehumidifier),
         ),
         //
+        // THERMOSTATS
+        //
+        (
+            "room_of_requirements/thermostat",
+            Z2mChannel::Thermostat(SetPoint::RoomOfRequirements, HeatingDemand::RoomOfRequirements),
+        ),
+        //
         // WINDOW CONTACTS
         //
         ("bedroom/window", Z2mChannel::ContactSensor(Opened::BedroomWindow)),

@@ -31,9 +31,15 @@ impl Display for NoHeatingDuringVentilation {
 
 impl SimpleAction for NoHeatingDuringVentilation {
     fn command(&self) -> Command {
-        Command::SetHeating {
-            device: self.heating_zone.thermostat(),
-            target_state: crate::home::command::HeatingTargetState::Off,
+        match self.heating_zone {
+            HeatingZone::RoomOfRequirements => Command::SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: crate::home::command::HeatingTargetState::WindowOpen,
+            },
+            _ => Command::SetHeating {
+                device: self.heating_zone.thermostat(),
+                target_state: crate::home::command::HeatingTargetState::Off,
+            },
         }
     }
 

@@ -136,6 +136,7 @@ pub enum Thermostat {
 pub enum HeatingTargetState {
     Auto,
     Off, //TODO support off-timer (not supported via HA)
+    WindowOpen,
     Heat {
         temperature: DegreeCelsius,
         duration: Duration,

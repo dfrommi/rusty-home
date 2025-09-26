@@ -30,7 +30,11 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "room_of_requirements/thermostat",
-            Z2mChannel::Thermostat(SetPoint::RoomOfRequirements, HeatingDemand::RoomOfRequirements),
+            Z2mChannel::Thermostat(
+                SetPoint::RoomOfRequirements,
+                HeatingDemand::RoomOfRequirements,
+                Opened::RoomOfRequirementsThermostat,
+            ),
         ),
         //
         // WINDOW CONTACTS

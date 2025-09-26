@@ -27,7 +27,7 @@ enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
-    Thermostat(SetPoint, HeatingDemand),
+    Thermostat(SetPoint, HeatingDemand, Opened),
 }
 
 impl Zigbee2Mqtt {

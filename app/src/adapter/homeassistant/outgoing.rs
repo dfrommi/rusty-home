@@ -68,6 +68,13 @@ impl HaCommandExecutor {
             (
                 ClimateControl(id),
                 Command::SetHeating {
+                    target_state: HeatingTargetState::WindowOpen,
+                    ..
+                },
+            ) => self.climate_set_hvac_mode(id, "off").await,
+            (
+                ClimateControl(id),
+                Command::SetHeating {
                     target_state: HeatingTargetState::Auto,
                     ..
                 },

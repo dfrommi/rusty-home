@@ -3,7 +3,7 @@ use crate::home::command::{
     Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification, NotificationAction,
     NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Powered, SetPoint};
+use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Opened, Powered, SetPoint};
 use crate::port::CommandExecutionAccess;
 use anyhow::Result;
 
@@ -51,6 +51,10 @@ async fn is_set_heating_reflected_in_state(
         crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
             Ok(!auto_mode && &set_point == temperature)
         }
+        crate::home::command::HeatingTargetState::WindowOpen => match device {
+            Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),
+            _ => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
+        },
     }
 }
 

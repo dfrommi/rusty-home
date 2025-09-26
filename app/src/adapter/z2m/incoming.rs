@@ -68,7 +68,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::Thermostat(set_point, demand) => {
+            Z2mChannel::Thermostat(set_point, demand, opened) => {
                 let payload: Thermostat = serde_json::from_str(&msg.payload)?;
 
                 vec![
@@ -82,6 +82,11 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     .into(),
                     DataPoint::new(
                         PersistentHomeStateValue::HeatingDemand(demand.clone(), Percent(payload.pi_heating_demand)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::Opened(opened.clone(), payload.window_open_external),
                         payload.last_seen,
                     )
                     .into(),
@@ -181,6 +186,7 @@ struct ClimateSensor {
 struct Thermostat {
     occupied_heating_setpoint: f64,
     pi_heating_demand: f64,
+    window_open_external: bool,
     last_seen: DateTime,
 }
 

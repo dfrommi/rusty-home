@@ -20,10 +20,10 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             Thermostat::Bedroom.into(),
             HaServiceTarget::ClimateControl("climate.schlafzimmer"),
         ),
-        (
-            Thermostat::RoomOfRequirements.into(),
-            HaServiceTarget::ClimateControl("climate.arbeitszimmer"),
-        ),
+        // (
+        //     Thermostat::RoomOfRequirements.into(),
+        //     HaServiceTarget::ClimateControl("climate.arbeitszimmer"),
+        // ),
         (Thermostat::Kitchen.into(), HaServiceTarget::ClimateControl("climate.kuche")),
         (Thermostat::Bathroom.into(), HaServiceTarget::ClimateControl("climate.bad")),
         (

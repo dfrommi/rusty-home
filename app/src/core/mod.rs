@@ -77,13 +77,14 @@ where
     }
 }
 
-pub fn plan_and_execute<P: CommandExecutor, S: CommandExecutor>(
+pub fn plan_and_execute<A: CommandExecutor, B: CommandExecutor, C: CommandExecutor>(
     infrastructure: &Infrastructure,
-    primary: P,
-    secondary: S,
-) -> impl Future<Output = ()> + use<P, S> {
+    first: A,
+    second: B,
+    third: C,
+) -> impl Future<Output = ()> + use<A, B, C> {
     let planner = planner::keep_on_planning(infrastructure);
-    let executor = command::keep_command_executor_running(infrastructure, primary, secondary);
+    let executor = command::keep_command_executor_running(infrastructure, first, second, third);
 
     async move {
         tokio::select! {

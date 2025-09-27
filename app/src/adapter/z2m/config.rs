@@ -1,8 +1,20 @@
 use super::Z2mChannel;
+use super::Z2mCommandTarget;
 use crate::core::unit::KiloWattHours;
+use crate::home::command::CommandTarget;
+use crate::home::command::Thermostat;
 use crate::home::state::Opened;
 use crate::home::state::*;
 use crate::home::trigger::RemoteTarget;
+
+pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
+    vec![(
+        CommandTarget::SetHeating {
+            device: Thermostat::RoomOfRequirements,
+        },
+        Z2mCommandTarget::Thermostat("room_of_requirements/thermostat"),
+    )]
+}
 
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
     vec![

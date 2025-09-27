@@ -11,15 +11,16 @@ pub trait CommandExecutor {
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
 }
 
-pub fn keep_command_executor_running<P: CommandExecutor, S: CommandExecutor>(
+pub fn keep_command_executor_running<A: CommandExecutor, B: CommandExecutor, C: CommandExecutor>(
     infrastructure: &Infrastructure,
-    primary: P,
-    secondary: S,
-) -> impl Future<Output = ()> + use<P, S> {
+    first: A,
+    second: B,
+    third: C,
+) -> impl Future<Output = ()> + use<A, B, C> {
     let command_repo = infrastructure.api.clone();
     let new_cmd_available = infrastructure.event_listener.new_command_added_listener();
 
-    let cmd_executor = MultiCommandExecutor { primary, secondary };
+    let cmd_executor = MultiCommandExecutor { first, second, third };
 
     async move {
         process_command_executor(&command_repo, &cmd_executor, new_cmd_available).await;
@@ -89,25 +90,34 @@ async fn handle_execution_result(command_id: i64, res: Result<bool>, api: &HomeA
     }
 }
 
-struct MultiCommandExecutor<A, B>
+struct MultiCommandExecutor<A, B, C>
 where
     A: CommandExecutor,
     B: CommandExecutor,
+    C: CommandExecutor,
 {
-    primary: A,
-    secondary: B,
+    first: A,
+    second: B,
+    third: C,
 }
 
-impl<A, B> CommandExecutor for MultiCommandExecutor<A, B>
+impl<A, B, C> CommandExecutor for MultiCommandExecutor<A, B, C>
 where
     A: CommandExecutor,
     B: CommandExecutor,
+    C: CommandExecutor,
 {
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        match self.primary.execute_command(command).await {
-            Ok(true) => Ok(true),
-            Ok(false) => self.secondary.execute_command(command).await,
-            Err(e) => Err(e),
+        if self.first.execute_command(command).await? {
+            return Ok(true);
         }
+        if self.second.execute_command(command).await? {
+            return Ok(true);
+        }
+        if self.third.execute_command(command).await? {
+            return Ok(true);
+        }
+
+        anyhow::bail!("No command executor configured for command {:?}", command)
     }
 }

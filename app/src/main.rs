@@ -33,6 +33,7 @@ pub async fn main() {
     let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
 
     let z2m_incoming_data_processing = settings.z2m.new_incoming_data_processor(&mut infrastructure).await;
+    let z2m_cmd_executor = settings.z2m.new_command_executor(&infrastructure);
 
     let tasmota_incoming_data_processing = settings.tasmota.new_incoming_data_processor(&mut infrastructure).await;
     let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -47,7 +48,8 @@ pub async fn main() {
     let hk_export_states = settings.homekit.export_state(&infrastructure);
     let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
 
-    let plan_and_execute = { core::plan_and_execute(&infrastructure, ha_cmd_executor, tasmota_cmd_executor) };
+    let plan_and_execute =
+        { core::plan_and_execute(&infrastructure, ha_cmd_executor, z2m_cmd_executor, tasmota_cmd_executor) };
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();

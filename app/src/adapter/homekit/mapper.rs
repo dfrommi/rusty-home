@@ -1,4 +1,7 @@
-use crate::{core::unit::Percent, home::state::FanSpeed};
+use crate::{
+    core::unit::{DegreeCelsius, Percent},
+    home::state::FanSpeed,
+};
 
 use super::HomekitStateValue;
 
@@ -33,6 +36,23 @@ impl TryInto<Percent> for HomekitStateValue {
         match self.0.parse() {
             Ok(v) => Ok(Percent(v)),
             Err(_) => anyhow::bail!("Error converting {} to Percent", self.0),
+        }
+    }
+}
+
+impl From<DegreeCelsius> for HomekitStateValue {
+    fn from(val: DegreeCelsius) -> Self {
+        HomekitStateValue(val.0.to_string())
+    }
+}
+
+impl TryInto<DegreeCelsius> for HomekitStateValue {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<DegreeCelsius, Self::Error> {
+        match self.0.parse() {
+            Ok(v) => Ok(DegreeCelsius(v)),
+            Err(_) => anyhow::bail!("Error converting {} to DegreeCelsius", self.0),
         }
     }
 }

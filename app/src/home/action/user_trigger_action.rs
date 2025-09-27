@@ -88,6 +88,7 @@ impl UserTriggerAction {
             }
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => Some(t!(1 hours)),
         }
     }
 }
@@ -123,6 +124,17 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
         UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(speed)) => Some(Command::ControlFan {
             device: Fan::BedroomCeilingFan,
             speed,
+        }),
+        UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => Some(Command::SetHeating {
+            device: Thermostat::RoomOfRequirements,
+            target_state: match state {
+                crate::adapter::homekit::HomekitHeatingState::Off => HeatingTargetState::Off,
+                crate::adapter::homekit::HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
+                    temperature,
+                    duration: t!(1 hours),
+                },
+                crate::adapter::homekit::HomekitHeatingState::Auto => return None,
+            },
         }),
 
         UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => None,

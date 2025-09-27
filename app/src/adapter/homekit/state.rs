@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::adapter::homekit::{Homekit, HomekitState};
 use crate::core::HomeApi;
-use crate::core::unit::Percent;
+use crate::core::unit::{DegreeCelsius, Percent};
 use crate::home::state::FanAirflow;
 use infrastructure::MqttOutMessage;
 use tokio::sync::{broadcast::Receiver, mpsc::Sender};
@@ -41,14 +41,27 @@ async fn export_accessory(
     sender: &mut MqttStateSender,
 ) -> anyhow::Result<()> {
     match accessory {
-        HomekitState::Powered(powered) => sender.send(key, powered.current(api).await?).await,
-        HomekitState::EnergySaving(energy_saving) => sender.send(key, energy_saving.current(api).await?).await,
+        HomekitState::Powered(powered) => sender.send(key, powered.current(api).await?).await?,
+        HomekitState::EnergySaving(energy_saving) => sender.send(key, energy_saving.current(api).await?).await?,
         HomekitState::FanSpeed(fan_activity) => {
             match fan_activity.current(api).await? {
-                FanAirflow::Off => sender.send(key, Percent(0.0)).await,
-                FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => sender.send(key, fan_speed).await,
+                FanAirflow::Off => sender.send(key, Percent(0.0)).await?,
+                FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => sender.send(key, fan_speed).await?,
             };
         }
+        HomekitState::CurrentTemperature(temperature) => sender.send(key, temperature.current(api).await?).await?,
+        HomekitState::CurrentHumidity(relative_humidity) => {
+            sender.send(key, relative_humidity.current(api).await?).await?
+        }
+        HomekitState::CurrentHeatingState(setpoint) => {
+            let heating_state = if setpoint.current(api).await? > DegreeCelsius(0.0) {
+                "HEAT"
+            } else {
+                "OFF"
+            };
+            sender.send(key, HomekitStateValue(heating_state.to_string())).await?
+        }
+        HomekitState::TargetTemperature(set_point) => sender.send(key, set_point.current(api).await?).await?,
     }
 
     Ok(())
@@ -69,7 +82,7 @@ impl MqttStateSender {
         }
     }
 
-    async fn send<T>(&mut self, item: &str, value: T)
+    async fn send<T>(&mut self, item: &str, value: T) -> anyhow::Result<()>
     where
         T: Into<HomekitStateValue>,
     {
@@ -79,12 +92,14 @@ impl MqttStateSender {
         let payload = value.0;
 
         if self.last_sent.get(&topic) == Some(&payload) {
-            return;
+            return Ok(());
         }
 
         let msg = MqttOutMessage::retained(topic.clone(), payload.clone());
 
-        self.tx.send(msg).await.unwrap();
+        self.tx.send(msg).await?;
         self.last_sent.insert(topic, payload);
+
+        Ok(())
     }
 }

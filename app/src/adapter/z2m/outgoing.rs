@@ -61,12 +61,19 @@ impl CommandExecutor for Z2mCommandExecutor {
                 },
                 Z2mCommandTarget::Thermostat(device_id),
             ) => self.set_heating(device_id, Some(DegreeCelsius(18.0)), false).await,
+            (
+                Command::SetHeating {
+                    target_state: HeatingTargetState::Heat { temperature, .. },
+                    ..
+                },
+                Z2mCommandTarget::Thermostat(device_id),
+            ) => self.set_heating(device_id, Some(*temperature), false).await,
             (Command::SetThermostatAmbientTemperature { temperature, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
                 self.set_ambient_temperature(device_id, *temperature).await
             }
 
             (_, tasmota_target) => {
-                anyhow::bail!("Mismatch between command and tasmota target {:?}", tasmota_target)
+                anyhow::bail!("Mismatch between command and Z2M target {:?}", tasmota_target)
             }
         }
     }

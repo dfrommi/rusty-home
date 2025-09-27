@@ -71,6 +71,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             ProvideAmbientTemperature::RoomOfRequirements.into(), 
             NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements).into(),
+            UserTriggerAction::new(HomekitCommandTarget::RoomOfRequirementsHeatingState.into()).into()
             //KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Thermostat::RoomOfRequirements).into(),
             //NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements).into(),
         ]

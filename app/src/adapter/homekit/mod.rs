@@ -2,7 +2,13 @@ mod command;
 mod mapper;
 mod state;
 
-use crate::home::state::{EnergySaving, FanActivity, FanAirflow, Powered};
+use crate::{
+    core::unit::DegreeCelsius,
+    home::{
+        command::Thermostat,
+        state::{EnergySaving, FanActivity, FanAirflow, Powered, RelativeHumidity, SetPoint, Temperature},
+    },
+};
 use serde::{Deserialize, Serialize};
 
 use crate::Infrastructure;
@@ -45,6 +51,21 @@ enum HomekitState {
     Powered(Powered),
     EnergySaving(EnergySaving),
     FanSpeed(FanActivity),
+    CurrentTemperature(Temperature),
+    CurrentHumidity(RelativeHumidity),
+    CurrentHeatingState(SetPoint),
+    TargetTemperature(SetPoint),
+}
+
+#[derive(Debug, Clone, derive_more::Display)]
+pub enum HomekitInput {
+    InfraredHeaterPower,
+    DehumidifierPower,
+    LivingRoomTvEnergySaving,
+    LivingRoomCeilingFanSpeed,
+    BedroomCeilingFanSpeed,
+    ThermostatTargetHeatingState(Thermostat),
+    ThermostatTargetTemperature(Thermostat),
 }
 
 //Don't forget to add to action planning config
@@ -56,6 +77,7 @@ pub enum HomekitCommand {
     LivingRoomTvEnergySaving(bool),
     LivingRoomCeilingFanSpeed(FanAirflow),
     BedroomCeilingFanSpeed(FanAirflow),
+    RoomOfRequirementsHeatingState(HomekitHeatingState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
@@ -67,35 +89,63 @@ pub enum HomekitCommandTarget {
     LivingRoomTvEnergySaving,
     LivingRoomCeilingFanSpeed,
     BedroomCeilingFanSpeed,
+    RoomOfRequirementsHeatingState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HomekitHeatingState {
+    Off,
+    Heat(DegreeCelsius),
+    Auto,
 }
 
 impl Homekit {
-    fn config() -> Vec<(&'static str, HomekitState, Option<HomekitCommandTarget>)> {
+    fn config() -> Vec<(&'static str, HomekitState, Option<HomekitInput>)> {
         vec![
             (
                 "powered/infared_heater",
                 HomekitState::Powered(Powered::InfraredHeater),
-                Some(HomekitCommandTarget::InfraredHeaterPower),
+                Some(HomekitInput::InfraredHeaterPower),
             ),
             (
                 "powered/dehumidifier",
                 HomekitState::Powered(Powered::Dehumidifier),
-                Some(HomekitCommandTarget::DehumidifierPower),
+                Some(HomekitInput::DehumidifierPower),
             ),
             (
                 "energy_saving/living_room_tv",
                 HomekitState::EnergySaving(EnergySaving::LivingRoomTv),
-                Some(HomekitCommandTarget::LivingRoomTvEnergySaving),
+                Some(HomekitInput::LivingRoomTvEnergySaving),
             ),
             (
                 "fan_speed/bedroom_ceiling_fan",
                 HomekitState::FanSpeed(FanActivity::BedroomCeilingFan),
-                Some(HomekitCommandTarget::BedroomCeilingFanSpeed),
+                Some(HomekitInput::BedroomCeilingFanSpeed),
             ),
             (
                 "fan_speed/living_room_ceiling_fan",
                 HomekitState::FanSpeed(FanActivity::LivingRoomCeilingFan),
-                Some(HomekitCommandTarget::LivingRoomCeilingFanSpeed),
+                Some(HomekitInput::LivingRoomCeilingFanSpeed),
+            ),
+            (
+                "thermostat/room_of_requirements/current_temperature",
+                HomekitState::CurrentTemperature(Temperature::RoomOfRequirementsDoor),
+                None,
+            ),
+            (
+                "thermostat/room_of_requirements/current_humidity",
+                HomekitState::CurrentHumidity(RelativeHumidity::RoomOfRequirementsDoor),
+                None,
+            ),
+            (
+                "thermostat/room_of_requirements/heating_state",
+                HomekitState::CurrentHeatingState(SetPoint::RoomOfRequirements),
+                Some(HomekitInput::ThermostatTargetHeatingState(Thermostat::RoomOfRequirements)),
+            ),
+            (
+                "thermostat/room_of_requirements/target_temperature",
+                HomekitState::TargetTemperature(SetPoint::RoomOfRequirements),
+                Some(HomekitInput::ThermostatTargetTemperature(Thermostat::RoomOfRequirements)),
             ),
         ]
     }

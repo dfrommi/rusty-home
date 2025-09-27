@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{Homekit, HomekitCommand, HomekitCommandTarget};
-use crate::core::HomeApi;
+use super::{Homekit, HomekitCommand};
+use crate::adapter::homekit::HomekitHeatingState;
 use crate::core::unit::Percent;
+use crate::home::command::Thermostat;
 use crate::home::state::FanAirflow;
 use crate::home::trigger::UserTrigger;
+use crate::{adapter::homekit::HomekitInput, core::HomeApi};
 use infrastructure::MqttInMessage;
 use tokio::{sync::mpsc::Receiver, task::JoinHandle};
 
@@ -39,7 +41,7 @@ pub async fn process_commands(base_topic: String, mut rx: Receiver<MqttInMessage
 
 async fn handle_message(base_topic: &str, msg: MqttInMessage, api: Arc<HomeApi>) {
     let config = Homekit::config();
-    let target: Option<&HomekitCommandTarget> = config.iter().find_map(|(key, _, target)| {
+    let input: Option<&HomekitInput> = config.iter().find_map(|(key, _, target)| {
         if msg.topic == format!("{base_topic}/{key}") {
             target.as_ref()
         } else {
@@ -47,7 +49,7 @@ async fn handle_message(base_topic: &str, msg: MqttInMessage, api: Arc<HomeApi>)
         }
     });
 
-    if let Some(target) = target {
+    if let Some(target) = input {
         tracing::info!("Received command for {}", target);
         if let Err(e) = execute_target(target, HomekitStateValue(msg.payload), api).await {
             tracing::error!("Error triggering command for {}: {:?}", target, e);
@@ -57,35 +59,55 @@ async fn handle_message(base_topic: &str, msg: MqttInMessage, api: Arc<HomeApi>)
     }
 }
 
-async fn execute_target(
-    target: &HomekitCommandTarget,
-    payload: HomekitStateValue,
-    api: Arc<HomeApi>,
-) -> anyhow::Result<()> {
-    match target {
-        HomekitCommandTarget::InfraredHeaterPower => {
+async fn execute_target(input: &HomekitInput, payload: HomekitStateValue, api: Arc<HomeApi>) -> anyhow::Result<()> {
+    match input {
+        HomekitInput::InfraredHeaterPower => {
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(payload.try_into()?)))
                 .await
         }
-        HomekitCommandTarget::DehumidifierPower => {
+        HomekitInput::DehumidifierPower => {
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::DehumidifierPower(payload.try_into()?)))
                 .await
         }
-        HomekitCommandTarget::LivingRoomTvEnergySaving => {
+        HomekitInput::LivingRoomTvEnergySaving => {
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(
                 payload.try_into()?,
             )))
             .await
         }
-        HomekitCommandTarget::LivingRoomCeilingFanSpeed => {
+        HomekitInput::LivingRoomCeilingFanSpeed => {
             let activity: FanAirflow = payload.try_into()?;
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(activity)))
                 .await
         }
-        HomekitCommandTarget::BedroomCeilingFanSpeed => {
+        HomekitInput::BedroomCeilingFanSpeed => {
             let activity: FanAirflow = payload.try_into()?;
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(activity)))
                 .await
+        }
+        HomekitInput::ThermostatTargetHeatingState(Thermostat::RoomOfRequirements) => {
+            let heating_state = match payload.0.as_ref() {
+                "OFF" => HomekitHeatingState::Off,
+                "AUTO" => HomekitHeatingState::Auto,
+                _ => return Ok(()), //HEAT is handled via target temperature
+            };
+
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(
+                heating_state,
+            )))
+            .await
+        }
+        HomekitInput::ThermostatTargetTemperature(Thermostat::RoomOfRequirements) => {
+            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(
+                HomekitHeatingState::Heat(payload.try_into()?),
+            )))
+            .await
+        }
+        HomekitInput::ThermostatTargetHeatingState(t) => {
+            anyhow::bail!("Thermostat {t} heating state not yet supported by HomeKit")
+        }
+        HomekitInput::ThermostatTargetTemperature(t) => {
+            anyhow::bail!("Thermostat {t} target temperature not yet supported by HomeKit")
         }
     }
 }

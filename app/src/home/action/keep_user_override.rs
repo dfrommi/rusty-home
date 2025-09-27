@@ -1,9 +1,14 @@
 use std::fmt::Display;
 
 use crate::{
-    core::HomeApi,
-    core::planner::{Action, ActionEvaluationResult},
-    home::state::UserControlled,
+    core::{
+        HomeApi,
+        planner::{Action, ActionEvaluationResult},
+    },
+    home::{
+        command::{PowerToggle, Thermostat},
+        state::UserControlled,
+    },
 };
 
 use super::DataPointAccess;
@@ -17,7 +22,28 @@ pub struct KeepUserOverride {
 }
 
 impl KeepUserOverride {
-    pub fn new(user_controlled: UserControlled, target: CommandTarget) -> Self {
+    pub fn new(user_controlled: UserControlled) -> Self {
+        let target = match &user_controlled {
+            UserControlled::RoomOfRequirementsThermostat => CommandTarget::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+            },
+            UserControlled::LivingRoomThermostat => CommandTarget::SetHeating {
+                device: Thermostat::LivingRoom,
+            },
+            UserControlled::BedroomThermostat => CommandTarget::SetHeating {
+                device: Thermostat::Bedroom,
+            },
+            UserControlled::KitchenThermostat => CommandTarget::SetHeating {
+                device: Thermostat::Kitchen,
+            },
+            UserControlled::BathroomThermostat => CommandTarget::SetHeating {
+                device: Thermostat::Bathroom,
+            },
+            UserControlled::Dehumidifier => CommandTarget::SetPower {
+                device: PowerToggle::Dehumidifier,
+            },
+        };
+
         Self {
             user_controlled,
             target,

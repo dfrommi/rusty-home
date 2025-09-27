@@ -1,5 +1,6 @@
 mod auto_temp_increase;
 mod ir_heater_auto_turn_off;
+mod provide_ambient_temperature;
 mod support_ventilation_with_fan;
 mod ventilation_in_progress;
 mod wait_for_sleeping;
@@ -9,6 +10,7 @@ use crate::home::command::Thermostat;
 
 pub use auto_temp_increase::NoHeatingDuringAutomaticTemperatureIncrease;
 pub use ir_heater_auto_turn_off::IrHeaterAutoTurnOff;
+pub use provide_ambient_temperature::ProvideAmbientTemperature;
 pub use support_ventilation_with_fan::SupportVentilationWithFan;
 pub use ventilation_in_progress::NoHeatingDuringVentilation;
 pub use wait_for_sleeping::ExtendHeatingUntilSleeping;

@@ -1,10 +1,12 @@
 use std::fmt::Display;
 
 use crate::core::HomeApi;
-use crate::home::command::{Command, CommandTarget};
+use crate::core::unit::DegreeCelsius;
+use crate::home::command::{Command, CommandTarget, Thermostat};
 use crate::home::state::FanAirflow;
 
 use crate::core::planner::{Action, ActionEvaluationResult};
+use crate::t;
 
 #[derive(Debug, Clone)]
 pub struct FollowDefaultSetting {
@@ -30,6 +32,16 @@ impl Action for FollowDefaultSetting {
                 device,
                 power_on: false,
             },
+            //Transition to Zigbee
+            CommandTarget::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+            } => Command::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+                target_state: crate::home::command::HeatingTargetState::Heat {
+                    temperature: DegreeCelsius(18.0),
+                    duration: t!(1 hours),
+                },
+            },
             CommandTarget::SetHeating { device } => Command::SetHeating {
                 device,
                 target_state: crate::home::command::HeatingTargetState::Auto,
@@ -47,6 +59,9 @@ impl Action for FollowDefaultSetting {
                 device,
                 speed: FanAirflow::Off,
             },
+            CommandTarget::SetThermostatAmbientTemperature { .. } => {
+                anyhow::bail!("FollowDefaultSetting cannot be applied to SetThermostatAmbientTemperature")
+            }
         };
 
         Ok(ActionEvaluationResult::Execute(command, super::action_source(self)))

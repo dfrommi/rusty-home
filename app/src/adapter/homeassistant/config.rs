@@ -9,23 +9,39 @@ use super::{HaChannel, HaServiceTarget};
 pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
     vec![
         (
-            PowerToggle::LivingRoomNotificationLight.into(),
+            CommandTarget::SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+            },
             HaServiceTarget::LightTurnOnOff("light.hue_go"),
         ),
         (
-            Thermostat::LivingRoom.into(),
+            CommandTarget::SetHeating {
+                device: Thermostat::LivingRoom,
+            },
             HaServiceTarget::ClimateControl("climate.wohnzimmer"),
         ),
         (
-            Thermostat::Bedroom.into(),
+            CommandTarget::SetHeating {
+                device: Thermostat::Bedroom,
+            },
             HaServiceTarget::ClimateControl("climate.schlafzimmer"),
         ),
         // (
         //     Thermostat::RoomOfRequirements.into(),
         //     HaServiceTarget::ClimateControl("climate.arbeitszimmer"),
         // ),
-        (Thermostat::Kitchen.into(), HaServiceTarget::ClimateControl("climate.kuche")),
-        (Thermostat::Bathroom.into(), HaServiceTarget::ClimateControl("climate.bad")),
+        (
+            CommandTarget::SetHeating {
+                device: Thermostat::Kitchen,
+            },
+            HaServiceTarget::ClimateControl("climate.kuche"),
+        ),
+        (
+            CommandTarget::SetHeating {
+                device: Thermostat::Bathroom,
+            },
+            HaServiceTarget::ClimateControl("climate.bad"),
+        ),
         (
             CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,

@@ -42,6 +42,7 @@ pub enum HomeAction {
     Dehumidify(Dehumidify),
     RequestClosingWindow(RequestClosingWindow),
     InformWindowOpen(InformWindowOpen),
+    ProvideAmbientTemperature(ProvideAmbientTemperature),
     NoHeatingDuringVentilation(NoHeatingDuringVentilation),
     NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease),
     IrHeaterAutoTurnOff(IrHeaterAutoTurnOff),
@@ -61,6 +62,9 @@ impl Action for HomeAction {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
             HomeAction::RequestClosingWindow(request_closing_window) => request_closing_window.evaluate(api).await,
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.evaluate(api).await,
+            HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
+                provide_ambient_temperature.evaluate(api).await
+            }
             HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
                 no_heating_during_ventilation.evaluate(api).await
             }

@@ -3,6 +3,7 @@ use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::unit::DegreeCelsius;
+use crate::home::command::CommandTarget;
 use crate::port::{CommandExecutionAccess, DataFrameAccess};
 use crate::t;
 use r#macro::{EnumVariants, Id, mockable};
@@ -106,7 +107,12 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
     }
 
     let last_command = api
-        .get_latest_command(PowerToggle::Dehumidifier, t!(20 minutes ago))
+        .get_latest_command(
+            CommandTarget::SetPower {
+                device: PowerToggle::Dehumidifier,
+            },
+            t!(20 minutes ago),
+        )
         .await?;
 
     let system_powered = match last_command {
@@ -158,7 +164,7 @@ async fn current_data_point_for_thermostat(
     let (auto_mode_on, set_point, latest_command) = tokio::try_join!(
         auto_mode.current_data_point(api),
         set_point.current_data_point(api),
-        api.get_latest_command(thermostat, t!(24 hours ago))
+        api.get_latest_command(CommandTarget::SetHeating { device: thermostat }, t!(24 hours ago))
     )?;
 
     //if no command, then overridden by user only if in manual mode

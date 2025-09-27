@@ -3,6 +3,7 @@ use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
+use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
@@ -41,7 +42,9 @@ impl DataPointAccess<EnergySaving> for EnergySaving {
         }
 
         let target = match self {
-            EnergySaving::LivingRoomTv => EnergySavingDevice::LivingRoomTv,
+            EnergySaving::LivingRoomTv => CommandTarget::SetEnergySaving {
+                device: EnergySavingDevice::LivingRoomTv,
+            },
         };
 
         let latest_command = api.get_latest_command(target, is_tv_on.timestamp).await?;

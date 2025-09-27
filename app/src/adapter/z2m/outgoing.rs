@@ -3,6 +3,7 @@ use crate::{
     home::command::{Command, CommandTarget, HeatingTargetState},
 };
 use infrastructure::MqttOutMessage;
+use serde_json::json;
 
 use crate::core::CommandExecutor;
 
@@ -60,6 +61,9 @@ impl CommandExecutor for Z2mCommandExecutor {
                 },
                 Z2mCommandTarget::Thermostat(device_id),
             ) => self.set_heating(device_id, Some(DegreeCelsius(18.0)), false).await,
+            (Command::SetThermostatAmbientTemperature { temperature, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
+                self.set_ambient_temperature(device_id, *temperature).await
+            }
 
             (_, tasmota_target) => {
                 anyhow::bail!("Mismatch between command and tasmota target {:?}", tasmota_target)
@@ -81,6 +85,18 @@ impl Z2mCommandExecutor {
                 window_open_external: window_open,
                 occupied_heating_setpoint: setpoint.map(|t| t.0),
             })?,
+        );
+
+        self.sender.send(msg).await?;
+        Ok(true)
+    }
+
+    async fn set_ambient_temperature(&self, device_id: &str, temperature: DegreeCelsius) -> anyhow::Result<bool> {
+        let value = (temperature.0 * 100.0) as i32; //Z2M expects temperature in centi-degrees
+
+        let msg = MqttOutMessage::transient(
+            self.target_topic(device_id),
+            json!({ "external_measured_room_sensor": value }).to_string(),
         );
 
         self.sender.send(msg).await?;

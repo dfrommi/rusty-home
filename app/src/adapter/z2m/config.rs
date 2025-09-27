@@ -8,12 +8,20 @@ use crate::home::state::*;
 use crate::home::trigger::RemoteTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
-    vec![(
-        CommandTarget::SetHeating {
-            device: Thermostat::RoomOfRequirements,
-        },
-        Z2mCommandTarget::Thermostat("room_of_requirements/thermostat"),
-    )]
+    vec![
+        (
+            CommandTarget::SetHeating {
+                device: Thermostat::RoomOfRequirements,
+            },
+            Z2mCommandTarget::Thermostat("room_of_requirements/thermostat"),
+        ),
+        (
+            CommandTarget::SetThermostatAmbientTemperature {
+                device: Thermostat::RoomOfRequirements,
+            },
+            Z2mCommandTarget::Thermostat("room_of_requirements/thermostat"),
+        ),
+    ]
 }
 
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {

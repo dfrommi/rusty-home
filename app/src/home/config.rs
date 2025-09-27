@@ -4,8 +4,8 @@ use crate::home::trigger::RemoteTarget;
 use crate::t;
 
 use crate::home::action::{
-    FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ReduceNoiseAtNight,
-    SupportVentilationWithFan, UserTriggerAction,
+    FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
+    ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
 use crate::home::state::UserControlled;
 
@@ -22,7 +22,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::LivingRoom),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
-            KeepUserOverride::new(UserControlled::LivingRoomThermostat, Thermostat::LivingRoom.into()).into(),
+            KeepUserOverride::new(UserControlled::LivingRoomThermostat).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
             ExtendHeatingUntilSleeping::LivingRoom.into(),
             DeferHeatingUntilVentilationDone::LivingRoom.into(),
@@ -43,7 +43,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
             IrHeaterAutoTurnOff::new().into(),
             NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
-            KeepUserOverride::new(UserControlled::BedroomThermostat, Thermostat::Bedroom.into()).into(),
+            KeepUserOverride::new(UserControlled::BedroomThermostat).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
             ExtendHeatingUntilSleeping::Bedroom.into(),
             DeferHeatingUntilVentilationDone::Bedroom.into(),
@@ -61,7 +61,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::Kitchen),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
-            KeepUserOverride::new(UserControlled::KitchenThermostat, Thermostat::Kitchen.into()).into(),
+            KeepUserOverride::new(UserControlled::KitchenThermostat).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
             DeferHeatingUntilVentilationDone::Kitchen.into(),
         ]
@@ -69,8 +69,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(Room::RoomOfRequirements),
         vec![
+            ProvideAmbientTemperature::RoomOfRequirements.into(), 
             NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements).into(),
-            //KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Thermostat::RoomOfRequirements.into()).into(),
+            //KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Thermostat::RoomOfRequirements).into(),
             //NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements).into(),
         ]
     ),
@@ -78,7 +79,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::Bathroom),
         vec![
             NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
-            KeepUserOverride::new(UserControlled::BathroomThermostat, Thermostat::Bathroom.into()).into(),
+            KeepUserOverride::new(UserControlled::BathroomThermostat).into(),
             NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
         ]
     ),
@@ -94,7 +95,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::PreventMouldInBathroom,
         vec![
             UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
-            KeepUserOverride::new(UserControlled::Dehumidifier, PowerToggle::Dehumidifier.into()).into(),
+            KeepUserOverride::new(UserControlled::Dehumidifier).into(),
             ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
             Dehumidify::new().into()
         ],

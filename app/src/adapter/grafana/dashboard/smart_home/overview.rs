@@ -150,6 +150,9 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
                 crate::home::command::HeatingTargetState::Heat { temperature, .. } => temperature.to_string(),
             },
         ),
+        Command::SetThermostatAmbientTemperature { device, temperature } => {
+            ("SetThermostatAmbientTemperature", device.to_string(), temperature.to_string())
+        }
         Command::PushNotify {
             action,
             notification,

@@ -1,7 +1,7 @@
 use crate::core::unit::DegreeCelsius;
 use crate::home::command::{
-    Command, CommandExecution, EnergySavingDevice, Fan, HeatingTargetState, Notification, NotificationAction,
-    NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
+    Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
+    NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
 use crate::home::state::{ExternalAutoControl, FanActivity, FanAirflow, Opened, Powered, SetPoint};
 use crate::port::CommandExecutionAccess;
@@ -16,6 +16,9 @@ impl Command {
             Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, api).await,
             Command::SetHeating { device, target_state } => {
                 is_set_heating_reflected_in_state(device, target_state, api).await
+            }
+            Command::SetThermostatAmbientTemperature { device, temperature } => {
+                is_set_thermmostat_ambient_templerature_reflected_in_state(device, *temperature, api).await
             }
             Command::PushNotify {
                 recipient,
@@ -43,7 +46,11 @@ async fn is_set_heating_reflected_in_state(
         Thermostat::Bathroom => (SetPoint::Bathroom, ExternalAutoControl::BathroomThermostat),
     };
 
-    let (set_point, auto_mode) = tokio::try_join!(set_point.current(api), auto_mode.current(api))?;
+    let (set_point, mut auto_mode) = tokio::try_join!(set_point.current(api), auto_mode.current(api))?;
+
+    if device == &Thermostat::RoomOfRequirements {
+        auto_mode = false; //manual only
+    }
 
     match target_state {
         crate::home::command::HeatingTargetState::Auto => Ok(auto_mode),
@@ -55,6 +62,32 @@ async fn is_set_heating_reflected_in_state(
             Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),
             _ => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
         },
+    }
+}
+
+async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
+    device: &Thermostat,
+    temperature: DegreeCelsius,
+    api: &HomeApi,
+) -> Result<bool> {
+    let latest_command = api
+        .get_latest_command(
+            CommandTarget::SetThermostatAmbientTemperature { device: device.clone() },
+            t!(2 hours ago),
+        )
+        .await?;
+
+    //see guidelines for device at https://www.zigbee2mqtt.io/devices/014G2461.html#external-measured-room-sensor-numeric
+    match latest_command {
+        Some(CommandExecution {
+            command: Command::SetThermostatAmbientTemperature {
+                temperature: cmd_temp, ..
+            },
+            created,
+            ..
+        }) => Ok(created.elapsed() > t!(1 hours) || (cmd_temp.0 - temperature.0).abs() < 0.1),
+        Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
+        None => Ok(false),
     }
 }
 

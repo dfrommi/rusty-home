@@ -19,6 +19,10 @@ pub enum Command {
         #[serde(flatten)]
         target_state: HeatingTargetState,
     },
+    SetThermostatAmbientTemperature {
+        device: Thermostat,
+        temperature: DegreeCelsius,
+    },
     PushNotify {
         action: NotificationAction,
         notification: Notification,
@@ -34,7 +38,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, From, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandTarget {
     #[display("SetPower[{}]", device)]
@@ -42,6 +46,9 @@ pub enum CommandTarget {
 
     #[display("SetHeating[{}]", device)]
     SetHeating { device: Thermostat },
+
+    #[display("SetThermostatAmbientTemperature[{}]", device)]
+    SetThermostatAmbientTemperature { device: Thermostat },
 
     #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {
@@ -67,6 +74,9 @@ impl From<&Command> for CommandTarget {
         match val {
             Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
             Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
+            Command::SetThermostatAmbientTemperature { device, .. } => {
+                CommandTarget::SetThermostatAmbientTemperature { device: device.clone() }
+            }
             Command::PushNotify {
                 recipient,
                 notification,

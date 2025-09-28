@@ -4,10 +4,10 @@ use crate::home::trigger::RemoteTarget;
 use crate::t;
 
 use crate::home::action::{
-    FollowDefaultSetting, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
-    ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
+    FollowDefaultSetting, FollowHeatingSchedule, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff,
+    ProvideAmbientTemperature, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
-use crate::home::state::UserControlled;
+use crate::home::state::{HeatingMode, UserControlled};
 
 use super::action::{
     DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction, KeepUserOverride,
@@ -70,10 +70,14 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::SmarterHeating(Room::RoomOfRequirements),
         vec![
             ProvideAmbientTemperature::RoomOfRequirements.into(), 
-            NoHeatingDuringVentilation::new(HeatingZone::RoomOfRequirements).into(),
-            UserTriggerAction::new(HomekitCommandTarget::RoomOfRequirementsHeatingState.into()).into()
-            //KeepUserOverride::new(UserControlled::RoomOfRequirementsThermostat, Thermostat::RoomOfRequirements).into(),
-            //NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::RoomOfRequirements).into(),
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Away).into(),
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Ventilation).into(),
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::PostVentilation).into(),
+            UserTriggerAction::new(HomekitCommandTarget::RoomOfRequirementsHeatingState.into()).into(),
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Sleep).into(),
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Comfort).into(),
+            //Or default?
+            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::EnergySaving).into(),
         ]
     ),
     (

@@ -1,12 +1,10 @@
 use std::fmt::Display;
 
 use crate::core::HomeApi;
-use crate::core::unit::DegreeCelsius;
-use crate::home::command::{Command, CommandTarget, Thermostat};
-use crate::home::state::FanAirflow;
+use crate::home::command::{Command, CommandTarget, HeatingTargetState, Thermostat};
+use crate::home::state::{FanAirflow, HeatingMode};
 
 use crate::core::planner::{Action, ActionEvaluationResult};
-use crate::t;
 
 #[derive(Debug, Clone)]
 pub struct FollowDefaultSetting {
@@ -37,14 +35,11 @@ impl Action for FollowDefaultSetting {
                 device: Thermostat::RoomOfRequirements,
             } => Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
-                target_state: crate::home::command::HeatingTargetState::Heat {
-                    temperature: DegreeCelsius(18.0),
-                    duration: t!(1 hours),
-                },
+                target_state: HeatingTargetState::for_mode(&HeatingMode::EnergySaving, &Thermostat::RoomOfRequirements),
             },
             CommandTarget::SetHeating { device } => Command::SetHeating {
                 device,
-                target_state: crate::home::command::HeatingTargetState::Auto,
+                target_state: HeatingTargetState::Auto,
             },
             CommandTarget::PushNotify {
                 recipient,

@@ -54,6 +54,7 @@ pub enum HomeAction {
     UserTriggerAction(UserTriggerAction),
     SupportVentilationWithFan(SupportVentilationWithFan),
     CoolDownWhenOccupied(CoolDownWhenOccupied),
+    FollowHeatingSchedule(FollowHeatingSchedule),
 }
 
 impl Action for HomeAction {
@@ -86,6 +87,7 @@ impl Action for HomeAction {
                 support_ventilation_with_fan.evaluate(api).await
             }
             HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => cool_down_when_occupied.evaluate(api).await,
+            HomeAction::FollowHeatingSchedule(follow_heating_schedule) => follow_heating_schedule.evaluate(api).await,
         }
     }
 }

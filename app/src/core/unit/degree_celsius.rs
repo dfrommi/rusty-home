@@ -24,6 +24,22 @@ impl Display for DegreeCelsius {
     }
 }
 
+impl std::ops::Add for DegreeCelsius {
+    type Output = DegreeCelsius;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        DegreeCelsius(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Add for &DegreeCelsius {
+    type Output = DegreeCelsius;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        *self + *rhs
+    }
+}
+
 impl std::ops::Sub for DegreeCelsius {
     type Output = DegreeCelsius;
 

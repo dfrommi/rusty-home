@@ -19,6 +19,7 @@ mod heating_demand;
 mod powered;
 mod presence;
 mod relative_humidity;
+mod scheduled_heating_mode;
 mod set_point;
 mod temperature;
 mod total_energy_consumption;
@@ -43,6 +44,7 @@ pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
+pub use scheduled_heating_mode::*;
 pub use set_point::SetPoint;
 pub use temperature::Temperature;
 pub use total_energy_consumption::TotalEnergyConsumption;
@@ -86,6 +88,7 @@ pub enum HomeStateValue {
     RelativeHumidity(RelativeHumidity, Percent),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
+    ScheduledHeatingMode(ScheduledHeatingMode, HeatingMode),
     #[persistent]
     SetPoint(SetPoint, DegreeCelsius),
     #[persistent]

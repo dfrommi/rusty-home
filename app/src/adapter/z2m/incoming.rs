@@ -85,7 +85,15 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::HeatingDemand(demand.clone(), Percent(payload.pi_heating_demand)),
+                        PersistentHomeStateValue::HeatingDemand(
+                            demand.clone(),
+                            Percent(if payload.pi_heating_demand > 1.0 {
+                                payload.pi_heating_demand
+                            } else {
+                                //sometimes reports 1% when closed
+                                0.0
+                            }),
+                        ),
                         payload.last_seen,
                     )
                     .into(),

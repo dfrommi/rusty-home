@@ -9,10 +9,7 @@ use crate::home::action::{
 };
 use crate::home::state::{HeatingMode, UserControlled};
 
-use super::action::{
-    DeferHeatingUntilVentilationDone, Dehumidify, ExtendHeatingUntilSleeping, HomeAction, KeepUserOverride,
-    NoHeatingDuringAutomaticTemperatureIncrease, NoHeatingDuringVentilation, RequestClosingWindow,
-};
+use super::action::{Dehumidify, HomeAction, KeepUserOverride, RequestClosingWindow};
 use super::goal::{HomeGoal, Room};
 
 #[rustfmt::skip]
@@ -20,13 +17,27 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     vec![
     (
         HomeGoal::SmarterHeating(Room::LivingRoom),
-        vec![
-            NoHeatingDuringVentilation::new(HeatingZone::LivingRoom).into(),
-            KeepUserOverride::new(UserControlled::LivingRoomThermostat).into(),
-            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::LivingRoom).into(),
-            ExtendHeatingUntilSleeping::LivingRoom.into(),
-            DeferHeatingUntilVentilationDone::LivingRoom.into(),
-        ]
+        smarter_heating_actions(HeatingZone::LivingRoom)
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::Bedroom),
+        {
+            let mut a = vec![
+                UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
+                UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
+                IrHeaterAutoTurnOff::new().into(),
+            ]; 
+            a.extend(smarter_heating_actions(HeatingZone::Bedroom));
+            a
+        }
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::Kitchen),
+        smarter_heating_actions(HeatingZone::Kitchen)
+    ),
+    (
+        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
+        smarter_heating_actions(HeatingZone::RoomOfRequirements)
     ),
     (
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
@@ -37,19 +48,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         ]
     ),
     (
-        HomeGoal::SmarterHeating(Room::Bedroom),
-        vec![
-            UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
-            UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
-            IrHeaterAutoTurnOff::new().into(),
-            NoHeatingDuringVentilation::new(HeatingZone::Bedroom).into(),
-            KeepUserOverride::new(UserControlled::BedroomThermostat).into(),
-            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bedroom).into(),
-            ExtendHeatingUntilSleeping::Bedroom.into(),
-            DeferHeatingUntilVentilationDone::Bedroom.into(),
-        ]
-    ),
-    (
         HomeGoal::BetterRoomClimate(Room::Bedroom),
         vec![
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
@@ -57,37 +55,14 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             //RoolDownWhenOccupied::Bedroom.into(),
         ]
     ),
-    (
-        HomeGoal::SmarterHeating(Room::Kitchen),
-        vec![
-            NoHeatingDuringVentilation::new(HeatingZone::Kitchen).into(),
-            KeepUserOverride::new(UserControlled::KitchenThermostat).into(),
-            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Kitchen).into(),
-            DeferHeatingUntilVentilationDone::Kitchen.into(),
-        ]
-    ),
-    (
-        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
-        vec![
-            ProvideAmbientTemperature::RoomOfRequirements.into(), 
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Away).into(),
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Ventilation).into(),
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::PostVentilation).into(),
-            UserTriggerAction::new(HomekitCommandTarget::RoomOfRequirementsHeatingState.into()).into(),
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Sleep).into(),
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::Comfort).into(),
-            //Or default?
-            FollowHeatingSchedule::RoomOfRequirements(HeatingMode::EnergySaving).into(),
-        ]
-    ),
-    (
-        HomeGoal::SmarterHeating(Room::Bathroom),
-        vec![
-            NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
-            KeepUserOverride::new(UserControlled::BathroomThermostat).into(),
-            NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
-        ]
-    ),
+    // (
+    //     HomeGoal::SmarterHeating(Room::Bathroom),
+    //     vec![
+    //         NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
+    //         KeepUserOverride::new(UserControlled::BathroomThermostat).into(),
+    //         NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
+    //     ]
+    // ),
     (
         HomeGoal::StayInformed,
         vec![
@@ -113,6 +88,15 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
                 device: crate::home::command::EnergySavingDevice::LivingRoomTv,
             }).into(),
         ]
+    ),
+    (
+        HomeGoal::CoreControl,
+        vec![
+            ProvideAmbientTemperature::LivingRoomThermostatBig.into(), 
+            ProvideAmbientTemperature::BedroomThermostat.into(), 
+            ProvideAmbientTemperature::KitchenThermostat.into(), 
+            ProvideAmbientTemperature::RoomOfRequirementsThermostat.into(), 
+            ]
     ),
     (
         HomeGoal::ResetToDefaltSettings,
@@ -157,5 +141,27 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             }).into(),
         ]
     )
+    ]
+}
+
+fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
+    vec![
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Away).into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Ventilation).into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::PostVentilation).into(),
+        UserTriggerAction::new(
+            match zone {
+                HeatingZone::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
+                HeatingZone::Bedroom => HomekitCommandTarget::BedroomHeatingState,
+                HeatingZone::Kitchen => HomekitCommandTarget::KitchenHeatingState,
+                HeatingZone::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
+                HeatingZone::Bathroom => panic!("Smart Heating for Bathroom currently not supported"),
+            }
+            .into(),
+        )
+        .into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Sleep).into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Comfort).into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::EnergySaving).into(),
     ]
 }

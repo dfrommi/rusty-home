@@ -28,19 +28,29 @@ pub enum HeatingMode {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum ScheduledHeatingMode {
+    LivingRoom,
+    Bedroom,
+    Kitchen,
     RoomOfRequirements,
+    Bathroom,
 }
 
 impl ScheduledHeatingMode {
     fn window(&self) -> OpenedArea {
         match self {
             ScheduledHeatingMode::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
+            ScheduledHeatingMode::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
+            ScheduledHeatingMode::Bedroom | ScheduledHeatingMode::Bathroom => OpenedArea::BedroomWindow,
+            ScheduledHeatingMode::Kitchen => OpenedArea::KitchenWindow,
         }
     }
 
     fn temp_increase(&self) -> AutomaticTemperatureIncrease {
         match self {
             ScheduledHeatingMode::RoomOfRequirements => AutomaticTemperatureIncrease::RoomOfRequirements,
+            ScheduledHeatingMode::LivingRoom => AutomaticTemperatureIncrease::LivingRoom,
+            ScheduledHeatingMode::Bedroom | ScheduledHeatingMode::Bathroom => AutomaticTemperatureIncrease::Bedroom,
+            ScheduledHeatingMode::Kitchen => AutomaticTemperatureIncrease::Kitchen,
         }
     }
 }

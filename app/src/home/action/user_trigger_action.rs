@@ -1,8 +1,8 @@
-use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
+use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::core::HomeApi;
 use crate::core::planner::{Action, ActionEvaluationResult};
 use crate::core::time::Duration;
-use crate::home::command::{Command, CommandSource};
+use crate::home::command::{Command, CommandSource, HeatingTargetState, Thermostat};
 use crate::home::state::Powered;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
 use crate::t;
@@ -88,7 +88,10 @@ impl UserTriggerAction {
             }
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => Some(t!(1 hours)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => Some(t!(1 hours)),
         }
     }
 }
@@ -125,20 +128,35 @@ fn into_command(trigger: UserTrigger) -> Option<Command> {
             device: Fan::BedroomCeilingFan,
             speed,
         }),
-        UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => Some(Command::SetHeating {
-            device: Thermostat::RoomOfRequirements,
-            target_state: match state {
-                crate::adapter::homekit::HomekitHeatingState::Off => HeatingTargetState::Off,
-                crate::adapter::homekit::HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
-                    temperature,
-                    duration: t!(1 hours),
-                },
-                crate::adapter::homekit::HomekitHeatingState::Auto => return None,
-            },
-        }),
+        UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(state)) => {
+            homekit_heating_action(Thermostat::LivingRoom, state)
+        }
+        UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(state)) => {
+            homekit_heating_action(Thermostat::Bedroom, state)
+        }
+        UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(state)) => {
+            homekit_heating_action(Thermostat::Kitchen, state)
+        }
+        UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => {
+            homekit_heating_action(Thermostat::RoomOfRequirements, state)
+        }
 
         UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => None,
     }
+}
+
+fn homekit_heating_action(thermostat: Thermostat, state: HomekitHeatingState) -> Option<Command> {
+    Some(Command::SetHeating {
+        device: thermostat,
+        target_state: match state {
+            HomekitHeatingState::Off => HeatingTargetState::Off,
+            HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
+                temperature,
+                duration: t!(1 hours),
+            },
+            HomekitHeatingState::Auto => return None,
+        },
+    })
 }
 
 #[cfg(test)]

@@ -6,7 +6,9 @@ use crate::{
     core::unit::DegreeCelsius,
     home::{
         command::Thermostat,
-        state::{EnergySaving, FanActivity, FanAirflow, Powered, RelativeHumidity, SetPoint, Temperature},
+        state::{
+            EnergySaving, FanActivity, FanAirflow, Powered, RelativeHumidity, SetPoint, Temperature, UserControlled,
+        },
     },
 };
 use serde::{Deserialize, Serialize};
@@ -53,7 +55,7 @@ enum HomekitState {
     FanSpeed(FanActivity),
     CurrentTemperature(Temperature),
     CurrentHumidity(RelativeHumidity),
-    CurrentHeatingState(SetPoint),
+    CurrentHeatingState(SetPoint, UserControlled),
     TargetTemperature(SetPoint),
 }
 
@@ -77,6 +79,9 @@ pub enum HomekitCommand {
     LivingRoomTvEnergySaving(bool),
     LivingRoomCeilingFanSpeed(FanAirflow),
     BedroomCeilingFanSpeed(FanAirflow),
+    LivingRoomHeatingState(HomekitHeatingState),
+    BedroomHeatingState(HomekitHeatingState),
+    KitchenHeatingState(HomekitHeatingState),
     RoomOfRequirementsHeatingState(HomekitHeatingState),
 }
 
@@ -89,6 +94,9 @@ pub enum HomekitCommandTarget {
     LivingRoomTvEnergySaving,
     LivingRoomCeilingFanSpeed,
     BedroomCeilingFanSpeed,
+    LivingRoomHeatingState,
+    BedroomHeatingState,
+    KitchenHeatingState,
     RoomOfRequirementsHeatingState,
 }
 
@@ -139,7 +147,10 @@ impl Homekit {
             ),
             (
                 "thermostat/room_of_requirements/heating_state",
-                HomekitState::CurrentHeatingState(SetPoint::RoomOfRequirements),
+                HomekitState::CurrentHeatingState(
+                    SetPoint::RoomOfRequirements,
+                    UserControlled::RoomOfRequirementsThermostat,
+                ),
                 Some(HomekitInput::ThermostatTargetHeatingState(Thermostat::RoomOfRequirements)),
             ),
             (

@@ -70,14 +70,7 @@ impl DataPointAccess<UserControlled> for UserControlled {
                 .await
             }
             UserControlled::RoomOfRequirementsThermostat => {
-                current_data_point_for_thermostat(
-                    api,
-                    self,
-                    Thermostat::RoomOfRequirements,
-                    ExternalAutoControl::RoomOfRequirementsThermostat,
-                    SetPoint::RoomOfRequirements,
-                )
-                .await
+                current_data_point_for_new_thermostat(api, self, Thermostat::RoomOfRequirements).await
             }
             UserControlled::BathroomThermostat => {
                 current_data_point_for_thermostat(
@@ -152,6 +145,37 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
             "User controlled active, because current state does not match last system"
         },
     );
+}
+
+async fn current_data_point_for_new_thermostat(
+    api: &HomeApi,
+    item: &UserControlled,
+    thermostat: Thermostat,
+) -> anyhow::Result<DataPoint<bool>> {
+    let latest_command_exec = api
+        .get_latest_command(CommandTarget::SetHeating { device: thermostat }, t!(24 hours ago))
+        .await?;
+    let timestamp = latest_command_exec
+        .as_ref()
+        .map(|exec| exec.created)
+        .unwrap_or_else(|| t!(now));
+
+    match latest_command_exec {
+        Some(CommandExecution {
+            source: CommandSource::User(_),
+            ..
+        }) => {
+            result!(true, timestamp, item, "User controlled based on latest command source is User");
+        }
+        _ => {
+            result!(
+                false,
+                timestamp,
+                item,
+                "Not user controlled because latest command is not a user-command"
+            );
+        }
+    }
 }
 
 async fn current_data_point_for_thermostat(

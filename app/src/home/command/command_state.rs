@@ -36,31 +36,26 @@ async fn is_set_heating_reflected_in_state(
     target_state: &HeatingTargetState,
     api: &HomeApi,
 ) -> Result<bool> {
-    let (set_point, auto_mode) = match device {
-        Thermostat::LivingRoom => (SetPoint::LivingRoom, ExternalAutoControl::LivingRoomThermostat),
-        Thermostat::Bedroom => (SetPoint::Bedroom, ExternalAutoControl::BedroomThermostat),
-        Thermostat::RoomOfRequirements => {
-            (SetPoint::RoomOfRequirements, ExternalAutoControl::RoomOfRequirementsThermostat)
-        }
-        Thermostat::Kitchen => (SetPoint::Kitchen, ExternalAutoControl::KitchenThermostat),
-        Thermostat::Bathroom => (SetPoint::Bathroom, ExternalAutoControl::BathroomThermostat),
-    };
-
-    let (set_point, mut auto_mode) = tokio::try_join!(set_point.current(api), auto_mode.current(api))?;
-
-    if device == &Thermostat::RoomOfRequirements {
-        auto_mode = false; //manual only
+    let set_point = match device {
+        Thermostat::LivingRoom => SetPoint::LivingRoom,
+        Thermostat::Bedroom => SetPoint::Bedroom,
+        Thermostat::RoomOfRequirements => SetPoint::RoomOfRequirements,
+        Thermostat::Kitchen => SetPoint::Kitchen,
+        Thermostat::Bathroom => SetPoint::Bathroom,
     }
+    .current(api)
+    .await?;
 
     match target_state {
-        crate::home::command::HeatingTargetState::Auto => Ok(auto_mode),
-        crate::home::command::HeatingTargetState::Off => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
-        crate::home::command::HeatingTargetState::Heat { temperature, .. } => {
-            Ok(!auto_mode && &set_point == temperature)
-        }
+        crate::home::command::HeatingTargetState::Auto => Ok(true), //TODO remove
+        crate::home::command::HeatingTargetState::Off => Ok(set_point == DegreeCelsius(0.0)),
+        crate::home::command::HeatingTargetState::Heat { temperature, .. } => Ok(&set_point == temperature),
         crate::home::command::HeatingTargetState::WindowOpen => match device {
+            Thermostat::LivingRoom => Ok(Opened::LivingRoomRadiatorThermostatBig.current(api).await?),
+            Thermostat::Bedroom => Ok(Opened::BedroomRadiatorThermostat.current(api).await?),
+            Thermostat::Kitchen => Ok(Opened::KitchenRadiatorThermostat.current(api).await?),
             Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),
-            _ => Ok(!auto_mode && set_point == DegreeCelsius(0.0)),
+            Thermostat::Bathroom => todo!("No smart heating in bath yet"),
         },
     }
 }
@@ -85,7 +80,7 @@ async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
             },
             created,
             ..
-        }) => Ok(created.elapsed() > t!(1 hours) || (cmd_temp.0 - temperature.0).abs() < 0.1),
+        }) => Ok(created.elapsed() < t!(1 hours) || (cmd_temp.0 - temperature.0).abs() < 0.1),
         Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
         None => Ok(false),
     }

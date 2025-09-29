@@ -1,8 +1,9 @@
 use std::fmt::Display;
 
 use crate::core::HomeApi;
+use crate::core::unit::DegreeCelsius;
 use crate::home::command::{Command, Fan};
-use crate::home::state::{FanAirflow, FanSpeed};
+use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
 
 use crate::core::planner::SimpleAction;
@@ -39,13 +40,18 @@ impl SimpleAction for SupportVentilationWithFan {
     }
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let window = match self.fan {
-            Fan::LivingRoomCeilingFan => OpenedArea::LivingRoomWindowOrDoor,
-            Fan::BedroomCeilingFan => OpenedArea::BedroomWindow,
+        let (window, temp_sensor) = match self.fan {
+            Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
+            Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::BedroomDoor),
         };
 
         let opened_dp = window.current_data_point(api).await?;
         let elapsed = opened_dp.timestamp.elapsed();
+
+        if temp_sensor.current(api).await? < DegreeCelsius(24.0) {
+            tracing::trace!("Temperature too low, not starting fan");
+            return Ok(false);
+        }
 
         if !opened_dp.value {
             return Ok(false);

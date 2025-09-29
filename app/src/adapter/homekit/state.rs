@@ -53,9 +53,11 @@ async fn export_accessory(
         HomekitState::CurrentHumidity(relative_humidity) => {
             sender.send(key, relative_humidity.current(api).await?).await?
         }
-        HomekitState::CurrentHeatingState(setpoint) => {
-            let heating_state = if setpoint.current(api).await? > DegreeCelsius(0.0) {
+        HomekitState::CurrentHeatingState(setpoint, user_controlled) => {
+            let heating_state = if user_controlled.current(api).await? {
                 "HEAT"
+            } else if setpoint.current(api).await? > DegreeCelsius(0.0) {
+                "AUTO"
             } else {
                 "OFF"
             };

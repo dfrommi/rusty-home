@@ -9,7 +9,7 @@ use crate::t;
 use r#macro::{EnumVariants, Id, mockable};
 
 use crate::core::timeseries::DataPoint;
-use crate::home::state::{ExternalAutoControl, Powered, SetPoint};
+use crate::home::state::Powered;
 
 use crate::home::{
     command::{Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat},
@@ -40,47 +40,19 @@ impl DataPointAccess<UserControlled> for UserControlled {
             //check expected state according to last action and compare with current state. Also
             //consider timer expiration
             UserControlled::LivingRoomThermostat => {
-                current_data_point_for_thermostat(
-                    api,
-                    self,
-                    Thermostat::LivingRoom,
-                    ExternalAutoControl::LivingRoomThermostat,
-                    SetPoint::LivingRoom,
-                )
-                .await
+                current_data_point_for_thermostat(api, self, Thermostat::LivingRoom).await
             }
             UserControlled::BedroomThermostat => {
-                current_data_point_for_thermostat(
-                    api,
-                    self,
-                    Thermostat::Bedroom,
-                    ExternalAutoControl::BedroomThermostat,
-                    SetPoint::Bedroom,
-                )
-                .await
+                current_data_point_for_thermostat(api, self, Thermostat::Bedroom).await
             }
             UserControlled::KitchenThermostat => {
-                current_data_point_for_thermostat(
-                    api,
-                    self,
-                    Thermostat::Kitchen,
-                    ExternalAutoControl::KitchenThermostat,
-                    SetPoint::Kitchen,
-                )
-                .await
+                current_data_point_for_thermostat(api, self, Thermostat::Kitchen).await
             }
             UserControlled::RoomOfRequirementsThermostat => {
-                current_data_point_for_new_thermostat(api, self, Thermostat::RoomOfRequirements).await
+                current_data_point_for_thermostat(api, self, Thermostat::RoomOfRequirements).await
             }
             UserControlled::BathroomThermostat => {
-                current_data_point_for_thermostat(
-                    api,
-                    self,
-                    Thermostat::Bathroom,
-                    ExternalAutoControl::BathroomThermostat,
-                    SetPoint::Bathroom,
-                )
-                .await
+                current_data_point_for_thermostat(api, self, Thermostat::Bathroom).await
             }
         }
     }
@@ -147,7 +119,7 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
     );
 }
 
-async fn current_data_point_for_new_thermostat(
+async fn current_data_point_for_thermostat(
     api: &HomeApi,
     item: &UserControlled,
     thermostat: Thermostat,
@@ -175,117 +147,6 @@ async fn current_data_point_for_new_thermostat(
                 "Not user controlled because latest command is not a user-command"
             );
         }
-    }
-}
-
-async fn current_data_point_for_thermostat(
-    api: &HomeApi,
-    item: &UserControlled,
-    thermostat: Thermostat,
-    auto_mode: ExternalAutoControl,
-    set_point: SetPoint,
-) -> anyhow::Result<DataPoint<bool>> {
-    let (auto_mode_on, set_point, latest_command) = tokio::try_join!(
-        auto_mode.current_data_point(api),
-        set_point.current_data_point(api),
-        api.get_latest_command(CommandTarget::SetHeating { device: thermostat }, t!(24 hours ago))
-    )?;
-
-    //if no command, then overridden by user only if in manual mode
-    if latest_command.is_none() {
-        result!(!auto_mode_on.value, auto_mode_on.timestamp, item,
-            @auto_mode_on,
-            "{}",
-            if auto_mode_on.value {
-                "User controlled not active, because no command found and automatic control is on"
-            } else {
-                "User controlled active, because no command found and automatic control is off"
-            },
-        );
-    }
-
-    let most_recent_change = std::cmp::max(auto_mode_on.timestamp, set_point.timestamp);
-    let latest_command = latest_command.unwrap();
-    let triggered_by_user = matches!(latest_command.source, CommandSource::User(_));
-
-    //command after change? -> triggered but roundtrip not yet done -> command source wins
-    if latest_command.created > most_recent_change {
-        result!(triggered_by_user, most_recent_change, item,
-            @auto_mode_on,
-            @set_point,
-            "{}",
-            if triggered_by_user {
-                "User controlled assumed active, because latest command is user-command and effect not yet reflected in state."
-            } else {
-                "User controlled assumed to be inactive, because latest command is system-command and effect not yet reflected in state."
-            },
-        );
-    }
-
-    let is_expired = get_expiration(&latest_command).is_some_and(|expiration| expiration < t!(now));
-
-    let comand_setting_followed = matches(&latest_command, auto_mode_on.value, set_point.value);
-
-    match (is_expired, comand_setting_followed) {
-        (true, _) => {
-            result!(!auto_mode_on.value, most_recent_change, item,
-                @auto_mode_on,
-                @set_point,
-                "{}",
-                if auto_mode_on.value {
-                    "User controlled not active, because command expired and automatic control is on"
-                } else {
-                    "User controlled active, because command expired and automatic control is off"
-                },
-            );
-        }
-        (false, true) => {
-            result!(triggered_by_user, most_recent_change, item,
-                @auto_mode_on,
-                @set_point,
-                "{}",
-                if triggered_by_user {
-                    "User controlled is active, because last command was triggered by user and state is still reflected"
-                } else {
-                    "User controlled is not active, because last command was triggered by system and state is still reflected"
-                },
-            );
-        }
-        (false, false) => {
-            result!(true, most_recent_change, item,
-                @auto_mode_on,
-                @set_point,
-                "User controlled active, because current state is not reflecting expected state"
-            );
-        }
-    }
-}
-
-fn matches(command_execution: &CommandExecution, auto_mode_enabled: bool, set_point: DegreeCelsius) -> bool {
-    match command_execution.command {
-        Command::SetHeating {
-            target_state: HeatingTargetState::Auto,
-            ..
-        } => auto_mode_enabled,
-        Command::SetHeating {
-            target_state: HeatingTargetState::Heat { temperature, .. },
-            ..
-        } => !auto_mode_enabled && set_point == temperature,
-        Command::SetHeating {
-            target_state: HeatingTargetState::Off,
-            ..
-        } => !auto_mode_enabled && set_point == DegreeCelsius(0.0),
-        _ => false,
-    }
-}
-
-pub fn get_expiration(command_execution: &CommandExecution) -> Option<DateTime> {
-    match &command_execution.command {
-        Command::SetHeating {
-            target_state: HeatingTargetState::Heat { duration: until, .. },
-            ..
-        } => Some(command_execution.created + until.clone()),
-        _ => None,
     }
 }
 

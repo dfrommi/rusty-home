@@ -43,12 +43,8 @@ pub enum HomeAction {
     RequestClosingWindow(RequestClosingWindow),
     InformWindowOpen(InformWindowOpen),
     ProvideAmbientTemperature(ProvideAmbientTemperature),
-    NoHeatingDuringVentilation(NoHeatingDuringVentilation),
-    NoHeatingDuringAutomaticTemperatureIncrease(NoHeatingDuringAutomaticTemperatureIncrease),
     IrHeaterAutoTurnOff(IrHeaterAutoTurnOff),
     KeepUserOverride(KeepUserOverride),
-    ExtendHeatingUntilSleeping(ExtendHeatingUntilSleeping),
-    DeferHeatingUntilVentilationDone(DeferHeatingUntilVentilationDone),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
@@ -66,20 +62,8 @@ impl Action for HomeAction {
             HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
                 provide_ambient_temperature.evaluate(api).await
             }
-            HomeAction::NoHeatingDuringVentilation(no_heating_during_ventilation) => {
-                no_heating_during_ventilation.evaluate(api).await
-            }
-            HomeAction::NoHeatingDuringAutomaticTemperatureIncrease(
-                no_heating_during_automatic_temperature_increase,
-            ) => no_heating_during_automatic_temperature_increase.evaluate(api).await,
             HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => ir_heater_auto_turn_off.evaluate(api).await,
             HomeAction::KeepUserOverride(keep_user_override) => keep_user_override.evaluate(api).await,
-            HomeAction::ExtendHeatingUntilSleeping(extend_heating_until_sleeping) => {
-                extend_heating_until_sleeping.evaluate(api).await
-            }
-            HomeAction::DeferHeatingUntilVentilationDone(defer_heating_until_ventilation_done) => {
-                defer_heating_until_ventilation_done.evaluate(api).await
-            }
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.evaluate(api).await,
             HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.evaluate(api).await,
             HomeAction::UserTriggerAction(user_trigger_action) => user_trigger_action.evaluate(api).await,

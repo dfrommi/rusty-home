@@ -8,9 +8,7 @@ use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
-use crate::home::state::{
-    ExternalAutoControl, FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
-};
+use crate::home::state::{FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature};
 use infrastructure::Mqtt;
 
 use std::collections::HashMap;
@@ -70,7 +68,6 @@ enum HaChannel {
     Powered(Powered),
     SetPoint(SetPoint),
     HeatingDemand(HeatingDemand),
-    ClimateAutoMode(ExternalAutoControl),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
     WindcalmFanSpeed(FanActivity),
@@ -79,7 +76,6 @@ enum HaChannel {
 #[derive(Debug, Clone)]
 enum HaServiceTarget {
     LightTurnOnOff(&'static str),
-    ClimateControl(&'static str),
     PushNotification(&'static str),
     LgWebosSmartTv(&'static str),
     WindcalmFanSpeed(&'static str),

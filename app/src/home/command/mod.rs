@@ -1,6 +1,6 @@
 mod command_state;
 
-use crate::core::time::{DateTime, Duration};
+use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use derive_more::derive::{Display, From};
 use serde::{Deserialize, Serialize};
@@ -144,13 +144,9 @@ pub enum Thermostat {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum HeatingTargetState {
-    Auto,
-    Off, //TODO support off-timer (not supported via HA)
+    Off,
     WindowOpen,
-    Heat {
-        temperature: DegreeCelsius,
-        duration: Duration,
-    },
+    Heat(DegreeCelsius),
 }
 
 //
@@ -212,7 +208,6 @@ pub enum Fan {
 
 #[cfg(test)]
 mod test {
-    use crate::t;
     use assert_json_diff::assert_json_eq;
     use serde_json::json;
 
@@ -256,30 +251,6 @@ mod test {
     }
 
     #[test]
-    fn set_heating_auto() {
-        assert_json_eq!(
-            Command::SetHeating {
-                device: Thermostat::RoomOfRequirements,
-                target_state: HeatingTargetState::Auto,
-            },
-            json!({
-                "type": "set_heating",
-                "device": "room_of_requirements",
-                "mode": "auto"
-            })
-        );
-        assert_json_eq!(
-            CommandTarget::SetHeating {
-                device: Thermostat::RoomOfRequirements
-            },
-            json!({
-                "type": "set_heating",
-                "device": "room_of_requirements",
-            })
-        );
-    }
-
-    #[test]
     fn set_heating_off() {
         assert_json_eq!(
             Command::SetHeating {
@@ -299,17 +270,13 @@ mod test {
         assert_json_eq!(
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
-                target_state: HeatingTargetState::Heat {
-                    temperature: DegreeCelsius::from(22.5),
-                    duration: t!(2 hours),
-                },
+                target_state: HeatingTargetState::Heat(DegreeCelsius::from(22.5)),
             },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
                 "mode": "heat",
-                "temperature": 22.5,
-                "duration": "PT2H"
+                "temperature": 22.5
             })
         );
     }

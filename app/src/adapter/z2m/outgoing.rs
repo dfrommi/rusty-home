@@ -56,14 +56,7 @@ impl CommandExecutor for Z2mCommandExecutor {
             ) => self.set_heating(device_id, None, true).await,
             (
                 Command::SetHeating {
-                    target_state: HeatingTargetState::Auto,
-                    ..
-                },
-                Z2mCommandTarget::Thermostat(device_id),
-            ) => self.set_heating(device_id, Some(DegreeCelsius(18.0)), false).await,
-            (
-                Command::SetHeating {
-                    target_state: HeatingTargetState::Heat { temperature, .. },
+                    target_state: HeatingTargetState::Heat(temperature),
                     ..
                 },
                 Z2mCommandTarget::Thermostat(device_id),

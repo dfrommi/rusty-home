@@ -128,13 +128,6 @@ fn to_persistent_data_point(
             )
             .into(),
         ),
-        HaChannel::ClimateAutoMode(channel) => Some(
-            DataPoint::new(
-                PersistentHomeStateValue::ExternalAutoControl(channel, ha_value == "auto"),
-                timestamp,
-            )
-            .into(),
-        ),
         HaChannel::PresenceFromEsp(channel) => {
             Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }

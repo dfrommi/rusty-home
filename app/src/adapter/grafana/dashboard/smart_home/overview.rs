@@ -144,10 +144,9 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             "SetHeating",
             device.to_string(),
             match target_state {
-                crate::home::command::HeatingTargetState::Auto => "auto".to_string(),
                 crate::home::command::HeatingTargetState::Off => "off".to_string(),
                 crate::home::command::HeatingTargetState::WindowOpen => "window_open".to_string(),
-                crate::home::command::HeatingTargetState::Heat { temperature, .. } => temperature.to_string(),
+                crate::home::command::HeatingTargetState::Heat(temperature) => temperature.to_string(),
             },
         ),
         Command::SetThermostatAmbientTemperature { device, temperature } => {

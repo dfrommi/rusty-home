@@ -150,10 +150,7 @@ fn homekit_heating_action(thermostat: Thermostat, state: HomekitHeatingState) ->
         device: thermostat,
         target_state: match state {
             HomekitHeatingState::Off => HeatingTargetState::Off,
-            HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
-                temperature,
-                duration: t!(1 hours),
-            },
+            HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat(temperature),
             HomekitHeatingState::Auto => return None,
         },
     })

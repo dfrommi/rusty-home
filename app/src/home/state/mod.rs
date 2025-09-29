@@ -13,7 +13,6 @@ mod risk_of_mould;
 //mod total_energy_consumption;
 mod current_power_usage;
 mod energy_saving;
-mod external_auto_control;
 mod fan_activity;
 mod heating_demand;
 mod powered;
@@ -34,7 +33,6 @@ pub use cold_air_coming_in::ColdAirComingIn;
 pub use current_power_usage::CurrentPowerUsage;
 pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
-pub use external_auto_control::ExternalAutoControl;
 pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
 pub use opened::Opened;
@@ -71,8 +69,6 @@ pub enum HomeStateValue {
     CurrentPowerUsage(CurrentPowerUsage, Watt),
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
-    #[persistent]
-    ExternalAutoControl(ExternalAutoControl, bool),
     #[persistent]
     FanActivity(FanActivity, FanAirflow),
     #[persistent]

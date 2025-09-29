@@ -30,16 +30,9 @@ impl Action for FollowDefaultSetting {
                 device,
                 power_on: false,
             },
-            //Transition to Zigbee
-            CommandTarget::SetHeating {
-                device: Thermostat::RoomOfRequirements,
-            } => Command::SetHeating {
+            CommandTarget::SetHeating { device } => Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::for_mode(&HeatingMode::EnergySaving, &Thermostat::RoomOfRequirements),
-            },
-            CommandTarget::SetHeating { device } => Command::SetHeating {
-                device,
-                target_state: HeatingTargetState::Auto,
             },
             CommandTarget::PushNotify {
                 recipient,

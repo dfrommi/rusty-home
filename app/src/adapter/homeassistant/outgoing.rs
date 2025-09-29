@@ -1,5 +1,4 @@
 use crate::core::time::Duration;
-use crate::core::unit::DegreeCelsius;
 use crate::home::command::{Command, CommandTarget, Fan};
 use crate::home::state::{FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
 use crate::t;
@@ -59,34 +58,6 @@ impl HaCommandExecutor {
         match (ha_target, command) {
             (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => self.light_turn_on_off(id, *power_on).await,
             (
-                ClimateControl(id),
-                Command::SetHeating {
-                    target_state: HeatingTargetState::Off,
-                    ..
-                },
-            ) => self.climate_set_hvac_mode(id, "off").await,
-            (
-                ClimateControl(id),
-                Command::SetHeating {
-                    target_state: HeatingTargetState::WindowOpen,
-                    ..
-                },
-            ) => self.climate_set_hvac_mode(id, "off").await,
-            (
-                ClimateControl(id),
-                Command::SetHeating {
-                    target_state: HeatingTargetState::Auto,
-                    ..
-                },
-            ) => self.climate_set_hvac_mode(id, "auto").await,
-            (
-                ClimateControl(id),
-                Command::SetHeating {
-                    target_state: HeatingTargetState::Heat { temperature, duration },
-                    ..
-                },
-            ) => self.tado_set_climate_timer(id, temperature, duration).await,
-            (
                 PushNotification(mobile_id),
                 Command::PushNotify {
                     notification: Notification::WindowOpened,
@@ -118,38 +89,6 @@ impl HaCommandExecutor {
                 service,
                 json!({
                     "entity_id": vec![id.to_string()],
-                }),
-            )
-            .await
-    }
-
-    async fn climate_set_hvac_mode(&self, id: &str, mode: &str) -> anyhow::Result<()> {
-        self.client
-            .call_service(
-                "climate",
-                "set_hvac_mode",
-                json!({
-                    "entity_id": vec![id.to_string()],
-                    "hvac_mode": mode,
-                }),
-            )
-            .await
-    }
-
-    async fn tado_set_climate_timer(
-        &self,
-        id: &str,
-        temperature: &DegreeCelsius,
-        duration: &Duration,
-    ) -> anyhow::Result<()> {
-        self.client
-            .call_service(
-                "tado",
-                "set_climate_timer",
-                json!({
-                    "entity_id": vec![id.to_string()],
-                    "temperature": temperature,
-                    "time_period": to_ha_duration_format(duration),
                 }),
             )
             .await

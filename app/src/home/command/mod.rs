@@ -146,7 +146,7 @@ pub enum Thermostat {
 pub enum HeatingTargetState {
     Off,
     WindowOpen,
-    Heat(DegreeCelsius),
+    Heat { temperature: DegreeCelsius },
 }
 
 //

@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use crate::{
-    core::planner::SimpleAction,
+    core::planner::{Action, ActionEvaluationResult},
     home::{
-        action::HeatingZone,
-        command::{Command, HeatingTargetState},
+        command::Command,
+        common::HeatingZone,
         state::{HeatingMode, ScheduledHeatingMode},
     },
     port::DataPointAccess,
@@ -28,27 +28,33 @@ impl Display for FollowHeatingSchedule {
     }
 }
 
-impl SimpleAction for FollowHeatingSchedule {
-    fn command(&self) -> Command {
-        Command::SetHeating {
-            target_state: HeatingTargetState::for_mode(&self.mode, &self.zone.thermostat()),
-            device: self.zone.thermostat(),
-        }
-    }
-
-    fn source(&self) -> crate::home::command::CommandSource {
-        super::action_source(self)
-    }
-
-    async fn preconditions_fulfilled(&self, api: &crate::core::HomeApi) -> anyhow::Result<bool> {
+impl Action for FollowHeatingSchedule {
+    async fn evaluate(&self, api: &crate::core::HomeApi) -> anyhow::Result<ActionEvaluationResult> {
         let active_mode = match self.zone {
             HeatingZone::RoomOfRequirements => ScheduledHeatingMode::RoomOfRequirements,
             HeatingZone::LivingRoom => ScheduledHeatingMode::LivingRoom,
             HeatingZone::Bedroom => ScheduledHeatingMode::Bedroom,
             HeatingZone::Kitchen => ScheduledHeatingMode::Kitchen,
             HeatingZone::Bathroom => ScheduledHeatingMode::Bathroom,
-        };
+        }
+        .current(api)
+        .await?;
 
-        Ok(active_mode.current(api).await? == self.mode)
+        if active_mode != self.mode {
+            return Ok(ActionEvaluationResult::Skip);
+        }
+
+        let target_state = self.zone.heating_state(&self.mode);
+        let commands = self
+            .zone
+            .thermostats()
+            .iter()
+            .map(|thermostat| Command::SetHeating {
+                target_state: target_state.clone(),
+                device: thermostat.clone(),
+            })
+            .collect();
+
+        Ok(ActionEvaluationResult::ExecuteMulti(commands, super::action_source(self)))
     }
 }

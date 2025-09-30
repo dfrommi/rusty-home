@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use crate::core::HomeApi;
-use crate::home::command::{Command, CommandTarget, HeatingTargetState, Thermostat};
+use crate::home::command::{Command, CommandTarget};
+use crate::home::common::HeatingZone;
 use crate::home::state::{FanAirflow, HeatingMode};
 
 use crate::core::planner::{Action, ActionEvaluationResult};
@@ -30,10 +31,14 @@ impl Action for FollowDefaultSetting {
                 device,
                 power_on: false,
             },
-            CommandTarget::SetHeating { device } => Command::SetHeating {
-                device: Thermostat::RoomOfRequirements,
-                target_state: HeatingTargetState::for_mode(&HeatingMode::EnergySaving, &Thermostat::RoomOfRequirements),
-            },
+            CommandTarget::SetHeating { device } => {
+                let heating_zone = HeatingZone::for_thermostat(&device);
+
+                Command::SetHeating {
+                    device,
+                    target_state: heating_zone.heating_state(&HeatingMode::EnergySaving),
+                }
+            }
             CommandTarget::PushNotify {
                 recipient,
                 notification,

@@ -10,6 +10,7 @@ use crate::core::HomeApi;
 pub enum ActionEvaluationResult {
     Lock(CommandTarget),
     Execute(Command, CommandSource),
+    ExecuteMulti(Vec<Command>, CommandSource),
     Skip,
 }
 

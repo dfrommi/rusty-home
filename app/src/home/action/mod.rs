@@ -77,7 +77,7 @@ impl Action for HomeAction {
 }
 
 //trigger and keep running until something else changes state
-async fn trigger_once_and_keep_running(
+async fn needs_execution_for_one_shot_of_target(
     command: &Command,
     source: &CommandSource,
     oneshot_range_start: DateTime,

@@ -65,8 +65,14 @@ where
     context.release_lock(resource_lock).await?;
 
     //EXECUTION
-    if let ActionEvaluationResult::Execute(command, source) = evaluation_result {
-        execute_action(&mut context, command, source, api).await;
+    match evaluation_result {
+        ActionEvaluationResult::Execute(command, source) => execute_action(&mut context, command, source, api).await,
+        ActionEvaluationResult::ExecuteMulti(commands, source) => {
+            for command in commands {
+                execute_action(&mut context, command, source.clone(), api).await;
+            }
+        }
+        ActionEvaluationResult::Lock(_) | ActionEvaluationResult::Skip => {}
     }
 
     Ok(context)
@@ -77,7 +83,7 @@ async fn evaluate_action<'a, A>(context: &mut Context<'a, A>, api: &HomeApi) -> 
 where
     A: Action,
 {
-    let result = if context.goal_active {
+    let mut result = if context.goal_active {
         context.action.evaluate(api).await.unwrap_or_else(|e| {
             tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
             ActionEvaluationResult::Skip
@@ -86,6 +92,14 @@ where
         tracing::trace!("Goal {} not active, skipping action {}", context.trace.goal, context.action);
         ActionEvaluationResult::Skip
     };
+
+    //Treat empty result as skipped to prevent further checks for empty
+    if let ActionEvaluationResult::ExecuteMulti(commands, _) = &result
+        && commands.is_empty()
+    {
+        tracing::warn!("Received empty commands list from action {}. Skipping.", context.action);
+        result = ActionEvaluationResult::Skip
+    }
 
     context.trace.fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
 
@@ -98,21 +112,25 @@ fn check_locked<'a, A>(
     evaluation_result: ActionEvaluationResult,
     resource_lock: &mut ResourceLock<CommandTarget>,
 ) -> ActionEvaluationResult {
-    let locking_key = match &evaluation_result {
-        ActionEvaluationResult::Lock(target) => Some(target.clone()),
-        ActionEvaluationResult::Execute(command, _) => Some(CommandTarget::from(command.clone())),
-        ActionEvaluationResult::Skip => None,
+    let locking_keys = match &evaluation_result {
+        ActionEvaluationResult::Lock(target) => vec![target.clone()],
+        ActionEvaluationResult::Execute(command, _) => vec![CommandTarget::from(command.clone())],
+        ActionEvaluationResult::ExecuteMulti(commands, _) => commands
+            .iter()
+            .map(|command| CommandTarget::from(command.clone()))
+            .collect(),
+        ActionEvaluationResult::Skip => vec![],
     };
 
-    match locking_key {
-        Some(key) if resource_lock.is_locked(&key) => {
-            context.trace.locked = true;
-            return ActionEvaluationResult::Skip;
-        }
-        Some(key) => {
-            resource_lock.lock(key);
-        }
-        None => {}
+    //only succeed if all commands can be locked. Partial execution will most likely lead to
+    //unwanted result
+    if locking_keys.iter().any(|key| resource_lock.is_locked(key)) {
+        context.trace.locked = true;
+        return ActionEvaluationResult::Skip;
+    }
+
+    for key in locking_keys {
+        resource_lock.lock(key);
     }
 
     evaluation_result

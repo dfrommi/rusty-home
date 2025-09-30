@@ -1,11 +1,12 @@
 use std::fmt::Display;
 
 use crate::core::{HomeApi, planner::SimpleAction, timeseries::DataPoint, unit::DegreeCelsius};
+use crate::home::action::needs_execution_for_one_shot_of_target;
 use crate::home::command::{Command, CommandSource, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
 
-use super::{DataPointAccess as _, Resident, trigger_once_and_keep_running};
+use super::{DataPointAccess as _, Resident};
 
 #[derive(Debug, Clone)]
 pub enum CoolDownWhenOccupied {
@@ -95,7 +96,7 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(&self.command(), &self.source(), anyone_sleeping.timestamp, api).await
+        needs_execution_for_one_shot_of_target(&self.command(), &self.source(), anyone_sleeping.timestamp, api).await
     }
 
     async fn trigger_when_on_couch(&self, api: &HomeApi) -> anyhow::Result<bool> {
@@ -115,6 +116,6 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        trigger_once_and_keep_running(&self.command(), &self.source(), on_couch.timestamp, api).await
+        needs_execution_for_one_shot_of_target(&self.command(), &self.source(), on_couch.timestamp, api).await
     }
 }

@@ -1,4 +1,3 @@
-use crate::core::time::Duration;
 use crate::home::command::{Command, CommandTarget, Fan};
 use crate::home::state::{FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
 use crate::t;
@@ -226,15 +225,6 @@ impl HaCommandExecutor {
 
         Ok(())
     }
-}
-
-fn to_ha_duration_format(duration: &Duration) -> String {
-    let total_seconds = duration.as_secs();
-    let hh = total_seconds / 3600;
-    let mm = (total_seconds % 3600) / 60;
-    let ss = total_seconds % 60;
-
-    format!("{hh:02}:{mm:02}:{ss:02}")
 }
 
 fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> serde_json::Value {

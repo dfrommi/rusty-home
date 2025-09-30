@@ -10,6 +10,7 @@ mod goal;
 pub mod state;
 pub mod trigger;
 
+mod common;
 #[cfg(test)]
 mod tests;
 

@@ -1,11 +1,12 @@
 use crate::adapter::homekit::HomekitCommandTarget;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
+use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
 use crate::t;
 
 use crate::home::action::{
-    FollowDefaultSetting, FollowHeatingSchedule, HeatingZone, InformWindowOpen, IrHeaterAutoTurnOff,
-    ProvideAmbientTemperature, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
+    FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
+    ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
 use crate::home::state::{HeatingMode, UserControlled};
 
@@ -122,9 +123,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Kitchen,
             }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::Bathroom,
-            }).into(),
+            // FollowDefaultSetting::new(CommandTarget::SetHeating {
+            //     device: Thermostat::Bathroom,
+            // }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,
                 notification: crate::home::command::Notification::WindowOpened,

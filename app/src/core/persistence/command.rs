@@ -140,20 +140,28 @@ impl super::Database {
         .fetch_all(&self.pool)
         .await?;
 
-        records
+        let commands = records
             .into_iter()
-            .map(|row| {
+            .map_while(|row| {
                 let source = CommandSource::from((row.source_type, row.source_id));
-                Ok(CommandExecution {
-                    id: row.id,
-                    command: serde_json::from_value(row.command)?,
-                    state: CommandState::from((row.status, row.error)),
-                    created: row.created.unwrap().into(),
-                    source,
-                    correlation_id: row.correlation_id,
-                })
+                match serde_json::from_value::<Command>(row.command) {
+                    Ok(command) => Some(CommandExecution {
+                        id: row.id,
+                        command,
+                        state: CommandState::from((row.status, row.error)),
+                        created: row.created.unwrap().into(),
+                        source,
+                        correlation_id: row.correlation_id,
+                    }),
+                    Err(e) => {
+                        tracing::warn!("Error mapping command from database, ignoring: {}", e);
+                        None
+                    }
+                }
             })
-            .collect()
+            .collect();
+
+        Ok(commands)
     }
 }
 

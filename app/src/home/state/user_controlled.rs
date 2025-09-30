@@ -1,8 +1,7 @@
 use crate::core::HomeApi;
-use crate::core::time::{DateTime, DateTimeRange};
+use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
-use crate::core::unit::DegreeCelsius;
 use crate::home::command::CommandTarget;
 use crate::port::{CommandExecutionAccess, DataFrameAccess};
 use crate::t;
@@ -12,7 +11,7 @@ use crate::core::timeseries::DataPoint;
 use crate::home::state::Powered;
 
 use crate::home::{
-    command::{Command, CommandExecution, CommandSource, HeatingTargetState, PowerToggle, Thermostat},
+    command::{Command, CommandExecution, CommandSource, PowerToggle, Thermostat},
     state::macros::result,
 };
 

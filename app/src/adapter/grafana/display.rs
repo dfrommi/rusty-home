@@ -55,7 +55,8 @@ impl DashboardDisplay for TotalEnergyConsumption {
 impl DashboardDisplay for HeatingDemand {
     fn display(&self) -> &'static str {
         match self {
-            HeatingDemand::LivingRoom => "Wohnzimmer",
+            HeatingDemand::LivingRoomBig => "Wohnzimmer (groß)",
+            HeatingDemand::LivingRoomSmall => "Wohnzimmer (klein)",
             HeatingDemand::Bedroom => "Schlafzimmer",
             HeatingDemand::RoomOfRequirements => "Room of Requirements",
             HeatingDemand::Kitchen => "Küche",

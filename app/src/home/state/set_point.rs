@@ -9,7 +9,8 @@ use crate::core::timeseries::{
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum SetPoint {
-    LivingRoom,
+    LivingRoomBig,
+    LivingRoomSmall,
     Bedroom,
     Kitchen,
     RoomOfRequirements,

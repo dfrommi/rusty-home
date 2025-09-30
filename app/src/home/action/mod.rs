@@ -3,7 +3,6 @@ mod dehumidify;
 mod follow_default_setting;
 mod heating;
 mod inform_window_open;
-mod keep_user_override;
 mod reduce_noise_at_night;
 mod request_closing_window;
 mod user_trigger_action;
@@ -22,7 +21,6 @@ pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
-pub use keep_user_override::KeepUserOverride;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use request_closing_window::RequestClosingWindow;
 pub use user_trigger_action::UserTriggerAction;
@@ -44,7 +42,6 @@ pub enum HomeAction {
     InformWindowOpen(InformWindowOpen),
     ProvideAmbientTemperature(ProvideAmbientTemperature),
     IrHeaterAutoTurnOff(IrHeaterAutoTurnOff),
-    KeepUserOverride(KeepUserOverride),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
@@ -63,7 +60,6 @@ impl Action for HomeAction {
                 provide_ambient_temperature.evaluate(api).await
             }
             HomeAction::IrHeaterAutoTurnOff(ir_heater_auto_turn_off) => ir_heater_auto_turn_off.evaluate(api).await,
-            HomeAction::KeepUserOverride(keep_user_override) => keep_user_override.evaluate(api).await,
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.evaluate(api).await,
             HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.evaluate(api).await,
             HomeAction::UserTriggerAction(user_trigger_action) => user_trigger_action.evaluate(api).await,

@@ -11,9 +11,15 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![
         (
             CommandTarget::SetHeating {
-                device: Thermostat::LivingRoom,
+                device: Thermostat::LivingRoomBig,
             },
             Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
+        ),
+        (
+            CommandTarget::SetHeating {
+                device: Thermostat::LivingRoomSmall,
+            },
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
         ),
         (
             CommandTarget::SetHeating {
@@ -35,9 +41,15 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
         ),
         (
             CommandTarget::SetThermostatAmbientTemperature {
-                device: Thermostat::LivingRoom,
+                device: Thermostat::LivingRoomBig,
             },
             Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
+        ),
+        (
+            CommandTarget::SetThermostatAmbientTemperature {
+                device: Thermostat::LivingRoomSmall,
+            },
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
         ),
         (
             CommandTarget::SetThermostatAmbientTemperature {
@@ -87,9 +99,17 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         (
             "living_room/radiator_thermostat_big",
             Z2mChannel::Thermostat(
-                SetPoint::LivingRoom,
-                HeatingDemand::LivingRoom,
+                SetPoint::LivingRoomBig,
+                HeatingDemand::LivingRoomBig,
                 Opened::LivingRoomRadiatorThermostatBig,
+            ),
+        ),
+        (
+            "living_room/radiator_thermostat_small",
+            Z2mChannel::Thermostat(
+                SetPoint::LivingRoomSmall,
+                HeatingDemand::LivingRoomSmall,
+                Opened::LivingRoomRadiatorThermostatSmall,
             ),
         ),
         (

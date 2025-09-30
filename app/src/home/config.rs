@@ -4,14 +4,13 @@ use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
 use crate::t;
 
+use super::action::{Dehumidify, HomeAction, RequestClosingWindow};
+use super::goal::{HomeGoal, Room};
 use crate::home::action::{
     FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
     ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
-use crate::home::state::{HeatingMode, UserControlled};
-
-use super::action::{Dehumidify, HomeAction, KeepUserOverride, RequestClosingWindow};
-use super::goal::{HomeGoal, Room};
+use crate::home::state::HeatingMode;
 
 #[rustfmt::skip]
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -53,17 +52,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
             UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
-            //RoolDownWhenOccupied::Bedroom.into(),
+            //CoolDownWhenOccupied::Bedroom.into(),
         ]
     ),
-    // (
-    //     HomeGoal::SmarterHeating(Room::Bathroom),
-    //     vec![
-    //         NoHeatingDuringVentilation::new(HeatingZone::Bathroom).into(),
-    //         KeepUserOverride::new(UserControlled::BathroomThermostat).into(),
-    //         NoHeatingDuringAutomaticTemperatureIncrease::new(HeatingZone::Bathroom).into(),
-    //     ]
-    // ),
     (
         HomeGoal::StayInformed,
         vec![
@@ -76,7 +67,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::PreventMouldInBathroom,
         vec![
             UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
-            KeepUserOverride::new(UserControlled::Dehumidifier).into(),
             ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
             Dehumidify::new().into()
         ],
@@ -94,6 +84,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         HomeGoal::CoreControl,
         vec![
             ProvideAmbientTemperature::LivingRoomThermostatBig.into(), 
+            ProvideAmbientTemperature::LivingRoomThermostatSmall.into(), 
             ProvideAmbientTemperature::BedroomThermostat.into(), 
             ProvideAmbientTemperature::KitchenThermostat.into(), 
             ProvideAmbientTemperature::RoomOfRequirementsThermostat.into(), 
@@ -112,7 +103,10 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
                 device: PowerToggle::LivingRoomNotificationLight,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::LivingRoom,
+                device: Thermostat::LivingRoomBig,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::LivingRoomSmall,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Bedroom,

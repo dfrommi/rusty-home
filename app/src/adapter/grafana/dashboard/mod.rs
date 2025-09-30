@@ -89,7 +89,8 @@ impl DashboardDisplay for Room {
 impl Room {
     fn heating_demand(&self) -> HeatingDemand {
         match self {
-            Room::LivingRoom => HeatingDemand::LivingRoom,
+            //TODO multiple thermostats per room
+            Room::LivingRoom => HeatingDemand::LivingRoomBig,
             Room::Bedroom => HeatingDemand::Bedroom,
             Room::Kitchen => HeatingDemand::Kitchen,
             Room::RoomOfRequirements => HeatingDemand::RoomOfRequirements,
@@ -119,7 +120,7 @@ impl Room {
 
     fn set_point(&self) -> SetPoint {
         match self {
-            Room::LivingRoom => SetPoint::LivingRoom,
+            Room::LivingRoom => SetPoint::LivingRoomBig,
             Room::Bedroom => SetPoint::Bedroom,
             Room::Kitchen => SetPoint::Kitchen,
             Room::RoomOfRequirements => SetPoint::RoomOfRequirements,

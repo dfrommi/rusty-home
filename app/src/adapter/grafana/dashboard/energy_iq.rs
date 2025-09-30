@@ -154,7 +154,7 @@ async fn combined_series(
 
     let mut result = mapped_ts.remove(0);
     for ts in mapped_ts {
-        result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoom, |a, b| Percent(a.0 + b.0))?;
+        result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoomBig, |a, b| Percent(a.0 + b.0))?;
     }
 
     Ok(result)

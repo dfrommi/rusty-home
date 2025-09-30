@@ -134,7 +134,8 @@ pub enum PowerToggle {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
-    LivingRoom,
+    LivingRoomBig,
+    LivingRoomSmall,
     Bedroom,
     Kitchen,
     RoomOfRequirements,

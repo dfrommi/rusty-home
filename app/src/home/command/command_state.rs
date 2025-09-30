@@ -37,7 +37,8 @@ async fn is_set_heating_reflected_in_state(
     api: &HomeApi,
 ) -> Result<bool> {
     let set_point = match device {
-        Thermostat::LivingRoom => SetPoint::LivingRoom,
+        Thermostat::LivingRoomBig => SetPoint::LivingRoomBig,
+        Thermostat::LivingRoomSmall => SetPoint::LivingRoomSmall,
         Thermostat::Bedroom => SetPoint::Bedroom,
         Thermostat::RoomOfRequirements => SetPoint::RoomOfRequirements,
         Thermostat::Kitchen => SetPoint::Kitchen,
@@ -50,7 +51,8 @@ async fn is_set_heating_reflected_in_state(
         crate::home::command::HeatingTargetState::Off => Ok(set_point == DegreeCelsius(0.0)),
         crate::home::command::HeatingTargetState::Heat { temperature } => Ok(&set_point == temperature),
         crate::home::command::HeatingTargetState::WindowOpen => match device {
-            Thermostat::LivingRoom => Ok(Opened::LivingRoomRadiatorThermostatBig.current(api).await?),
+            Thermostat::LivingRoomBig => Ok(Opened::LivingRoomRadiatorThermostatBig.current(api).await?),
+            Thermostat::LivingRoomSmall => Ok(Opened::LivingRoomRadiatorThermostatSmall.current(api).await?),
             Thermostat::Bedroom => Ok(Opened::BedroomRadiatorThermostat.current(api).await?),
             Thermostat::Kitchen => Ok(Opened::KitchenRadiatorThermostat.current(api).await?),
             Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),

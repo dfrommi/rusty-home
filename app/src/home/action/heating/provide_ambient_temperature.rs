@@ -13,6 +13,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProvideAmbientTemperature {
     LivingRoomThermostatBig,
+    LivingRoomThermostatSmall,
     BedroomThermostat,
     KitchenThermostat,
     RoomOfRequirementsThermostat,
@@ -27,7 +28,12 @@ impl std::fmt::Display for ProvideAmbientTemperature {
 impl Action for ProvideAmbientTemperature {
     async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<ActionEvaluationResult> {
         let (temp_sensor, thermostat) = match self {
-            ProvideAmbientTemperature::LivingRoomThermostatBig => (Temperature::LivingRoomDoor, Thermostat::LivingRoom),
+            ProvideAmbientTemperature::LivingRoomThermostatBig => {
+                (Temperature::LivingRoomDoor, Thermostat::LivingRoomBig)
+            }
+            ProvideAmbientTemperature::LivingRoomThermostatSmall => {
+                (Temperature::LivingRoomDoor, Thermostat::LivingRoomSmall)
+            }
             ProvideAmbientTemperature::BedroomThermostat => (Temperature::BedroomDoor, Thermostat::Bedroom),
             ProvideAmbientTemperature::KitchenThermostat => (Temperature::KitchenOuterWall, Thermostat::Kitchen),
             ProvideAmbientTemperature::RoomOfRequirementsThermostat => {

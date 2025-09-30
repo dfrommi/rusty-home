@@ -23,7 +23,7 @@ pub enum HeatingZone {
 impl HeatingZone {
     pub fn thermostats(&self) -> &[Thermostat] {
         match self {
-            HeatingZone::LivingRoom => &[Thermostat::LivingRoom],
+            HeatingZone::LivingRoom => &[Thermostat::LivingRoomBig, Thermostat::LivingRoomSmall],
             HeatingZone::Bedroom => &[Thermostat::Bedroom],
             HeatingZone::Kitchen => &[Thermostat::Kitchen],
             HeatingZone::RoomOfRequirements => &[Thermostat::RoomOfRequirements],
@@ -63,7 +63,7 @@ impl HeatingZone {
 
     pub fn for_thermostat(thermostat: &Thermostat) -> Self {
         match thermostat {
-            Thermostat::LivingRoom => HeatingZone::LivingRoom,
+            Thermostat::LivingRoomBig | Thermostat::LivingRoomSmall => HeatingZone::LivingRoom,
             Thermostat::Bedroom => HeatingZone::Bedroom,
             Thermostat::Kitchen => HeatingZone::Kitchen,
             Thermostat::RoomOfRequirements => HeatingZone::RoomOfRequirements,

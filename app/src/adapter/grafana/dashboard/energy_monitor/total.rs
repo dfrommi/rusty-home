@@ -98,7 +98,8 @@ where
 
 fn room_of(item: &HeatingDemand) -> Room {
     match item {
-        HeatingDemand::LivingRoom => Room::LivingRoom,
+        HeatingDemand::LivingRoomBig => Room::LivingRoom,
+        HeatingDemand::LivingRoomSmall => Room::LivingRoom,
         HeatingDemand::Bedroom => Room::Bedroom,
         HeatingDemand::RoomOfRequirements => Room::RoomOfRequirements,
         HeatingDemand::Kitchen => Room::Kitchen,

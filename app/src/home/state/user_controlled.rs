@@ -20,11 +20,11 @@ use super::{DataPointAccess, sampled_data_frame};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum UserControlled {
     Dehumidifier,
-    LivingRoomThermostat,
+    LivingRoomThermostatBig,
+    LivingRoomThermostatSmall,
     BedroomThermostat,
     KitchenThermostat,
     RoomOfRequirementsThermostat,
-    BathroomThermostat,
 }
 
 //TODO try to simplify
@@ -38,8 +38,11 @@ impl DataPointAccess<UserControlled> for UserControlled {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(api).await,
             //check expected state according to last action and compare with current state. Also
             //consider timer expiration
-            UserControlled::LivingRoomThermostat => {
-                current_data_point_for_thermostat(api, self, Thermostat::LivingRoom).await
+            UserControlled::LivingRoomThermostatBig => {
+                current_data_point_for_thermostat(api, self, Thermostat::LivingRoomBig).await
+            }
+            UserControlled::LivingRoomThermostatSmall => {
+                current_data_point_for_thermostat(api, self, Thermostat::LivingRoomSmall).await
             }
             UserControlled::BedroomThermostat => {
                 current_data_point_for_thermostat(api, self, Thermostat::Bedroom).await
@@ -49,9 +52,6 @@ impl DataPointAccess<UserControlled> for UserControlled {
             }
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(api, self, Thermostat::RoomOfRequirements).await
-            }
-            UserControlled::BathroomThermostat => {
-                current_data_point_for_thermostat(api, self, Thermostat::Bathroom).await
             }
         }
     }

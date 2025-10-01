@@ -7,7 +7,8 @@ use crate::{
     home::{
         HeatingZone,
         state::{
-            EnergySaving, FanActivity, FanAirflow, Powered, RelativeHumidity, SetPoint, Temperature, UserControlled,
+            EnergySaving, FanActivity, FanAirflow, OpenedArea, Powered, RelativeHumidity, SetPoint, Temperature,
+            UserControlled,
         },
     },
 };
@@ -57,6 +58,7 @@ enum HomekitState {
     CurrentHumidity(RelativeHumidity),
     CurrentHeatingState(SetPoint, UserControlled),
     TargetTemperature(SetPoint),
+    WindowOpen(OpenedArea),
 }
 
 #[derive(Debug, Clone, derive_more::Display)]
@@ -134,6 +136,26 @@ impl Homekit {
                 "fan_speed/living_room_ceiling_fan",
                 HomekitState::FanSpeed(FanActivity::LivingRoomCeilingFan),
                 Some(HomekitInput::LivingRoomCeilingFanSpeed),
+            ),
+            (
+                "contact/living_room/closed",
+                HomekitState::WindowOpen(OpenedArea::LivingRoomWindowOrDoor),
+                None,
+            ),
+            (
+                "contact/bedroom/closed",
+                HomekitState::WindowOpen(OpenedArea::BedroomWindow),
+                None,
+            ),
+            (
+                "contact/room_of_requirements/closed",
+                HomekitState::WindowOpen(OpenedArea::RoomOfRequirementsWindow),
+                None,
+            ),
+            (
+                "contact/kitchen/closed",
+                HomekitState::WindowOpen(OpenedArea::KitchenWindow),
+                None,
             ),
             (
                 "thermostat/living_room/current_temperature",

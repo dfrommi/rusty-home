@@ -64,6 +64,7 @@ async fn export_accessory(
             sender.send(key, HomekitStateValue(heating_state.to_string())).await?
         }
         HomekitState::TargetTemperature(set_point) => sender.send(key, set_point.current(api).await?).await?,
+        HomekitState::WindowOpen(opened_area) => sender.send(key, opened_area.current(api).await?).await?,
     }
 
     Ok(())

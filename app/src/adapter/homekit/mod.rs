@@ -5,7 +5,7 @@ mod state;
 use crate::{
     core::unit::DegreeCelsius,
     home::{
-        command::Thermostat,
+        HeatingZone,
         state::{
             EnergySaving, FanActivity, FanAirflow, Powered, RelativeHumidity, SetPoint, Temperature, UserControlled,
         },
@@ -66,8 +66,8 @@ pub enum HomekitInput {
     LivingRoomTvEnergySaving,
     LivingRoomCeilingFanSpeed,
     BedroomCeilingFanSpeed,
-    ThermostatTargetHeatingState(Thermostat),
-    ThermostatTargetTemperature(Thermostat),
+    ThermostatTargetHeatingState(HeatingZone),
+    ThermostatTargetTemperature(HeatingZone),
 }
 
 //Don't forget to add to action planning config
@@ -136,8 +136,33 @@ impl Homekit {
                 Some(HomekitInput::LivingRoomCeilingFanSpeed),
             ),
             (
+                "thermostat/living_room/current_temperature",
+                HomekitState::CurrentTemperature(Temperature::LivingRoomDoor),
+                None,
+            ),
+            (
+                "thermostat/bedroom/current_temperature",
+                HomekitState::CurrentTemperature(Temperature::BedroomDoor),
+                None,
+            ),
+            (
                 "thermostat/room_of_requirements/current_temperature",
                 HomekitState::CurrentTemperature(Temperature::RoomOfRequirementsDoor),
+                None,
+            ),
+            (
+                "thermostat/kitchen/current_temperature",
+                HomekitState::CurrentTemperature(Temperature::KitchenOuterWall),
+                None,
+            ),
+            (
+                "thermostat/living_room/current_humidity",
+                HomekitState::CurrentHumidity(RelativeHumidity::LivingRoomDoor),
+                None,
+            ),
+            (
+                "thermostat/bedroom/current_humidity",
+                HomekitState::CurrentHumidity(RelativeHumidity::BedroomDoor),
                 None,
             ),
             (
@@ -146,17 +171,52 @@ impl Homekit {
                 None,
             ),
             (
+                "thermostat/kitchen/current_humidity",
+                HomekitState::CurrentHumidity(RelativeHumidity::KitchenOuterWall),
+                None,
+            ),
+            (
+                "thermostat/living_room/heating_state",
+                HomekitState::CurrentHeatingState(SetPoint::LivingRoomBig, UserControlled::LivingRoomThermostatBig),
+                Some(HomekitInput::ThermostatTargetHeatingState(HeatingZone::LivingRoom)),
+            ),
+            (
+                "thermostat/bedroom/heating_state",
+                HomekitState::CurrentHeatingState(SetPoint::Bedroom, UserControlled::BedroomThermostat),
+                Some(HomekitInput::ThermostatTargetHeatingState(HeatingZone::Bedroom)),
+            ),
+            (
                 "thermostat/room_of_requirements/heating_state",
                 HomekitState::CurrentHeatingState(
                     SetPoint::RoomOfRequirements,
                     UserControlled::RoomOfRequirementsThermostat,
                 ),
-                Some(HomekitInput::ThermostatTargetHeatingState(Thermostat::RoomOfRequirements)),
+                Some(HomekitInput::ThermostatTargetHeatingState(HeatingZone::RoomOfRequirements)),
+            ),
+            (
+                "thermostat/kitchen/heating_state",
+                HomekitState::CurrentHeatingState(SetPoint::Kitchen, UserControlled::KitchenThermostat),
+                Some(HomekitInput::ThermostatTargetHeatingState(HeatingZone::Kitchen)),
+            ),
+            (
+                "thermostat/living_room/target_temperature",
+                HomekitState::TargetTemperature(SetPoint::LivingRoomBig),
+                Some(HomekitInput::ThermostatTargetTemperature(HeatingZone::LivingRoom)),
+            ),
+            (
+                "thermostat/bedroom/target_temperature",
+                HomekitState::TargetTemperature(SetPoint::Bedroom),
+                Some(HomekitInput::ThermostatTargetTemperature(HeatingZone::Bedroom)),
             ),
             (
                 "thermostat/room_of_requirements/target_temperature",
                 HomekitState::TargetTemperature(SetPoint::RoomOfRequirements),
-                Some(HomekitInput::ThermostatTargetTemperature(Thermostat::RoomOfRequirements)),
+                Some(HomekitInput::ThermostatTargetTemperature(HeatingZone::RoomOfRequirements)),
+            ),
+            (
+                "thermostat/kitchen/target_temperature",
+                HomekitState::TargetTemperature(SetPoint::Kitchen),
+                Some(HomekitInput::ThermostatTargetTemperature(HeatingZone::Kitchen)),
             ),
         ]
     }

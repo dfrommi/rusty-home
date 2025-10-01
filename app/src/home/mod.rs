@@ -15,6 +15,7 @@ mod common;
 mod tests;
 
 use crate::core::HomeApi;
+pub use common::*;
 pub use goal::get_active_goals;
 
 pub struct HomePlanning;

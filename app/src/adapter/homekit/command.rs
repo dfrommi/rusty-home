@@ -4,7 +4,8 @@ use std::sync::Arc;
 use super::{Homekit, HomekitCommand};
 use crate::adapter::homekit::HomekitHeatingState;
 use crate::core::unit::Percent;
-use crate::home::command::Thermostat;
+use crate::home::HeatingZone;
+use crate::home::command::HeatingTargetState;
 use crate::home::state::FanAirflow;
 use crate::home::trigger::UserTrigger;
 use crate::{adapter::homekit::HomekitInput, core::HomeApi};
@@ -85,30 +86,33 @@ async fn execute_target(input: &HomekitInput, payload: HomekitStateValue, api: A
             api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(activity)))
                 .await
         }
-        HomekitInput::ThermostatTargetHeatingState(Thermostat::RoomOfRequirements) => {
+        HomekitInput::ThermostatTargetHeatingState(zone) => {
             let heating_state = match payload.0.as_ref() {
                 "OFF" => HomekitHeatingState::Off,
                 "AUTO" => HomekitHeatingState::Auto,
                 _ => return Ok(()), //HEAT is handled via target temperature
             };
 
-            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(
-                heating_state,
-            )))
-            .await
+            api.add_user_trigger(UserTrigger::Homekit(heating_state_command(zone, heating_state)))
+                .await
         }
-        HomekitInput::ThermostatTargetTemperature(Thermostat::RoomOfRequirements) => {
-            api.add_user_trigger(UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(
+        HomekitInput::ThermostatTargetTemperature(zone) => {
+            api.add_user_trigger(UserTrigger::Homekit(heating_state_command(
+                zone,
                 HomekitHeatingState::Heat(payload.try_into()?),
             )))
             .await
         }
-        HomekitInput::ThermostatTargetHeatingState(t) => {
-            anyhow::bail!("Thermostat {t} heating state not yet supported by HomeKit")
-        }
-        HomekitInput::ThermostatTargetTemperature(t) => {
-            anyhow::bail!("Thermostat {t} target temperature not yet supported by HomeKit")
-        }
+    }
+}
+
+fn heating_state_command(zone: &HeatingZone, heating_state: HomekitHeatingState) -> HomekitCommand {
+    match zone {
+        HeatingZone::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingState(heating_state),
+        HeatingZone::LivingRoom => HomekitCommand::LivingRoomHeatingState(heating_state),
+        HeatingZone::Bedroom => HomekitCommand::BedroomHeatingState(heating_state),
+        HeatingZone::Kitchen => HomekitCommand::KitchenHeatingState(heating_state),
+        HeatingZone::Bathroom => panic!("Bathroom heating state not supported by HomeKit"),
     }
 }
 

@@ -9,7 +9,7 @@ use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
-use crate::port::{CommandExecutionAccess, DataFrameAccess, DataPointAccess};
+use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
@@ -193,10 +193,8 @@ impl HomeApi {
     pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
         self.db.set_command_state_error(command_id, error_message).await
     }
-}
 
-impl CommandExecutionAccess for HomeApi {
-    async fn get_latest_command(
+    pub async fn get_latest_command(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,
@@ -207,7 +205,7 @@ impl CommandExecutionAccess for HomeApi {
         Ok(commands.into_iter().max_by_key(|cmd| cmd.created))
     }
 
-    async fn get_all_commands_for_target(
+    pub async fn get_all_commands_for_target(
         &self,
         target: impl Into<CommandTarget>,
         since: DateTime,

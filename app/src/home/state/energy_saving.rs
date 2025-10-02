@@ -15,7 +15,6 @@ use crate::home::{
 };
 
 use super::{DataPointAccess, sampled_data_frame};
-use crate::port::CommandExecutionAccess;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum EnergySaving {

@@ -3,7 +3,7 @@ use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::home::command::CommandTarget;
-use crate::port::{CommandExecutionAccess, DataFrameAccess};
+use crate::port::DataFrameAccess;
 use crate::t;
 use r#macro::{EnumVariants, Id, mockable};
 

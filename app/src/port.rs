@@ -2,7 +2,6 @@
 
 use crate::core::timeseries::DataFrame;
 use crate::core::{HomeApi, ValueObject};
-use crate::home::command::{CommandExecution, CommandTarget};
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
@@ -29,20 +28,6 @@ pub trait TimeSeriesAccess<T: Estimatable> {
     async fn series_since(&self, since: DateTime, api: &HomeApi) -> Result<TimeSeries<T>> {
         self.series(DateTimeRange::new(since, t!(now)), api).await
     }
-}
-
-pub trait CommandExecutionAccess {
-    async fn get_latest_command(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Option<CommandExecution>>;
-
-    async fn get_all_commands_for_target(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution>>;
 }
 
 impl<T> TimeSeriesAccess<T> for T

@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use crate::{
     home::command::{Command, CommandSource, CommandTarget},
-    port::CommandExecutionAccess as _,
     t,
 };
 use anyhow::Result;

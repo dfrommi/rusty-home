@@ -4,7 +4,6 @@ use crate::home::command::{
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
 use crate::home::state::{FanActivity, FanAirflow, Opened, Powered, SetPoint};
-use crate::port::CommandExecutionAccess;
 use anyhow::Result;
 
 use crate::{core::HomeApi, t};

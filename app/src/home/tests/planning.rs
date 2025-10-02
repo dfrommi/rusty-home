@@ -56,7 +56,6 @@ mod support {
     use crate::core::time::{DateTime, DateTimeRange};
     use crate::home::command::{Command, CommandSource};
 
-    use crate::port::CommandExecutionAccess;
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 
     pub struct TestDatabase {

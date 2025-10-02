@@ -145,16 +145,19 @@ async fn execute_action<'a, A>(
 ) where
     A: Action,
 {
+    let target: CommandTarget = command.clone().into();
+
     match command_processor.execute(command, source).await {
         Ok(CommandExecutionResult::Triggered) => {
-            tracing::info!("Action {} started", context.action);
+            tracing::info!("Started command {} via action {}", target, context.action);
             context.trace.triggered = Some(true);
         }
         Ok(CommandExecutionResult::Skipped) => {
+            tracing::trace!("Skipped execution command {} via action {}", target, context.action);
             context.trace.triggered = Some(false);
         }
         Err(e) => {
-            tracing::error!("Error starting action {}: {:?}", context.action, e);
+            tracing::error!("Error starting command {} via action {}: {:?}", target, context.action, e);
         }
     }
 }

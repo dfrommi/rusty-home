@@ -34,7 +34,7 @@ impl Z2mCommandExecutor {
 }
 
 impl CommandExecutor for Z2mCommandExecutor {
-    #[tracing::instrument(name = "execute_command TASMOTA", ret, skip(self))]
+    #[tracing::instrument(name = "execute_command Z2M", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let cmd_target: CommandTarget = command.into();
         let z2m_target = self
@@ -65,8 +65,8 @@ impl CommandExecutor for Z2mCommandExecutor {
                 self.set_ambient_temperature(device_id, *temperature).await
             }
 
-            (_, tasmota_target) => {
-                anyhow::bail!("Mismatch between command and Z2M target {:?}", tasmota_target)
+            (_, z2m_target) => {
+                anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
             }
         }
     }

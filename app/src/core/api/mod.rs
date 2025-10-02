@@ -194,6 +194,8 @@ impl HomeApi {
         let is_reflected_in_state = command.is_reflected_in_state(self).await?;
 
         if !was_latest_execution || !is_reflected_in_state {
+            tracing::trace!(?was_latest_execution, ?is_reflected_in_state, "Triggering command");
+
             self.db
                 .save_command(&command, source, TraceContext::current_correlation_id())
                 .await?;
@@ -203,6 +205,7 @@ impl HomeApi {
 
             Ok(CommandExecutionResult::Triggered)
         } else {
+            tracing::trace!(?was_latest_execution, ?is_reflected_in_state, "Skipping command");
             Ok(CommandExecutionResult::Skipped)
         }
     }

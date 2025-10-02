@@ -45,11 +45,6 @@ pub trait CommandExecutionAccess {
     ) -> Result<Vec<CommandExecution>>;
 }
 
-pub enum CommandExecutionResult {
-    Triggered,
-    Skipped,
-}
-
 impl<T> TimeSeriesAccess<T> for T
 where
     T: DataFrameAccess<T> + Estimatable + Clone,

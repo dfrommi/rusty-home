@@ -1,14 +1,15 @@
 use std::fmt::Display;
 
-use crate::home::command::{Command, CommandSource, CommandTarget};
+use crate::{
+    home::command::{Command, CommandSource, CommandTarget},
+    port::CommandExecutionAccess as _,
+    t,
+};
 use anyhow::Result;
 use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
-use crate::{
-    core::{HomeApi, planner::action::ActionEvaluationResult},
-    port::CommandExecutionResult,
-};
+use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
@@ -136,28 +137,62 @@ fn check_locked<'a, A>(
     evaluation_result
 }
 
-#[tracing::instrument(skip(context, command_processor))]
-async fn execute_action<'a, A>(
-    context: &mut Context<'a, A>,
+#[tracing::instrument(skip(api))]
+async fn should_execute(
     command: Command,
-    source: CommandSource,
-    command_processor: &HomeApi,
-) where
+    source: crate::home::command::CommandSource,
+    api: &HomeApi,
+) -> anyhow::Result<bool> {
+    let target: CommandTarget = command.clone().into();
+    let last_execution = api
+        .get_latest_command(target.clone(), t!(48 hours ago))
+        .await?
+        .filter(|e| e.source == source && e.command == command)
+        .map(|e| e.created);
+
+    let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
+
+    if was_just_executed {
+        tracing::trace!("Command for {target} was just executed, skipping");
+        return Ok(false);
+    }
+
+    let is_reflected_in_state = command.is_reflected_in_state(api).await?;
+    if is_reflected_in_state {
+        tracing::trace!("Command for {target} is already reflected in state, skipping");
+        return Ok(false);
+    }
+
+    tracing::trace!("Command for {target} should be executed");
+    Ok(true)
+}
+
+#[tracing::instrument(skip(context, api))]
+async fn execute_action<'a, A>(context: &mut Context<'a, A>, command: Command, source: CommandSource, api: &HomeApi)
+where
     A: Action,
 {
     let target: CommandTarget = command.clone().into();
 
-    match command_processor.execute(command, source).await {
-        Ok(CommandExecutionResult::Triggered) => {
-            tracing::info!("Started command {} via action {}", target, context.action);
-            context.trace.triggered = Some(true);
-        }
-        Ok(CommandExecutionResult::Skipped) => {
+    match should_execute(command.clone(), source.clone(), api).await {
+        Ok(true) => match api.save_command(command, source).await {
+            Ok(_) => {
+                tracing::info!("Started command {} via action {}", target, context.action);
+                context.trace.triggered = Some(true);
+            }
+            Err(e) => tracing::error!("Error saving command for {}: {:?}", target, e),
+        },
+        Ok(false) => {
             tracing::trace!("Skipped execution command {} via action {}", target, context.action);
             context.trace.triggered = Some(false);
         }
         Err(e) => {
-            tracing::error!("Error starting command {} via action {}: {:?}", target, context.action, e);
+            tracing::error!(
+                "Error checking whether command for {} via action {} should be started: {:?}",
+                target,
+                context.action,
+                e
+            );
         }
     }
 }

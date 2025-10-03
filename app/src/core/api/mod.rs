@@ -9,11 +9,9 @@ use crate::core::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
-use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
-use r#macro::mockable;
 
 #[derive(Clone)]
 pub struct HomeApi {
@@ -114,40 +112,35 @@ impl HomeApi {
         self.apply_timeshift_filter_to_dataframe(df)
     }
 
-    pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
-        self.db.add_state(value, timestamp).await
-    }
-}
+    pub async fn current_data_point<T>(&self, item: &T) -> Result<DataPoint<T::ValueType>>
+    where
+        T: Into<PersistentHomeState> + Into<HomeState> + ValueObject + Clone,
+    {
+        let channel: PersistentHomeState = item.clone().into();
+        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
 
-impl<T> DataPointAccess<T> for T
-where
-    T: Into<PersistentHomeState> + Into<HomeState> + ValueObject + Clone,
-{
-    #[mockable]
-    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>> {
-        let channel: PersistentHomeState = self.clone().into();
-        let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
-
-        api.get_datapoint(tag_id, &t!(now))
+        self.get_datapoint(tag_id, &t!(now))
             .await
-            .map(|dp| DataPoint::new(self.from_f64(dp.value), dp.timestamp))
+            .map(|dp| DataPoint::new(item.from_f64(dp.value), dp.timestamp))
     }
-}
 
-impl<T> DataFrameAccess<T> for T
-where
-    T: Into<PersistentHomeState> + ValueObject + Clone,
-{
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<T::ValueType>> {
-        let channel: PersistentHomeState = self.clone().into();
-        let tag_id = api.db.get_tag_id(channel.clone(), false).await?;
+    pub async fn get_data_frame<T>(&self, item: &T, range: DateTimeRange) -> Result<DataFrame<T::ValueType>>
+    where
+        T: Into<PersistentHomeState> + ValueObject + Clone,
+    {
+        let channel: PersistentHomeState = item.clone().into();
+        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
 
-        let df = api
+        let df = self
             .get_dataframe(tag_id, &range)
             .await?
-            .map(|dp| self.from_f64(dp.value));
+            .map(|dp| item.from_f64(dp.value));
 
         Ok(df)
+    }
+
+    pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
+        self.db.add_state(value, timestamp).await
     }
 }
 

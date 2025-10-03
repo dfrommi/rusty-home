@@ -3,10 +3,15 @@ use std::fmt::Display;
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::core::timeseries::{
-    DataFrame,
-    interpolate::{self, Estimatable},
+use crate::core::{
+    HomeApi,
+    time::DateTimeRange,
+    timeseries::{
+        DataFrame, DataPoint,
+        interpolate::{self, Estimatable},
+    },
 };
+use crate::port::{DataFrameAccess, DataPointAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum FanActivity {
@@ -33,6 +38,18 @@ pub enum FanSpeed {
 impl Estimatable for FanActivity {
     fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<FanAirflow>) -> Option<FanAirflow> {
         interpolate::algo::last_seen(at, df)
+    }
+}
+
+impl DataPointAccess<FanActivity> for FanActivity {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<FanAirflow>> {
+        api.current_data_point(self).await
+    }
+}
+
+impl DataFrameAccess<FanActivity> for FanActivity {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<FanAirflow>> {
+        api.get_data_frame(self, range).await
     }
 }
 

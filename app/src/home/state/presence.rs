@@ -1,13 +1,15 @@
 use crate::{
-    core::{HomeApi, time::DateTime, timeseries::DataPoint},
-    port::DataPointAccess as _,
+    core::{
+        HomeApi,
+        time::{DateTime, DateTimeRange},
+        timeseries::{
+            DataFrame, DataPoint,
+            interpolate::{Estimatable, algo},
+        },
+    },
+    port::{DataFrameAccess, DataPointAccess},
 };
 use r#macro::{EnumVariants, Id};
-
-use crate::core::timeseries::{
-    DataFrame,
-    interpolate::{Estimatable, algo},
-};
 
 //TODO impl anyoneSleeping. Requires impl of enum from crate
 
@@ -25,6 +27,18 @@ pub enum Presence {
 impl Estimatable for Presence {
     fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         algo::last_seen(at, df)
+    }
+}
+
+impl DataPointAccess<Presence> for Presence {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
+        api.current_data_point(self).await
+    }
+}
+
+impl DataFrameAccess<Presence> for Presence {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
+        api.get_data_frame(self, range).await
     }
 }
 

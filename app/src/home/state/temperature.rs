@@ -1,5 +1,11 @@
-use crate::core::time::DateTime;
+use crate::core::HomeApi;
+use crate::core::timeseries::DataPoint;
 use crate::core::unit::DegreeCelsius;
+use crate::port::DataFrameAccess;
+use crate::{
+    core::time::{DateTime, DateTimeRange},
+    port::DataPointAccess,
+};
 use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::{
@@ -23,5 +29,17 @@ pub enum Temperature {
 impl Estimatable for Temperature {
     fn interpolate(&self, at: DateTime, df: &DataFrame<DegreeCelsius>) -> Option<DegreeCelsius> {
         algo::linear(at, df)
+    }
+}
+
+impl DataPointAccess<Temperature> for Temperature {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
+        api.current_data_point(self).await
+    }
+}
+
+impl DataFrameAccess<Temperature> for Temperature {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
+        api.get_data_frame(self, range).await
     }
 }

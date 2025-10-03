@@ -60,3 +60,17 @@ impl Action for FollowDefaultSetting {
         Ok(ActionEvaluationResult::Execute(command, super::action_source(self)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::home::command::PowerToggle;
+
+    #[test]
+    fn display_includes_target() {
+        let action = FollowDefaultSetting::new(CommandTarget::SetPower {
+            device: PowerToggle::Dehumidifier,
+        });
+        assert_eq!(action.to_string(), "FollowDefaultSetting[SetPower[Dehumidifier]]");
+    }
+}

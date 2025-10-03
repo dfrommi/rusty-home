@@ -119,3 +119,14 @@ impl CoolDownWhenOccupied {
         needs_execution_for_one_shot_of_target(&self.command(), &self.source(), on_couch.timestamp, api).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_variants() {
+        assert_eq!(CoolDownWhenOccupied::Bedroom.to_string(), "CoolDownWhenOccupied[Bedroom]");
+        assert_eq!(CoolDownWhenOccupied::LivingRoom.to_string(), "CoolDownWhenOccupied[LivingRoom]");
+    }
+}

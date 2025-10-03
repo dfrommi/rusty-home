@@ -40,3 +40,13 @@ impl SimpleAction for IrHeaterAutoTurnOff {
         Ok(current.value && current.timestamp.elapsed() > t!(1 hours))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_is_expected() {
+        assert_eq!(IrHeaterAutoTurnOff::new().to_string(), "IrHeaterAutoTurnOff[Bedroom]");
+    }
+}

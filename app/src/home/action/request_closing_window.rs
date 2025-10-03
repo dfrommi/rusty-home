@@ -47,3 +47,13 @@ impl SimpleAction for RequestClosingWindow {
         Ok(result?.into_iter().any(|v| v))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_is_expected() {
+        assert_eq!(RequestClosingWindow::new().to_string(), "RequestClosingWindow");
+    }
+}

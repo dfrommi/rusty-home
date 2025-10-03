@@ -39,3 +39,13 @@ impl SimpleAction for Dehumidify {
         RiskOfMould::Bathroom.current(api).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_is_expected() {
+        assert_eq!(Dehumidify::new().to_string(), "Dehumidify");
+    }
+}

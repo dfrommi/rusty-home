@@ -52,3 +52,38 @@ impl Action for ProvideAmbientTemperature {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_includes_variant_name() {
+        let cases = [
+            (
+                ProvideAmbientTemperature::LivingRoomThermostatBig,
+                "ProvideAmbientTemperature[LivingRoomThermostatBig]",
+            ),
+            (
+                ProvideAmbientTemperature::LivingRoomThermostatSmall,
+                "ProvideAmbientTemperature[LivingRoomThermostatSmall]",
+            ),
+            (
+                ProvideAmbientTemperature::BedroomThermostat,
+                "ProvideAmbientTemperature[BedroomThermostat]",
+            ),
+            (
+                ProvideAmbientTemperature::KitchenThermostat,
+                "ProvideAmbientTemperature[KitchenThermostat]",
+            ),
+            (
+                ProvideAmbientTemperature::RoomOfRequirementsThermostat,
+                "ProvideAmbientTemperature[RoomOfRequirementsThermostat]",
+            ),
+        ];
+
+        for (variant, expected) in cases {
+            assert_eq!(variant.to_string(), expected);
+        }
+    }
+}

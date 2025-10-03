@@ -79,3 +79,15 @@ async fn cold_air_coming_in(api: &HomeApi) -> anyhow::Result<Option<(DateTime, D
         _ => Ok(None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::home::command::NotificationRecipient;
+
+    #[test]
+    fn display_includes_recipient() {
+        let action = InformWindowOpen::new(NotificationRecipient::Dennis);
+        assert_eq!(action.to_string(), "InformWindowOpen[Dennis]");
+    }
+}

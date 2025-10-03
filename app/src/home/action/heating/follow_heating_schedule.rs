@@ -58,3 +58,15 @@ impl Action for FollowHeatingSchedule {
         Ok(ActionEvaluationResult::ExecuteMulti(commands, super::action_source(self)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{home::common::HeatingZone, home::state::HeatingMode};
+
+    #[test]
+    fn display_includes_zone_and_mode() {
+        let action = FollowHeatingSchedule::new(HeatingZone::LivingRoom, HeatingMode::EnergySaving);
+        assert_eq!(action.to_string(), "FollowHeatingSchedule[LivingRoom - EnergySaving]");
+    }
+}

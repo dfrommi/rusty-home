@@ -40,3 +40,15 @@ impl SimpleAction for ReduceNoiseAtNight {
         Ok(self.range.contains(t!(now).time()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::time::Time;
+
+    #[test]
+    fn display_is_expected() {
+        let range = DailyTimeRange::new(Time::at(22, 0).unwrap(), Time::at(6, 0).unwrap());
+        assert_eq!(ReduceNoiseAtNight::new(range).to_string(), "ReduceNoiseAtNight");
+    }
+}

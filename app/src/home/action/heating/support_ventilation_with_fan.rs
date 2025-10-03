@@ -68,3 +68,15 @@ impl SimpleAction for SupportVentilationWithFan {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::home::command::Fan;
+
+    #[test]
+    fn display_includes_fan() {
+        let action = SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan);
+        assert_eq!(action.to_string(), "SupportVentilationWithFan[LivingRoomCeilingFan]");
+    }
+}

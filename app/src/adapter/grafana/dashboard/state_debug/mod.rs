@@ -65,8 +65,8 @@ async fn get_items(path: web::Path<String>) -> impl Responder {
 
     let supported_channels = supported_channels();
     let items = supported_channels.iter().filter_map(|c| {
-        if type_ == c.ext_type() {
-            Some(c.ext_name().to_owned())
+        if type_ == c.type_name() {
+            Some(c.variant_name().to_owned())
         } else {
             None
         }
@@ -131,8 +131,8 @@ where
         .iter()
         .map(|dp| Row {
             timestamp: dp.timestamp,
-            type_: ext_id.ext_type().to_string(),
-            item: ext_id.ext_name().to_string(),
+            type_: ext_id.type_name().to_string(),
+            item: ext_id.variant_name().to_string(),
             value: *dp.value.as_ref(),
         })
         .collect();

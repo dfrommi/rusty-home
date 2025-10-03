@@ -120,8 +120,8 @@ impl SmartHomeMcp {
             let external_id = state.ext_id();
 
             devices.push(Content::json(DeviceId {
-                device_type: external_id.ext_type().to_string(),
-                device_name: external_id.ext_name().to_string(),
+                device_type: external_id.type_name().to_string(),
+                device_name: external_id.variant_name().to_string(),
             })?);
         }
 

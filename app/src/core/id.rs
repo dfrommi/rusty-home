@@ -11,11 +11,11 @@ impl InternalId {
         Self { type_, name }
     }
 
-    pub fn int_type(&self) -> &str {
+    pub fn type_name(&self) -> &str {
         self.type_
     }
 
-    pub fn int_name(&self) -> &str {
+    pub fn variant_name(&self) -> &str {
         self.name
     }
 }
@@ -58,11 +58,11 @@ impl ExternalId {
         Ok(ExternalId::new(parts[0], parts[1]))
     }
 
-    pub fn ext_type(&self) -> &str {
+    pub fn type_name(&self) -> &str {
         &self.type_
     }
 
-    pub fn ext_name(&self) -> &str {
+    pub fn variant_name(&self) -> &str {
         &self.name
     }
 }

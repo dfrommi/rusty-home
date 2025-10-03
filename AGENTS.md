@@ -64,19 +64,18 @@ The project uses several custom derive macros in `lib/macro/` that generate boil
 #### `#[derive(Id)]`
 
 - **Purpose**: Generates ID conversion methods for enum types
-- **Generated Methods**:
-  - `AsRef<InternalId>` and `AsRef<ExternalId>` implementations
-  - `int_type()`, `int_name()`, `ext_type()`, `ext_name()` methods
+- **Generated Helpers**:
+  - `int_id()` / `ext_id()` returning `&'static InternalId` / `&'static ExternalId`
   - `TryFrom<InternalId>` and `TryFrom<ExternalId>` implementations
   - `Display` implementation showing `Type[Variant]`
 - **Usage**: Applied to all state enums (Temperature, Presence, etc.)
-- **Example**: `Temperature::Outside.int_name()` returns `"Outside"`
+- **Example**: `Temperature::Outside.int_id().variant_name()` returns `"Outside"`
 
 #### `#[derive(IdDelegation)]`
 
 - **Purpose**: Delegates ID methods to wrapped enum variants
 - **Usage**: Applied to compound enums that contain other ID-implementing enums
-- **Generated**: Same methods as `Id` but delegates to inner enum variants
+- **Generated**: Same helpers/impls as `Id`, delegating to the inner enum's `int_id()` / `ext_id()`
 - **Example**: Used by `HomeState` enum generated from `HomeStateValue`
 
 #### `#[derive(EnumVariants)]`

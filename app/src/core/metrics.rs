@@ -55,7 +55,7 @@ async fn update_home_state_metrics(api: &HomeApi) {
             set(
                 "home_state_value",
                 value,
-                &[(ITEM_TYPE, external_id.ext_type()), (ITEM_NAME, external_id.ext_name())],
+                &[(ITEM_TYPE, external_id.type_name()), (ITEM_NAME, external_id.variant_name())],
             );
         }
     }

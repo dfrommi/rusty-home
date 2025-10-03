@@ -163,24 +163,24 @@ pub async fn get_tag_id(
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            id.ext_type(),
-            id.ext_name()
+            id.type_name(),
+            id.variant_name()
         )
         .fetch_one(db_pool)
         .await
-        .with_context(|| format!("Error getting or creating tag id for {}/{}", id.ext_type(), id.ext_name()))
+        .with_context(|| format!("Error getting or creating tag id for {}/{}", id.type_name(), id.variant_name()))
     } else {
         sqlx::query_scalar!(
             r#"SELECT id FROM thing_value_tag
                 WHERE channel IS NOT DISTINCT FROM $1
                 AND name IS NOT DISTINCT FROM $2
                 LIMIT 1"#,
-            id.ext_type(),
-            id.ext_name()
+            id.type_name(),
+            id.variant_name()
         )
         .fetch_one(db_pool)
         .await
-        .with_context(|| format!("Error getting tag id for {}/{}", id.ext_type(), id.ext_name()))
+        .with_context(|| format!("Error getting tag id for {}/{}", id.type_name(), id.variant_name()))
     }?;
 
     Ok(tag_id as i64)

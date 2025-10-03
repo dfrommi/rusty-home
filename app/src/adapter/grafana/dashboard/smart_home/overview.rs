@@ -187,10 +187,12 @@ async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQue
     let rows = states.into_iter().map(|dp| {
         let target = PersistentHomeState::from(&dp.value);
 
+        let id = target.int_id();
+
         Row {
             timestamp: dp.timestamp.to_human_readable(),
-            type_: target.int_type().to_string(),
-            item: target.int_name().to_string(),
+            type_: id.type_name().to_string(),
+            item: id.variant_name().to_string(),
             value: dp.value.value_to_string(),
         }
     });

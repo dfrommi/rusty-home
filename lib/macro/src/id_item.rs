@@ -77,35 +77,19 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
                     #(#ext_id_matches),*
                 }
             }
-
-            pub fn int_type(&self) -> &str {
-                self.int_id().int_type()
-            }
-
-            pub fn int_name(&self) -> &str {
-                self.int_id().int_name()
-            }
-
-            pub fn ext_type(&self) -> &str {
-                self.ext_id().ext_type()
-            }
-
-            pub fn ext_name(&self) -> &str {
-                self.ext_id().ext_name()
-            }
         }
 
         impl TryFrom<&crate::core::id::InternalId> for #enum_name {
             type Error = anyhow::Error;
 
             fn try_from(value: &crate::core::id::InternalId) -> Result<Self, Self::Error> {
-                if value.int_type() != #type_name_int {
-                    anyhow::bail!("Error converting InternalId, expected type {}, got {}", #type_name_int, value.int_type());
+                if value.type_name() != #type_name_int {
+                    anyhow::bail!("Error converting InternalId, expected type {}, got {}", #type_name_int, value.type_name());
                 }
 
-                let item = match value.int_name() {
+                let item = match value.variant_name() {
                     #(#from_int_item_name_matches),*,
-                    _ => anyhow::bail!("Error converting InternalId, unknown name {}", value.int_name()),
+                    _ => anyhow::bail!("Error converting InternalId, unknown name {}", value.variant_name()),
                 };
 
                 Ok(item)
@@ -124,13 +108,13 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             type Error = anyhow::Error;
 
             fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
-                if value.ext_type() != #type_name_ext {
-                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.ext_type());
+                if value.type_name() != #type_name_ext {
+                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.type_name());
                 }
 
-                let item = match value.ext_name() {
+                let item = match value.variant_name() {
                     #(#from_ext_item_name_matches),*,
-                    _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.ext_name()),
+                    _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.variant_name()),
                 };
 
                 Ok(item)
@@ -147,7 +131,8 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
 
         impl std::fmt::Display for #enum_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}[{}]", self.int_type(), self.int_name())
+                let id = self.int_id();
+                write!(f, "{}[{}]", id.type_name(), id.variant_name())
             }
         }
     };
@@ -204,22 +189,6 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
                     #(#ext_id_matches),*
                 }
             }
-
-            pub fn int_type(&self) -> &str {
-                self.int_id().int_type()
-            }
-
-            pub fn int_name(&self) -> &str {
-                self.int_id().int_name()
-            }
-
-            pub fn ext_type(&self) -> &str {
-                self.ext_id().ext_type()
-            }
-
-            pub fn ext_name(&self) -> &str {
-                self.ext_id().ext_name()
-            }
         }
 
         impl TryFrom<&crate::core::id::InternalId> for #name {
@@ -227,7 +196,7 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
             fn try_from(value: &crate::core::id::InternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
-                anyhow::bail!("Error converting InternalId, unknown type/name {}/{}", value.int_type(), value.int_name());
+                anyhow::bail!("Error converting InternalId, unknown type/name {}/{}", value.type_name(), value.variant_name());
             }
         }
 
@@ -244,7 +213,7 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
             fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
                 #(#try_from_impls)*
-                anyhow::bail!("Error converting ExternalId, unknown type/name {}/{}", value.ext_type(), value.ext_name());
+                anyhow::bail!("Error converting ExternalId, unknown type/name {}/{}", value.type_name(), value.variant_name());
             }
         }
 

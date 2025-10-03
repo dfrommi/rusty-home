@@ -148,8 +148,8 @@ mod macros {
 
             tracing::trace!(
                 timestamp = %crate::t!(now),
-                item.r#type = %$item.int_type(),
-                item.name = %$item.int_name(),
+                item.r#type = %$item.int_id().type_name(),
+                item.name = %$item.int_id().variant_name(),
                 result.value = %result.value,
                 result.timestamp = %result.timestamp,
                 $(

@@ -58,6 +58,7 @@ impl Estimatable for ColdAirComingIn {
 }
 
 impl DataFrameAccess<ColdAirComingIn> for ColdAirComingIn {
+    #[mockable]
     async fn get_data_frame(
         &self,
         range: DateTimeRange,

@@ -34,6 +34,7 @@ impl DataPointAccess<SetPoint> for SetPoint {
 }
 
 impl DataFrameAccess<SetPoint> for SetPoint {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
         api.get_data_frame(self, range).await
     }

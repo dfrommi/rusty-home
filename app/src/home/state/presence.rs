@@ -38,6 +38,7 @@ impl DataPointAccess<Presence> for Presence {
 }
 
 impl DataFrameAccess<Presence> for Presence {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }

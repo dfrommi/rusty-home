@@ -36,6 +36,7 @@ impl DataPointAccess<RelativeHumidity> for RelativeHumidity {
 }
 
 impl DataFrameAccess<RelativeHumidity> for RelativeHumidity {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<Percent>> {
         api.get_data_frame(self, range).await
     }

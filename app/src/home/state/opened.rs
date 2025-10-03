@@ -66,6 +66,7 @@ impl DataPointAccess<Opened> for Opened {
 }
 
 impl DataFrameAccess<Opened> for Opened {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }
@@ -94,6 +95,7 @@ async fn any_of(api: &HomeApi, opened_states: Vec<Opened>) -> anyhow::Result<Dat
 }
 
 impl DataFrameAccess<OpenedArea> for OpenedArea {
+    #[mockable]
     async fn get_data_frame(
         &self,
         range: DateTimeRange,

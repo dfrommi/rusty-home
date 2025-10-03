@@ -34,6 +34,7 @@ impl DataPointAccess<TotalWaterConsumption> for TotalWaterConsumption {
 }
 
 impl DataFrameAccess<TotalWaterConsumption> for TotalWaterConsumption {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<KiloCubicMeter>> {
         api.get_data_frame(self, range).await
     }

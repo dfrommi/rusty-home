@@ -49,6 +49,7 @@ impl DataPointAccess<FanActivity> for FanActivity {
 }
 
 impl DataFrameAccess<FanActivity> for FanActivity {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<FanAirflow>> {
         api.get_data_frame(self, range).await
     }

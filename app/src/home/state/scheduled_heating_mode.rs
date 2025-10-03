@@ -123,6 +123,7 @@ impl Estimatable for ScheduledHeatingMode {
 }
 
 impl DataFrameAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingMode>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

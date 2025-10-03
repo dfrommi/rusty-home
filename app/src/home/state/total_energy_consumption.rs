@@ -45,6 +45,7 @@ impl DataPointAccess<TotalEnergyConsumption> for TotalEnergyConsumption {
 }
 
 impl DataFrameAccess<TotalEnergyConsumption> for TotalEnergyConsumption {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<KiloWattHours>> {
         api.get_data_frame(self, range).await
     }

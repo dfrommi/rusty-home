@@ -34,6 +34,7 @@ impl DataPointAccess<HeatingDemand> for HeatingDemand {
 }
 
 impl DataFrameAccess<HeatingDemand> for HeatingDemand {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<Percent>> {
         api.get_data_frame(self, range).await
     }

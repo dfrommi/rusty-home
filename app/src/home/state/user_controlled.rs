@@ -156,6 +156,7 @@ impl Estimatable for UserControlled {
 }
 
 impl DataFrameAccess<UserControlled> for UserControlled {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

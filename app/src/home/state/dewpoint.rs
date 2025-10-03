@@ -69,6 +69,7 @@ impl DataPointAccess<DewPoint> for DewPoint {
 }
 
 impl DataFrameAccess<DewPoint> for DewPoint {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<DegreeCelsius>> {
         let (t_series, h_series) = {
             let temp = self.temperature();

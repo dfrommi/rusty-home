@@ -271,7 +271,9 @@ mod test {
         assert_json_eq!(
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
-                target_state: HeatingTargetState::Heat(DegreeCelsius::from(22.5)),
+                target_state: HeatingTargetState::Heat {
+                    temperature: DegreeCelsius::from(22.5)
+                },
             },
             json!({
                 "type": "set_heating",

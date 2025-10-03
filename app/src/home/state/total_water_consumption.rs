@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::core::{
     HomeApi,
@@ -27,6 +27,7 @@ impl Estimatable for TotalWaterConsumption {
 }
 
 impl DataPointAccess<TotalWaterConsumption> for TotalWaterConsumption {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<KiloCubicMeter>> {
         api.current_data_point(self).await
     }

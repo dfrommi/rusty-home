@@ -9,7 +9,7 @@ use crate::{
     },
     port::{DataFrameAccess, DataPointAccess},
 };
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 //TODO impl anyoneSleeping. Requires impl of enum from crate
 
@@ -31,6 +31,7 @@ impl Estimatable for Presence {
 }
 
 impl DataPointAccess<Presence> for Presence {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }

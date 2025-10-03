@@ -304,7 +304,9 @@ mod get_all_commands_since {
         //WHEN
         let result = db
             .query_all_commands(
-                Some(PowerToggle::Dehumidifier.into()),
+                Some(CommandTarget::SetPower {
+                    device: PowerToggle::Dehumidifier,
+                }),
                 &DateTimeRange::new(t!(8 minutes ago), t!(now)),
             )
             .await
@@ -389,7 +391,9 @@ mod get_all_commands_since {
         //WHEN
         let result = db
             .query_all_commands(
-                Some(PowerToggle::Dehumidifier.into()),
+                Some(CommandTarget::SetPower {
+                    device: PowerToggle::Dehumidifier,
+                }),
                 &DateTimeRange::new(t!(8 minutes ago), t!(now)),
             )
             .await

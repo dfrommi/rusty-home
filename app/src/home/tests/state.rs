@@ -29,21 +29,21 @@ mod automatic_temp_increase {
         assert!(dp.value);
     }
 
-    #[tokio::test]
-    async fn sampled_time_series() {
-        let api = infrastructure().api();
-
-        //let start = DateTime::from_iso("2025-01-21T12:06:24.086+01:00").unwrap();
-        //let end = start + t!(60 hours);
-        let start = DateTime::from_iso("2025-01-22T08:40:16.949+01:00").unwrap();
-        let end = start + t!(1 hours);
-        let df = AutomaticTemperatureIncrease::LivingRoom
-            .get_data_frame(DateTimeRange::new(start, end), &api)
-            .await
-            .unwrap();
-
-        for dp in df.iter() {
-            println!("{dp:?}");
-        }
-    }
+    // #[tokio::test]
+    // async fn sampled_time_series() {
+    //     let api = infrastructure().api();
+    //
+    //     //let start = DateTime::from_iso("2025-01-21T12:06:24.086+01:00").unwrap();
+    //     //let end = start + t!(60 hours);
+    //     let start = DateTime::from_iso("2025-01-22T08:40:16.949+01:00").unwrap();
+    //     let end = start + t!(1 hours);
+    //     let df = AutomaticTemperatureIncrease::LivingRoom
+    //         .get_data_frame(DateTimeRange::new(start, end), &api)
+    //         .await
+    //         .unwrap();
+    //
+    //     for dp in df.iter() {
+    //         println!("{dp:?}");
+    //     }
+    // }
 }

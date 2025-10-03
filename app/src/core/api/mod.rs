@@ -20,7 +20,7 @@ pub struct HomeApi {
     #[cfg(test)]
     state_dp_mock: std::collections::HashMap<HomeState, DataPoint<f64>>,
     #[cfg(test)]
-    state_ts_mock: std::collections::HashMap<HomeState, DataFrame<f64>>,
+    state_df_mock: std::collections::HashMap<HomeState, DataFrame<f64>>,
 }
 
 impl HomeApi {
@@ -31,7 +31,7 @@ impl HomeApi {
             #[cfg(test)]
             state_dp_mock: std::collections::HashMap::new(),
             #[cfg(test)]
-            state_ts_mock: std::collections::HashMap::new(),
+            state_df_mock: std::collections::HashMap::new(),
         }
     }
 
@@ -45,7 +45,7 @@ impl HomeApi {
                 #[cfg(test)]
                 state_dp_mock: std::collections::HashMap::new(),
                 #[cfg(test)]
-                state_ts_mock: std::collections::HashMap::new(),
+                state_df_mock: std::collections::HashMap::new(),
             }
         }
     }
@@ -319,7 +319,7 @@ mod tests {
                 .insert(state.clone().into(), DataPoint::new(state.to_f64(&value), timestamp));
         }
 
-        pub fn with_fixed_ts<T, V>(&mut self, state: T, values: &[(V, DateTime)])
+        pub fn with_fixed_df<T, V>(&mut self, state: T, values: &[(V, DateTime)])
         where
             T: Into<HomeState> + ValueObject + Clone,
             V: Into<T::ValueType> + Clone,
@@ -330,7 +330,7 @@ mod tests {
                 .collect();
             let df = DataFrame::new(dps).expect("Error creating test timeseries");
 
-            self.state_ts_mock.insert(state.into(), df);
+            self.state_df_mock.insert(state.into(), df);
         }
 
         pub fn get_fixed_current_dp<T>(&self, state: T) -> Option<DataPoint<T::ValueType>>
@@ -342,11 +342,11 @@ mod tests {
                 .map(|dp| DataPoint::new(state.from_f64(dp.value), dp.timestamp))
         }
 
-        pub fn get_fixed_ts<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
+        pub fn get_fixed_df<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
         where
             T: Into<HomeState> + ValueObject + Clone,
         {
-            self.state_ts_mock
+            self.state_df_mock
                 .get(&state.clone().into())
                 .map(|df| df.map(|dp| state.from_f64(dp.value)))
         }

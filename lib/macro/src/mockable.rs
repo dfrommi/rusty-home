@@ -21,12 +21,12 @@ pub fn mockable_state(item: TokenStream) -> TokenStream {
                 #block
             }
         }
-    } else if sig.ident == "series" {
+    } else if sig.ident == "get_data_frame" {
         quote! {
             #vis #sig {
                 #[cfg(test)]
-                if let Some(df) = api.get_fixed_ts(self.clone()) {
-                    return crate::core::timeseries::TimeSeries::new(self.clone(), &df, range);
+                if let Some(df) = api.get_fixed_df(self.clone()) {
+                    return Ok(df);
                 }
 
                 #block

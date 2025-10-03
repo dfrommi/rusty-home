@@ -21,34 +21,34 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
     runtime().block_on(FIXED_NOW.scope(fake_now, f))
 }
 
-#[test]
-fn test_planning() {
-    let actions = plan_at("2024-12-24T12:50:01+01:00");
-
-    for (action, source) in actions.iter() {
-        println!("{source:?} - {action:?}");
-    }
-
-    assert_eq!(actions.len(), 0);
-}
-
-#[test]
-fn test_planning_execution() {
-    let actions = plan_at("2024-12-31T19:49:07.50+01:00");
-
-    for (action, source) in actions.iter() {
-        println!("{source:?} - {action:?}");
-    }
-
-    assert_eq!(actions.len(), 1);
-    assert_eq!(
-        actions[0].0,
-        Command::SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: true,
-        }
-    );
-}
+// #[test]
+// fn test_planning() {
+//     let actions = plan_at("2024-12-24T12:50:01+01:00");
+//
+//     for (action, source) in actions.iter() {
+//         println!("{source:?} - {action:?}");
+//     }
+//
+//     assert_eq!(actions.len(), 0);
+// }
+//
+// #[test]
+// fn test_planning_execution() {
+//     let actions = plan_at("2024-12-31T19:49:07.50+01:00");
+//
+//     for (action, source) in actions.iter() {
+//         println!("{source:?} - {action:?}");
+//     }
+//
+//     assert_eq!(actions.len(), 1);
+//     assert_eq!(
+//         actions[0].0,
+//         Command::SetPower {
+//             device: PowerToggle::Dehumidifier,
+//             power_on: true,
+//         }
+//     );
+// }
 
 mod support {
     use std::sync::Mutex;

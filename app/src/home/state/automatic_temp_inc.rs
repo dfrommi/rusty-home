@@ -6,7 +6,7 @@ use crate::core::{HomeApi, timeseries::DataPoint};
 use crate::home::state::Temperature;
 use crate::port::DataFrameAccess;
 use crate::t;
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::home::state::macros::result;
 
@@ -23,6 +23,7 @@ pub enum AutomaticTemperatureIncrease {
 
 //TODO detect active heating and summer mode
 impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
@@ -162,7 +163,7 @@ mod tests {
     async fn increasing_when_not_enough_data_points() {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(8 minutes ago));
-        api.with_fixed_ts(
+        api.with_fixed_df(
             Temperature::LivingRoomDoor,
             &[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))],
         );
@@ -174,7 +175,7 @@ mod tests {
     async fn increasing_when_temperature_difference_big() {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
-        api.with_fixed_ts(
+        api.with_fixed_df(
             Temperature::LivingRoomDoor,
             &[
                 (17.0, t!(10 minutes ago)),
@@ -190,7 +191,7 @@ mod tests {
     async fn not_increasing_when_temperature_change_small() {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
-        api.with_fixed_ts(
+        api.with_fixed_df(
             Temperature::LivingRoomDoor,
             &[
                 (17.0, t!(10 minutes ago)),
@@ -206,7 +207,7 @@ mod tests {
         let mut api = HomeApi::for_testing();
         api.with_fixed_current_dp(Temperature::Outside, 18.0, t!(now));
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
-        api.with_fixed_ts(
+        api.with_fixed_df(
             Temperature::LivingRoomDoor,
             &[
                 (17.0, t!(10 minutes ago)),

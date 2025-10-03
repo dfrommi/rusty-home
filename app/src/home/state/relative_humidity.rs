@@ -8,7 +8,7 @@ use crate::core::{
     unit::Percent,
 };
 use crate::port::{DataFrameAccess, DataPointAccess};
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
@@ -29,6 +29,7 @@ impl Estimatable for RelativeHumidity {
 }
 
 impl DataPointAccess<RelativeHumidity> for RelativeHumidity {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<Percent>> {
         api.current_data_point(self).await
     }

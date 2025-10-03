@@ -6,7 +6,7 @@ use crate::{
     core::time::{DateTime, DateTimeRange},
     port::DataPointAccess,
 };
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::core::timeseries::{
     DataFrame,
@@ -33,12 +33,14 @@ impl Estimatable for Temperature {
 }
 
 impl DataPointAccess<Temperature> for Temperature {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
         api.current_data_point(self).await
     }
 }
 
 impl DataFrameAccess<Temperature> for Temperature {
+    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
         api.get_data_frame(self, range).await
     }

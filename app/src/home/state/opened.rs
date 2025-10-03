@@ -59,6 +59,7 @@ impl OpenedArea {
 }
 
 impl DataPointAccess<Opened> for Opened {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }

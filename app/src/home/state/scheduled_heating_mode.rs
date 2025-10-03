@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id};
+use r#macro::{EnumVariants, Id, mockable};
 
 use crate::{
     core::{
@@ -56,6 +56,7 @@ impl ScheduledHeatingMode {
 }
 
 impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
+    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingMode>> {
         let (window, temp_increase) = (self.window(), self.temp_increase());
 

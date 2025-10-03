@@ -145,7 +145,7 @@ pub async fn get_tag_id(
     channel: PersistentHomeState,
     create_if_missing: bool,
 ) -> anyhow::Result<i64> {
-    let id: &ExternalId = channel.as_ref();
+    let id = channel.ext_id();
 
     let tag_id = if create_if_missing {
         sqlx::query_scalar!(

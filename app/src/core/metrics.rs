@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use crate::Infrastructure;
-use crate::core::id::ExternalId;
 use crate::core::{HomeApi, ValueObject};
 use crate::home::state::HomeState;
 use crate::port::DataPointAccess;
@@ -51,7 +50,7 @@ async fn update_home_state_metrics(api: &HomeApi) {
     for state in HomeState::variants() {
         if let Ok(data_point) = state.current_data_point(api).await {
             let value = state.to_f64(&data_point.value);
-            let external_id: &ExternalId = state.as_ref();
+            let external_id = state.ext_id();
 
             set(
                 "home_state_value",

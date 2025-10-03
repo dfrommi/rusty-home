@@ -14,10 +14,10 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
     let type_name_int = enum_name.to_string();
     let type_name_ext = enum_name.to_string().to_snake_case();
 
-    let mut as_ref_int_statics = Vec::new();
-    let mut as_ref_int_matches = Vec::new();
-    let mut as_ref_ext_statics = Vec::new();
-    let mut as_ref_ext_matches = Vec::new();
+    let mut int_id_statics = Vec::new();
+    let mut int_id_matches = Vec::new();
+    let mut ext_id_statics = Vec::new();
+    let mut ext_id_matches = Vec::new();
 
     let mut from_ext_item_name_matches = Vec::new();
     let mut from_int_item_name_matches = Vec::new();
@@ -25,26 +25,25 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
 
     for variant in enum_variants {
         let variant_name = &variant.ident;
-        let id_static_name = Ident::new(
-            &format!("{}_ID", variant_name.to_string().to_shouty_snake_case()),
-            variant_name.span(),
-        );
+        let static_suffix = variant_name.to_string().to_shouty_snake_case();
+        let int_id_static_name = Ident::new(&format!("{}_INT_ID", static_suffix), variant_name.span());
+        let ext_id_static_name = Ident::new(&format!("{}_EXT_ID", static_suffix), variant_name.span());
 
         let variant_name_int = variant_name.to_string();
         let variant_name_ext = variant_name.to_string().to_snake_case();
 
-        as_ref_int_statics.push(quote! {
-            static #id_static_name: crate::core::id::InternalId = crate::core::id::InternalId::new(#type_name_int, #variant_name_int);
+        int_id_statics.push(quote! {
+            static #int_id_static_name: crate::core::id::InternalId = crate::core::id::InternalId::new(#type_name_int, #variant_name_int);
         });
-        as_ref_int_matches.push(quote! {
-            #enum_name::#variant_name => &#id_static_name
+        int_id_matches.push(quote! {
+            #enum_name::#variant_name => &#int_id_static_name
         });
 
-        as_ref_ext_statics.push(quote! {
-            static #id_static_name: crate::core::id::ExternalId = crate::core::id::ExternalId::new_static(#type_name_ext, #variant_name_ext);
+        ext_id_statics.push(quote! {
+            static #ext_id_static_name: crate::core::id::ExternalId = crate::core::id::ExternalId::new_static(#type_name_ext, #variant_name_ext);
         });
-        as_ref_ext_matches.push(quote! {
-            #enum_name::#variant_name => &#id_static_name
+        ext_id_matches.push(quote! {
+            #enum_name::#variant_name => &#ext_id_static_name
         });
 
         from_int_item_name_matches.push(quote! {
@@ -62,45 +61,37 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl AsRef<crate::core::id::InternalId> for #enum_name {
-            fn as_ref(&self) -> &crate::core::id::InternalId {
-                #(#as_ref_int_statics)*
-
-                match self {
-                    #(#as_ref_int_matches),*
-                }
-            }
-        }
-
-        impl AsRef<crate::core::id::ExternalId> for #enum_name {
-            fn as_ref(&self) -> &crate::core::id::ExternalId {
-                #(#as_ref_ext_statics)*
-
-                match self {
-                    #(#as_ref_ext_matches),*
-                }
-            }
-        }
-
         impl #enum_name {
+            pub fn int_id(&self) -> &'static crate::core::id::InternalId {
+                #(#int_id_statics)*
+
+                match self {
+                    #(#int_id_matches),*
+                }
+            }
+
+            pub fn ext_id(&self) -> &'static crate::core::id::ExternalId {
+                #(#ext_id_statics)*
+
+                match self {
+                    #(#ext_id_matches),*
+                }
+            }
+
             pub fn int_type(&self) -> &str {
-                let id: &crate::core::id::InternalId = self.as_ref();
-                id.int_type()
+                self.int_id().int_type()
             }
 
             pub fn int_name(&self) -> &str {
-                let id: &crate::core::id::InternalId = self.as_ref();
-                id.int_name()
+                self.int_id().int_name()
             }
 
             pub fn ext_type(&self) -> &str {
-                let id: &crate::core::id::ExternalId = self.as_ref();
-                id.ext_type()
+                self.ext_id().ext_type()
             }
 
             pub fn ext_name(&self) -> &str {
-                let id: &crate::core::id::ExternalId = self.as_ref();
-                id.ext_name()
+                self.ext_id().ext_name()
             }
         }
 
@@ -173,14 +164,19 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     // Ensure it's an enum
     let variants = super::enum_variants(input.data);
 
-    let mut value_as_ref_impls = Vec::new();
+    let mut int_id_matches = Vec::new();
+    let mut ext_id_matches = Vec::new();
     let mut try_from_impls = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
 
-        value_as_ref_impls.push(quote! {
-            #name::#variant_name(v) => v.as_ref()
+        int_id_matches.push(quote! {
+            #name::#variant_name(v) => v.int_id()
+        });
+
+        ext_id_matches.push(quote! {
+            #name::#variant_name(v) => v.ext_id()
         });
 
         //should always be true
@@ -196,41 +192,33 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl AsRef<crate::core::id::InternalId> for #name {
-            fn as_ref(&self) -> &crate::core::id::InternalId {
-                match self {
-                    #(#value_as_ref_impls),*
-                }
-            }
-        }
-
-        impl AsRef<crate::core::id::ExternalId> for #name {
-            fn as_ref(&self) -> &crate::core::id::ExternalId {
-                match self {
-                    #(#value_as_ref_impls),*
-                }
-            }
-        }
-
         impl #name {
+            pub fn int_id(&self) -> &'static crate::core::id::InternalId {
+                match self {
+                    #(#int_id_matches),*
+                }
+            }
+
+            pub fn ext_id(&self) -> &'static crate::core::id::ExternalId {
+                match self {
+                    #(#ext_id_matches),*
+                }
+            }
+
             pub fn int_type(&self) -> &str {
-                let id: &crate::core::id::InternalId = self.as_ref();
-                id.int_type()
+                self.int_id().int_type()
             }
 
             pub fn int_name(&self) -> &str {
-                let id: &crate::core::id::InternalId = self.as_ref();
-                id.int_name()
+                self.int_id().int_name()
             }
 
             pub fn ext_type(&self) -> &str {
-                let id: &crate::core::id::ExternalId = self.as_ref();
-                id.ext_type()
+                self.ext_id().ext_type()
             }
 
             pub fn ext_name(&self) -> &str {
-                let id: &crate::core::id::ExternalId = self.as_ref();
-                id.ext_name()
+                self.ext_id().ext_name()
             }
         }
 

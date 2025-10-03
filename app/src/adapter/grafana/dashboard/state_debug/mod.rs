@@ -3,6 +3,7 @@ use std::{cmp::Ordering, sync::Arc};
 use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
+use crate::home::state::HomeState;
 use crate::{
     core::timeseries::DataPoint,
     home::state::{HeatingDemand, PersistentHomeState, RelativeHumidity, Temperature, TotalEnergyConsumption},
@@ -46,27 +47,11 @@ struct Row {
 
 fn supported_channels() -> Vec<&'static ExternalId> {
     let mut supported_channels: Vec<&'static ExternalId> = vec![];
-    supported_channels.extend(
-        TotalEnergyConsumption::variants()
-            .iter()
-            .map(|c| c.as_ref() as &'static ExternalId),
-    );
-    supported_channels.extend(
-        HeatingDemand::variants()
-            .iter()
-            .map(|c| c.as_ref() as &'static ExternalId),
-    );
-    supported_channels.extend(
-        Temperature::variants()
-            .iter()
-            .map(|c| c.as_ref() as &'static ExternalId),
-    );
-    supported_channels.extend(
-        RelativeHumidity::variants()
-            .iter()
-            .map(|c| c.as_ref() as &'static ExternalId),
-    );
-    supported_channels.extend(DewPoint::variants().iter().map(|c| c.as_ref() as &'static ExternalId));
+    supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.ext_id()));
+    supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.ext_id()));
+    supported_channels.extend(Temperature::variants().iter().map(|c| c.ext_id()));
+    supported_channels.extend(RelativeHumidity::variants().iter().map(|c| c.ext_id()));
+    supported_channels.extend(DewPoint::variants().iter().map(|c| c.ext_id()));
 
     supported_channels
 }
@@ -129,7 +114,7 @@ async fn get_rows<T>(
     time_range: &TimeRangeWithIntervalQuery,
 ) -> Result<Vec<Row>, GrafanaApiError>
 where
-    T: Estimatable + Clone + AsRef<ExternalId> + TimeSeriesAccess<T>,
+    T: Estimatable + Clone + Into<HomeState> + TimeSeriesAccess<T>,
     T::ValueType: AsRef<f64>,
 {
     let ts = item
@@ -140,7 +125,7 @@ where
 
     let dps: Vec<DataPoint<<T>::ValueType>> = time_range.iter().filter_map(|t| ts.at(t)).collect::<Vec<_>>();
 
-    let ext_id: &ExternalId = item.as_ref();
+    let ext_id = item.clone().into().ext_id();
 
     let rows: Vec<Row> = dps
         .iter()

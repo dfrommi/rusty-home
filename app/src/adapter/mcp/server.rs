@@ -117,7 +117,7 @@ impl SmartHomeMcp {
         let mut devices = Vec::new();
 
         for state in HomeState::variants() {
-            let external_id: &ExternalId = state.as_ref();
+            let external_id = state.ext_id();
 
             devices.push(Content::json(DeviceId {
                 device_type: external_id.ext_type().to_string(),

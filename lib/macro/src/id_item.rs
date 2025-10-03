@@ -128,13 +128,6 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
                 Self::try_from(&value)
             }
         }
-
-        impl std::fmt::Display for #enum_name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let id = self.int_id();
-                write!(f, "{}[{}]", id.type_name(), id.variant_name())
-            }
-        }
     };
 
     TokenStream::from(expanded)

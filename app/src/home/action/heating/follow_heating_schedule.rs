@@ -24,7 +24,7 @@ impl FollowHeatingSchedule {
 
 impl Display for FollowHeatingSchedule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FollowHeatingSchedule[{} - {}]", self.zone, self.mode.int_id().variant_name())
+        write!(f, "FollowHeatingSchedule[{} - {}]", self.zone, self.mode)
     }
 }
 

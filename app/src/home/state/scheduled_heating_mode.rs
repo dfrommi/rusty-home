@@ -14,7 +14,7 @@ use crate::{
     t,
 };
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display)]
 pub enum HeatingMode {
     EnergySaving,
     Comfort,

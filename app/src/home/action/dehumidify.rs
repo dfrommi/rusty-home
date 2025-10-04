@@ -9,12 +9,8 @@ use crate::{core::planner::SimpleAction, home::state::RiskOfMould};
 use super::DataPointAccess;
 
 #[derive(Debug, Clone)]
-pub struct Dehumidify;
-
-impl Dehumidify {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub enum Dehumidify {
+    Dehumidifier,
 }
 
 impl Display for Dehumidify {
@@ -25,9 +21,11 @@ impl Display for Dehumidify {
 
 impl SimpleAction for Dehumidify {
     fn command(&self) -> Command {
-        Command::SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: true,
+        match self {
+            Dehumidify::Dehumidifier => Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            },
         }
     }
 
@@ -36,7 +34,9 @@ impl SimpleAction for Dehumidify {
     }
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
-        RiskOfMould::Bathroom.current(api).await
+        match self {
+            Dehumidify::Dehumidifier => RiskOfMould::Bathroom.current(api).await,
+        }
     }
 }
 
@@ -46,6 +46,6 @@ mod tests {
 
     #[test]
     fn display_is_expected() {
-        assert_eq!(Dehumidify::new().to_string(), "Dehumidify");
+        assert_eq!(Dehumidify::Dehumidifier.to_string(), "Dehumidify");
     }
 }

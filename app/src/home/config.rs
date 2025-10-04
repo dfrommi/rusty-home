@@ -2,9 +2,8 @@ use crate::adapter::homekit::HomekitCommandTarget;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
 use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
-use crate::t;
 
-use super::action::{Dehumidify, HomeAction, RequestClosingWindow};
+use super::action::{Dehumidify, HomeAction};
 use super::goal::{HomeGoal, Room};
 use crate::home::action::{
     FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
@@ -58,17 +57,17 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::StayInformed,
         vec![
-            RequestClosingWindow::new().into(),
-            InformWindowOpen::new(NotificationRecipient::Dennis).into(),
-            InformWindowOpen::new(NotificationRecipient::Sabine).into(),
+            InformWindowOpen::NotificationLightLivingRoom.into(),
+            InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into(),
+            InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into(),
         ],
     ),
     (
         HomeGoal::PreventMouldInBathroom,
         vec![
             UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
-            ReduceNoiseAtNight::new(t!(22:30 - 12:00)).into(),
-            Dehumidify::new().into()
+            ReduceNoiseAtNight::Dehumidifier.into(),
+            Dehumidify::Dehumidifier.into()
         ],
     ),
     (

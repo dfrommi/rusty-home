@@ -1,21 +1,14 @@
 use std::fmt::Display;
 
 use crate::core::HomeApi;
-use crate::core::time::DailyTimeRange;
 use crate::home::command::{Command, PowerToggle};
 use crate::t;
 
 use crate::core::planner::SimpleAction;
 
 #[derive(Debug, Clone)]
-pub struct ReduceNoiseAtNight {
-    range: DailyTimeRange,
-}
-
-impl ReduceNoiseAtNight {
-    pub fn new(range: DailyTimeRange) -> Self {
-        Self { range }
-    }
+pub enum ReduceNoiseAtNight {
+    Dehumidifier,
 }
 
 impl Display for ReduceNoiseAtNight {
@@ -26,9 +19,11 @@ impl Display for ReduceNoiseAtNight {
 
 impl SimpleAction for ReduceNoiseAtNight {
     fn command(&self) -> Command {
-        Command::SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: false,
+        match self {
+            ReduceNoiseAtNight::Dehumidifier => Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: false,
+            },
         }
     }
 
@@ -37,18 +32,18 @@ impl SimpleAction for ReduceNoiseAtNight {
     }
 
     async fn preconditions_fulfilled(&self, _: &HomeApi) -> anyhow::Result<bool> {
-        Ok(self.range.contains(t!(now).time()))
+        match self {
+            ReduceNoiseAtNight::Dehumidifier => Ok(t!(22:30 - 12:00).contains(t!(now).time())),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::time::Time;
 
     #[test]
     fn display_is_expected() {
-        let range = DailyTimeRange::new(Time::at(22, 0).unwrap(), Time::at(6, 0).unwrap());
-        assert_eq!(ReduceNoiseAtNight::new(range).to_string(), "ReduceNoiseAtNight");
+        assert_eq!(ReduceNoiseAtNight::Dehumidifier.to_string(), "ReduceNoiseAtNight");
     }
 }

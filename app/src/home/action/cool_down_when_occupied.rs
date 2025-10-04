@@ -10,28 +10,31 @@ use super::{DataPointAccess as _, Resident};
 
 #[derive(Debug, Clone)]
 pub enum CoolDownWhenOccupied {
-    Bedroom,
-    LivingRoom,
+    CeilingFan(Fan),
 }
 
 impl Display for CoolDownWhenOccupied {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "CoolDownWhenOccupied[{}]",
-            match self {
-                CoolDownWhenOccupied::Bedroom => "Bedroom",
-                CoolDownWhenOccupied::LivingRoom => "LivingRoom",
-            }
-        )
+        match self {
+            CoolDownWhenOccupied::CeilingFan(fan) => write!(
+                f,
+                "CoolDownWhenOccupied[{}]",
+                match fan {
+                    Fan::LivingRoomCeilingFan => "LivingRoom",
+                    Fan::BedroomCeilingFan => "Bedroom",
+                }
+            ),
+        }
     }
 }
 
 impl SimpleAction for CoolDownWhenOccupied {
     fn command(&self) -> Command {
-        Command::ControlFan {
-            device: self.fan(),
-            speed: FanAirflow::Forward(FanSpeed::Low),
+        match self {
+            CoolDownWhenOccupied::CeilingFan(fan) => Command::ControlFan {
+                device: fan.clone(),
+                speed: FanAirflow::Forward(FanSpeed::Low),
+            },
         }
     }
 
@@ -52,8 +55,8 @@ impl SimpleAction for CoolDownWhenOccupied {
         }
 
         match self {
-            CoolDownWhenOccupied::Bedroom => self.trigger_when_sleeping(api).await,
-            CoolDownWhenOccupied::LivingRoom => self.trigger_when_on_couch(api).await,
+            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan) => self.trigger_when_sleeping(api).await,
+            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan) => self.trigger_when_on_couch(api).await,
         }
     }
 }
@@ -61,15 +64,8 @@ impl SimpleAction for CoolDownWhenOccupied {
 impl CoolDownWhenOccupied {
     fn temperature(&self) -> Temperature {
         match self {
-            CoolDownWhenOccupied::Bedroom => Temperature::BedroomDoor,
-            CoolDownWhenOccupied::LivingRoom => Temperature::LivingRoomDoor,
-        }
-    }
-
-    fn fan(&self) -> Fan {
-        match self {
-            CoolDownWhenOccupied::Bedroom => Fan::BedroomCeilingFan,
-            CoolDownWhenOccupied::LivingRoom => Fan::LivingRoomCeilingFan,
+            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan) => Temperature::BedroomDoor,
+            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan) => Temperature::LivingRoomDoor,
         }
     }
 
@@ -126,7 +122,13 @@ mod tests {
 
     #[test]
     fn display_variants() {
-        assert_eq!(CoolDownWhenOccupied::Bedroom.to_string(), "CoolDownWhenOccupied[Bedroom]");
-        assert_eq!(CoolDownWhenOccupied::LivingRoom.to_string(), "CoolDownWhenOccupied[LivingRoom]");
+        assert_eq!(
+            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan).to_string(),
+            "CoolDownWhenOccupied[Bedroom]"
+        );
+        assert_eq!(
+            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan).to_string(),
+            "CoolDownWhenOccupied[LivingRoom]"
+        );
     }
 }

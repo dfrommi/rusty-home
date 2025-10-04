@@ -4,7 +4,6 @@ mod follow_default_setting;
 mod heating;
 mod inform_window_open;
 mod reduce_noise_at_night;
-mod request_closing_window;
 mod user_trigger_action;
 
 use std::fmt::Debug;
@@ -22,7 +21,6 @@ pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
-pub use request_closing_window::RequestClosingWindow;
 pub use user_trigger_action::UserTriggerAction;
 
 use crate::core::HomeApi;
@@ -38,7 +36,6 @@ fn action_source(action: &impl Display) -> CommandSource {
 #[derive(Debug, Clone, derive_more::Display, derive_more::From)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
-    RequestClosingWindow(RequestClosingWindow),
     InformWindowOpen(InformWindowOpen),
     ProvideAmbientTemperature(ProvideAmbientTemperature),
     IrHeaterAutoTurnOff(IrHeaterAutoTurnOff),
@@ -54,7 +51,6 @@ impl Action for HomeAction {
     async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult> {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.evaluate(api).await,
-            HomeAction::RequestClosingWindow(request_closing_window) => request_closing_window.evaluate(api).await,
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.evaluate(api).await,
             HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
                 provide_ambient_temperature.evaluate(api).await

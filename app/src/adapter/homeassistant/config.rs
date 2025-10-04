@@ -52,34 +52,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         // TEMPERATURE
         //
-        (
-            "sensor.wohnzimmer_temperature",
-            HaChannel::Temperature(Temperature::LivingRoomDoor),
-        ),
-        (
-            "sensor.arbeitszimmer_temperature",
-            HaChannel::Temperature(Temperature::RoomOfRequirementsDoor),
-        ),
-        (
-            "sensor.schlafzimmer_temperature",
-            HaChannel::Temperature(Temperature::BedroomDoor),
-        ),
         ("sensor.home_temperature", HaChannel::Temperature(Temperature::Outside)),
         //
         // HUMIDITY
         //
-        (
-            "sensor.wohnzimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::LivingRoomDoor),
-        ),
-        (
-            "sensor.arbeitszimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::RoomOfRequirementsDoor),
-        ),
-        (
-            "sensor.schlafzimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::BedroomDoor),
-        ),
         (
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
@@ -89,14 +65,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         ("light.hue_go", HaChannel::Powered(Powered::LivingRoomNotificationLight)),
         ("media_player.lg_webos_smart_tv", HaChannel::Powered(Powered::LivingRoomTv)),
-        //
-        // HEATING DEMAND
-        //
-        ("sensor.bad_heating", HaChannel::HeatingDemand(HeatingDemand::Bathroom)),
-        //
-        // SET POINT
-        //
-        ("climate.bad", HaChannel::SetPoint(SetPoint::Bathroom)),
         //
         // PRESENCE
         //

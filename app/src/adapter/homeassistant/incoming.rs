@@ -91,7 +91,7 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
 fn to_persistent_data_point(
     channel: HaChannel,
     ha_value: &str,
-    attributes: &HashMap<String, serde_json::Value>,
+    _attributes: &HashMap<String, serde_json::Value>,
     timestamp: DateTime,
 ) -> anyhow::Result<Option<IncomingData>> {
     let dp: Option<IncomingData> = match channel {
@@ -112,22 +112,6 @@ fn to_persistent_data_point(
         HaChannel::Powered(channel) => {
             Some(DataPoint::new(PersistentHomeStateValue::Powered(channel, ha_value == "on"), timestamp).into())
         }
-        HaChannel::SetPoint(channel) => {
-            let v = match (ha_value, attributes.get("temperature").and_then(|v| v.as_f64())) {
-                ("off", _) => 0.0,
-                (_, Some(f_value)) => f_value,
-                _ => bail!("No temperature found in attributes or not a number"),
-            };
-
-            Some(DataPoint::new(PersistentHomeStateValue::SetPoint(channel, DegreeCelsius::from(v)), timestamp).into())
-        }
-        HaChannel::HeatingDemand(channel) => Some(
-            DataPoint::new(
-                PersistentHomeStateValue::HeatingDemand(channel, Percent(ha_value.parse()?)),
-                timestamp,
-            )
-            .into(),
-        ),
         HaChannel::PresenceFromEsp(channel) => {
             Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }

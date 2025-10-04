@@ -8,7 +8,7 @@ use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
-use crate::home::state::{FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature};
+use crate::home::state::{FanActivity, Powered, Presence, RelativeHumidity, Temperature};
 use infrastructure::Mqtt;
 
 use std::collections::HashMap;
@@ -66,8 +66,6 @@ enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Powered(Powered),
-    SetPoint(SetPoint),
-    HeatingDemand(HeatingDemand),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
     WindcalmFanSpeed(FanActivity),

@@ -26,7 +26,7 @@ impl super::Database {
     }
 
     #[tracing::instrument(name = "get_latest_user_trigger", skip(self))]
-    pub async fn latest_since(
+    pub async fn latest_trigger_since(
         &self,
         target: &UserTriggerTarget,
         since: DateTime,
@@ -79,7 +79,7 @@ mod tests {
             .unwrap();
 
         let latest_trigger = db
-            .latest_since(
+            .latest_trigger_since(
                 &UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower),
                 t!(10 seconds ago),
             )

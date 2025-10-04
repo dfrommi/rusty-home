@@ -32,7 +32,7 @@ impl Action for UserTriggerAction {
             }
         };
 
-        let (latest_trigger, trigger_time) = match api.latest_since(&self.target, start_of_range).await? {
+        let (latest_trigger, trigger_time) = match api.latest_trigger_since(&self.target, start_of_range).await? {
             Some(dp) => (dp.value, dp.timestamp),
             None => {
                 tracing::trace!("No user-trigger found, skipping");

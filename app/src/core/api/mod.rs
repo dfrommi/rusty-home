@@ -217,12 +217,12 @@ impl HomeApi {
         self.db.add_user_trigger(trigger).await
     }
 
-    pub async fn latest_since(
+    pub async fn latest_trigger_since(
         &self,
         target: &UserTriggerTarget,
         since: DateTime,
     ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
-        let result = self.db.latest_since(target, since).await?;
+        let result = self.db.latest_trigger_since(target, since).await?;
         if DateTime::is_shifted() {
             let now = t!(now);
             Ok(result.filter(|dp| dp.timestamp <= now))

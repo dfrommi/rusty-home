@@ -8,7 +8,7 @@ use trace::display_planning_trace;
 
 use crate::{Infrastructure, core::HomeApi, home::HomePlanning};
 
-pub use action::{Action, ActionEvaluationResult, SimpleAction};
+pub use action::{Action, ActionEvaluationResult};
 pub use trace::{PlanningTrace, PlanningTraceStep};
 
 pub fn keep_on_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {

@@ -1,32 +1,23 @@
-use std::fmt::Display;
+use r#macro::Id;
 
 use crate::core::HomeApi;
+use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, CommandTarget};
 use crate::home::common::HeatingZone;
 use crate::home::state::{FanAirflow, HeatingMode};
 
-use crate::core::planner::{Action, ActionEvaluationResult};
-
-#[derive(Debug, Clone)]
-pub struct FollowDefaultSetting {
-    target: CommandTarget,
-}
+#[derive(Debug, Clone, Id)]
+pub struct FollowDefaultSetting(CommandTarget);
 
 impl FollowDefaultSetting {
     pub fn new(target: CommandTarget) -> Self {
-        Self { target }
+        Self(target)
     }
 }
 
-impl Display for FollowDefaultSetting {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FollowDefaultSetting[{}]", self.target)
-    }
-}
-
-impl Action for FollowDefaultSetting {
-    async fn evaluate(&self, _: &HomeApi) -> anyhow::Result<ActionEvaluationResult> {
-        let command = match self.target.clone() {
+impl Rule for FollowDefaultSetting {
+    async fn evaluate(&self, _: &HomeApi) -> anyhow::Result<RuleResult> {
+        let command = match self.0.clone() {
             CommandTarget::SetPower { device } => Command::SetPower {
                 device,
                 power_on: false,
@@ -57,20 +48,6 @@ impl Action for FollowDefaultSetting {
             }
         };
 
-        Ok(ActionEvaluationResult::Execute(command, super::action_source(self)))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::home::command::PowerToggle;
-
-    #[test]
-    fn display_includes_target() {
-        let action = FollowDefaultSetting::new(CommandTarget::SetPower {
-            device: PowerToggle::Dehumidifier,
-        });
-        assert_eq!(action.to_string(), "FollowDefaultSetting[SetPower[Dehumidifier]]");
+        Ok(RuleResult::Execute(vec![command]))
     }
 }

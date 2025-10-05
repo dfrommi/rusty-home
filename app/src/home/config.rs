@@ -6,7 +6,7 @@ use crate::home::trigger::RemoteTarget;
 use super::action::{Dehumidify, HomeAction};
 use super::goal::{HomeGoal, Room};
 use crate::home::action::{
-    FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, IrHeaterAutoTurnOff, ProvideAmbientTemperature,
+    AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
     ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
 use crate::home::state::HeatingMode;
@@ -24,7 +24,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             let mut a = vec![
                 UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
                 UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
-                IrHeaterAutoTurnOff::new().into(),
+                AutoTurnOff::IrHeater.into(),
             ]; 
             a.extend(smarter_heating_actions(HeatingZone::Bedroom));
             a
@@ -82,11 +82,11 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::CoreControl,
         vec![
-            ProvideAmbientTemperature::LivingRoomThermostatBig.into(), 
-            ProvideAmbientTemperature::LivingRoomThermostatSmall.into(), 
-            ProvideAmbientTemperature::BedroomThermostat.into(), 
-            ProvideAmbientTemperature::KitchenThermostat.into(), 
-            ProvideAmbientTemperature::RoomOfRequirementsThermostat.into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomBig).into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomSmall).into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::Bedroom).into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::Kitchen).into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::RoomOfRequirements).into(), 
             ]
     ),
     (

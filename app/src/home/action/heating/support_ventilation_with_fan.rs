@@ -1,46 +1,33 @@
-use std::fmt::Display;
+use r#macro::Id;
 
 use crate::core::HomeApi;
 use crate::core::unit::DegreeCelsius;
+use crate::home::action::SimpleRule;
 use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
 
-use crate::core::planner::SimpleAction;
-
 use super::{DataPointAccess, OpenedArea};
 
-#[derive(Debug, Clone)]
-pub struct SupportVentilationWithFan {
-    fan: Fan,
-}
+#[derive(Debug, Clone, Id)]
+pub struct SupportVentilationWithFan(Fan);
 
 impl SupportVentilationWithFan {
     pub fn new(fan: Fan) -> Self {
-        Self { fan }
+        Self(fan)
     }
 }
 
-impl Display for SupportVentilationWithFan {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SupportVentilationWithFan[{:?}]", self.fan)
-    }
-}
-
-impl SimpleAction for SupportVentilationWithFan {
+impl SimpleRule for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
-            device: self.fan.clone(),
+            device: self.0.clone(),
             speed: FanAirflow::Forward(FanSpeed::Low),
         }
     }
 
-    fn source(&self) -> crate::home::command::CommandSource {
-        super::action_source(self)
-    }
-
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let (window, temp_sensor) = match self.fan {
+        let (window, temp_sensor) = match self.0 {
             Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
             Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::BedroomDoor),
         };
@@ -66,17 +53,5 @@ impl SimpleAction for SupportVentilationWithFan {
         }
 
         Ok(true)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::home::command::Fan;
-
-    #[test]
-    fn display_includes_fan() {
-        let action = SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan);
-        assert_eq!(action.to_string(), "SupportVentilationWithFan[LivingRoomCeilingFan]");
     }
 }

@@ -1,25 +1,19 @@
-use std::fmt::Display;
-
 use crate::core::HomeApi;
+use crate::home::action::SimpleRule;
 use crate::home::command::{Command, PowerToggle};
 use anyhow::Result;
+use r#macro::{EnumVariants, Id};
 
-use crate::{core::planner::SimpleAction, home::state::RiskOfMould};
+use crate::home::state::RiskOfMould;
 
 use super::DataPointAccess;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Id, EnumVariants)]
 pub enum Dehumidify {
     Dehumidifier,
 }
 
-impl Display for Dehumidify {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Dehumidify")
-    }
-}
-
-impl SimpleAction for Dehumidify {
+impl SimpleRule for Dehumidify {
     fn command(&self) -> Command {
         match self {
             Dehumidify::Dehumidifier => Command::SetPower {
@@ -29,23 +23,9 @@ impl SimpleAction for Dehumidify {
         }
     }
 
-    fn source(&self) -> crate::home::command::CommandSource {
-        super::action_source(self)
-    }
-
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
         match self {
             Dehumidify::Dehumidifier => RiskOfMould::Bathroom.current(api).await,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_is_expected() {
-        assert_eq!(Dehumidify::Dehumidifier.to_string(), "Dehumidify");
     }
 }

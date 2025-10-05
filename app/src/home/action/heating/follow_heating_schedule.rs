@@ -1,16 +1,15 @@
-use std::fmt::Display;
-
 use crate::{
-    core::planner::{Action, ActionEvaluationResult},
     home::{
+        action::{Rule, RuleResult},
         command::Command,
         common::HeatingZone,
         state::{HeatingMode, ScheduledHeatingMode},
     },
     port::DataPointAccess,
 };
+use r#macro::Id;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Id)]
 pub struct FollowHeatingSchedule {
     zone: HeatingZone,
     mode: HeatingMode,
@@ -22,14 +21,8 @@ impl FollowHeatingSchedule {
     }
 }
 
-impl Display for FollowHeatingSchedule {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FollowHeatingSchedule[{} - {}]", self.zone, self.mode)
-    }
-}
-
-impl Action for FollowHeatingSchedule {
-    async fn evaluate(&self, api: &crate::core::HomeApi) -> anyhow::Result<ActionEvaluationResult> {
+impl Rule for FollowHeatingSchedule {
+    async fn evaluate(&self, api: &crate::core::HomeApi) -> anyhow::Result<RuleResult> {
         let active_mode = match self.zone {
             HeatingZone::RoomOfRequirements => ScheduledHeatingMode::RoomOfRequirements,
             HeatingZone::LivingRoom => ScheduledHeatingMode::LivingRoom,
@@ -41,7 +34,7 @@ impl Action for FollowHeatingSchedule {
         .await?;
 
         if active_mode != self.mode {
-            return Ok(ActionEvaluationResult::Skip);
+            return Ok(RuleResult::Skip);
         }
 
         let target_state = self.zone.heating_state(&self.mode);
@@ -55,18 +48,8 @@ impl Action for FollowHeatingSchedule {
             })
             .collect();
 
-        Ok(ActionEvaluationResult::ExecuteMulti(commands, super::action_source(self)))
-    }
-}
+        //TODO PostVentilation and Sleep trigger once and keep running
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{home::common::HeatingZone, home::state::HeatingMode};
-
-    #[test]
-    fn display_includes_zone_and_mode() {
-        let action = FollowHeatingSchedule::new(HeatingZone::LivingRoom, HeatingMode::EnergySaving);
-        assert_eq!(action.to_string(), "FollowHeatingSchedule[LivingRoom - EnergySaving]");
+        Ok(RuleResult::Execute(commands))
     }
 }

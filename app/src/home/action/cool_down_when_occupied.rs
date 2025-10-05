@@ -1,45 +1,22 @@
-use std::fmt::Display;
+use r#macro::Id;
 
-use crate::core::{HomeApi, planner::SimpleAction, timeseries::DataPoint, unit::DegreeCelsius};
-use crate::home::action::needs_execution_for_one_shot_of_target;
-use crate::home::command::{Command, CommandSource, Fan};
+use crate::core::{HomeApi, timeseries::DataPoint, unit::DegreeCelsius};
+use crate::home::action::{SimpleRule, needs_execution_for_one_shot_of_target};
+use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
 
 use super::{DataPointAccess as _, Resident};
 
-#[derive(Debug, Clone)]
-pub enum CoolDownWhenOccupied {
-    CeilingFan(Fan),
-}
+#[derive(Debug, Clone, Id)]
+pub struct CoolDownWhenOccupied(Fan);
 
-impl Display for CoolDownWhenOccupied {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CoolDownWhenOccupied::CeilingFan(fan) => write!(
-                f,
-                "CoolDownWhenOccupied[{}]",
-                match fan {
-                    Fan::LivingRoomCeilingFan => "LivingRoom",
-                    Fan::BedroomCeilingFan => "Bedroom",
-                }
-            ),
-        }
-    }
-}
-
-impl SimpleAction for CoolDownWhenOccupied {
+impl SimpleRule for CoolDownWhenOccupied {
     fn command(&self) -> Command {
-        match self {
-            CoolDownWhenOccupied::CeilingFan(fan) => Command::ControlFan {
-                device: fan.clone(),
-                speed: FanAirflow::Forward(FanSpeed::Low),
-            },
+        Command::ControlFan {
+            device: self.0.clone(),
+            speed: FanAirflow::Forward(FanSpeed::Low),
         }
-    }
-
-    fn source(&self) -> CommandSource {
-        super::action_source(self)
     }
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
@@ -54,18 +31,18 @@ impl SimpleAction for CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        match self {
-            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan) => self.trigger_when_sleeping(api).await,
-            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan) => self.trigger_when_on_couch(api).await,
+        match self.0 {
+            Fan::BedroomCeilingFan => self.trigger_when_sleeping(api).await,
+            Fan::LivingRoomCeilingFan => self.trigger_when_on_couch(api).await,
         }
     }
 }
 
 impl CoolDownWhenOccupied {
     fn temperature(&self) -> Temperature {
-        match self {
-            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan) => Temperature::BedroomDoor,
-            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan) => Temperature::LivingRoomDoor,
+        match self.0 {
+            Fan::BedroomCeilingFan => Temperature::BedroomDoor,
+            Fan::LivingRoomCeilingFan => Temperature::LivingRoomDoor,
         }
     }
 
@@ -92,7 +69,7 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        needs_execution_for_one_shot_of_target(&self.command(), &self.source(), anyone_sleeping.timestamp, api).await
+        needs_execution_for_one_shot_of_target(&self.command(), &self.ext_id(), anyone_sleeping.timestamp, api).await
     }
 
     async fn trigger_when_on_couch(&self, api: &HomeApi) -> anyhow::Result<bool> {
@@ -112,23 +89,11 @@ impl CoolDownWhenOccupied {
             return Ok(false);
         }
 
-        needs_execution_for_one_shot_of_target(&self.command(), &self.source(), on_couch.timestamp, api).await
+        needs_execution_for_one_shot_of_target(&self.command(), &self.ext_id(), on_couch.timestamp, api).await
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_variants() {
-        assert_eq!(
-            CoolDownWhenOccupied::CeilingFan(Fan::BedroomCeilingFan).to_string(),
-            "CoolDownWhenOccupied[Bedroom]"
-        );
-        assert_eq!(
-            CoolDownWhenOccupied::CeilingFan(Fan::LivingRoomCeilingFan).to_string(),
-            "CoolDownWhenOccupied[LivingRoom]"
-        );
+    #[cfg(test)]
+    pub(crate) fn from_fan_for_test(fan: Fan) -> Self {
+        Self(fan)
     }
 }

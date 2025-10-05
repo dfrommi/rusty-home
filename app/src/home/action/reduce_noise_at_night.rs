@@ -1,49 +1,25 @@
-use std::fmt::Display;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::HomeApi;
+use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, PowerToggle};
 use crate::t;
 
-use crate::core::planner::SimpleAction;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Id, EnumVariants)]
 pub enum ReduceNoiseAtNight {
     Dehumidifier,
 }
 
-impl Display for ReduceNoiseAtNight {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ReduceNoiseAtNight")
-    }
-}
-
-impl SimpleAction for ReduceNoiseAtNight {
-    fn command(&self) -> Command {
-        match self {
-            ReduceNoiseAtNight::Dehumidifier => Command::SetPower {
+impl Rule for ReduceNoiseAtNight {
+    async fn evaluate(&self, _api: &HomeApi) -> anyhow::Result<super::RuleResult> {
+        let command = match self {
+            ReduceNoiseAtNight::Dehumidifier if t!(22:30 - 12:00).is_now() => Command::SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: false,
             },
-        }
-    }
+            _ => return Ok(RuleResult::Skip),
+        };
 
-    fn source(&self) -> crate::home::command::CommandSource {
-        super::action_source(self)
-    }
-
-    async fn preconditions_fulfilled(&self, _: &HomeApi) -> anyhow::Result<bool> {
-        match self {
-            ReduceNoiseAtNight::Dehumidifier => Ok(t!(22:30 - 12:00).contains(t!(now).time())),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_is_expected() {
-        assert_eq!(ReduceNoiseAtNight::Dehumidifier.to_string(), "ReduceNoiseAtNight");
+        Ok(RuleResult::Execute(vec![command]))
     }
 }

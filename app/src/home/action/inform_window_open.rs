@@ -1,61 +1,47 @@
-use std::fmt::Display;
-
 use futures::future::try_join_all;
+use r#macro::{EnumVariants, Id};
 
 use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::home::command::{
-    Command, CommandSource, Notification, NotificationAction, NotificationRecipient, PowerToggle,
-};
+use crate::home::action::{Rule, RuleResult};
+use crate::home::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
 use crate::home::state::Presence;
 use crate::t;
 
-use crate::{core::planner::SimpleAction, home::state::ColdAirComingIn};
+use crate::home::state::ColdAirComingIn;
 
 use super::DataPointAccess;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Id, EnumVariants)]
 pub enum InformWindowOpen {
     PushNotification(NotificationRecipient),
     NotificationLightLivingRoom,
 }
 
-impl Display for InformWindowOpen {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InformWindowOpen::PushNotification(recipient) => write!(f, "InformWindowOpen[{}]", recipient),
-            InformWindowOpen::NotificationLightLivingRoom => write!(f, "RequestClosingWindow"),
-        }
-    }
-}
-
-impl SimpleAction for InformWindowOpen {
-    fn command(&self) -> Command {
-        match self {
-            InformWindowOpen::PushNotification(recipient) => Command::PushNotify {
-                action: NotificationAction::Notify,
-                notification: Notification::WindowOpened,
-                recipient: recipient.clone(),
-            },
-            InformWindowOpen::NotificationLightLivingRoom => Command::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
-            },
-        }
-    }
-
-    fn source(&self) -> CommandSource {
-        super::action_source(self)
-    }
-
-    async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        match self {
-            InformWindowOpen::PushNotification(notification_recipient) => {
-                self.preconditions_fulfilled_push(notification_recipient, api).await
+impl Rule for InformWindowOpen {
+    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<super::RuleResult> {
+        let command = match self {
+            InformWindowOpen::PushNotification(recipient)
+                if self.preconditions_fulfilled_push(recipient, api).await? =>
+            {
+                Command::PushNotify {
+                    action: NotificationAction::Notify,
+                    notification: Notification::WindowOpened,
+                    recipient: recipient.clone(),
+                }
             }
-            InformWindowOpen::NotificationLightLivingRoom => self.preconditions_fulfilled_light(api).await,
-        }
+            InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(api).await? => {
+                Command::SetPower {
+                    device: PowerToggle::LivingRoomNotificationLight,
+                    power_on: true,
+                }
+            }
+
+            _ => return Ok(RuleResult::Skip),
+        };
+
+        Ok(RuleResult::Execute(vec![command]))
     }
 }
 
@@ -113,23 +99,4 @@ fn should_send_push_notification(cold_air_coming_in: Vec<DataPoint<bool>>, recip
 
 fn should_turn_on_light(cold_air_coming_in: Vec<DataPoint<bool>>) -> bool {
     cold_air_coming_in.into_iter().any(|dp| dp.value)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::home::command::NotificationRecipient;
-
-    #[test]
-    fn display_includes_recipient() {
-        assert_eq!(
-            InformWindowOpen::PushNotification(NotificationRecipient::Dennis).to_string(),
-            "InformWindowOpen[Dennis]"
-        );
-
-        assert_eq!(
-            InformWindowOpen::NotificationLightLivingRoom.to_string(),
-            "RequestClosingWindow"
-        );
-    }
 }

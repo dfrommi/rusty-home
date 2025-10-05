@@ -3,6 +3,7 @@ mod command_state;
 use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
 use derive_more::derive::{Display, From};
+use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
 use crate::home::state::FanAirflow;
@@ -38,7 +39,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandTarget {
     #[display("SetPower[{}]", device)]
@@ -120,7 +121,7 @@ pub enum CommandSource {
 //
 // SET POWER
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
     Dehumidifier,
@@ -131,7 +132,7 @@ pub enum PowerToggle {
 //
 // SET HEATING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum Thermostat {
     LivingRoomBig,
@@ -153,13 +154,13 @@ pub enum HeatingTargetState {
 //
 // SEND NOTIFICATION
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum Notification {
     WindowOpened,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationRecipient {
     Dennis,
@@ -173,7 +174,7 @@ pub enum NotificationAction {
     Dismiss,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Id)]
 pub struct NotificationTarget {
     pub recipient: NotificationRecipient,
     pub notification: Notification,
@@ -191,7 +192,7 @@ impl From<NotificationTarget> for CommandTarget {
 //
 // SET ENERGY SAVING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum EnergySavingDevice {
     LivingRoomTv,
@@ -200,7 +201,7 @@ pub enum EnergySavingDevice {
 //
 // FAN CONTROL
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum Fan {
     LivingRoomCeilingFan,

@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
+use crate::core::id::ExternalId;
 use crate::home::command::{Command, CommandSource, CommandTarget};
 
 use crate::core::HomeApi;
@@ -15,23 +16,6 @@ pub enum ActionEvaluationResult {
 }
 
 pub trait Action: Display {
+    fn ext_id(&self) -> ExternalId;
     async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult>;
-}
-
-pub trait SimpleAction: Display {
-    fn command(&self) -> Command;
-    fn source(&self) -> CommandSource;
-    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool>;
-}
-
-impl<T: SimpleAction> Action for T {
-    async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult> {
-        let preconditions_fulfilled = self.preconditions_fulfilled(api).await?;
-
-        if !preconditions_fulfilled {
-            return Ok(ActionEvaluationResult::Skip);
-        }
-
-        Ok(ActionEvaluationResult::Execute(self.command(), self.source()))
-    }
 }

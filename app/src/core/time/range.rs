@@ -33,6 +33,10 @@ impl DailyTimeRange {
         Self { start, end }
     }
 
+    pub fn is_now(&self) -> bool {
+        self.contains(t!(now).time())
+    }
+
     pub fn contains(&self, time: Time) -> bool {
         if self.start <= self.end {
             //same-day scenario

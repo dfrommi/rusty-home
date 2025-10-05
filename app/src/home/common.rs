@@ -1,3 +1,5 @@
+use r#macro::{EnumVariants, Id};
+
 use crate::{
     core::unit::DegreeCelsius,
     home::{
@@ -6,7 +8,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, derive_more::Display)]
+#[derive(Debug, Clone, derive_more::Display, Id, EnumVariants)]
 pub enum HeatingZone {
     #[display("LivingRoom")]
     LivingRoom,

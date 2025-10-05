@@ -1,3 +1,4 @@
+use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
@@ -9,7 +10,7 @@ pub enum UserTrigger {
     Homekit(HomekitCommand),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From, derive_more::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From, derive_more::Display, Id, EnumVariants)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
     Remote(RemoteTarget),
@@ -22,7 +23,7 @@ pub enum Remote {
     BedroomDoor(ButtonPress),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(tag = "remote", rename_all = "snake_case")]
 #[display("Remote[{}]", _variant)]
 pub enum RemoteTarget {

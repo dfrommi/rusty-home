@@ -12,6 +12,7 @@ use crate::{
         },
     },
 };
+use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
 use crate::Infrastructure;
@@ -87,7 +88,7 @@ pub enum HomekitCommand {
     RoomOfRequirementsHeatingState(HomekitHeatingState),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(tag = "command", rename_all = "snake_case")]
 #[display("Homekit[{}]", _variant)]
 pub enum HomekitCommandTarget {

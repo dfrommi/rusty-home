@@ -1,8 +1,10 @@
+use r#macro::Id;
+
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::core::HomeApi;
-use crate::core::planner::{Action, ActionEvaluationResult};
 use crate::core::time::Duration;
-use crate::home::command::{Command, CommandSource, HeatingTargetState};
+use crate::home::action::{Rule, RuleResult};
+use crate::home::command::{Command, HeatingTargetState};
 use crate::home::common::HeatingZone;
 use crate::home::state::Powered;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
@@ -10,8 +12,7 @@ use crate::t;
 
 use super::{DataPointAccess, needs_execution_for_one_shot_of_target};
 
-#[derive(Debug, Clone, derive_more::Display)]
-#[display("UserTriggerAction[{}]", target)]
+#[derive(Debug, Clone, Id)]
 pub struct UserTriggerAction {
     target: UserTriggerTarget,
 }
@@ -22,13 +23,13 @@ impl UserTriggerAction {
     }
 }
 
-impl Action for UserTriggerAction {
-    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<ActionEvaluationResult> {
+impl Rule for UserTriggerAction {
+    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
         let start_of_range = match self.default_duration(api).await {
             Some(duration) => t!(now) - duration,
             None => {
                 tracing::trace!("User-trigger action currently disabled, skipping");
-                return Ok(ActionEvaluationResult::Skip);
+                return Ok(RuleResult::Skip);
             }
         };
 
@@ -36,49 +37,40 @@ impl Action for UserTriggerAction {
             Some(dp) => (dp.value, dp.timestamp),
             None => {
                 tracing::trace!("No user-trigger found, skipping");
-                return Ok(ActionEvaluationResult::Skip);
+                return Ok(RuleResult::Skip);
             }
         };
 
-        let commands = into_command(latest_trigger);
+        let commands = into_command(&latest_trigger);
 
         if commands.is_empty() {
             tracing::trace!("Trigger not handled by this action, skipping");
-            return Ok(ActionEvaluationResult::Skip);
+            return Ok(RuleResult::Skip);
         } else if commands.len() > 2 {
             tracing::error!(
                 "Error: more than 2 action are tried to be scheduled for {}. Skipping",
                 self.target
             );
-            return Ok(ActionEvaluationResult::Skip);
+            return Ok(RuleResult::Skip);
         }
 
-        let source = self.source();
-
         for command in &commands {
-            let needs_execution = needs_execution_for_one_shot_of_target(command, &source, trigger_time, api).await?;
+            let needs_execution =
+                needs_execution_for_one_shot_of_target(command, &self.ext_id(), trigger_time, api).await?;
 
             if !needs_execution {
                 tracing::trace!("User-trigger action skipped due to one-shot conditions");
-                return Ok(ActionEvaluationResult::Skip);
+                return Ok(RuleResult::Skip);
             }
         }
 
-        tracing::trace!(?commands, ?source, "User-trigger action(s) ready to be executed");
+        tracing::trace!(?commands, ?latest_trigger, "User-trigger action(s) ready to be executed");
 
-        Ok(ActionEvaluationResult::ExecuteMulti(commands, source))
+        Ok(RuleResult::Execute(commands))
     }
 }
 
 impl UserTriggerAction {
-    fn source(&self) -> CommandSource {
-        let source_group = match self.target {
-            UserTriggerTarget::Remote(_) => "remote".to_string(),
-            UserTriggerTarget::Homekit(_) => "homekit".to_string(),
-        };
-        CommandSource::User(format!("{}:{}", source_group, self.target))
-    }
-
     async fn default_duration(&self, api: &HomeApi) -> Option<Duration> {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
@@ -104,10 +96,10 @@ impl UserTriggerAction {
     }
 }
 
-fn into_command(trigger: UserTrigger) -> Vec<Command> {
+fn into_command(trigger: &UserTrigger) -> Vec<Command> {
     use crate::home::command::*;
 
-    match trigger {
+    match trigger.clone() {
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => vec![Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: true,
@@ -128,6 +120,8 @@ fn into_command(trigger: UserTrigger) -> Vec<Command> {
             device: EnergySavingDevice::LivingRoomTv,
             on: false,
         }],
+        //Active EnergySaving is just setting back to FollowDefault action
+        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => vec![],
         UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(speed)) => vec![Command::ControlFan {
             device: Fan::LivingRoomCeilingFan,
             speed,
@@ -148,9 +142,6 @@ fn into_command(trigger: UserTrigger) -> Vec<Command> {
         UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => {
             homekit_heating_actions(HeatingZone::RoomOfRequirements, state)
         }
-
-        //TODO why no action?
-        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => vec![],
     }
 }
 
@@ -168,19 +159,4 @@ fn homekit_heating_actions(zone: HeatingZone, state: HomekitHeatingState) -> Vec
             target_state: target_state.clone(),
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::home::trigger::*;
-
-    use super::*;
-
-    #[test]
-    fn test_display() {
-        assert_eq!(
-            UserTriggerAction::new(UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower)).to_string(),
-            "UserTriggerAction[Homekit[InfraredHeaterPower]]"
-        );
-    }
 }

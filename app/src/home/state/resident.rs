@@ -112,7 +112,7 @@ async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
         (None, Some(stopped_dp)) => {
             bail!(
                 "Internal error: {} sleeping stopped, but not started: {:?}",
-                in_bed.int_id(),
+                in_bed.ext_id(),
                 stopped_dp
             );
         }

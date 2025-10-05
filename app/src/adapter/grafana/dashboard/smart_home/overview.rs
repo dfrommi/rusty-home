@@ -187,7 +187,7 @@ async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQue
     let rows = states.into_iter().map(|dp| {
         let target = PersistentHomeState::from(&dp.value);
 
-        let id = target.int_id();
+        let id = target.ext_id();
 
         Row {
             timestamp: dp.timestamp.to_human_readable(),

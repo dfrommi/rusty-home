@@ -45,8 +45,8 @@ struct Row {
     value: f64,
 }
 
-fn supported_channels() -> Vec<&'static ExternalId> {
-    let mut supported_channels: Vec<&'static ExternalId> = vec![];
+fn supported_channels() -> Vec<ExternalId> {
+    let mut supported_channels: Vec<ExternalId> = vec![];
     supported_channels.extend(TotalEnergyConsumption::variants().iter().map(|c| c.ext_id()));
     supported_channels.extend(HeatingDemand::variants().iter().map(|c| c.ext_id()));
     supported_channels.extend(Temperature::variants().iter().map(|c| c.ext_id()));

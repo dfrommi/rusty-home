@@ -1,45 +1,122 @@
-use heck::ToShoutySnakeCase;
-use heck::ToSnakeCase;
+use heck::{ToShoutySnakeCase, ToSnakeCase};
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::Ident;
-use syn::{DeriveInput, parse_macro_input};
+use quote::{format_ident, quote};
+use syn::{Data, DataEnum, DataStruct, DeriveInput, Error, Fields, Ident, parse_macro_input};
 
 pub fn derive_id_item(input: TokenStream) -> TokenStream {
-    // Parse the input tokens
     let input = parse_macro_input!(input as DeriveInput);
-    let enum_name = input.ident;
-    let enum_variants = super::enum_variants(input.data);
+    let type_name = input.ident;
+    let type_name_ext = type_name.to_string().to_snake_case();
 
-    let type_name_ext = enum_name.to_string().to_snake_case();
+    let expanded = match input.data {
+        Data::Enum(data_enum) => derive_enum(&type_name, &type_name_ext, data_enum),
+        Data::Struct(data_struct) => derive_struct(&type_name, &type_name_ext, data_struct),
+        Data::Union(_) => panic!("Id derive does not support unions"),
+    };
 
+    TokenStream::from(expanded)
+}
+
+fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> proc_macro2::TokenStream {
     let mut ext_id_statics = Vec::new();
     let mut ext_id_matches = Vec::new();
-
     let mut from_ext_item_name_matches = Vec::new();
 
-    for variant in enum_variants {
+    for variant in data_enum.variants {
         let variant_name = &variant.ident;
-        let static_suffix = variant_name.to_string().to_shouty_snake_case();
-        let ext_id_static_name = Ident::new(&format!("{}_EXT_ID", static_suffix), variant_name.span());
-
         let variant_name_ext = variant_name.to_string().to_snake_case();
 
-        ext_id_statics.push(quote! {
-            static #ext_id_static_name: crate::core::id::ExternalId = crate::core::id::ExternalId::new_static(#type_name_ext, #variant_name_ext);
-        });
-        ext_id_matches.push(quote! {
-            #enum_name::#variant_name => &#ext_id_static_name
-        });
+        match variant.fields {
+            Fields::Unit => {
+                let static_suffix = variant_name.to_string().to_shouty_snake_case();
+                let ext_id_static_name = Ident::new(&format!("{}_EXT_ID", static_suffix), variant_name.span());
 
-        from_ext_item_name_matches.push(quote! {
-            #variant_name_ext => #enum_name::#variant_name
-        });
+                ext_id_statics.push(quote! {
+                    static #ext_id_static_name: crate::core::id::ExternalId = crate::core::id::ExternalId::new_static(#type_name_ext, #variant_name_ext);
+                });
+                ext_id_matches.push(quote! {
+                    #enum_name::#variant_name => #ext_id_static_name.clone()
+                });
+
+                from_ext_item_name_matches.push(quote! {
+                    #variant_name_ext => #enum_name::#variant_name
+                });
+            }
+            Fields::Unnamed(fields) => {
+                let bindings: Vec<_> = (0..fields.unnamed.len())
+                    .map(|idx| format_ident!("field_{idx}"))
+                    .collect();
+
+                let variant_segments = bindings.iter().map(|binding| {
+                    quote! { #binding.ext_id().variant_name() }
+                });
+
+                ext_id_matches.push(quote! {
+                    #enum_name::#variant_name(#(#bindings),*) => {
+                        let mut segments = vec![#variant_name_ext.to_string()];
+                        #(segments.push(#variant_segments.to_string());)*
+                        let variant_name = segments.join("::");
+                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
+                    }
+                });
+            }
+            Fields::Named(fields) => {
+                let bindings: Vec<_> = fields
+                    .named
+                    .into_iter()
+                    .map(|field| field.ident.expect("named field expected"))
+                    .collect();
+
+                let variant_segments = bindings.iter().map(|binding| {
+                    quote! { #binding.ext_id().variant_name() }
+                });
+
+                ext_id_matches.push(quote! {
+                    #enum_name::#variant_name { #(#bindings),* } => {
+                        let mut segments = vec![#variant_name_ext.to_string()];
+                        #(segments.push(#variant_segments.to_string());)*
+                        let variant_name = segments.join("::");
+                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
+                    }
+                });
+            }
+        }
     }
 
-    let expanded = quote! {
+    let try_from_impl = if from_ext_item_name_matches.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            impl TryFrom<&crate::core::id::ExternalId> for #enum_name {
+                type Error = anyhow::Error;
+
+                fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
+                    if value.type_name() != #type_name_ext {
+                        anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.type_name());
+                    }
+
+                    let item = match value.variant_name() {
+                        #(#from_ext_item_name_matches),*,
+                        _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.variant_name()),
+                    };
+
+                    Ok(item)
+                }
+            }
+
+            impl TryFrom<crate::core::id::ExternalId> for #enum_name {
+                type Error = anyhow::Error;
+
+                fn try_from(value: crate::core::id::ExternalId) -> Result<Self, Self::Error> {
+                    Self::try_from(&value)
+                }
+            }
+        }
+    };
+
+    quote! {
         impl #enum_name {
-            pub fn ext_id(&self) -> &'static crate::core::id::ExternalId {
+            pub fn ext_id(&self) -> crate::core::id::ExternalId {
                 #(#ext_id_statics)*
 
                 match self {
@@ -48,33 +125,52 @@ pub fn derive_id_item(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl TryFrom<&crate::core::id::ExternalId> for #enum_name {
-            type Error = anyhow::Error;
+        #try_from_impl
+    }
+}
 
-            fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
-                if value.type_name() != #type_name_ext {
-                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.type_name());
+fn derive_struct(struct_name: &Ident, type_name_ext: &str, data_struct: DataStruct) -> proc_macro2::TokenStream {
+    match data_struct.fields {
+        Fields::Unit => {
+            Error::new_spanned(struct_name, "Id derive requires structs to have at least one field").to_compile_error()
+        }
+        Fields::Unnamed(fields) => {
+            let indices: Vec<_> = (0..fields.unnamed.len()).collect();
+            let variant_parts = indices.iter().map(|idx| {
+                let index = syn::Index::from(*idx);
+                quote! { self.#index.ext_id().variant_name() }
+            });
+
+            quote! {
+                impl #struct_name {
+                    pub fn ext_id(&self) -> crate::core::id::ExternalId {
+                        let variant_name = vec![#(#variant_parts),*].join("::");
+                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
+                    }
                 }
-
-                let item = match value.variant_name() {
-                    #(#from_ext_item_name_matches),*,
-                    _ => anyhow::bail!("Error converting ExternalId, unknown name {}", value.variant_name()),
-                };
-
-                Ok(item)
             }
         }
+        Fields::Named(fields) => {
+            let field_idents: Vec<_> = fields
+                .named
+                .iter()
+                .map(|field| field.ident.as_ref().expect("named field expected").clone())
+                .collect();
 
-        impl TryFrom<crate::core::id::ExternalId> for #enum_name {
-            type Error = anyhow::Error;
+            let variant_parts = field_idents.iter().map(|field_ident| {
+                quote! { self.#field_ident.ext_id().variant_name() }
+            });
 
-            fn try_from(value: crate::core::id::ExternalId) -> Result<Self, Self::Error> {
-                Self::try_from(&value)
+            quote! {
+                impl #struct_name {
+                    pub fn ext_id(&self) -> crate::core::id::ExternalId {
+                        let variant_name = vec![#(#variant_parts),*].join("::");
+                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
+                    }
+                }
             }
         }
-    };
-
-    TokenStream::from(expanded)
+    }
 }
 
 pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
@@ -110,7 +206,7 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #name {
-            pub fn ext_id(&self) -> &'static crate::core::id::ExternalId {
+            pub fn ext_id(&self) -> crate::core::id::ExternalId {
                 match self {
                     #(#ext_id_matches),*
                 }

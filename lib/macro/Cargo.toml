@@ -11,3 +11,7 @@ heck = "0.5"
 
 [lib]
 proc-macro = true
+
+[dev-dependencies]
+anyhow = "1.0"
+trybuild = "1.0"

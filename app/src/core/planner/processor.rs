@@ -1,14 +1,13 @@
 use std::fmt::Display;
 
-use crate::{
-    home::command::{Command, CommandSource, CommandTarget},
-    t,
-};
 use anyhow::Result;
 use infrastructure::TraceContext;
 use tokio::sync::oneshot;
 
+use crate::core::id::ExternalId;
 use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
+use crate::home::command::{Command, CommandTarget};
+use crate::t;
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
@@ -137,16 +136,12 @@ fn check_locked<'a, A>(
 }
 
 #[tracing::instrument(skip(api))]
-async fn should_execute(
-    command: Command,
-    source: crate::home::command::CommandSource,
-    api: &HomeApi,
-) -> anyhow::Result<bool> {
+async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -> anyhow::Result<bool> {
     let target: CommandTarget = command.clone().into();
     let last_execution = api
         .get_latest_command(target.clone(), t!(48 hours ago))
         .await?
-        .filter(|e| e.source == source && e.command == command)
+        .filter(|e| e.source == *source && e.command == *command)
         .map(|e| e.created);
 
     let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
@@ -167,14 +162,14 @@ async fn should_execute(
 }
 
 #[tracing::instrument(skip(context, api))]
-async fn execute_action<'a, A>(context: &mut Context<'a, A>, command: Command, source: CommandSource, api: &HomeApi)
+async fn execute_action<'a, A>(context: &mut Context<'a, A>, command: Command, source: ExternalId, api: &HomeApi)
 where
     A: Action,
 {
     let target: CommandTarget = command.clone().into();
 
-    match should_execute(command.clone(), source.clone(), api).await {
-        Ok(true) => match api.save_command(command, source).await {
+    match should_execute(&command, &source, api).await {
+        Ok(true) => match api.save_command(command, &source).await {
             Ok(_) => {
                 tracing::info!("Started command {} via action {}", target, context.action);
                 context.trace.triggered = Some(true);

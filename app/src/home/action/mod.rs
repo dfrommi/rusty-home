@@ -14,7 +14,6 @@ use crate::home::command::Command;
 use anyhow::Result;
 
 use crate::core::time::DateTime;
-use crate::home::command::CommandSource;
 use crate::t;
 pub use cool_down_when_occupied::CoolDownWhenOccupied;
 pub use dehumidify::Dehumidify;
@@ -126,13 +125,9 @@ impl Action for HomeAction {
     }
 }
 
-fn ext_id_as_source(ext_id: &ExternalId) -> CommandSource {
-    CommandSource::System(format!("{}::{}", ext_id.type_name(), ext_id.variant_name()))
-}
-
 async fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, api: &HomeApi) -> Result<ActionEvaluationResult> {
     match rule.evaluate(api).await? {
-        RuleResult::Execute(commands) => Ok(ActionEvaluationResult::ExecuteMulti(commands, ext_id_as_source(&ext_id))),
+        RuleResult::Execute(commands) => Ok(ActionEvaluationResult::ExecuteMulti(commands, ext_id)),
         RuleResult::Skip => Ok(ActionEvaluationResult::Skip),
     }
 }
@@ -144,7 +139,7 @@ async fn needs_execution_for_one_shot_of_target(
     oneshot_range_start: DateTime,
     api: &HomeApi,
 ) -> Result<bool> {
-    let source = ext_id_as_source(ext_id);
+    let source = ext_id.clone();
     let executions = api
         .get_all_commands_for_target(command.clone(), oneshot_range_start)
         .await?;

@@ -1,11 +1,12 @@
+use crate::core::id::ExternalId;
 use crate::core::plan_for_home;
 use crate::core::time::{DateTime, FIXED_NOW};
-use crate::home::command::{Command, CommandSource, PowerToggle};
+use crate::home::command::{Command, PowerToggle};
 use support::TestDatabase;
 
 use super::{infrastructure, runtime};
 
-pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
+pub fn plan_at(iso: &str) -> Vec<(Command, ExternalId)> {
     let fake_now = DateTime::from_iso(iso).unwrap();
 
     let f = async {
@@ -53,13 +54,14 @@ pub fn plan_at(iso: &str) -> Vec<(Command, CommandSource)> {
 mod support {
     use std::sync::Mutex;
 
+    use crate::core::id::ExternalId;
     use crate::core::time::{DateTime, DateTimeRange};
-    use crate::home::command::{Command, CommandSource};
+    use crate::home::command::Command;
 
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 
     pub struct TestDatabase {
-        executed_actions: Mutex<Vec<(Command, CommandSource)>>,
+        executed_actions: Mutex<Vec<(Command, ExternalId)>>,
     }
 
     impl TestDatabase {
@@ -96,14 +98,14 @@ mod support {
 
     //Command
     impl TestDatabase {
-        pub fn executed_actions(&self) -> Vec<(Command, CommandSource)> {
+        pub fn executed_actions(&self) -> Vec<(Command, ExternalId)> {
             self.executed_actions.lock().unwrap().clone()
         }
 
         pub async fn save_command(
             &self,
             command: Command,
-            source: CommandSource,
+            source: ExternalId,
             _: Option<String>,
         ) -> anyhow::Result<()> {
             println!("Pretend executing command in test: {command:?} with source: {source:?}");

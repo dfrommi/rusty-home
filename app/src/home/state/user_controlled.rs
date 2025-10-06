@@ -11,7 +11,7 @@ use crate::core::timeseries::DataPoint;
 use crate::home::state::Powered;
 
 use crate::home::{
-    command::{Command, CommandExecution, CommandSource, PowerToggle, Thermostat},
+    command::{Command, CommandExecution, PowerToggle, Thermostat, is_system_generated, is_user_generated},
     state::macros::result,
 };
 
@@ -82,10 +82,10 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
     let system_powered = match last_command {
         Some(CommandExecution {
             command: Command::SetPower { power_on, .. },
-            source: CommandSource::System(_),
+            source,
             created,
             ..
-        }) => DataPoint::new(power_on, created),
+        }) if is_system_generated(&source) => DataPoint::new(power_on, created),
 
         _ => {
             result!(true, power.timestamp, item,
@@ -132,10 +132,7 @@ async fn current_data_point_for_thermostat(
         .unwrap_or_else(|| t!(now));
 
     match latest_command_exec {
-        Some(CommandExecution {
-            source: CommandSource::User(_),
-            ..
-        }) => {
+        Some(command) if is_user_generated(&command.source) => {
             result!(true, timestamp, item, "User controlled based on latest command source is User");
         }
         _ => {

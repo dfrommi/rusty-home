@@ -1,7 +1,7 @@
 mod command_state;
 
-use crate::core::time::DateTime;
 use crate::core::unit::DegreeCelsius;
+use crate::core::{id::ExternalId, time::DateTime};
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ pub struct CommandExecution {
     pub command: Command,
     pub state: CommandState,
     pub created: DateTime,
-    pub source: CommandSource,
+    pub source: ExternalId,
     pub correlation_id: Option<String>,
 }
 
@@ -111,11 +111,12 @@ pub enum CommandState {
     Error(String),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CommandSource {
-    System(String),
-    User(String),
+pub fn is_user_generated(source: &ExternalId) -> bool {
+    source.type_name() == "user_trigger_action"
+}
+
+pub fn is_system_generated(source: &ExternalId) -> bool {
+    !is_user_generated(source)
 }
 
 //

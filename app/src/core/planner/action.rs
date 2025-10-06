@@ -3,15 +3,15 @@ use std::fmt::Display;
 use anyhow::Result;
 
 use crate::core::id::ExternalId;
-use crate::home::command::{Command, CommandSource, CommandTarget};
+use crate::home::command::{Command, CommandTarget};
 
 use crate::core::HomeApi;
 
 #[derive(Debug, Clone)]
 pub enum ActionEvaluationResult {
     Lock(CommandTarget),
-    Execute(Command, CommandSource),
-    ExecuteMulti(Vec<Command>, CommandSource),
+    Execute(Command, ExternalId),
+    ExecuteMulti(Vec<Command>, ExternalId),
     Skip,
 }
 

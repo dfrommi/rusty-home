@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use crate::home::command::{Command, CommandSource};
-use crate::home::state::PersistentHomeState;
 use actix_web::{HttpResponse, http::header, web};
 use anyhow::Context;
 use infrastructure::TraceContext;
+
+use crate::core::id::ExternalId;
+use crate::home::command::{Command, is_user_generated};
+use crate::home::state::PersistentHomeState;
 
 use crate::{
     adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
@@ -222,9 +224,7 @@ async fn get_offline_items(api: web::Data<HomeApi>) -> GrafanaResponse {
     csv_response(rows)
 }
 
-fn source_as_string(source: &CommandSource) -> (&str, String) {
-    match source {
-        CommandSource::System(id) => ("SYSTEM", id.to_owned()),
-        CommandSource::User(id) => ("USER", id.to_owned()),
-    }
+fn source_as_string(source: &ExternalId) -> (&str, String) {
+    let icon = if is_user_generated(source) { "USER" } else { "SYSTEM" };
+    (icon, source.to_string())
 }

@@ -6,6 +6,7 @@ use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange};
 use super::timeseries::{DataFrame, DataPoint};
 use crate::core::ItemAvailability;
+use crate::core::id::ExternalId;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{HomeState, PersistentHomeState, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
@@ -164,9 +165,9 @@ impl HomeApi {
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 
-    pub async fn save_command(&self, command: Command, source: crate::home::command::CommandSource) -> Result<()> {
+    pub async fn save_command(&self, command: Command, action_id: &ExternalId) -> Result<()> {
         self.db
-            .save_command(&command, source, TraceContext::current_correlation_id())
+            .save_command(&command, action_id, TraceContext::current_correlation_id())
             .await?;
 
         // Invalidate command cache after saving command

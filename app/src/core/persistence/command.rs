@@ -1,5 +1,6 @@
+use crate::core::id::ExternalId;
 use crate::core::time::DateTimeRange;
-use crate::home::command::*;
+use crate::home::command::{Command, CommandExecution, CommandState, CommandTarget};
 use crate::t;
 use anyhow::Result;
 use schema::*;
@@ -12,7 +13,7 @@ impl super::Database {
         let mut tx = self.pool.begin().await?;
 
         let maybe_rec = sqlx::query!(
-            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type: DbCommandSource", source_id, correlation_id
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id
                 from THING_COMMAND
                 where status = $1
                 order by created DESC
@@ -36,7 +37,7 @@ impl super::Database {
                     Ok(command) => {
                         set_command_status_in_tx(&mut *tx, id, DbCommandState::InProgress, Option::None).await?;
 
-                        let source = CommandSource::from((rec.source_type, rec.source_id));
+                        let source = ExternalId::new(rec.source_type, rec.source_id);
 
                         Some(CommandExecution {
                             id,
@@ -73,19 +74,18 @@ impl super::Database {
     pub async fn save_command(
         &self,
         command: &Command,
-        source: CommandSource,
+        source: &ExternalId,
         correlation_id: Option<String>,
     ) -> Result<()> {
         let db_command = serde_json::json!(command);
-        let (db_source_type, db_source_id): (DbCommandSource, String) = source.into();
 
         sqlx::query!(
             r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
             db_command,
             t!(now).into_db(),
             DbCommandState::Pending as DbCommandState,
-            db_source_type as DbCommandSource,
-            db_source_id,
+            source.type_name(),
+            source.variant_name(),
             correlation_id
         )
         .execute(&self.pool)
@@ -113,7 +113,7 @@ impl super::Database {
         let db_target = target.map(|j| serde_json::json!(j));
 
         let records = sqlx::query!(
-            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!: DbCommandSource", source_id as "source_id!", correlation_id
+            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created >= $2
@@ -143,7 +143,7 @@ impl super::Database {
         let commands = records
             .into_iter()
             .map_while(|row| {
-                let source = CommandSource::from((row.source_type, row.source_id));
+                let source = ExternalId::new(row.source_type, row.source_id);
                 match serde_json::from_value::<Command>(row.command) {
                     Ok(command) => Some(CommandExecution {
                         id: row.id,
@@ -218,18 +218,11 @@ pub mod schema {
         Success,
         Error,
     }
-
-    #[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
-    #[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
-    pub enum DbCommandSource {
-        System,
-        User,
-    }
 }
 
 pub mod mapper {
     use super::*;
-    use crate::home::command::{CommandSource, CommandState};
+    use crate::home::command::CommandState;
 
     impl From<(DbCommandState, Option<String>)> for CommandState {
         fn from((status, error): (DbCommandState, Option<String>)) -> Self {
@@ -238,24 +231,6 @@ pub mod mapper {
                 DbCommandState::InProgress => CommandState::InProgress,
                 DbCommandState::Success => CommandState::Success,
                 DbCommandState::Error => CommandState::Error(error.unwrap_or("unknown error".to_string())),
-            }
-        }
-    }
-
-    impl From<(DbCommandSource, String)> for CommandSource {
-        fn from(value: (DbCommandSource, String)) -> Self {
-            match value.0 {
-                DbCommandSource::System => CommandSource::System(value.1),
-                DbCommandSource::User => CommandSource::User(value.1),
-            }
-        }
-    }
-
-    impl From<CommandSource> for (DbCommandSource, String) {
-        fn from(val: CommandSource) -> Self {
-            match val {
-                CommandSource::System(id) => (DbCommandSource::System, id.to_owned()),
-                CommandSource::User(id) => (DbCommandSource::User, id.to_owned()),
             }
         }
     }
@@ -417,8 +392,8 @@ mod get_all_commands_since {
             serde_json::to_value(command).unwrap(),
             at.into_db(),
             DbCommandState::Pending as DbCommandState,
-            DbCommandSource::System as DbCommandSource,
-            "unit-test".to_owned()
+            "unit_test",
+            "fixture"
         )
         .execute(&db.pool)
         .await

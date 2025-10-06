@@ -8,6 +8,8 @@ mod user_trigger_action;
 
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::future::Future;
+use std::pin::Pin;
 
 use crate::core::id::ExternalId;
 use crate::home::command::Command;
@@ -78,33 +80,42 @@ impl Display for HomeAction {
 }
 
 impl Action for HomeAction {
-    async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult> {
-        let ext_id = self.ext_id();
+    fn evaluate<'a>(
+        &'a self,
+        api: &'a HomeApi,
+    ) -> Pin<Box<dyn Future<Output = Result<ActionEvaluationResult>> + Send + 'a>> {
+        Box::pin(async move {
+            let ext_id = self.ext_id();
 
-        match self {
-            HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, api).await,
-            HomeAction::InformWindowOpen(inform_window_open) => evaluate_rule(inform_window_open, ext_id, api).await,
-            HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
-                evaluate_rule(provide_ambient_temperature, ext_id, api).await
+            match self {
+                HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, api).await,
+                HomeAction::InformWindowOpen(inform_window_open) => {
+                    evaluate_rule(inform_window_open, ext_id, api).await
+                }
+                HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
+                    evaluate_rule(provide_ambient_temperature, ext_id, api).await
+                }
+                HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, api).await,
+                HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
+                    evaluate_rule(reduce_noise_at_night, ext_id, api).await
+                }
+                HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                    evaluate_rule(follow_default_setting, ext_id, api).await
+                }
+                HomeAction::UserTriggerAction(user_trigger_action) => {
+                    evaluate_rule(user_trigger_action, ext_id, api).await
+                }
+                HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
+                    evaluate_rule(support_ventilation_with_fan, ext_id, api).await
+                }
+                HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => {
+                    evaluate_rule(cool_down_when_occupied, ext_id, api).await
+                }
+                HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
+                    evaluate_rule(follow_heating_schedule, ext_id, api).await
+                }
             }
-            HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, api).await,
-            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
-                evaluate_rule(reduce_noise_at_night, ext_id, api).await
-            }
-            HomeAction::FollowDefaultSetting(follow_default_setting) => {
-                evaluate_rule(follow_default_setting, ext_id, api).await
-            }
-            HomeAction::UserTriggerAction(user_trigger_action) => evaluate_rule(user_trigger_action, ext_id, api).await,
-            HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
-                evaluate_rule(support_ventilation_with_fan, ext_id, api).await
-            }
-            HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => {
-                evaluate_rule(cool_down_when_occupied, ext_id, api).await
-            }
-            HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
-                evaluate_rule(follow_heating_schedule, ext_id, api).await
-            }
-        }
+        })
     }
 
     fn ext_id(&self) -> ExternalId {

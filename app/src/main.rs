@@ -16,7 +16,7 @@ struct Infrastructure {
     mqtt_client: Mqtt,
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main(flavor = "multi_thread")]
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
 

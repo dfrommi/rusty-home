@@ -5,23 +5,23 @@ use tokio::sync::oneshot;
 
 use super::{resource_lock::ResourceLock, trace::PlanningTraceStep};
 
-pub struct Context<'a, A> {
-    pub action: &'a A,
+pub struct Context<A> {
+    pub action: A,
     pub goal_active: bool,
     pub trace: PlanningTraceStep,
     lock_rx: oneshot::Receiver<ResourceLock<CommandTarget>>,
     lock_tx: Option<oneshot::Sender<ResourceLock<CommandTarget>>>,
 }
 
-impl<'a, A: Display> Context<'a, A> {
+impl<A: Display> Context<A> {
     pub fn new<G: Display>(
-        goal: &'a G,
-        action: &'a A,
+        goal: &G,
+        action: A,
         goal_active: bool,
         lock_rx: oneshot::Receiver<ResourceLock<CommandTarget>>,
         lock_tx: oneshot::Sender<ResourceLock<CommandTarget>>,
     ) -> Self {
-        let mut trace = PlanningTraceStep::new(action, goal);
+        let mut trace = PlanningTraceStep::new(&action, goal);
         trace.goal_active = goal_active;
 
         Self {

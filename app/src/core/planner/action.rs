@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, future::Future, pin::Pin};
 
 use anyhow::Result;
 
@@ -15,7 +15,10 @@ pub enum ActionEvaluationResult {
     Skip,
 }
 
-pub trait Action: Display {
+pub trait Action: Display + Send + Sync {
     fn ext_id(&self) -> ExternalId;
-    async fn evaluate(&self, api: &HomeApi) -> Result<ActionEvaluationResult>;
+    fn evaluate<'a>(
+        &'a self,
+        api: &'a HomeApi,
+    ) -> Pin<Box<dyn Future<Output = Result<ActionEvaluationResult>> + Send + 'a>>;
 }

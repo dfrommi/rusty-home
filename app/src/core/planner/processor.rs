@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use infrastructure::TraceContext;
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, task::yield_now};
+use tracing::Instrument;
 
 use crate::core::id::ExternalId;
 use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
@@ -14,7 +15,7 @@ use super::{PlanningTrace, action::Action, context::Context, resource_lock::Reso
 pub async fn plan_and_execute<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &HomeApi) -> Result<PlanningTrace>
 where
     G: Eq + Display,
-    A: Action,
+    A: Action + Clone + Send + Sync + 'static,
 {
     let (first_tx, mut prev_rx) = oneshot::channel();
 
@@ -24,7 +25,7 @@ where
 
         for action in actions {
             let (tx, rx) = oneshot::channel();
-            let context = Context::new(goal, action, is_goal_active, prev_rx, tx);
+            let context = Context::new(goal, action.clone(), is_goal_active, prev_rx, tx);
             contexts.push(context);
             prev_rx = rx;
         }
@@ -34,14 +35,22 @@ where
         .send(ResourceLock::new())
         .map_err(|_| anyhow::anyhow!("Error sending first resource lock to planner"))?;
 
-    let mut tasks = vec![];
+    let mut handles = Vec::with_capacity(contexts.len());
     for context in contexts {
-        tasks.push(process_action(context, api));
+        let api = api.clone();
+        let span = tracing::Span::current();
+        handles.push(tokio::spawn(async move { process_action(context, api).await }.instrument(span)));
     }
 
-    let results: Result<Vec<Context<A>>> = futures::future::join_all(tasks).await.into_iter().collect();
+    let mut results = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let context = handle
+            .await
+            .map_err(|e| anyhow::anyhow!("Planning task failed: {:?}", e))??;
+        results.push(context);
+    }
 
-    let steps = results?.into_iter().map(|r| r.trace).collect();
+    let steps = results.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
 }
 
@@ -49,26 +58,27 @@ where
     skip_all,
     fields(action = %context.action, otel.name = %context.action),
 )]
-async fn process_action<'a, A>(mut context: Context<'a, A>, api: &HomeApi) -> Result<Context<'a, A>>
-where
-    A: Action,
-{
+async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Result<Context<A>> {
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
     //EVALUATION
-    let evaluation_result = evaluate_action(&mut context, api).await;
+    let evaluation_result = evaluate_action(&mut context, &api).await;
+    // Yield so other actions can start evaluating before we attempt to acquire the lock.
+    yield_now().await;
 
     //LOCKING
     let mut resource_lock = context.get_lock().await?;
     let evaluation_result = check_locked(&mut context, evaluation_result, &mut resource_lock);
     context.release_lock(resource_lock).await?;
+    // Allow the next action to pick up the lock before we start executing commands.
+    yield_now().await;
 
     //EXECUTION
     match evaluation_result {
-        ActionEvaluationResult::Execute(command, source) => execute_action(&mut context, command, source, api).await,
+        ActionEvaluationResult::Execute(command, source) => execute_action(&mut context, command, source, &api).await,
         ActionEvaluationResult::ExecuteMulti(commands, source) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), api).await;
+                execute_action(&mut context, command, source.clone(), &api).await;
             }
         }
         ActionEvaluationResult::Lock(_) | ActionEvaluationResult::Skip => {}
@@ -78,10 +88,7 @@ where
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<'a, A>(context: &mut Context<'a, A>, api: &HomeApi) -> ActionEvaluationResult
-where
-    A: Action,
-{
+async fn evaluate_action<A: Action>(context: &mut Context<A>, api: &HomeApi) -> ActionEvaluationResult {
     let mut result = if context.goal_active {
         context.action.evaluate(api).await.unwrap_or_else(|e| {
             tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
@@ -106,8 +113,8 @@ where
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-fn check_locked<'a, A>(
-    context: &mut Context<'a, A>,
+fn check_locked<A>(
+    context: &mut Context<A>,
     evaluation_result: ActionEvaluationResult,
     resource_lock: &mut ResourceLock<CommandTarget>,
 ) -> ActionEvaluationResult {
@@ -162,10 +169,7 @@ async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -
 }
 
 #[tracing::instrument(skip(context, api))]
-async fn execute_action<'a, A>(context: &mut Context<'a, A>, command: Command, source: ExternalId, api: &HomeApi)
-where
-    A: Action,
-{
+async fn execute_action<A: Action>(context: &mut Context<A>, command: Command, source: ExternalId, api: &HomeApi) {
     let target: CommandTarget = command.clone().into();
 
     match should_execute(&command, &source, api).await {

@@ -6,6 +6,7 @@ mod state;
 mod trigger;
 
 pub use availability::OfflineItem;
+pub use trigger::UserTriggerRequest;
 
 #[derive(Clone)]
 pub struct Database {

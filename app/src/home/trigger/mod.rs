@@ -10,7 +10,9 @@ pub enum UserTrigger {
     Homekit(HomekitCommand),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From, derive_more::Display, Id, EnumVariants)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, Id, EnumVariants,
+)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
     Remote(RemoteTarget),
@@ -23,7 +25,7 @@ pub enum Remote {
     BedroomDoor(ButtonPress),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(tag = "remote", rename_all = "snake_case")]
 #[display("Remote[{}]", _variant)]
 pub enum RemoteTarget {
@@ -35,6 +37,45 @@ pub enum RemoteTarget {
 pub enum ButtonPress {
     TopSingle,
     BottomSingle,
+}
+
+impl UserTrigger {
+    pub fn target(&self) -> UserTriggerTarget {
+        match self {
+            UserTrigger::Remote(remote) => match remote {
+                Remote::BedroomDoor(_) => UserTriggerTarget::Remote(RemoteTarget::BedroomDoor),
+            },
+            UserTrigger::Homekit(command) => match command {
+                HomekitCommand::InfraredHeaterPower(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower)
+                }
+                HomekitCommand::DehumidifierPower(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower)
+                }
+                HomekitCommand::LivingRoomTvEnergySaving(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving)
+                }
+                HomekitCommand::LivingRoomCeilingFanSpeed(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
+                }
+                HomekitCommand::BedroomCeilingFanSpeed(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed)
+                }
+                HomekitCommand::LivingRoomHeatingState(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
+                }
+                HomekitCommand::BedroomHeatingState(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
+                }
+                HomekitCommand::KitchenHeatingState(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
+                }
+                HomekitCommand::RoomOfRequirementsHeatingState(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState)
+                }
+            },
+        }
+    }
 }
 
 #[cfg(test)]

@@ -88,7 +88,7 @@ pub enum HomekitCommand {
     RoomOfRequirementsHeatingState(HomekitHeatingState),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(tag = "command", rename_all = "snake_case")]
 #[display("Homekit[{}]", _variant)]
 pub enum HomekitCommandTarget {

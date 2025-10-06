@@ -1,7 +1,7 @@
 mod cache;
 
 use super::ValueObject;
-use super::persistence::{Database, OfflineItem};
+use super::persistence::{Database, OfflineItem, UserTriggerRequest};
 use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange};
 use super::timeseries::{DataFrame, DataPoint};
@@ -78,7 +78,12 @@ impl HomeApi {
 //
 impl HomeApi {
     pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
-        self.cache.preload_ts_cache().await
+        self.cache.preload_ts_cache().await?;
+        self.cache.preload_user_trigger_cache().await
+    }
+
+    pub async fn preload_user_trigger_cache(&self) -> anyhow::Result<()> {
+        self.cache.preload_user_trigger_cache().await
     }
 
     pub async fn invalidate_ts_cache(&self, tag_id: i64) {
@@ -87,6 +92,18 @@ impl HomeApi {
 
     pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
         self.cache.invalidate_command_cache(target).await;
+    }
+
+    pub async fn invalidate_user_trigger_cache(&self, target: &UserTriggerTarget) {
+        self.cache.invalidate_user_trigger_cache(target).await;
+    }
+
+    pub async fn invalidate_user_trigger_cache_by_id(&self, id: i64) -> anyhow::Result<()> {
+        match self.db.user_trigger_target_by_id(id).await? {
+            Some(target) => self.invalidate_user_trigger_cache(&target).await,
+            None => tracing::warn!("Can not invalidate user trigger cache, id {} not found", id),
+        }
+        Ok(())
     }
 }
 
@@ -104,7 +121,7 @@ impl HomeApi {
 
     async fn get_dataframe(&self, tag_id: i64, range: &DateTimeRange) -> Result<DataFrame<f64>> {
         let df = match self.cache.get_dataframe_from_cache(tag_id, range).await {
-            Some(df) => df.1.retain_range_with_context(range)?,
+            Some(df) => df.data().retain_range_with_context(range)?,
             None => {
                 tracing::warn!("No cached data found for tag {}, fetching from database", tag_id);
                 self.db.get_dataframe_for_tag(tag_id, range).await?
@@ -152,7 +169,7 @@ impl HomeApi {
     async fn get_commands(&self, target: &CommandTarget, range: &DateTimeRange) -> Result<Vec<CommandExecution>> {
         let commands = match self.cache.get_commands_from_cache(target, range).await {
             Some(commands) => commands
-                .1
+                .data()
                 .iter()
                 .filter(|cmd| range.contains(&cmd.created))
                 .cloned()
@@ -214,8 +231,32 @@ impl HomeApi {
 //USER TRIGGER
 //
 impl HomeApi {
+    async fn get_user_triggers(
+        &self,
+        target: &UserTriggerTarget,
+        range: &DateTimeRange,
+    ) -> anyhow::Result<Vec<UserTriggerRequest>> {
+        let triggers = match self.cache.get_user_triggers_from_cache(target, range).await {
+            Some(cached) => cached
+                .data()
+                .iter()
+                .filter(|req| range.contains(&req.timestamp))
+                .cloned()
+                .collect(),
+            None => {
+                tracing::warn!("No cached user triggers found for target {:?}, fetching from database", target);
+                self.db.user_triggers_in_range(target, range).await?
+            }
+        };
+
+        Ok(self.apply_timeshift_filter(triggers, |req| req.timestamp))
+    }
+
     pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        self.db.add_user_trigger(trigger).await
+        let target = trigger.target();
+        self.db.add_user_trigger(trigger).await?;
+        self.invalidate_user_trigger_cache(&target).await;
+        Ok(())
     }
 
     pub async fn latest_trigger_since(
@@ -223,13 +264,14 @@ impl HomeApi {
         target: &UserTriggerTarget,
         since: DateTime,
     ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
-        let result = self.db.latest_trigger_since(target, since).await?;
-        if DateTime::is_shifted() {
-            let now = t!(now);
-            Ok(result.filter(|dp| dp.timestamp <= now))
-        } else {
-            Ok(result)
-        }
+        let now = t!(now);
+        let range = DateTimeRange::new(since, now);
+        let triggers = self.get_user_triggers(target, &range).await?;
+
+        Ok(triggers
+            .into_iter()
+            .map(|req| req.into_datapoint())
+            .max_by_key(|dp| dp.timestamp))
     }
 }
 

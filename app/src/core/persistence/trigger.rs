@@ -1,10 +1,32 @@
-use crate::core::time::DateTime;
+use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use crate::{
     core::timeseries::DataPoint,
     home::trigger::{UserTrigger, UserTriggerTarget},
 };
 use anyhow::Context;
+
+#[derive(Debug, Clone)]
+pub struct UserTriggerRequest {
+    pub id: i64,
+    pub trigger: UserTrigger,
+    pub timestamp: DateTime,
+    pub correlation_id: Option<String>,
+}
+
+impl UserTriggerRequest {
+    pub fn target(&self) -> UserTriggerTarget {
+        self.trigger.target()
+    }
+
+    pub fn into_datapoint(self) -> DataPoint<UserTrigger> {
+        DataPoint::new(self.trigger, self.timestamp)
+    }
+
+    pub fn to_datapoint(&self) -> DataPoint<UserTrigger> {
+        DataPoint::new(self.trigger.clone(), self.timestamp)
+    }
+}
 
 // User Trigger Management
 // Methods for storing and retrieving user-triggered events and interactions
@@ -51,6 +73,71 @@ impl super::Database {
         };
 
         Ok(result)
+    }
+
+    pub async fn user_triggers_in_range(
+        &self,
+        target: &UserTriggerTarget,
+        range: &DateTimeRange,
+    ) -> anyhow::Result<Vec<UserTriggerRequest>> {
+        let db_target = serde_json::json!(target);
+
+        let records = sqlx::query!(
+            r#"(SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
+                    FROM user_trigger
+                    WHERE trigger @> $1
+                    AND timestamp >= $2
+                    AND timestamp <= $3)
+               UNION ALL
+               (SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
+                    FROM user_trigger
+                    WHERE trigger @> $1
+                    AND timestamp < $2
+                    ORDER BY timestamp DESC
+                    LIMIT 1)
+               UNION ALL
+               (SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
+                    FROM user_trigger
+                    WHERE trigger @> $1
+                    AND timestamp > $3
+                    ORDER BY timestamp ASC
+                    LIMIT 1)
+               ORDER BY 2 ASC"#,
+            db_target,
+            range.start().into_db(),
+            range.end().into_db()
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut result = Vec::with_capacity(records.len());
+
+        for row in records {
+            let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+            let timestamp = row.timestamp.into();
+            result.push(UserTriggerRequest {
+                id: row.id,
+                trigger,
+                timestamp,
+                correlation_id: row.correlation_id,
+            });
+        }
+
+        Ok(result)
+    }
+
+    pub async fn user_trigger_target_by_id(&self, id: i64) -> anyhow::Result<Option<UserTriggerTarget>> {
+        let record = sqlx::query!(r#"SELECT trigger FROM user_trigger WHERE id = $1"#, id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        match record {
+            Some(row) => {
+                let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+                Ok(Some(trigger.target()))
+            }
+            None => Ok(None),
+        }
     }
 }
 

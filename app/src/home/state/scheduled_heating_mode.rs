@@ -107,7 +107,25 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         .max()
         .unwrap_or_else(|| t!(now));
 
-        //TODO comfort mode based on time and occupancy
+        //TODO comfort mode based on time and occupancy in most rooms
+        if self == &ScheduledHeatingMode::LivingRoom && t!(19:00 - 23:00).is_now() {
+            let max_ts = t!(19:00).today().max(*max_ts);
+
+            result!(HeatingMode::Comfort, max_ts, self,
+                @away, @window_open, @temp_increase, @sleeping,
+                "Heating in comfort-mode as it's evening time in the living room"
+            );
+        }
+
+        let max_ts = &[
+            away.timestamp,
+            window_open.timestamp,
+            temp_increase.timestamp,
+            sleeping.timestamp,
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or_else(|| t!(now));
 
         result!(HeatingMode::EnergySaving, *max_ts , self,
             @away, @window_open, @temp_increase, @sleeping,

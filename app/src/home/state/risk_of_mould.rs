@@ -58,9 +58,9 @@ impl RiskOfMould {
     async fn get_reference_dewpoint(&self, api: &HomeApi) -> Result<DegreeCelsius> {
         let ref_dewpoints = match self {
             RiskOfMould::Bathroom => vec![
-                DewPoint::LivingRoomDoor,
+                DewPoint::LivingRoom,
                 //DewPoint::KitchenOuterWall, //TODO fix data collection
-                DewPoint::RoomOfRequirementDoor,
+                DewPoint::RoomOfRequirement,
             ],
         };
 

@@ -160,42 +160,42 @@ impl Homekit {
             ),
             (
                 "thermostat/living_room/current_temperature",
-                HomekitState::CurrentTemperature(Temperature::LivingRoomDoor),
+                HomekitState::CurrentTemperature(Temperature::LivingRoom),
                 None,
             ),
             (
                 "thermostat/bedroom/current_temperature",
-                HomekitState::CurrentTemperature(Temperature::BedroomDoor),
+                HomekitState::CurrentTemperature(Temperature::Bedroom),
                 None,
             ),
             (
                 "thermostat/room_of_requirements/current_temperature",
-                HomekitState::CurrentTemperature(Temperature::RoomOfRequirementsDoor),
+                HomekitState::CurrentTemperature(Temperature::RoomOfRequirements),
                 None,
             ),
             (
                 "thermostat/kitchen/current_temperature",
-                HomekitState::CurrentTemperature(Temperature::KitchenOuterWall),
+                HomekitState::CurrentTemperature(Temperature::Kitchen),
                 None,
             ),
             (
                 "thermostat/living_room/current_humidity",
-                HomekitState::CurrentHumidity(RelativeHumidity::LivingRoomDoor),
+                HomekitState::CurrentHumidity(RelativeHumidity::LivingRoom),
                 None,
             ),
             (
                 "thermostat/bedroom/current_humidity",
-                HomekitState::CurrentHumidity(RelativeHumidity::BedroomDoor),
+                HomekitState::CurrentHumidity(RelativeHumidity::Bedroom),
                 None,
             ),
             (
                 "thermostat/room_of_requirements/current_humidity",
-                HomekitState::CurrentHumidity(RelativeHumidity::RoomOfRequirementsDoor),
+                HomekitState::CurrentHumidity(RelativeHumidity::RoomOfRequirements),
                 None,
             ),
             (
                 "thermostat/kitchen/current_humidity",
-                HomekitState::CurrentHumidity(RelativeHumidity::KitchenOuterWall),
+                HomekitState::CurrentHumidity(RelativeHumidity::Kitchen),
                 None,
             ),
             (

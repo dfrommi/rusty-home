@@ -19,28 +19,30 @@ use r#macro::{EnumVariants, Id, mockable};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
     BathroomShower,
-    LivingRoomDoor,
-    #[allow(dead_code)]
+    LivingRoom,
+    Kitchen,
     KitchenOuterWall,
-    RoomOfRequirementDoor,
+    RoomOfRequirement,
 }
 
 impl DewPoint {
     fn temperature(&self) -> Temperature {
         match self {
-            DewPoint::LivingRoomDoor => Temperature::LivingRoomDoor,
+            DewPoint::LivingRoom => Temperature::LivingRoom,
             DewPoint::BathroomShower => Temperature::BathroomShower,
+            DewPoint::Kitchen => Temperature::Kitchen,
             DewPoint::KitchenOuterWall => Temperature::KitchenOuterWall,
-            DewPoint::RoomOfRequirementDoor => Temperature::RoomOfRequirementsDoor,
+            DewPoint::RoomOfRequirement => Temperature::RoomOfRequirements,
         }
     }
 
     fn relative_humidity(&self) -> RelativeHumidity {
         match self {
-            DewPoint::LivingRoomDoor => RelativeHumidity::LivingRoomDoor,
+            DewPoint::LivingRoom => RelativeHumidity::LivingRoom,
             DewPoint::BathroomShower => RelativeHumidity::BathroomShower,
+            DewPoint::Kitchen => RelativeHumidity::Kitchen,
             DewPoint::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
-            DewPoint::RoomOfRequirementDoor => RelativeHumidity::RoomOfRequirementsDoor,
+            DewPoint::RoomOfRequirement => RelativeHumidity::RoomOfRequirements,
         }
     }
 }

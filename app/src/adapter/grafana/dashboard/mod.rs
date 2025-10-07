@@ -110,10 +110,10 @@ impl Room {
 
     fn inside_temperature(&self) -> Temperature {
         match self {
-            Room::LivingRoom => Temperature::LivingRoomDoor,
-            Room::Bedroom => Temperature::BedroomDoor,
-            Room::Kitchen => Temperature::KitchenOuterWall,
-            Room::RoomOfRequirements => Temperature::RoomOfRequirementsDoor,
+            Room::LivingRoom => Temperature::LivingRoom,
+            Room::Bedroom => Temperature::Bedroom,
+            Room::Kitchen => Temperature::Kitchen,
+            Room::RoomOfRequirements => Temperature::RoomOfRequirements,
             Room::Bathroom => Temperature::BathroomShower,
         }
     }

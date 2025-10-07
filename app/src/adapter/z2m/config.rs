@@ -79,11 +79,11 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "living_room/temp_sensor_couch",
-            Z2mChannel::ClimateSensor(Temperature::LivingRoomDoor, RelativeHumidity::LivingRoomDoor),
+            Z2mChannel::ClimateSensor(Temperature::LivingRoom, RelativeHumidity::LivingRoom),
         ),
         (
             "bedroom/temp_sensor_bed",
-            Z2mChannel::ClimateSensor(Temperature::BedroomDoor, RelativeHumidity::BedroomDoor),
+            Z2mChannel::ClimateSensor(Temperature::Bedroom, RelativeHumidity::Bedroom),
         ),
         (
             "bedroom/outer_wall",
@@ -91,7 +91,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         ),
         (
             "room_of_requirements/temp_sensor_desk",
-            Z2mChannel::ClimateSensor(Temperature::RoomOfRequirementsDoor, RelativeHumidity::RoomOfRequirementsDoor),
+            Z2mChannel::ClimateSensor(Temperature::RoomOfRequirements, RelativeHumidity::RoomOfRequirements),
         ),
         (
             "bathroom/temp_sensor",
@@ -103,6 +103,10 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         ),
         (
             "kitchen/temp_sensor",
+            Z2mChannel::ClimateSensor(Temperature::Kitchen, RelativeHumidity::Kitchen),
+        ),
+        (
+            "kitchen/temp_sensor_outer_wall",
             Z2mChannel::ClimateSensor(Temperature::KitchenOuterWall, RelativeHumidity::KitchenOuterWall),
         ),
         //

@@ -41,8 +41,8 @@ impl SimpleRule for CoolDownWhenOccupied {
 impl CoolDownWhenOccupied {
     fn temperature(&self) -> Temperature {
         match self.0 {
-            Fan::BedroomCeilingFan => Temperature::BedroomDoor,
-            Fan::LivingRoomCeilingFan => Temperature::LivingRoomDoor,
+            Fan::BedroomCeilingFan => Temperature::Bedroom,
+            Fan::LivingRoomCeilingFan => Temperature::LivingRoom,
         }
     }
 

@@ -17,10 +17,11 @@ use crate::core::timeseries::{
 //TODO remove EnumVariants, only for state-debug
 pub enum Temperature {
     Outside,
-    LivingRoomDoor,
-    RoomOfRequirementsDoor,
-    BedroomDoor,
+    LivingRoom,
+    RoomOfRequirements,
+    Bedroom,
     BedroomOuterWall,
+    Kitchen,
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,

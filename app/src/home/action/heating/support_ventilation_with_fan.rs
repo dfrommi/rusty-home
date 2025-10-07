@@ -28,8 +28,8 @@ impl SimpleRule for SupportVentilationWithFan {
 
     async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
         let (window, temp_sensor) = match self.0 {
-            Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor),
-            Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::BedroomDoor),
+            Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoom),
+            Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::Bedroom),
         };
 
         let opened_dp = window.current_data_point(api).await?;

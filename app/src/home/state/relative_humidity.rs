@@ -13,10 +13,11 @@ use r#macro::{EnumVariants, Id, mockable};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
     Outside,
-    LivingRoomDoor,
-    RoomOfRequirementsDoor,
-    BedroomDoor,
+    LivingRoom,
+    RoomOfRequirements,
+    Bedroom,
     BedroomOuterWall,
+    Kitchen,
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,

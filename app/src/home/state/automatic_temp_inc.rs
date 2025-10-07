@@ -36,13 +36,11 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
         }
 
         let (window, temp_sensor) = match self {
-            AutomaticTemperatureIncrease::LivingRoom => {
-                (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoomDoor)
-            }
-            AutomaticTemperatureIncrease::Bedroom => (OpenedArea::BedroomWindow, Temperature::BedroomDoor),
-            AutomaticTemperatureIncrease::Kitchen => (OpenedArea::KitchenWindow, Temperature::KitchenOuterWall),
+            AutomaticTemperatureIncrease::LivingRoom => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoom),
+            AutomaticTemperatureIncrease::Bedroom => (OpenedArea::BedroomWindow, Temperature::Bedroom),
+            AutomaticTemperatureIncrease::Kitchen => (OpenedArea::KitchenWindow, Temperature::Kitchen),
             AutomaticTemperatureIncrease::RoomOfRequirements => {
-                (OpenedArea::RoomOfRequirementsWindow, Temperature::RoomOfRequirementsDoor)
+                (OpenedArea::RoomOfRequirementsWindow, Temperature::RoomOfRequirements)
             }
         };
 
@@ -165,7 +163,7 @@ mod tests {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(8 minutes ago));
         api.with_fixed_df(
-            Temperature::LivingRoomDoor,
+            Temperature::LivingRoom,
             &[(19.0, t!(10 minutes ago)), (17.0, t!(6 minutes ago))],
         );
 
@@ -177,7 +175,7 @@ mod tests {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_df(
-            Temperature::LivingRoomDoor,
+            Temperature::LivingRoom,
             &[
                 (17.0, t!(10 minutes ago)),
                 (17.5, t!(6 minutes ago)),
@@ -193,7 +191,7 @@ mod tests {
         let mut api = api_with_defaults();
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_df(
-            Temperature::LivingRoomDoor,
+            Temperature::LivingRoom,
             &[
                 (17.0, t!(10 minutes ago)),
                 (17.5, t!(6 minutes ago)),
@@ -209,7 +207,7 @@ mod tests {
         api.with_fixed_current_dp(Temperature::Outside, 18.0, t!(now));
         api.with_fixed_current_dp(OpenedArea::LivingRoomWindowOrDoor, false, t!(15 minutes ago));
         api.with_fixed_df(
-            Temperature::LivingRoomDoor,
+            Temperature::LivingRoom,
             &[
                 (17.0, t!(10 minutes ago)),
                 (17.5, t!(6 minutes ago)),

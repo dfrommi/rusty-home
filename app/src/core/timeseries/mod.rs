@@ -313,7 +313,7 @@ mod combined {
     #[test]
     fn single_item_per_series_out_of_range() {
         let t_series = TimeSeries::new(
-            Temperature::LivingRoomDoor,
+            Temperature::LivingRoom,
             &DataFrame::new(vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:46Z").unwrap(),
                 value: DegreeCelsius(19.93),
@@ -324,7 +324,7 @@ mod combined {
         .unwrap();
 
         let h_series = TimeSeries::new(
-            RelativeHumidity::LivingRoomDoor,
+            RelativeHumidity::LivingRoom,
             &DataFrame::new(vec![DataPoint {
                 timestamp: DateTime::from_iso("2024-11-03T15:23:47Z").unwrap(),
                 value: Percent(61.1),
@@ -334,8 +334,7 @@ mod combined {
         )
         .unwrap();
 
-        let result =
-            TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoomDoor, |a, b| DegreeCelsius(a.0 + b.0));
+        let result = TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoom, |a, b| DegreeCelsius(a.0 + b.0));
 
         assert_eq!(result.iter().len(), 1);
     }

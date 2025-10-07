@@ -102,6 +102,16 @@ impl Z2mCommandExecutor {
         self.sender.send(msg).await?;
         Ok(true)
     }
+
+    pub async fn set_load_room_mean(&self, device_id: &str, load: i64) -> anyhow::Result<bool> {
+        let msg = MqttOutMessage::transient(
+            self.target_topic(device_id),
+            serde_json::to_string(&ThermostatLoadPayload { load_room_mean: load })?,
+        );
+
+        self.sender.send(msg).await?;
+        Ok(true)
+    }
 }
 
 //TODO occupied_heating_setpoint_scheduled
@@ -110,4 +120,9 @@ struct ThermostatCommandPayload {
     window_open_external: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     occupied_heating_setpoint: Option<f64>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct ThermostatLoadPayload {
+    load_room_mean: i64,
 }

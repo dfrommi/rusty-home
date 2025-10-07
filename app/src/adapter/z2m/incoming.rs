@@ -1,8 +1,10 @@
+use crate::adapter::z2m::outgoing::Z2mCommandExecutor;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::home::state::PersistentHomeStateValue;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
+use crate::t;
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
 
@@ -14,14 +16,21 @@ pub struct Z2mIncomingDataSource {
     base_topic: String,
     device_config: DeviceConfig<Z2mChannel>,
     mqtt_receiver: mpsc::Receiver<MqttInMessage>,
+    executor: Z2mCommandExecutor,
 }
 
 impl Z2mIncomingDataSource {
-    pub fn new(base_topic: String, config: DeviceConfig<Z2mChannel>, mqtt_rx: mpsc::Receiver<MqttInMessage>) -> Self {
+    pub fn new(
+        base_topic: String,
+        config: DeviceConfig<Z2mChannel>,
+        mqtt_rx: mpsc::Receiver<MqttInMessage>,
+        executor: Z2mCommandExecutor,
+    ) -> Self {
         Self {
             base_topic: base_topic.trim_matches('/').to_owned(),
             device_config: config,
             mqtt_receiver: mqtt_rx,
+            executor,
         }
     }
 }
@@ -68,8 +77,16 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::Thermostat(set_point, demand, opened) => {
+            Z2mChannel::Thermostat(set_point, demand, opened, group) => {
                 let payload: Thermostat = serde_json::from_str(&msg.payload)?;
+
+                if let Some(group) = group {
+                    let mut group = group.lock().await;
+                    group.register_load(device_id, DataPoint::new(payload.load_estimate, payload.last_seen));
+                    if let Err(e) = group.send_if_needed(&self.executor).await {
+                        tracing::error!("Error sending load estimate to thermostat group: {:?}", e);
+                    }
+                }
 
                 vec![
                     DataPoint::new(
@@ -199,6 +216,7 @@ struct Thermostat {
     occupied_heating_setpoint: f64,
     pi_heating_demand: f64,
     window_open_external: bool,
+    load_estimate: i64,
     last_seen: DateTime,
 }
 
@@ -227,4 +245,63 @@ struct WaterLeakSensor {
 struct RemoteControl {
     action: Option<String>,
     last_seen: DateTime,
+}
+
+#[derive(Debug)]
+pub struct ThermostatGroup {
+    first_id: String,
+    first_data: Option<DataPoint<i64>>,
+    second_id: String,
+    second_data: Option<DataPoint<i64>>,
+    last_sent: DateTime,
+}
+
+impl ThermostatGroup {
+    pub fn new(first_id: String, second_id: String) -> Self {
+        Self {
+            first_id,
+            first_data: None,
+            second_id,
+            second_data: None,
+            last_sent: t!(24 hours ago),
+        }
+    }
+
+    pub async fn send_if_needed(&mut self, sender: &Z2mCommandExecutor) -> anyhow::Result<bool> {
+        if self.last_sent > t!(15 minutes ago) {
+            return Ok(false);
+        }
+
+        if let Some(mean) = self.mean() {
+            tracing::debug!(
+                "Sending load estimate mean {} to thermostats {} and {}",
+                mean,
+                self.first_id,
+                self.second_id
+            );
+
+            sender.set_load_room_mean(&self.first_id, mean).await?;
+            sender.set_load_room_mean(&self.second_id, mean).await?;
+            self.last_sent = t!(now);
+        }
+
+        Ok(true)
+    }
+
+    fn register_load(&mut self, device_id: &str, data: DataPoint<i64>) {
+        let data = if data.value > -500 { Some(data) } else { None };
+
+        if device_id == self.first_id {
+            self.first_data = data;
+        } else if device_id == self.second_id {
+            self.second_data = data;
+        }
+    }
+
+    fn mean(&self) -> Option<i64> {
+        match (&self.first_data, &self.second_data) {
+            (Some(first), Some(second)) => Some((first.value + second.value) / 2),
+            _ => None,
+        }
+    }
 }

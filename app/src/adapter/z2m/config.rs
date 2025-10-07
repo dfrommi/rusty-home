@@ -1,5 +1,10 @@
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
+
 use super::Z2mChannel;
 use super::Z2mCommandTarget;
+use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
 use crate::home::command::CommandTarget;
 use crate::home::command::Thermostat;
@@ -73,6 +78,11 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
 }
 
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
+    let thermostat_group_living_room = Arc::new(Mutex::new(ThermostatGroup::new(
+        "living_room/radiator_thermostat_big".to_string(),
+        "living_room/radiator_thermostat_small".to_string(),
+    )));
+
     vec![
         //
         // CLIMATE SENSORS
@@ -118,6 +128,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::LivingRoomBig,
                 HeatingDemand::LivingRoomBig,
                 Opened::LivingRoomRadiatorThermostatBig,
+                Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
@@ -126,15 +137,26 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::LivingRoomSmall,
                 HeatingDemand::LivingRoomSmall,
                 Opened::LivingRoomRadiatorThermostatSmall,
+                Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
             "kitchen/radiator_thermostat",
-            Z2mChannel::Thermostat(SetPoint::Kitchen, HeatingDemand::Kitchen, Opened::KitchenRadiatorThermostat),
+            Z2mChannel::Thermostat(
+                SetPoint::Kitchen,
+                HeatingDemand::Kitchen,
+                Opened::KitchenRadiatorThermostat,
+                None,
+            ),
         ),
         (
             "bedroom/radiator_thermostat",
-            Z2mChannel::Thermostat(SetPoint::Bedroom, HeatingDemand::Bedroom, Opened::BedroomRadiatorThermostat),
+            Z2mChannel::Thermostat(
+                SetPoint::Bedroom,
+                HeatingDemand::Bedroom,
+                Opened::BedroomRadiatorThermostat,
+                None,
+            ),
         ),
         (
             "room_of_requirements/radiator_thermostat",
@@ -142,6 +164,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::RoomOfRequirements,
                 HeatingDemand::RoomOfRequirements,
                 Opened::RoomOfRequirementsThermostat,
+                None,
             ),
         ),
         //

@@ -2,6 +2,9 @@ mod config;
 mod incoming;
 mod outgoing;
 
+use std::sync::Arc;
+
+use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::CommandExecutor;
 use crate::core::unit::KiloWattHours;
 use crate::home::state::{
@@ -11,6 +14,7 @@ use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;
 use serde::Deserialize;
+use tokio::sync::Mutex;
 
 use crate::{
     Infrastructure,
@@ -30,7 +34,7 @@ enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
-    Thermostat(SetPoint, HeatingDemand, Opened),
+    Thermostat(SetPoint, HeatingDemand, Opened, Option<Arc<Mutex<ThermostatGroup>>>),
 }
 
 #[derive(Debug, Clone)]
@@ -50,9 +54,7 @@ impl Zigbee2Mqtt {
     }
 
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
-        let tx = infrastructure.mqtt_client.new_publisher();
-        let config = config::default_z2m_command_config();
-        Z2mCommandExecutor::new(self.event_topic.clone(), config, tx)
+        self.new_z2m_command_executor(&infrastructure.mqtt_client)
     }
 
     async fn new_incoming_data_source(&self, mqtt: &mut infrastructure::Mqtt) -> Z2mIncomingDataSource {
@@ -62,6 +64,12 @@ impl Zigbee2Mqtt {
             .await
             .expect("Error subscribing to MQTT topic");
 
-        Z2mIncomingDataSource::new(self.event_topic.to_string(), config, rx)
+        Z2mIncomingDataSource::new(self.event_topic.to_string(), config, rx, self.new_z2m_command_executor(mqtt))
+    }
+
+    fn new_z2m_command_executor(&self, mqtt: &infrastructure::Mqtt) -> Z2mCommandExecutor {
+        let tx = mqtt.new_publisher();
+        let config = config::default_z2m_command_config();
+        Z2mCommandExecutor::new(self.event_topic.clone(), config, tx)
     }
 }

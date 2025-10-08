@@ -34,7 +34,13 @@ enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
-    Thermostat(SetPoint, HeatingDemand, Opened, Option<Arc<Mutex<ThermostatGroup>>>),
+    Thermostat(
+        SetPoint,
+        HeatingDemand,
+        Opened,
+        Temperature,
+        Option<Arc<Mutex<ThermostatGroup>>>,
+    ),
 }
 
 #[derive(Debug, Clone)]

@@ -77,7 +77,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::Thermostat(set_point, demand, opened, group) => {
+            Z2mChannel::Thermostat(set_point, demand, opened, temperature, group) => {
                 let payload: Thermostat = serde_json::from_str(&msg.payload)?;
 
                 if let Some(group) = group {
@@ -116,6 +116,14 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     .into(),
                     DataPoint::new(
                         PersistentHomeStateValue::Opened(opened.clone(), payload.window_open_external),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::Temperature(
+                            temperature.clone(),
+                            DegreeCelsius(payload.local_temperature),
+                        ),
                         payload.last_seen,
                     )
                     .into(),
@@ -217,6 +225,7 @@ struct Thermostat {
     pi_heating_demand: f64,
     window_open_external: bool,
     load_estimate: i64,
+    local_temperature: f64,
     last_seen: DateTime,
 }
 

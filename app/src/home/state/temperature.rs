@@ -1,6 +1,7 @@
 use crate::core::HomeApi;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::DegreeCelsius;
+use crate::home::command::Thermostat;
 use crate::port::DataFrameAccess;
 use crate::{
     core::time::{DateTime, DateTimeRange},
@@ -25,6 +26,7 @@ pub enum Temperature {
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,
+    Thermostat(Thermostat),
 }
 
 impl Estimatable for Temperature {

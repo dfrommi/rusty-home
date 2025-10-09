@@ -33,15 +33,12 @@ impl Rule for UserTriggerAction {
             }
         };
 
-        let (latest_trigger, trigger_time) = match api.latest_trigger_since(&self.target, start_of_range).await? {
-            Some(dp) => (dp.value, dp.timestamp),
-            None => {
-                tracing::trace!("No user-trigger found, skipping");
-                return Ok(RuleResult::Skip);
-            }
+        let Some(latest_trigger) = api.latest_trigger_since(&self.target, start_of_range).await? else {
+            tracing::trace!("No user-trigger found, skipping");
+            return Ok(RuleResult::Skip);
         };
 
-        let commands = into_command(&latest_trigger);
+        let commands = into_command(&latest_trigger.trigger);
 
         if commands.is_empty() {
             tracing::trace!("Trigger not handled by this action, skipping");
@@ -56,7 +53,7 @@ impl Rule for UserTriggerAction {
 
         for command in &commands {
             let needs_execution =
-                needs_execution_for_one_shot_of_target(command, &self.ext_id(), trigger_time, api).await?;
+                needs_execution_for_one_shot_of_target(command, &self.ext_id(), latest_trigger.timestamp, api).await?;
 
             if !needs_execution {
                 tracing::trace!("User-trigger action skipped due to one-shot conditions");

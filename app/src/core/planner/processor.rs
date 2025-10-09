@@ -18,29 +18,30 @@ where
     A: Action + Clone + Send + Sync + 'static,
 {
     let (first_tx, mut prev_rx) = oneshot::channel();
+    let mut handles = Vec::new();
 
-    let mut contexts: Vec<Context<A>> = vec![];
     for (goal, actions) in config.iter() {
         let is_goal_active = active_goals.contains(goal);
+        let goal_name = goal.to_string();
+        let goal_span =
+            tracing::info_span!("planning goal", %goal_name, otel.name = %goal_name, goal_active = is_goal_active);
+        let _enter = goal_span.enter();
 
         for action in actions {
             let (tx, rx) = oneshot::channel();
             let context = Context::new(goal, action.clone(), is_goal_active, prev_rx, tx);
-            contexts.push(context);
             prev_rx = rx;
+
+            let api = api.clone();
+            handles.push(tokio::spawn(
+                async move { process_action(context, api).await }.instrument(goal_span.clone()),
+            ));
         }
     }
 
     first_tx
         .send(ResourceLock::new())
         .map_err(|_| anyhow::anyhow!("Error sending first resource lock to planner"))?;
-
-    let mut handles = Vec::with_capacity(contexts.len());
-    for context in contexts {
-        let api = api.clone();
-        let span = tracing::Span::current();
-        handles.push(tokio::spawn(async move { process_action(context, api).await }.instrument(span)));
-    }
 
     let mut results = Vec::with_capacity(handles.len());
     for handle in handles {

@@ -263,15 +263,12 @@ impl HomeApi {
         &self,
         target: &UserTriggerTarget,
         since: DateTime,
-    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
+    ) -> anyhow::Result<Option<UserTriggerRequest>> {
         let now = t!(now);
         let range = DateTimeRange::new(since, now);
         let triggers = self.get_user_triggers(target, &range).await?;
 
-        Ok(triggers
-            .into_iter()
-            .map(|req| req.into_datapoint())
-            .max_by_key(|dp| dp.timestamp))
+        Ok(triggers.into_iter().max_by_key(|it| it.timestamp))
     }
 }
 

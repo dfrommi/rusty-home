@@ -142,7 +142,6 @@ fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
     vec![
         FollowHeatingSchedule::new(zone.clone(), HeatingMode::Away).into(),
         FollowHeatingSchedule::new(zone.clone(), HeatingMode::Ventilation).into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::PostVentilation).into(),
         UserTriggerAction::new(
             match zone {
                 HeatingZone::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
@@ -154,6 +153,7 @@ fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
             .into(),
         )
         .into(),
+        FollowHeatingSchedule::new(zone.clone(), HeatingMode::PostVentilation).into(),
         FollowHeatingSchedule::new(zone.clone(), HeatingMode::Sleep).into(),
         FollowHeatingSchedule::new(zone.clone(), HeatingMode::Comfort).into(),
         FollowHeatingSchedule::new(zone.clone(), HeatingMode::EnergySaving).into(),

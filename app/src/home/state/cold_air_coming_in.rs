@@ -5,9 +5,7 @@ use crate::core::unit::DegreeCelsius;
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Temperature};
-use r#macro::{EnumVariants, Id, mockable};
-
-use crate::home::state::macros::result;
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use super::{DataPointAccess, OpenedArea, sampled_data_frame};
 
@@ -20,15 +18,14 @@ pub enum ColdAirComingIn {
 }
 
 impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
         if outside_temp.value > DegreeCelsius(22.0) {
-            result!(false, outside_temp.timestamp, self,
-                @outside_temp,
-                "No cold air coming in, temperature outside is too high"
-            );
+            tracing::trace!("No cold air coming in, temperature outside is too high");
+            return Ok(DataPoint::new(false, outside_temp.timestamp));
         }
 
         let window_opened = match self {
@@ -38,16 +35,13 @@ impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
             ColdAirComingIn::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow.current_data_point(api).await,
         }?;
 
-        result!(window_opened.value, window_opened.timestamp, self,
-            @outside_temp,
-            @window_opened,
-            "{}",
-            if window_opened.value {
-                "Cold air coming in, because it's cold outside and window is open"
-            } else {
-                "No cold air coming in, because window is closed"
-            },
-        );
+        let message = if window_opened.value {
+            "Cold air coming in, because it's cold outside and window is open"
+        } else {
+            "No cold air coming in, because window is closed"
+        };
+        tracing::trace!("{}", message);
+        Ok(DataPoint::new(window_opened.value, window_opened.timestamp))
     }
 }
 

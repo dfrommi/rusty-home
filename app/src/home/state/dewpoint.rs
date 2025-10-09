@@ -14,7 +14,7 @@ use futures::try_join;
 
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::unit::{DegreeCelsius, Percent};
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
@@ -54,6 +54,7 @@ impl Estimatable for DewPoint {
 }
 
 impl DataPointAccess<DewPoint> for DewPoint {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<DegreeCelsius>> {
         let temperature: DataPoint<DegreeCelsius> = self.temperature().current_data_point(api).await?;

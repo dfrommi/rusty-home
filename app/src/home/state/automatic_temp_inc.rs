@@ -6,9 +6,7 @@ use crate::core::{HomeApi, timeseries::DataPoint};
 use crate::home::state::Temperature;
 use crate::port::DataFrameAccess;
 use crate::t;
-use r#macro::{EnumVariants, Id, mockable};
-
-use crate::home::state::macros::result;
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use super::sampled_data_frame;
 use super::{DataPointAccess, TimeSeriesAccess, opened::OpenedArea};
@@ -23,16 +21,15 @@ pub enum AutomaticTemperatureIncrease {
 
 //TODO detect active heating and summer mode
 impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
         if outside_temp.value > DegreeCelsius(22.0) {
-            result!(false, outside_temp.timestamp, self,
-                @outside_temp,
-                "No automatic increase, temperature outside is too high"
-            );
+            tracing::trace!("No automatic increase, temperature outside is too high");
+            return Ok(DataPoint::new(false, outside_temp.timestamp));
         }
 
         let (window, temp_sensor) = match self {
@@ -46,36 +43,32 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
 
         let window_opened = window.current_data_point(api).await?;
         if window_opened.value {
-            result!(false, window_opened.timestamp, self,
-                @window_opened,
-                "No automatic temperature increase, because window is open"
-            );
+            tracing::trace!("No automatic temperature increase, because window is open");
+            return Ok(DataPoint::new(false, window_opened.timestamp));
         }
 
         let opened_elapsed = window_opened.timestamp.elapsed();
 
         if opened_elapsed > t!(30 minutes) {
-            result!(false, window_opened.timestamp, self,
-                @window_opened,
+            tracing::trace!(
                 "No automatic temperature increase anymore, because window is closed for more than 30 minutes"
             );
+            return Ok(DataPoint::new(false, window_opened.timestamp));
         }
 
         if opened_elapsed < t!(5 minutes) {
-            result!(true, window_opened.timestamp, self,
-                @window_opened,
-                "Automatic temperature increase assumed, because window is open for less than 5 minutes"
-            );
+            tracing::trace!("Automatic temperature increase assumed, because window is open for less than 5 minutes");
+            return Ok(DataPoint::new(true, window_opened.timestamp));
         }
 
         let temperature = temp_sensor.series_since(window_opened.timestamp, api).await?;
 
         //wait for a measurement. until then assume opened window still has effect
         if temperature.len_non_estimated() < 2 {
-            result!(true, window_opened.timestamp, self,
-                @window_opened,
+            tracing::trace!(
                 "Automatic temperature increase assumed, because not enough temperature measurements exist after window was opened"
             );
+            return Ok(DataPoint::new(true, window_opened.timestamp));
         }
 
         let current_temperature = temperature.at(t!(now));
@@ -91,25 +84,20 @@ impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncre
                 let diff = current_temperature.value - start_temperature.value;
                 //temperature still increasing significantly
                 let significant_increase = diff >= DegreeCelsius(0.1);
-                result!(significant_increase, current_temperature.timestamp, self,
-                    @window_opened,
-                    @current_temperature,
-                    @start_temperature,
-                    temperature_increase = %diff,
-                    "{}",
-                    if significant_increase {
-                        "Automatic temperature increase active, because temperature increased by more than 0.1 degree in last 5 minutes"
-                    } else {
-                        "Automatic temperature increase not active, because temperature increased by less than 0.1 degree in last 5 minutes"
-                    },
-                );
+                let message = if significant_increase {
+                    "Automatic temperature increase active, because temperature increased by more than 0.1 degree in last 5 minutes"
+                } else {
+                    "Automatic temperature increase not active, because temperature increased by less than 0.1 degree in last 5 minutes"
+                };
+                tracing::trace!("{}", message);
+                return Ok(DataPoint::new(significant_increase, current_temperature.timestamp));
             }
             _ => {
                 //Should not happen, covered before
-                result!(true, any_timestamp, self,
-                    @window_opened,
+                tracing::trace!(
                     "Automatic temperature increase assumed, because there are not enough temperature measurements"
                 );
+                return Ok(DataPoint::new(true, any_timestamp));
             }
         }
     }

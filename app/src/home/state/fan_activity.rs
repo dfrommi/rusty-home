@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 use serde::{Deserialize, Serialize};
 
 use crate::core::{
@@ -42,6 +42,7 @@ impl Estimatable for FanActivity {
 }
 
 impl DataPointAccess<FanActivity> for FanActivity {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<FanAirflow>> {
         api.current_data_point(self).await

@@ -136,37 +136,3 @@ where
 
     DataFrame::new(result)
 }
-
-mod macros {
-    macro_rules! result {
-        ($result:expr, $timestamp:expr, $item:expr, { $(,)* $($dps:ident),* }, @$dp:ident, $($arg:tt)+ ) => {
-            result!($result, $timestamp, $item, { $($dps),*, $dp }, $($arg)+)
-        };
-
-        ($result:expr, $timestamp:expr, $item:expr, { $(,)* $($dps:ident),* }, $($arg:tt)+ ) => {
-            let result = crate::core::timeseries::DataPoint::new($result, $timestamp);
-
-            tracing::trace!(
-                timestamp = %crate::t!(now),
-                item.r#type = %$item.ext_id().type_name(),
-                item.name = %$item.ext_id().variant_name(),
-                result.value = %result.value,
-                result.timestamp = %result.timestamp,
-                $(
-                    $dps.value = %$dps.value,
-                    $dps.timestamp = %$dps.timestamp,
-                    $dps.elapsed = %$dps.timestamp.elapsed(),
-                )*
-                $($arg)+
-            );
-
-            return Ok(result);
-        };
-
-        ($result:expr, $timestamp:expr, $item:expr, $($arg:tt)+ ) => {
-            result!($result, $timestamp, $item, {}, $($arg)+)
-        };
-    }
-
-    pub(super) use result;
-}

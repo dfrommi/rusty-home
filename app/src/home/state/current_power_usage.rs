@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use crate::core::{
     HomeApi,
@@ -40,6 +40,7 @@ impl Estimatable for CurrentPowerUsage {
 }
 
 impl DataPointAccess<CurrentPowerUsage> for CurrentPowerUsage {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<Watt>> {
         api.current_data_point(self).await

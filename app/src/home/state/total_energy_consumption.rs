@@ -8,7 +8,7 @@ use crate::core::{
     unit::KiloWattHours,
 };
 use crate::port::{DataFrameAccess, DataPointAccess};
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TotalEnergyConsumption {
@@ -38,6 +38,7 @@ impl Estimatable for TotalEnergyConsumption {
 }
 
 impl DataPointAccess<TotalEnergyConsumption> for TotalEnergyConsumption {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<KiloWattHours>> {
         api.current_data_point(self).await

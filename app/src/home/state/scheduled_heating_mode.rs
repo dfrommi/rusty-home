@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use crate::{
     core::{
@@ -9,7 +9,7 @@ use crate::{
             interpolate::{self, Estimatable},
         },
     },
-    home::state::{AutomaticTemperatureIncrease, OpenedArea, Presence, Resident, macros::result, sampled_data_frame},
+    home::state::{AutomaticTemperatureIncrease, OpenedArea, Presence, Resident, sampled_data_frame},
     port::{DataFrameAccess, DataPointAccess},
     t,
 };
@@ -56,6 +56,7 @@ impl ScheduledHeatingMode {
 }
 
 impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingMode>> {
         let (window, temp_increase) = (self.window(), self.temp_increase());
@@ -68,33 +69,25 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         )?;
 
         if away.value {
-            result!(HeatingMode::Away, away.timestamp, self,
-                @away, @window_open, @temp_increase, @sleeping,
-                "Heating in away mode as nobody is at home"
-            );
+            tracing::trace!("Heating in away mode as nobody is at home");
+            return Ok(DataPoint::new(HeatingMode::Away, away.timestamp));
         }
 
         //Or cold-air coming in?
         if window_open.value {
-            result!(HeatingMode::Ventilation, window_open.timestamp, self,
-                @away, @window_open, @temp_increase, @sleeping,
-                "Heating in ventilation mode as window is open"
-            );
+            tracing::trace!("Heating in ventilation mode as window is open");
+            return Ok(DataPoint::new(HeatingMode::Ventilation, window_open.timestamp));
         }
 
         if temp_increase.value {
-            result!(HeatingMode::PostVentilation, temp_increase.timestamp, self,
-                @away, @window_open, @temp_increase, @sleeping,
-                "Heating in post-ventilation mode as cold air is coming in after ventilation"
-            );
+            tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
+            return Ok(DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp));
         }
 
         //TODO more refined per room
         if sleeping.value {
-            result!(HeatingMode::Sleep, sleeping.timestamp, self,
-                @away, @window_open, @temp_increase, @sleeping,
-                "Heating in sleep-mode as Dennis is sleeping"
-            );
+            tracing::trace!("Heating in sleep-mode as Dennis is sleeping");
+            return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));
         }
 
         let max_ts = &[
@@ -110,11 +103,8 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         //TODO comfort mode based on time and occupancy in most rooms
         if self == &ScheduledHeatingMode::LivingRoom && t!(19:00 - 23:00).is_now() {
             let max_ts = t!(19:00).today().max(*max_ts);
-
-            result!(HeatingMode::Comfort, max_ts, self,
-                @away, @window_open, @temp_increase, @sleeping,
-                "Heating in comfort-mode as it's evening time in the living room"
-            );
+            tracing::trace!("Heating in comfort-mode as it's evening time in the living room");
+            return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
         }
 
         let max_ts = &[
@@ -126,11 +116,8 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         .into_iter()
         .max()
         .unwrap_or_else(|| t!(now));
-
-        result!(HeatingMode::EnergySaving, *max_ts , self,
-            @away, @window_open, @temp_increase, @sleeping,
-            "Heating in energy-saving-mode (fallback) as no higher-prio rule applied"
-        );
+        tracing::trace!("Heating in energy-saving-mode (fallback) as no higher-prio rule applied");
+        Ok(DataPoint::new(HeatingMode::EnergySaving, *max_ts))
     }
 }
 

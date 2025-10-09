@@ -7,9 +7,7 @@ use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
 use anyhow::Result;
-use r#macro::{EnumVariants, Id, mockable};
-
-use crate::home::state::macros::result;
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use super::{DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint, sampled_data_frame};
 
@@ -19,6 +17,7 @@ pub enum RiskOfMould {
 }
 
 impl DataPointAccess<RiskOfMould> for RiskOfMould {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         let humidity = match self {
@@ -28,10 +27,8 @@ impl DataPointAccess<RiskOfMould> for RiskOfMould {
         .await?;
 
         if humidity.value < Percent(70.0) {
-            result!(false, humidity.timestamp, self,
-                @humidity,
-                "Humidity of shower-sensor is below 70%, no risk of mould"
-            );
+            tracing::trace!("Humidity of shower-sensor is below 70%, no risk of mould");
+            return Ok(DataPoint::new(false, humidity.timestamp));
         }
 
         let this_dp = match self {
@@ -44,13 +41,9 @@ impl DataPointAccess<RiskOfMould> for RiskOfMould {
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
-        result!(risk, this_dp.timestamp, self,
-            @humidity,
-            dewpoint_item = %this_dp.value,
-            dewpoint_reference = %ref_dp,
-            "Risk of mould is {}",
-            if risk { "high" } else { "low" }
-        );
+        let level = if risk { "high" } else { "low" };
+        tracing::trace!("Risk of mould is {}", level);
+        Ok(DataPoint::new(risk, this_dp.timestamp))
     }
 }
 

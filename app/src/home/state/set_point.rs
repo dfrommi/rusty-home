@@ -8,7 +8,7 @@ use crate::core::{
     unit::DegreeCelsius,
 };
 use crate::port::{DataFrameAccess, DataPointAccess};
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum SetPoint {
@@ -27,6 +27,7 @@ impl Estimatable for SetPoint {
 }
 
 impl DataPointAccess<SetPoint> for SetPoint {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
         api.current_data_point(self).await

@@ -7,12 +7,9 @@ use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
-use crate::home::{
-    command::{Command, CommandExecution, EnergySavingDevice},
-    state::macros::result,
-};
+use crate::home::command::{Command, CommandExecution, EnergySavingDevice};
 
 use super::{DataPointAccess, sampled_data_frame};
 
@@ -23,6 +20,7 @@ pub enum EnergySaving {
 
 impl DataPointAccess<EnergySaving> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
+    #[trace_state]
     #[mockable]
     async fn current_data_point(
         &self,
@@ -34,10 +32,8 @@ impl DataPointAccess<EnergySaving> for EnergySaving {
 
         //if device is off, then we save energy
         if !is_tv_on.value {
-            result!(true, is_tv_on.timestamp, self,
-                @is_tv_on,
-                "Energy saving active, because TV is off"
-            );
+            tracing::trace!("Energy saving active, because TV is off");
+            return Ok(DataPoint::new(true, is_tv_on.timestamp));
         }
 
         let target = match self {
@@ -54,23 +50,19 @@ impl DataPointAccess<EnergySaving> for EnergySaving {
                 created,
                 ..
             }) => {
-                result!(on, created, self,
-                    @is_tv_on,
-                    latest_command.timestamp = %created,
-                    latest_command.elapsed = %created.elapsed(),
-                    "{}",
-                    if on {
-                        "Energy saving active, because energy saving command was received since TV was turned on"
-                    } else {
-                        "Energy saving not active, because no energy saving command was received since TV was turned on"
-                    },
-                );
+                let message = if on {
+                    "Energy saving active, because energy saving command was received since TV was turned on"
+                } else {
+                    "Energy saving not active, because no energy saving command was received since TV was turned on"
+                };
+                tracing::trace!("{}", message);
+                Ok(DataPoint::new(on, created))
             }
             _ => {
-                result!(false, is_tv_on.timestamp, self,
-                    @is_tv_on,
+                tracing::trace!(
                     "Energy saving not active, because no energy saving command was received since TV was turned on"
                 );
+                Ok(DataPoint::new(false, is_tv_on.timestamp))
             }
         }
     }

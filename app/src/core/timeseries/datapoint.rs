@@ -21,3 +21,9 @@ impl<T> DataPoint<T> {
         }
     }
 }
+
+impl<V: std::fmt::Display> std::fmt::Display for DataPoint<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} @ {})", self.value, self.timestamp.to_human_readable())
+    }
+}

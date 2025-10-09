@@ -6,12 +6,14 @@ pub fn mockable_state(item: TokenStream) -> TokenStream {
     //let args = parse_macro_input!(attr as AttributeArgs);
     let input_fn = parse_macro_input!(item as ItemFn);
 
+    let attrs = &input_fn.attrs;
     let vis = &input_fn.vis;
     let sig = &input_fn.sig;
     let block = &input_fn.block;
 
     let expanded = if sig.ident == "current_data_point" {
         quote! {
+            #(#attrs)*
             #vis #sig {
                 #[cfg(test)]
                 if let Some(dp) = api.get_fixed_current_dp(self.clone()) {
@@ -23,6 +25,7 @@ pub fn mockable_state(item: TokenStream) -> TokenStream {
         }
     } else if sig.ident == "get_data_frame" {
         quote! {
+            #(#attrs)*
             #vis #sig {
                 #[cfg(test)]
                 if let Some(df) = api.get_fixed_df(self.clone()) {

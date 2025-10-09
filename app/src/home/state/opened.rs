@@ -3,7 +3,7 @@ use crate::core::time::{DateTime, DateTimeRange};
 use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -59,6 +59,7 @@ impl OpenedArea {
 }
 
 impl DataPointAccess<Opened> for Opened {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
@@ -73,6 +74,7 @@ impl DataFrameAccess<Opened> for Opened {
 }
 
 impl DataPointAccess<OpenedArea> for OpenedArea {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         any_of(api, self.api_items()).await

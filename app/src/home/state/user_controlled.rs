@@ -5,14 +5,13 @@ use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
-use r#macro::{EnumVariants, Id, mockable};
+use r#macro::{EnumVariants, Id, mockable, trace_state};
 
 use crate::core::timeseries::DataPoint;
 use crate::home::state::Powered;
 
-use crate::home::{
-    command::{Command, CommandExecution, PowerToggle, Thermostat, is_system_generated, is_user_generated},
-    state::macros::result,
+use crate::home::command::{
+    Command, CommandExecution, PowerToggle, Thermostat, is_system_generated, is_user_generated,
 };
 
 use super::{DataPointAccess, sampled_data_frame};
@@ -32,6 +31,7 @@ pub enum UserControlled {
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
 impl DataPointAccess<UserControlled> for UserControlled {
+    #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         match self {
@@ -58,16 +58,14 @@ impl DataPointAccess<UserControlled> for UserControlled {
 }
 
 async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
-    let item = UserControlled::Dehumidifier;
-
     let power = Powered::Dehumidifier.current_data_point(api).await?;
 
     //user-control only valid for 15 minutes
     if power.timestamp < t!(15 minutes ago) {
-        result!(false, power.timestamp, item,
-            @power,
+        tracing::trace!(
             "User controlled not active for dehumidifier, because last state change more than 15 minutes ago"
         );
+        return Ok(DataPoint::new(false, power.timestamp));
     }
 
     let last_command = api
@@ -88,39 +86,34 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
         }) if is_system_generated(&source) => DataPoint::new(power_on, created),
 
         _ => {
-            result!(true, power.timestamp, item,
-                @power,
+            tracing::trace!(
                 "User controlled active, because no system command was triggered for last 20 minutes, but power state changed"
             );
+            return Ok(DataPoint::new(true, power.timestamp));
         }
     };
 
     let power_after_command_duration = power.timestamp.elapsed_since(system_powered.timestamp);
     if power_after_command_duration > t!(30 seconds) {
-        result!(true, power.timestamp, item,
-            @power,
-            @system_powered,
-            state_command_diff = %power_after_command_duration,
+        tracing::trace!(
             "User controlled active, because power state changed more than 30 seconds after last system command"
         );
+        return Ok(DataPoint::new(true, power.timestamp));
     }
 
     let is_as_expected = system_powered.value == power.value;
-    result!(!is_as_expected, power.timestamp, item,
-        @power,
-        @system_powered,
-        "{}",
-        if is_as_expected {
-            "User controlled not active, because current state matches last system command"
-        } else {
-            "User controlled active, because current state does not match last system"
-        },
-    );
+    let message = if is_as_expected {
+        "User controlled not active, because current state matches last system command"
+    } else {
+        "User controlled active, because current state does not match last system"
+    };
+    tracing::trace!("{}", message);
+    Ok(DataPoint::new(!is_as_expected, power.timestamp))
 }
 
 async fn current_data_point_for_thermostat(
     api: &HomeApi,
-    item: &UserControlled,
+    _item: &UserControlled,
     thermostat: Thermostat,
 ) -> anyhow::Result<DataPoint<bool>> {
     let latest_command_exec = api
@@ -133,15 +126,12 @@ async fn current_data_point_for_thermostat(
 
     match latest_command_exec {
         Some(command) if is_user_generated(&command.source) => {
-            result!(true, timestamp, item, "User controlled based on latest command source is User");
+            tracing::trace!("User controlled based on latest command source is User");
+            Ok(DataPoint::new(true, timestamp))
         }
         _ => {
-            result!(
-                false,
-                timestamp,
-                item,
-                "Not user controlled because latest command is not a user-command"
-            );
+            tracing::trace!("Not user controlled because latest command is not a user-command");
+            Ok(DataPoint::new(false, timestamp))
         }
     }
 }

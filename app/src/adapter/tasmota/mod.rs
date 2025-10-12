@@ -3,7 +3,7 @@ mod incoming;
 mod outgoing;
 
 use crate::{
-    core::IncomingDataSource as _,
+    adapter::command::CommandExecutor,
     home::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption},
 };
 
@@ -11,10 +11,7 @@ use incoming::TasmotaIncomingDataSource;
 use outgoing::TasmotaCommandExecutor;
 use serde::Deserialize;
 
-use crate::{
-    Infrastructure,
-    core::{CommandExecutor, DeviceConfig},
-};
+use crate::{Infrastructure, core::DeviceConfig};
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
@@ -23,7 +20,7 @@ pub struct Tasmota {
 }
 
 #[derive(Debug, Clone)]
-enum TasmotaChannel {
+pub enum TasmotaChannel {
     EnergyMeter(CurrentPowerUsage, TotalEnergyConsumption),
     PowerToggle(Powered),
 }
@@ -34,23 +31,14 @@ enum TasmotaCommandTarget {
 }
 
 impl Tasmota {
-    pub async fn new_incoming_data_processor(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
-        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
-
-        let api = infrastructure.api.clone();
-        async move { ds.run(&api).await }
-    }
-
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
         let tx = infrastructure.mqtt_client.new_publisher();
         let config = config::default_tasmota_command_config();
         TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
     }
 
-    async fn new_incoming_data_source(&self, mqtt_client: &mut infrastructure::Mqtt) -> TasmotaIncomingDataSource {
+    pub async fn new_incoming_data_source(&self, infrastructure: &mut Infrastructure) -> TasmotaIncomingDataSource {
+        let mqtt_client = &mut infrastructure.mqtt_client;
         let config = DeviceConfig::new(&config::default_tasmota_state_config());
         let tele_base_topic = format!("{}/tele", self.event_topic);
         let stat_base_topic = format!("{}/stat", self.event_topic);

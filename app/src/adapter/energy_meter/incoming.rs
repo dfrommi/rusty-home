@@ -1,11 +1,9 @@
+use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
 use crate::home::state::{PersistentHomeStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use tokio::sync::broadcast::Receiver;
 
-use crate::{
-    core::persistence::Database,
-    core::{IncomingData, IncomingDataSource, app_event::EnergyReadingAddedEvent},
-};
+use crate::{core::app_event::EnergyReadingAddedEvent, core::persistence::Database};
 
 use super::{EnergyReading, Faucet, Radiator};
 

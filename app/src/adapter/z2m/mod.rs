@@ -4,9 +4,9 @@ mod outgoing;
 
 use std::sync::Arc;
 
+use crate::adapter::command::CommandExecutor;
 use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
-use crate::core::{CommandExecutor, IncomingDataSource as _};
 use crate::home::state::{
     CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
@@ -25,7 +25,7 @@ pub struct Zigbee2Mqtt {
 }
 
 #[derive(Debug, Clone)]
-enum Z2mChannel {
+pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
@@ -41,26 +41,17 @@ enum Z2mChannel {
 }
 
 #[derive(Debug, Clone)]
-enum Z2mCommandTarget {
+pub enum Z2mCommandTarget {
     Thermostat(&'static str),
 }
 
 impl Zigbee2Mqtt {
-    pub async fn new_incoming_data_processor(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
-        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
-
-        let api = infrastructure.api.clone();
-        async move { ds.run(&api).await }
-    }
-
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
         self.new_z2m_command_executor(&infrastructure.mqtt_client)
     }
 
-    async fn new_incoming_data_source(&self, mqtt: &mut infrastructure::Mqtt) -> Z2mIncomingDataSource {
+    pub async fn new_incoming_data_source(&self, infrastructure: &mut Infrastructure) -> Z2mIncomingDataSource {
+        let mqtt = &mut infrastructure.mqtt_client;
         let config = DeviceConfig::new(&config::default_z2m_state_config());
         let rx = mqtt
             .subscribe(format!("{}/#", self.event_topic))

@@ -30,3 +30,15 @@ impl HomePlanning {
         CONFIG.get_or_init(config::default_config)
     }
 }
+
+pub mod availability {
+    use crate::core::time::DateTime;
+
+    #[derive(Debug, Clone)]
+    pub struct ItemAvailability {
+        pub source: String,
+        pub item: String,
+        pub last_seen: DateTime,
+        pub marked_offline: bool,
+    }
+}

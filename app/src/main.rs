@@ -3,6 +3,9 @@ use core::{HomeApi, app_event::AppEventListener};
 use infrastructure::Mqtt;
 use settings::Settings;
 
+use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
+use crate::core::command::CommandDispatcher;
+
 mod adapter;
 mod core;
 mod home;
@@ -24,32 +27,47 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let energy_meter = adapter::energy_meter::EnergyMeter;
+    let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
 
-    let ha_incoming_data_processing = settings
-        .homeassistant
-        .new_incoming_data_processor(&mut infrastructure)
-        .await;
-    let ha_cmd_executor = settings.homeassistant.new_command_executor(&infrastructure);
+    let ha_incoming_data_processing = {
+        let ds = settings
+            .homeassistant
+            .new_incoming_data_source(&mut infrastructure)
+            .await;
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+    };
+    let ha_cmd_executor = {
+        let executor = settings.homeassistant.new_command_executor(&infrastructure);
+        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+    };
 
-    let z2m_incoming_data_processing = settings.z2m.new_incoming_data_processor(&mut infrastructure).await;
-    let z2m_cmd_executor = settings.z2m.new_command_executor(&infrastructure);
+    let z2m_incoming_data_processing = {
+        let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+    };
+    let z2m_cmd_executor = {
+        let executor = settings.z2m.new_command_executor(&infrastructure);
+        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+    };
 
-    let tasmota_incoming_data_processing = settings.tasmota.new_incoming_data_processor(&mut infrastructure).await;
-    let tasmota_cmd_executor = settings.tasmota.new_command_executor(&infrastructure);
+    let tasmota_incoming_data_processing = {
+        let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+    };
+    let tasmota_cmd_executor = {
+        let executor = settings.tasmota.new_command_executor(&infrastructure);
+        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+    };
 
-    let energy_meter_processing = energy_meter
-        .new_incoming_data_processor(
-            infrastructure.database.clone(),
-            infrastructure.event_listener.new_energy_reading_added_listener(),
-        )
-        .await;
+    let energy_meter_processing = {
+        let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+    };
 
     let hk_export_states = settings.homekit.export_state(&infrastructure);
     let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
 
-    let plan_and_execute =
-        { core::plan_and_execute(&infrastructure, ha_cmd_executor, z2m_cmd_executor, tasmota_cmd_executor) };
+    let keep_planning = core::keep_on_planning(&infrastructure);
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
@@ -60,7 +78,7 @@ pub async fn main() {
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::new_web_service(http_database.clone()),
+                        adapter::energy_meter::EnergyMeter::new_web_service(http_database.clone()),
                         adapter::grafana::new_routes(http_api.clone()),
                         adapter::mcp::new_routes(http_api.clone()),
                     ]
@@ -86,11 +104,15 @@ pub async fn main() {
 
     tokio::select!(
         _ = process_infrastucture => {},
-        _ = plan_and_execute => {},
-        _ = energy_meter_processing => {},
-        _ = ha_incoming_data_processing => {},
-        _ = z2m_incoming_data_processing => {},
-        _ = tasmota_incoming_data_processing => {},
+        _ = keep_planning => {}, //TODO spawn into new thread
+        _ = command_dispatcher.dispatch() => {},
+        _ = energy_meter_processing.run() => {},
+        _ = ha_incoming_data_processing.run() => {},
+        _ = ha_cmd_executor.run() => {},
+        _ = z2m_incoming_data_processing.run() => {},
+        _ = z2m_cmd_executor.run() => {},
+        _ = tasmota_incoming_data_processing.run() => {},
+        _ = tasmota_cmd_executor.run() => {},
         _ = http_server_exec => {},
         _ = hk_export_states => {},
         _ = hk_process_commands => {},

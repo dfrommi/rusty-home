@@ -8,9 +8,8 @@ use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
-use crate::core::IncomingDataSource as _;
+use crate::adapter::command::CommandExecutor;
 use crate::home::state::{FanActivity, Powered, Presence, RelativeHumidity, Temperature};
-use infrastructure::Mqtt;
 
 use std::collections::HashMap;
 
@@ -19,7 +18,6 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
 use crate::Infrastructure;
-use crate::core::CommandExecutor;
 use crate::core::DeviceConfig;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -31,23 +29,14 @@ pub struct HomeAssitant {
 }
 
 impl HomeAssitant {
-    pub async fn new_incoming_data_processor(
-        &self,
-        infrastructure: &mut Infrastructure,
-    ) -> impl Future<Output = ()> + use<> {
-        let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
-
-        let api = infrastructure.api.clone();
-        async move { ds.run(&api).await }
-    }
-
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
         let http_client =
             HaHttpClient::new(&self.url, &self.token).expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(http_client, infrastructure.api.clone(), &config::default_ha_command_config())
     }
 
-    async fn new_incoming_data_source(&self, mqtt: &mut Mqtt) -> HaIncomingDataSource {
+    pub async fn new_incoming_data_source(&self, infrastructure: &mut Infrastructure) -> HaIncomingDataSource {
+        let mqtt = &mut infrastructure.mqtt_client;
         let config = DeviceConfig::new(&config::default_ha_state_config());
         let rx = mqtt
             .subscribe(self.topic_event.clone())
@@ -62,7 +51,7 @@ impl HomeAssitant {
 }
 
 #[derive(Debug, Clone)]
-enum HaChannel {
+pub enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Powered(Powered),
@@ -80,7 +69,7 @@ enum HaServiceTarget {
 }
 
 #[derive(Deserialize, Debug)]
-struct StateChangedEvent {
+pub struct StateChangedEvent {
     pub entity_id: String,
     pub state: StateValue,
     pub last_changed: DateTime,
@@ -89,7 +78,7 @@ struct StateChangedEvent {
 }
 
 #[derive(Debug)]
-enum StateValue {
+pub enum StateValue {
     Available(String),
     Unavailable,
 }

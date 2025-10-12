@@ -1,10 +1,11 @@
+use crate::adapter::command::CommandExecutor;
 use crate::home::command::{Command, CommandTarget, Fan};
 use crate::home::state::{FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
 use crate::t;
 use serde_json::json;
 
 use super::{HaHttpClient, HaServiceTarget};
-use crate::core::{CommandExecutor, HomeApi};
+use crate::core::HomeApi;
 
 pub struct HaCommandExecutor {
     client: HaHttpClient,

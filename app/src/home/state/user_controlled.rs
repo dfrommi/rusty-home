@@ -2,6 +2,7 @@ use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
+use crate::home::Thermostat;
 use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
@@ -10,9 +11,7 @@ use r#macro::{EnumVariants, Id, mockable, trace_state};
 use crate::core::timeseries::DataPoint;
 use crate::home::state::Powered;
 
-use crate::home::command::{
-    Command, CommandExecution, PowerToggle, Thermostat, is_system_generated, is_user_generated,
-};
+use crate::home::command::{Command, CommandExecution, PowerToggle, is_system_generated, is_user_generated};
 
 use super::{DataPointAccess, sampled_data_frame};
 

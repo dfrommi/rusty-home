@@ -2,6 +2,7 @@ mod command_state;
 
 use crate::core::unit::DegreeCelsius;
 use crate::core::{id::ExternalId, time::DateTime};
+use crate::home::Thermostat;
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
@@ -133,17 +134,6 @@ pub enum PowerToggle {
 //
 // SET HEATING
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum Thermostat {
-    LivingRoomBig,
-    LivingRoomSmall,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum HeatingTargetState {

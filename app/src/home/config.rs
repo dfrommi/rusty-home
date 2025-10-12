@@ -1,5 +1,6 @@
 use crate::adapter::homekit::HomekitCommandTarget;
-use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle, Thermostat};
+use crate::home::Thermostat;
+use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle};
 use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
 
@@ -15,11 +16,11 @@ use crate::home::state::HeatingMode;
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     vec![
     (
-        HomeGoal::SmarterHeating(Room::LivingRoom),
+        HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
         smarter_heating_actions(HeatingZone::LivingRoom)
     ),
     (
-        HomeGoal::SmarterHeating(Room::Bedroom),
+        HomeGoal::SmarterHeating(HeatingZone::Bedroom),
         {
             let mut a = vec![
                 UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
@@ -31,11 +32,11 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         }
     ),
     (
-        HomeGoal::SmarterHeating(Room::Kitchen),
+        HomeGoal::SmarterHeating(HeatingZone::Kitchen),
         smarter_heating_actions(HeatingZone::Kitchen)
     ),
     (
-        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
+        HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
         smarter_heating_actions(HeatingZone::RoomOfRequirements)
     ),
     (

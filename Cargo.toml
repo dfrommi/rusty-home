@@ -38,7 +38,7 @@ reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 
 #MCP dependencies
-rmcp = { version = "0.6.4", features = ["server", "macros"] }
+rmcp = { version = "0.8", features = ["server", "macros"] }
 rmcp-actix-web = "0.8"
 
 #DB Dependencies

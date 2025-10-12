@@ -3,8 +3,9 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     core::HomeApi,
     home::{
+        Thermostat,
         action::{Rule, RuleResult},
-        command::{Command, Thermostat},
+        command::Command,
         state::Temperature,
     },
     port::DataPointAccess as _,

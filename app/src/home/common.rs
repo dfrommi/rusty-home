@@ -1,14 +1,23 @@
 use r#macro::{EnumVariants, Id};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     core::unit::DegreeCelsius,
-    home::{
-        command::{HeatingTargetState, Thermostat},
-        state::HeatingMode,
-    },
+    home::{command::HeatingTargetState, state::HeatingMode},
 };
 
-#[derive(Debug, Clone, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[serde(rename_all = "snake_case")]
+pub enum Thermostat {
+    LivingRoomBig,
+    LivingRoomSmall,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
+    Bathroom,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants)]
 pub enum HeatingZone {
     #[display("LivingRoom")]
     LivingRoom,

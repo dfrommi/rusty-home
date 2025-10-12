@@ -1,4 +1,5 @@
 use crate::core::HomeApi;
+use crate::home::HeatingZone;
 use crate::home::state::Powered;
 use crate::port::DataPointAccess;
 
@@ -17,7 +18,7 @@ pub enum HomeGoal {
     PreventMouldInBathroom,
     StayInformed,
     #[display("SmarterHeating[{}]", _0)]
-    SmarterHeating(Room),
+    SmarterHeating(HeatingZone),
     #[display("BetterRoomClimate[{}]", _0)]
     BetterRoomClimate(Room),
     TvControl,
@@ -29,12 +30,12 @@ pub enum HomeGoal {
 pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
     //TODO auto-detect summer mode
     let mut goals = vec![
-        HomeGoal::SmarterHeating(Room::LivingRoom),
+        HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
-        HomeGoal::SmarterHeating(Room::Bedroom),
+        HomeGoal::SmarterHeating(HeatingZone::Bedroom),
         HomeGoal::BetterRoomClimate(Room::Bedroom),
-        HomeGoal::SmarterHeating(Room::Kitchen),
-        HomeGoal::SmarterHeating(Room::RoomOfRequirements),
+        HomeGoal::SmarterHeating(HeatingZone::Kitchen),
+        HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
         //HomeGoal::SmarterHeating(Room::Bathroom),
         HomeGoal::PreventMouldInBathroom,
         HomeGoal::StayInformed,

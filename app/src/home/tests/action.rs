@@ -37,12 +37,13 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
 
 mod ext_id {
     use crate::adapter::homekit::HomekitCommandTarget;
+    use crate::home::Thermostat;
     use crate::home::action::{
         AutoTurnOff, CoolDownWhenOccupied, Dehumidify, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen,
         ProvideAmbientTemperature, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
     };
     use crate::home::command::{
-        CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle, Thermostat,
+        CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle,
     };
     use crate::home::common::HeatingZone;
     use crate::home::state::HeatingMode;

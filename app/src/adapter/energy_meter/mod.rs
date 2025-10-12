@@ -2,10 +2,7 @@ mod http_server;
 mod incoming;
 mod persistence;
 
-use crate::{
-    core::persistence::Database,
-    core::{HomeApi, app_event::EnergyReadingAddedEvent, process_incoming_data_source},
-};
+use crate::core::{HomeApi, IncomingDataSource, app_event::EnergyReadingAddedEvent, persistence::Database};
 use incoming::EnergyMeterIncomingDataSource;
 use tokio::sync::broadcast::Receiver;
 
@@ -20,8 +17,9 @@ impl EnergyMeter {
     ) -> impl Future<Output = ()> + use<> {
         async move {
             let ds = EnergyMeterIncomingDataSource::new(db.clone(), rx);
+            //TODO: reuse api from infrastructure
             let api = HomeApi::new(db);
-            process_incoming_data_source("EnergyReading", ds, &api).await
+            ds.run(&api).await
         }
     }
 }

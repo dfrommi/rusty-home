@@ -5,8 +5,8 @@ mod outgoing;
 use std::sync::Arc;
 
 use crate::adapter::z2m::incoming::ThermostatGroup;
-use crate::core::CommandExecutor;
 use crate::core::unit::KiloWattHours;
+use crate::core::{CommandExecutor, IncomingDataSource as _};
 use crate::home::state::{
     CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
@@ -16,10 +16,7 @@ use outgoing::Z2mCommandExecutor;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 
-use crate::{
-    Infrastructure,
-    core::{DeviceConfig, process_incoming_data_source},
-};
+use crate::{Infrastructure, core::DeviceConfig};
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
@@ -56,7 +53,7 @@ impl Zigbee2Mqtt {
         let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let api = infrastructure.api.clone();
-        async move { process_incoming_data_source("Z2M", ds, &api).await }
+        async move { ds.run(&api).await }
     }
 
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {

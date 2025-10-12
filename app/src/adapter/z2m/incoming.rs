@@ -36,6 +36,10 @@ impl Z2mIncomingDataSource {
 }
 
 impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
+    fn ds_name(&self) -> &str {
+        "Z2M"
+    }
+
     async fn recv(&mut self) -> Option<MqttInMessage> {
         self.mqtt_receiver.recv().await
     }

@@ -8,6 +8,7 @@ use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
+use crate::core::IncomingDataSource as _;
 use crate::home::state::{FanActivity, Powered, Presence, RelativeHumidity, Temperature};
 use infrastructure::Mqtt;
 
@@ -20,7 +21,6 @@ use serde_json::Value;
 use crate::Infrastructure;
 use crate::core::CommandExecutor;
 use crate::core::DeviceConfig;
-use crate::core::process_incoming_data_source;
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
@@ -38,7 +38,7 @@ impl HomeAssitant {
         let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let api = infrastructure.api.clone();
-        async move { process_incoming_data_source("HomeAssitant", ds, &api).await }
+        async move { ds.run(&api).await }
     }
 
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {

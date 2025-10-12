@@ -26,6 +26,10 @@ impl EnergyMeterIncomingDataSource {
 }
 
 impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingDataSource {
+    fn ds_name(&self) -> &str {
+        "EnergyMeter"
+    }
+
     async fn recv(&mut self) -> Option<EnergyReadingAddedEvent> {
         if self.initial_load.is_none() {
             self.initial_load = match self.db.get_latest_total_readings_ids().await {

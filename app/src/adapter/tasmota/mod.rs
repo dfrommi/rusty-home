@@ -2,7 +2,10 @@ mod config;
 mod incoming;
 mod outgoing;
 
-use crate::home::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption};
+use crate::{
+    core::IncomingDataSource as _,
+    home::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption},
+};
 
 use incoming::TasmotaIncomingDataSource;
 use outgoing::TasmotaCommandExecutor;
@@ -10,7 +13,7 @@ use serde::Deserialize;
 
 use crate::{
     Infrastructure,
-    core::{CommandExecutor, DeviceConfig, process_incoming_data_source},
+    core::{CommandExecutor, DeviceConfig},
 };
 
 #[derive(Debug, Deserialize, Clone)]
@@ -38,7 +41,7 @@ impl Tasmota {
         let ds = self.new_incoming_data_source(&mut infrastructure.mqtt_client).await;
 
         let api = infrastructure.api.clone();
-        async move { process_incoming_data_source("Tasmota", ds, &api).await }
+        async move { ds.run(&api).await }
     }
 
     pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {

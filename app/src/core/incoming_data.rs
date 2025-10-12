@@ -2,9 +2,15 @@ use crate::core::HomeApi;
 
 use super::IncomingData;
 
-pub trait IncomingDataSource<Message, Channel> {
+pub trait IncomingDataSource<Message, Channel>
+where
+    Message: std::fmt::Debug,
+    Channel: std::fmt::Debug,
+    Self: Sized,
+{
     async fn recv(&mut self) -> Option<Message>;
 
+    fn ds_name(&self) -> &str;
     fn device_id(&self, msg: &Message) -> Option<String>;
     fn get_channels(&self, device_id: &str) -> &[Channel];
 
@@ -14,28 +20,26 @@ pub trait IncomingDataSource<Message, Channel> {
         channel: &Channel,
         msg: &Message,
     ) -> anyhow::Result<Vec<IncomingData>>;
-}
 
-pub async fn process_incoming_data_source<M, C>(name: &str, mut source: impl IncomingDataSource<M, C>, api: &HomeApi)
-where
-    M: std::fmt::Debug,
-    C: std::fmt::Debug,
-{
-    loop {
-        let msg = match source.recv().await {
-            Some(msg) => msg,
-            None => continue,
-        };
+    async fn run(mut self, api: &HomeApi) {
+        loop {
+            let msg = match self.recv().await {
+                Some(msg) => msg,
+                None => continue,
+            };
 
-        handle_incoming_data(name, &msg, &source, api).await;
+            handle_incoming_data(&msg, &self, api).await;
+        }
     }
 }
 
-async fn handle_incoming_data<M, C>(name: &str, msg: &M, source: &impl IncomingDataSource<M, C>, api: &HomeApi)
+async fn handle_incoming_data<M, C>(msg: &M, source: &impl IncomingDataSource<M, C>, api: &HomeApi)
 where
     M: std::fmt::Debug,
     C: std::fmt::Debug,
 {
+    let name = source.ds_name();
+
     let device_id = match source.device_id(msg) {
         Some(device_id) => device_id,
         None => return,

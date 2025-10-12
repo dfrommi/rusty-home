@@ -18,7 +18,6 @@ use crate::home::trigger::UserTrigger;
 pub use api::HomeApi;
 pub use command::CommandExecutor;
 pub use incoming_data::IncomingDataSource;
-pub use incoming_data::process_incoming_data_source;
 
 #[cfg(test)]
 pub use planner::plan_for_home;

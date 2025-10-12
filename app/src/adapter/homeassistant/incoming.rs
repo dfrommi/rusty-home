@@ -5,7 +5,6 @@ use crate::{
     core::{time::DateTime, timeseries::DataPoint},
     home::state::{FanAirflow, PersistentHomeStateValue},
 };
-use anyhow::bail;
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::{DeviceConfig, IncomingData, IncomingDataSource, ItemAvailability};
@@ -29,6 +28,10 @@ impl HaIncomingDataSource {
 }
 
 impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
+    fn ds_name(&self) -> &str {
+        "HomeAssistant"
+    }
+
     async fn recv(&mut self) -> Option<StateChangedEvent> {
         if self.initial_load.is_none() {
             self.initial_load = match self.client.get_current_state().await {

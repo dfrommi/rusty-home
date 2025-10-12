@@ -37,6 +37,10 @@ impl TasmotaIncomingDataSource {
 }
 
 impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSource {
+    fn ds_name(&self) -> &str {
+        "Tasmota"
+    }
+
     async fn recv(&mut self) -> Option<MqttInMessage> {
         self.mqtt_receiver.recv().await
     }

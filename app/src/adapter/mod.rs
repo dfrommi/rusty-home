@@ -3,5 +3,6 @@ pub mod grafana;
 pub mod homeassistant;
 pub mod homekit;
 pub mod mcp;
+pub mod metrics_export;
 pub mod tasmota;
 pub mod z2m;

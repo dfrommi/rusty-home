@@ -65,6 +65,12 @@ enum CompositeEnum {
     Named { left: Parameter, right: Parameter },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Id)]
+enum NestedItem {
+    Parameter(Parameter),
+    Other,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Id)]
 struct TupleStruct(Parameter, Parameter);
 
@@ -108,6 +114,18 @@ fn named_enum_variant_concatenates_in_field_order() {
     assert_eq!(ext.variant_name(), "named::bedroom::living_room");
 
     assert!(CompositeEnum::try_from(ext).is_err());
+}
+
+#[test]
+fn single_nested_variant_supports_try_from() -> Result<()> {
+    let ext = core::id::ExternalId::new("nested_item", "parameter::bedroom");
+    let restored = NestedItem::try_from(ext)?;
+    assert_eq!(restored, NestedItem::Parameter(Parameter::Bedroom));
+
+    let missing_child = core::id::ExternalId::new("nested_item", "parameter");
+    assert!(NestedItem::try_from(missing_child).is_err());
+
+    Ok(())
 }
 
 #[test]

@@ -1,7 +1,7 @@
 use heck::{ToShoutySnakeCase, ToSnakeCase};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Data, DataEnum, DataStruct, DeriveInput, Error, Fields, Ident, parse_macro_input};
+use syn::{Data, DataEnum, DataStruct, DeriveInput, Error, Fields, Ident, Type, parse_macro_input};
 
 pub fn derive_id_item(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -59,6 +59,30 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
                         crate::core::id::ExternalId::new(#type_name_ext, variant_name)
                     }
                 });
+
+                if fields.unnamed.len() == 1 {
+                    let field_type = &fields.unnamed[0].ty;
+
+                    if let Type::Path(type_path) = field_type {
+                        if let Some(segment) = type_path.path.segments.last() {
+                            if segment.arguments.is_empty() {
+                                let nested_type_ext = segment.ident.to_string().to_snake_case();
+
+                                from_ext_item_name_matches.push(quote! {
+                                    variant_name if variant_name.starts_with(concat!(#variant_name_ext, "::")) => {
+                                        let nested_variant = match variant_name.split_once("::") {
+                                            Some((_, nested)) if !nested.is_empty() => nested,
+                                            _ => anyhow::bail!("Error converting ExternalId, missing nested variant name for {}", variant_name),
+                                        };
+                                        let nested_id = crate::core::id::ExternalId::new(#nested_type_ext, nested_variant);
+                                        let nested_item = #field_type::try_from(nested_id)?;
+                                        #enum_name::#variant_name(nested_item)
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
             }
             Fields::Named(fields) => {
                 let bindings: Vec<_> = fields

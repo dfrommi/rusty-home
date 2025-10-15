@@ -41,8 +41,13 @@ impl DataPointAccess<RiskOfMould> for RiskOfMould {
 
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
-        let level = if risk { "high" } else { "low" };
-        tracing::trace!("Risk of mould is {}", level);
+        tracing::trace!(
+            "Risk is {}. Dewpoint is {}, reference dewpoint is {}, threashold is 3.0",
+            if risk { "high" } else { "low" },
+            this_dp.value,
+            ref_dp
+        );
+
         Ok(DataPoint::new(risk, this_dp.timestamp))
     }
 }

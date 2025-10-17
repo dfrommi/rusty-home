@@ -61,7 +61,7 @@ use crate::port::{DataPointAccess, TimeSeriesAccess};
 use crate::t;
 use r#macro::{EnumWithValue, StateTypeInfoDerive, mockable};
 
-#[derive(Debug, Clone, EnumWithValue, StateTypeInfoDerive)]
+#[derive(Debug, Clone, PartialEq, EnumWithValue, StateTypeInfoDerive)]
 pub enum HomeStateValue {
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),

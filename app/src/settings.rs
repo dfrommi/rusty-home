@@ -10,6 +10,7 @@ pub struct Settings {
     pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
     pub homekit: crate::adapter::homekit::Homekit,
+    pub homebridge: crate::adapter::homebridge::Homebridge,
     pub homeassistant: crate::adapter::homeassistant::HomeAssitant,
     pub z2m: crate::adapter::z2m::Zigbee2Mqtt,
     pub tasmota: crate::adapter::tasmota::Tasmota,

@@ -99,7 +99,8 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                         PersistentHomeStateValue::SetPoint(
                             set_point.clone(),
                             DegreeCelsius(if payload.window_open_external {
-                                0.0
+                                //internal window-open temperature is 8-12 degrees
+                                10.0
                             } else {
                                 payload.occupied_heating_setpoint
                             }),

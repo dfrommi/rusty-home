@@ -3,8 +3,10 @@ use core::{HomeApi, app_event::AppEventListener};
 use infrastructure::Mqtt;
 use settings::Settings;
 
+use crate::adapter::metrics_export::HomeStateMetricsExporter;
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
 use crate::core::command::CommandDispatcher;
+use crate::core::state::HomeStateEventEmitter;
 
 mod adapter;
 mod core;
@@ -28,6 +30,7 @@ pub async fn main() {
         .expect("Error initializing infrastructure");
 
     let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
+    let mut home_state_event_emitter = HomeStateEventEmitter::new(&infrastructure);
 
     let ha_incoming_data_processing = {
         let ds = settings
@@ -66,8 +69,14 @@ pub async fn main() {
 
     let hk_export_states = settings.homekit.export_state(&infrastructure);
     let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
+    let homebridge_runner = settings
+        .homebridge
+        .new_runner(&mut infrastructure, home_state_event_emitter.subscribe_changed())
+        .await;
 
     let keep_planning = core::keep_on_planning(&infrastructure);
+
+    let mut metrics_exporter = HomeStateMetricsExporter::new(home_state_event_emitter.subscribe_updated());
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
@@ -97,13 +106,14 @@ pub async fn main() {
         .expect("Error preloading cache");
 
     tracing::info!("Starting infrastructure processing");
-    let home_state_metrics_updater = crate::adapter::metrics_export::start_home_state_metrics_updater(&infrastructure);
+
     let process_infrastucture = infrastructure.process();
 
     tracing::info!("Starting main loop");
 
     tokio::select!(
         _ = process_infrastucture => {},
+        _ = home_state_event_emitter.run() => {},
         _ = keep_planning => {}, //TODO spawn into new thread
         _ = command_dispatcher.dispatch() => {},
         _ = energy_meter_processing.run() => {},
@@ -116,7 +126,8 @@ pub async fn main() {
         _ = http_server_exec => {},
         _ = hk_export_states => {},
         _ = hk_process_commands => {},
-        _ = home_state_metrics_updater => {},
+        _ = homebridge_runner.run() => {},
+        _ = metrics_exporter.run() => {},
     );
 }
 

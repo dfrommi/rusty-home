@@ -10,6 +10,6 @@ Cargo.lock
 /*.toml
 !Cargo.toml
 
-homebridge/
 *.stderr
 
+/homebridge/

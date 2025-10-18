@@ -1,7 +1,6 @@
 use crate::{
-    adapter::{
-        homebridge::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
-        homekit::HomekitCommand,
+    adapter::homekit::{
+        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
     home::{
         command::PowerToggle,

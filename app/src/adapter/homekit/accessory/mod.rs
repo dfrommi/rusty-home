@@ -1,13 +1,10 @@
 use crate::{
-    adapter::{
-        homebridge::{
-            HomekitEvent, HomekitTargetConfig,
-            accessory::{
-                climate_sensor::ClimateSensor, fan::Fan, power_switch::PowerSwitch, thermostat::Thermostat,
-                window_sensor::WindowSensor,
-            },
+    adapter::homekit::{
+        HomekitCommand, HomekitEvent, HomekitTargetConfig,
+        accessory::{
+            climate_sensor::ClimateSensor, fan::Fan, power_switch::PowerSwitch, thermostat::Thermostat,
+            window_sensor::WindowSensor,
         },
-        homekit::HomekitCommand,
     },
     home::{
         HeatingZone,

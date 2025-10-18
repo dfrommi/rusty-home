@@ -7,16 +7,16 @@ use tokio::{
     task::JoinHandle,
 };
 
+use super::{
+    HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig, accessory::HomekitRegistry,
+    hap::HomekitCharacteristic,
+};
 use crate::{
-    adapter::homebridge::{
-        HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig, accessory::HomekitRegistry,
-        hap::HomekitCharacteristic,
-    },
     core::{HomeApi, timeseries::DataPoint},
     home::{state::HomeStateValue, trigger::UserTrigger},
 };
 
-pub struct HomebridgeRunner {
+pub struct HomekitRunner {
     registry: HomekitRegistry,
     state_change_rx: Receiver<DataPoint<HomeStateValue>>,
     mqtt_sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
@@ -26,7 +26,7 @@ pub struct HomebridgeRunner {
     trigger_debounce: HashMap<HomekitTarget, JoinHandle<()>>,
 }
 
-impl HomebridgeRunner {
+impl HomekitRunner {
     pub fn new(
         registry: HomekitRegistry,
         state_change_rx: Receiver<DataPoint<HomeStateValue>>,
@@ -101,13 +101,13 @@ impl HomebridgeRunner {
             let payload = match serde_json::to_string(&export) {
                 Ok(p) => p,
                 Err(e) => {
-                    tracing::error!("Error serializing Homebridge outgoing message: {:?} -- {:?}", export, e);
+                    tracing::error!("Error serializing Homekit outgoing message: {:?} -- {:?}", export, e);
                     continue;
                 }
             };
             let msg = MqttOutMessage::transient(topic.to_string(), payload);
             if let Err(e) = self.mqtt_sender.send(msg).await {
-                tracing::error!("Error sending MQTT message to Homebridge: {} -- {:?}", topic, e);
+                tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }
     }
@@ -127,7 +127,7 @@ impl HomebridgeRunner {
         let incoming: IncomingMessage = match serde_json::from_str(&msg.payload) {
             Ok(msg) => msg,
             Err(e) => {
-                tracing::error!("Error parsing incoming Homebridge message: {:?} -- {:?}", msg.payload, e);
+                tracing::error!("Error parsing incoming Homekit message: {:?} -- {:?}", msg.payload, e);
                 return;
             }
         };
@@ -137,20 +137,20 @@ impl HomebridgeRunner {
             value: incoming.value,
         };
 
-        tracing::debug!("Processing Homebridge MQTT event: {:?}", state);
+        tracing::debug!("Processing Homekit MQTT event: {:?}", state);
 
         if let Some(command) = self.registry.process_trigger(&state) {
             if let Some(handle) = self.trigger_debounce.get(&state.target) {
                 handle.abort();
             }
 
-            tracing::info!("Debouncing Homebridge command for target: {:?}", state.target);
+            tracing::info!("Debouncing Homekit command for target: {:?}", state.target);
 
             let api = self.api.clone();
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
 
-                tracing::info!("Received Homebridge command: {:?}", command);
+                tracing::info!("Received Homekit command: {:?}", command);
                 if let Err(e) = api.add_user_trigger(UserTrigger::Homekit(command.clone())).await {
                     tracing::error!("Error processing Homekit command {:?}: {:?}", command, e);
                 }
@@ -180,7 +180,7 @@ impl HomebridgeRunner {
             let msg = MqttOutMessage::transient(topic.to_string(), payload.to_string());
 
             if let Err(e) = self.mqtt_sender.send(msg).await {
-                tracing::error!("Error sending MQTT message to Homebridge: {} -- {:?}", topic, e);
+                tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }
     }
@@ -229,7 +229,7 @@ impl HomebridgeRunner {
             config,
         };
 
-        serde_json::to_value(payload).expect("Error serializing Homebridge service registration payload")
+        serde_json::to_value(payload).expect("Error serializing Homekit service registration payload")
     }
 }
 
@@ -247,7 +247,7 @@ mod tests {
             HomekitTarget::new(name.clone(), service.clone(), HomekitCharacteristic::CurrentTemperature).into_config(),
         ];
 
-        let payload = HomebridgeRunner::service_registration_payload(name.clone(), service.clone(), &characteristics);
+        let payload = HomekitRunner::service_registration_payload(name.clone(), service.clone(), &characteristics);
 
         assert_json_eq!(
             payload,

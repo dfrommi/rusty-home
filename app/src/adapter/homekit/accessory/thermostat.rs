@@ -1,7 +1,7 @@
 use crate::{
-    adapter::{
-        homebridge::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
-        homekit::{HomekitCommand, HomekitHeatingState},
+    adapter::homekit::{
+        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitHeatingState, HomekitService, HomekitTarget,
+        HomekitTargetConfig,
     },
     core::unit::DegreeCelsius,
     home::{
@@ -55,7 +55,7 @@ impl Thermostat {
                 UserControlled::RoomOfRequirementsThermostat,
                 HeatingDemand::RoomOfRequirements,
             ),
-            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homebridge thermostat"),
+            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homekit thermostat"),
         };
 
         Self {
@@ -193,7 +193,7 @@ impl Thermostat {
             HeatingZone::Bedroom => HomekitCommand::BedroomHeatingState(heating_state),
             HeatingZone::Kitchen => HomekitCommand::KitchenHeatingState(heating_state),
             HeatingZone::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingState(heating_state),
-            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homebridge thermostat"),
+            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homekit thermostat"),
         }
     }
 

@@ -67,9 +67,7 @@ pub async fn main() {
         IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
     };
 
-    let hk_export_states = settings.homekit.export_state(&infrastructure);
-    let hk_process_commands = settings.homekit.process_commands(&mut infrastructure).await;
-    let homebridge_runner = settings
+    let homekit_runner = settings
         .homebridge
         .new_runner(&mut infrastructure, home_state_event_emitter.subscribe_changed())
         .await;
@@ -124,9 +122,7 @@ pub async fn main() {
         _ = tasmota_incoming_data_processing.run() => {},
         _ = tasmota_cmd_executor.run() => {},
         _ = http_server_exec => {},
-        _ = hk_export_states => {},
-        _ = hk_process_commands => {},
-        _ = homebridge_runner.run() => {},
+        _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},
     );
 }

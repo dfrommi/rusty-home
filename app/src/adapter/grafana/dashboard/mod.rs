@@ -15,7 +15,6 @@ pub mod energy_monitor;
 pub mod heating_details;
 pub mod meta;
 pub mod smart_home;
-pub mod state_debug;
 
 use super::support::empty_string_as_none;
 

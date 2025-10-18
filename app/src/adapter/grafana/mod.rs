@@ -5,7 +5,6 @@ mod support;
 use std::sync::Arc;
 
 use crate::core::HomeApi;
-use crate::core::id::ExternalId;
 use actix_web::{
     HttpResponse, ResponseError,
     web::{self},
@@ -20,7 +19,6 @@ pub fn new_routes(api: HomeApi) -> actix_web::Scope {
     web::scope("/grafana")
         .service(dashboard::energy_iq::routes(api.clone()))
         .service(dashboard::energy_monitor::routes(api.clone()))
-        .service(dashboard::state_debug::routes(api.clone()))
         .service(dashboard::heating_details::routes(api.clone()))
         .service(dashboard::smart_home::routes(api.clone()))
         .service(dashboard::meta::routes())
@@ -30,12 +28,6 @@ type GrafanaResponse = Result<HttpResponse, GrafanaApiError>;
 
 #[derive(Debug, Error, Display)]
 enum GrafanaApiError {
-    #[display("Channel not found: {_0}")]
-    ChannelNotFound(#[error(not(source))] ExternalId),
-
-    #[display("Channel not supported: {_0}")]
-    ChannelUnsupported(#[error(not(source))] ExternalId),
-
     #[display("Error accessing data")]
     DataAccessError(anyhow::Error),
 
@@ -53,9 +45,7 @@ impl ResponseError for GrafanaApiError {
         tracing::warn!("GrafanaApiError: {:?}", self);
 
         match self {
-            GrafanaApiError::ChannelNotFound(_) => StatusCode::NOT_FOUND,
             GrafanaApiError::NotFound => StatusCode::NOT_FOUND,
-            GrafanaApiError::ChannelUnsupported(_) => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

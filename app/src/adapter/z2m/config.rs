@@ -80,7 +80,9 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
     let thermostat_group_living_room = Arc::new(Mutex::new(ThermostatGroup::new(
         "living_room/radiator_thermostat_big".to_string(),
+        Thermostat::LivingRoomBig.heating_factor(),
         "living_room/radiator_thermostat_small".to_string(),
+        Thermostat::LivingRoomSmall.heating_factor(),
     )));
 
     vec![

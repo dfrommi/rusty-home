@@ -266,40 +266,52 @@ struct RemoteControl {
 #[derive(Debug)]
 pub struct ThermostatGroup {
     first_id: String,
+    first_factor: f64,
     first_data: Option<DataPoint<i64>>,
     second_id: String,
+    second_factor: f64,
     second_data: Option<DataPoint<i64>>,
-    last_sent: DateTime,
+    last_sent_at: DateTime,
+    last_sent_value: i64,
 }
 
 impl ThermostatGroup {
-    pub fn new(first_id: String, second_id: String) -> Self {
+    pub fn new(first_id: String, first_factor: f64, second_id: String, second_factor: f64) -> Self {
         Self {
             first_id,
+            first_factor,
             first_data: None,
             second_id,
+            second_factor,
             second_data: None,
-            last_sent: t!(24 hours ago),
+            last_sent_at: t!(24 hours ago),
+            last_sent_value: -8000,
         }
     }
 
     pub async fn send_if_needed(&mut self, sender: &Z2mCommandExecutor) -> anyhow::Result<bool> {
-        if self.last_sent > t!(15 minutes ago) {
+        let mean = match self.mean() {
+            Some(mean) => mean,
+            None => {
+                return Ok(false);
+            }
+        };
+
+        if (mean - self.last_sent_value).abs() < 5 || t!(15 minutes ago) < self.last_sent_at {
             return Ok(false);
         }
 
-        if let Some(mean) = self.mean() {
-            tracing::debug!(
-                "Sending load estimate mean {} to thermostats {} and {}",
-                mean,
-                self.first_id,
-                self.second_id
-            );
+        tracing::debug!(
+            "Sending load estimate mean {} to thermostats {} and {}",
+            mean,
+            self.first_id,
+            self.second_id
+        );
 
-            sender.set_load_room_mean(&self.first_id, mean).await?;
-            sender.set_load_room_mean(&self.second_id, mean).await?;
-            self.last_sent = t!(now);
-        }
+        sender.set_load_room_mean(&self.first_id, mean).await?;
+        sender.set_load_room_mean(&self.second_id, mean).await?;
+        self.last_sent_at = t!(now);
+        self.last_sent_value = mean;
 
         Ok(true)
     }
@@ -316,7 +328,12 @@ impl ThermostatGroup {
 
     fn mean(&self) -> Option<i64> {
         match (&self.first_data, &self.second_data) {
-            (Some(first), Some(second)) => Some((first.value + second.value) / 2),
+            (Some(first), Some(second)) => {
+                //weighted by influence of the radiator
+                let v = (self.first_factor * (first.value as f64) + self.second_factor * (second.value as f64))
+                    / (self.first_factor + self.second_factor);
+                Some(v.round() as i64)
+            }
             _ => None,
         }
     }

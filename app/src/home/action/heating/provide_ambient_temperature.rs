@@ -23,7 +23,7 @@ impl Rule for ProvideAmbientTemperature {
                 thermostat,
                 match thermostat {
                     Thermostat::LivingRoomBig | Thermostat::LivingRoomSmall => Temperature::LivingRoom,
-                    Thermostat::Bedroom => Temperature::BedroomOuterWall,
+                    Thermostat::Bedroom => Temperature::Bedroom,
                     Thermostat::Kitchen => Temperature::Kitchen,
                     Thermostat::RoomOfRequirements => Temperature::RoomOfRequirements,
                     Thermostat::Bathroom => Temperature::BathroomShower,

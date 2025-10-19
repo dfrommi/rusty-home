@@ -80,7 +80,14 @@ async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
             },
             created,
             ..
-        }) => Ok(created.elapsed() < t!(1 hours) || (cmd_temp.0 - temperature.0).abs() < 0.1),
+        }) => {
+            //Always send with significant changes
+            if (cmd_temp.0 - temperature.0).abs() > 0.1 {
+                return Ok(false); //not reflected
+            }
+
+            Ok(created.elapsed() < t!(1 hours))
+        }
         Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
         None => Ok(false),
     }

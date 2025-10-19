@@ -79,7 +79,8 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
             return Ok(DataPoint::new(HeatingMode::Ventilation, window_open.timestamp));
         }
 
-        if temp_increase.value {
+        //TODO take more factors like cold air coming in after ventilation into account
+        if !window_open.value && window_open.timestamp.elapsed() < t!(15 minutes) {
             tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
             return Ok(DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp));
         }
@@ -88,6 +89,15 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         if sleeping.value {
             tracing::trace!("Heating in sleep-mode as Dennis is sleeping");
             return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));
+        }
+
+        //sleeping preseved until ventilation in that room
+        if let Some(morning_timerange) = t!(5:30 - 12:30).active() {
+            //some tampering with window, but not in morning hours
+            if !morning_timerange.contains(&window_open.timestamp) {
+                tracing::trace!("Heating in sleep-mode as not yet ventilated");
+                return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));
+            }
         }
 
         let max_ts = &[
@@ -100,11 +110,22 @@ impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
         .max()
         .unwrap_or_else(|| t!(now));
 
-        //TODO comfort mode based on time and occupancy in most rooms
-        if self == &ScheduledHeatingMode::LivingRoom && t!(19:00 - 23:00).is_now() {
-            let max_ts = t!(19:00).today().max(*max_ts);
-            tracing::trace!("Heating in comfort-mode as it's evening time in the living room");
-            return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
+        //TODO block comfort mode based on time and occupancy in most rooms
+        if self == &ScheduledHeatingMode::LivingRoom {
+            //in ventilation check range
+            if let Some(ventilation_range) = t!(17:30 - 19:45).active()
+                && ventilation_range.contains(&window_open.timestamp)
+            {
+                let max_ts = t!(17:30).today().max(*max_ts);
+                tracing::trace!("Heating in comfort-mode as living room was ventilated in the evening");
+                return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
+            }
+
+            if t!(19:00 - 23:00).is_now() {
+                let max_ts = t!(19:00).today().max(*max_ts);
+                tracing::trace!("Heating in comfort-mode as it's evening time in the living room");
+                return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
+            }
         }
 
         let max_ts = &[

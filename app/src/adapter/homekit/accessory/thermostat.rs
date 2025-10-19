@@ -55,7 +55,12 @@ impl Thermostat {
                 UserControlled::RoomOfRequirementsThermostat,
                 HeatingDemand::RoomOfRequirements,
             ),
-            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homekit thermostat"),
+            HeatingZone::Bathroom => (
+                Temperature::BathroomShower,
+                SetPoint::Bathroom,
+                UserControlled::BathroomThermostat,
+                HeatingDemand::Bathroom,
+            ),
         };
 
         Self {
@@ -193,7 +198,7 @@ impl Thermostat {
             HeatingZone::Bedroom => HomekitCommand::BedroomHeatingState(heating_state),
             HeatingZone::Kitchen => HomekitCommand::KitchenHeatingState(heating_state),
             HeatingZone::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingState(heating_state),
-            HeatingZone::Bathroom => panic!("Bathroom heating is not exposed via Homekit thermostat"),
+            HeatingZone::Bathroom => HomekitCommand::BathroomHeatingState(heating_state),
         }
     }
 

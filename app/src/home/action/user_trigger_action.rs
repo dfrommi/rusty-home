@@ -89,6 +89,7 @@ impl UserTriggerAction {
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => Some(t!(1 hours)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
         }
     }
 }
@@ -138,6 +139,9 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
         }
         UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => {
             homekit_heating_actions(HeatingZone::RoomOfRequirements, state)
+        }
+        UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => {
+            homekit_heating_actions(HeatingZone::Bathroom, state)
         }
     }
 }

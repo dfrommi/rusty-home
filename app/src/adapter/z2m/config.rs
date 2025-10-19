@@ -45,6 +45,12 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
             Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
         ),
         (
+            CommandTarget::SetHeating {
+                device: Thermostat::Bathroom,
+            },
+            Z2mCommandTarget::Thermostat("bathroom/radiator_thermostat"),
+        ),
+        (
             CommandTarget::SetThermostatAmbientTemperature {
                 device: Thermostat::LivingRoomBig,
             },
@@ -73,6 +79,12 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
                 device: Thermostat::RoomOfRequirements,
             },
             Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
+        ),
+        (
+            CommandTarget::SetThermostatAmbientTemperature {
+                device: Thermostat::Bathroom,
+            },
+            Z2mCommandTarget::Thermostat("bathroom/radiator_thermostat"),
         ),
     ]
 }
@@ -171,6 +183,16 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 HeatingDemand::RoomOfRequirements,
                 Opened::RoomOfRequirementsThermostat,
                 Temperature::Thermostat(Thermostat::RoomOfRequirements),
+                None,
+            ),
+        ),
+        (
+            "bathroom/radiator_thermostat",
+            Z2mChannel::Thermostat(
+                SetPoint::Bathroom,
+                HeatingDemand::Bathroom,
+                Opened::BathroomThermostat,
+                Temperature::Thermostat(Thermostat::Bathroom),
                 None,
             ),
         ),

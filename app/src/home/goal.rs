@@ -36,7 +36,7 @@ pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
         HomeGoal::BetterRoomClimate(Room::Bedroom),
         HomeGoal::SmarterHeating(HeatingZone::Kitchen),
         HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
-        //HomeGoal::SmarterHeating(Room::Bathroom),
+        HomeGoal::SmarterHeating(HeatingZone::Bathroom),
         HomeGoal::PreventMouldInBathroom,
         HomeGoal::StayInformed,
         HomeGoal::TvControl,

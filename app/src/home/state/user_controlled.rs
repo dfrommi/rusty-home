@@ -23,6 +23,7 @@ pub enum UserControlled {
     BedroomThermostat,
     KitchenThermostat,
     RoomOfRequirementsThermostat,
+    BathroomThermostat,
 }
 
 //TODO try to simplify
@@ -51,6 +52,9 @@ impl DataPointAccess<UserControlled> for UserControlled {
             }
             UserControlled::RoomOfRequirementsThermostat => {
                 current_data_point_for_thermostat(api, self, Thermostat::RoomOfRequirements).await
+            }
+            UserControlled::BathroomThermostat => {
+                current_data_point_for_thermostat(api, self, Thermostat::Bathroom).await
             }
         }
     }

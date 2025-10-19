@@ -40,6 +40,10 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         smarter_heating_actions(HeatingZone::RoomOfRequirements)
     ),
     (
+        HomeGoal::SmarterHeating(HeatingZone::Bathroom),
+        smarter_heating_actions(HeatingZone::Bathroom)
+    ),
+    (
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
         vec![
             SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
@@ -88,6 +92,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             ProvideAmbientTemperature::Thermostat(Thermostat::Bedroom).into(), 
             ProvideAmbientTemperature::Thermostat(Thermostat::Kitchen).into(), 
             ProvideAmbientTemperature::Thermostat(Thermostat::RoomOfRequirements).into(), 
+            ProvideAmbientTemperature::Thermostat(Thermostat::Bathroom).into(), 
             ]
     ),
     (
@@ -117,9 +122,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Kitchen,
             }).into(),
-            // FollowDefaultSetting::new(CommandTarget::SetHeating {
-            //     device: Thermostat::Bathroom,
-            // }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetHeating {
+                device: Thermostat::Bathroom,
+            }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,
                 notification: crate::home::command::Notification::WindowOpened,
@@ -149,7 +154,7 @@ fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
                 HeatingZone::Bedroom => HomekitCommandTarget::BedroomHeatingState,
                 HeatingZone::Kitchen => HomekitCommandTarget::KitchenHeatingState,
                 HeatingZone::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
-                HeatingZone::Bathroom => panic!("Smart Heating for Bathroom currently not supported"),
+                HeatingZone::Bathroom => HomekitCommandTarget::BathroomHeatingState,
             }
             .into(),
         )

@@ -339,6 +339,9 @@ mod ext_id {
                 UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => {
                     "homekit::room_of_requirements_heating_state"
                 }
+                UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => {
+                    "homekit::bathroom_heating_state"
+                }
             };
 
             let ext_id = UserTriggerAction::new(target.clone()).ext_id();

@@ -73,6 +73,9 @@ impl UserTrigger {
                 HomekitCommand::RoomOfRequirementsHeatingState(_) => {
                     UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState)
                 }
+                HomekitCommand::BathroomHeatingState(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState)
+                }
             },
         }
     }

@@ -36,6 +36,7 @@ pub enum Opened {
     RoomOfRequirementsWindowRight,
     RoomOfRequirementsWindowSide,
     RoomOfRequirementsThermostat,
+    BathroomThermostat,
 }
 
 impl OpenedArea {

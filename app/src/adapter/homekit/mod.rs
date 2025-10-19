@@ -75,6 +75,7 @@ pub enum HomekitCommand {
     BedroomHeatingState(HomekitHeatingState),
     KitchenHeatingState(HomekitHeatingState),
     RoomOfRequirementsHeatingState(HomekitHeatingState),
+    BathroomHeatingState(HomekitHeatingState),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
@@ -90,6 +91,7 @@ pub enum HomekitCommandTarget {
     BedroomHeatingState,
     KitchenHeatingState,
     RoomOfRequirementsHeatingState,
+    BathroomHeatingState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -128,6 +128,7 @@ fn config() -> Vec<HomekitAccessory> {
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Schlafzimmer", HeatingZone::Bedroom)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Arbeitszimmer", HeatingZone::RoomOfRequirements)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
+        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
         HomekitAccessory::Fan(Fan::new("Deckenventilator Wohnzimmer", FanActivity::LivingRoomCeilingFan)),

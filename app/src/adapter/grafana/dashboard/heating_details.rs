@@ -31,7 +31,7 @@ where
 #[derive(serde::Serialize)]
 struct Row {
     timestamp: DateTime,
-    channel: &'static str,
+    channel: String,
     value: f64,
 }
 
@@ -45,39 +45,50 @@ where
     SetPoint: TimeSeriesAccess<SetPoint>,
 {
     let room = path.into_inner();
+    let heating_zone = room.heating_zone();
 
     let inside_temp = room.inside_temperature();
-    let set_point = room.set_point();
-    let (ts_outside, ts_inside, ts_set_point) = tokio::try_join!(
+    let (ts_outside, ts_inside) = tokio::try_join!(
         Temperature::Outside.series(query.range(), api.as_ref()),
         inside_temp.series(query.range(), api.as_ref()),
-        set_point.series(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
+
+    let mut ts_set_points = vec![];
+    for thermostat in heating_zone.thermostats() {
+        let ts_set_point = thermostat
+            .set_point()
+            .series(query.range(), api.as_ref())
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+        ts_set_points.push(ts_set_point);
+    }
 
     let mut rows: Vec<Row> = vec![];
     for dt in query.iter() {
         if let Some(dp) = ts_outside.at(dt) {
             rows.push(Row {
-                channel: "outside_temperature",
+                channel: "outside_temperature".to_string(),
                 timestamp: dp.timestamp,
                 value: dp.value.0,
             })
         }
         if let Some(dp) = ts_inside.at(dt) {
             rows.push(Row {
-                channel: "inside_temperature",
+                channel: "inside_temperature".to_string(),
                 timestamp: dp.timestamp,
                 value: dp.value.0,
             })
         }
 
-        if let Some(dp) = ts_set_point.at(dt) {
-            rows.push(Row {
-                channel: "target_temperature",
-                timestamp: dp.timestamp,
-                value: dp.value.0,
-            })
+        for (i, ts_set_point) in ts_set_points.iter().enumerate() {
+            if let Some(dp) = ts_set_point.at(dt) {
+                rows.push(Row {
+                    channel: format!("target_temperature_{}", i + 1),
+                    timestamp: dp.timestamp,
+                    value: dp.value.0,
+                })
+            }
         }
     }
 
@@ -94,30 +105,43 @@ where
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
     let room = path.into_inner();
+    let heating_zone = room.heating_zone();
 
     let window = room.window();
-    let heating_demand = room.heating_demand();
-    let (ts_opened, ts_heating) = tokio::try_join!(
-        window.series(query.range(), api.as_ref()),
-        heating_demand.series(query.range(), api.as_ref()),
-    )
-    .map_err(GrafanaApiError::DataAccessError)?;
+    let ts_opened = window
+        .series(query.range(), api.as_ref())
+        .await
+        .map_err(GrafanaApiError::DataAccessError)?;
+
+    let mut ts_heating_demands = vec![];
+    for thermostat in heating_zone.thermostats() {
+        let ts_heating_demand = thermostat
+            .heating_demand()
+            .series(query.range(), api.as_ref())
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+        ts_heating_demands.push(ts_heating_demand);
+    }
 
     let mut rows: Vec<Row> = vec![];
     for dt in query.iter() {
         if let Some(dp) = ts_opened.at(dt) {
             rows.push(Row {
-                channel: "window_opened",
+                channel: "window_opened".to_string(),
                 timestamp: dp.timestamp,
                 value: if dp.value { 100.0 } else { 0.0 },
             })
         }
-        if let Some(dp) = ts_heating.at(dt) {
-            rows.push(Row {
-                channel: "heating_demand",
-                timestamp: dp.timestamp,
-                value: dp.value.0,
-            })
+
+        for (i, ts_heating) in ts_heating_demands.iter().enumerate() {
+            let channel_name = format!("heating_demand_{}", i + 1);
+            if let Some(dp) = ts_heating.at(dt) {
+                rows.push(Row {
+                    channel: channel_name.to_string(),
+                    timestamp: dp.timestamp,
+                    value: dp.value.0,
+                })
+            }
         }
     }
 
@@ -136,11 +160,9 @@ where
     }
 
     let inside_temp = room.inside_temperature();
-    let set_point = room.set_point();
-    let (ts_outside, ts_inside, ts_set_point) = tokio::try_join!(
+    let (ts_outside, ts_inside) = tokio::try_join!(
         Temperature::Outside.series(query.range(), api.as_ref()),
         inside_temp.series(query.range(), api.as_ref()),
-        set_point.series(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -152,10 +174,6 @@ where
         Row {
             channel: "inside_temperature",
             mean: ts_inside.mean().0,
-        },
-        Row {
-            channel: "target_temperature",
-            mean: ts_set_point.mean().0,
         },
     ];
 
@@ -172,15 +190,22 @@ where
         sum: f64,
     }
 
-    let heating_demand = room.heating_demand();
-    let ts_heating = heating_demand
-        .series(query.range(), api.as_ref())
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?;
+    let mut total_demand_scaled = 0.0;
+
+    let zone = room.heating_zone();
+    for thermostat in zone.thermostats() {
+        let ts_heating = thermostat
+            .heating_demand()
+            .series(query.range(), api.as_ref())
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+
+        total_demand_scaled = total_demand_scaled + ts_heating.area_in_type_hours() * thermostat.heating_factor();
+    }
 
     let rows: Vec<Row> = vec![Row {
         channel: "heating_demand",
-        sum: ts_heating.area_in_type_hours() * room.heating_factor(),
+        sum: total_demand_scaled,
     }];
 
     csv_response(&rows)

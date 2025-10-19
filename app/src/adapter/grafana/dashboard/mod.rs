@@ -1,6 +1,7 @@
 use crate::core::time::DateTime;
 use crate::core::time::DateTimeRange;
 use crate::core::time::Duration;
+use crate::home::HeatingZone;
 use crate::home::state::HeatingDemand;
 use crate::home::state::SetPoint;
 use crate::home::state::Temperature;
@@ -86,24 +87,13 @@ impl DashboardDisplay for Room {
 }
 
 impl Room {
-    fn heating_demand(&self) -> HeatingDemand {
+    fn heating_zone(&self) -> HeatingZone {
         match self {
-            //TODO multiple thermostats per room
-            Room::LivingRoom => HeatingDemand::LivingRoomBig,
-            Room::Bedroom => HeatingDemand::Bedroom,
-            Room::Kitchen => HeatingDemand::Kitchen,
-            Room::RoomOfRequirements => HeatingDemand::RoomOfRequirements,
-            Room::Bathroom => HeatingDemand::Bathroom,
-        }
-    }
-
-    fn heating_factor(&self) -> f64 {
-        match self {
-            Room::LivingRoom => 1.728 + 0.501,
-            Room::Bedroom => 1.401,
-            Room::Kitchen => 1.485,
-            Room::RoomOfRequirements => 1.193,
-            Room::Bathroom => 0.496,
+            Room::LivingRoom => HeatingZone::LivingRoom,
+            Room::Bedroom => HeatingZone::Bedroom,
+            Room::Kitchen => HeatingZone::Kitchen,
+            Room::RoomOfRequirements => HeatingZone::RoomOfRequirements,
+            Room::Bathroom => HeatingZone::Bathroom,
         }
     }
 
@@ -114,16 +104,6 @@ impl Room {
             Room::Kitchen => Temperature::Kitchen,
             Room::RoomOfRequirements => Temperature::RoomOfRequirements,
             Room::Bathroom => Temperature::BathroomShower,
-        }
-    }
-
-    fn set_point(&self) -> SetPoint {
-        match self {
-            Room::LivingRoom => SetPoint::LivingRoomBig,
-            Room::Bedroom => SetPoint::Bedroom,
-            Room::Kitchen => SetPoint::Kitchen,
-            Room::RoomOfRequirements => SetPoint::RoomOfRequirements,
-            Room::Bathroom => SetPoint::Bathroom,
         }
     }
 

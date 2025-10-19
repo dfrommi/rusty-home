@@ -128,32 +128,29 @@ async fn combined_series(
     rooms: &[Room],
     time_range: DateTimeRange,
 ) -> anyhow::Result<TimeSeries<HeatingDemand>> {
-    let rooms_ts = rooms.iter().map(|room| async {
-        match room.heating_demand().series(time_range.clone(), api).await {
-            Ok(ts) => Ok((room.clone(), ts)),
-            Err(e) => Err(e),
-        }
-    });
-
-    let rooms_ts = futures::future::join_all(rooms_ts)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let mut mapped_ts = rooms_ts
-        .into_iter()
-        .map(|(room, ts)| {
-            let factor = room.heating_factor();
-            let context = ts.context();
-            ts.map(context, |dp| {
-                let value: f64 = dp.value.0;
-                Percent(value * factor)
-            })
-        })
+    let thermostats = rooms
+        .iter()
+        .flat_map(|r| r.heating_zone().thermostats())
         .collect::<Vec<_>>();
 
-    let mut result = mapped_ts.remove(0);
-    for ts in mapped_ts {
+    let mut scaled_ts = vec![];
+
+    for thermostat in thermostats {
+        let ts = thermostat
+            .heating_demand()
+            .series(time_range.clone(), api)
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+
+        let factor = thermostat.heating_factor();
+        let context = ts.context();
+
+        scaled_ts.push(ts.map(context, |dp| Percent(dp.value.0 * factor)));
+    }
+
+    //remove to simulate a fold
+    let mut result = scaled_ts.remove(0);
+    for ts in scaled_ts {
         result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoomBig, |a, b| Percent(a.0 + b.0))?;
     }
 

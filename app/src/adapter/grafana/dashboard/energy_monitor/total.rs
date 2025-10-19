@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use crate::core::HomeApi;
 use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
+use crate::home::Thermostat;
 use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
 use actix_web::{
     HttpResponse, Responder,
@@ -37,7 +38,7 @@ pub async fn total_power(api: web::Data<HomeApi>, time_range: Query<TimeRangeQue
 pub async fn total_heating(api: web::Data<HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
     total_values_response(api.as_ref(), HeatingDemand::variants(), time_range.range(), |item, ts| {
         let value = ts.area_in_type_hours();
-        (value, value * room_of(item).heating_factor())
+        (value, value * thermostat_of(item).heating_factor())
     })
     .await
 }
@@ -96,13 +97,13 @@ where
         .body(csv)
 }
 
-fn room_of(item: &HeatingDemand) -> Room {
+fn thermostat_of(item: &HeatingDemand) -> Thermostat {
     match item {
-        HeatingDemand::LivingRoomBig => Room::LivingRoom,
-        HeatingDemand::LivingRoomSmall => Room::LivingRoom,
-        HeatingDemand::Bedroom => Room::Bedroom,
-        HeatingDemand::RoomOfRequirements => Room::RoomOfRequirements,
-        HeatingDemand::Kitchen => Room::Kitchen,
-        HeatingDemand::Bathroom => Room::Bathroom,
+        HeatingDemand::LivingRoomBig => Thermostat::LivingRoomBig,
+        HeatingDemand::LivingRoomSmall => Thermostat::LivingRoomSmall,
+        HeatingDemand::Bedroom => Thermostat::Bedroom,
+        HeatingDemand::RoomOfRequirements => Thermostat::RoomOfRequirements,
+        HeatingDemand::Kitchen => Thermostat::Kitchen,
+        HeatingDemand::Bathroom => Thermostat::Bathroom,
     }
 }

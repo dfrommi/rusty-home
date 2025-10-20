@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use crate::core::HomeApi;
 use crate::core::time::DateTime;
-use crate::home::state::{HeatingDemand, SetPoint, Temperature};
+use crate::home::HeatingZone;
+use crate::home::state::{HeatingDemand, HeatingMode, ScheduledHeatingMode, SetPoint, Temperature};
 use actix_web::web::{self, Path, Query};
 
 use crate::{
@@ -25,6 +26,7 @@ where
         .route("/temperature/stats", web::get().to(temperature_stats))
         .route("/environment", web::get().to(environment_series))
         .route("/environment/stats", web::get().to(environment_stats))
+        .route("/schedule", web::get().to(schedule_series))
         .app_data(web::Data::from(api))
 }
 
@@ -148,6 +150,47 @@ where
     csv_response(&rows)
 }
 
+async fn schedule_series(
+    api: web::Data<HomeApi>,
+    path: Path<Room>,
+    query: Query<TimeRangeWithIntervalQuery>,
+) -> GrafanaResponse {
+    let room = path.into_inner();
+    let heating_zone = room.heating_zone();
+
+    let schedule = match heating_zone {
+        HeatingZone::LivingRoom => ScheduledHeatingMode::LivingRoom,
+        HeatingZone::Bedroom => ScheduledHeatingMode::Bedroom,
+        HeatingZone::Kitchen => ScheduledHeatingMode::Kitchen,
+        HeatingZone::RoomOfRequirements => ScheduledHeatingMode::RoomOfRequirements,
+        HeatingZone::Bathroom => ScheduledHeatingMode::Bathroom,
+    };
+
+    let ts = schedule
+        .series(query.range(), api.as_ref())
+        .await
+        .map_err(GrafanaApiError::DataAccessError)?;
+
+    let mut rows: Vec<Row> = vec![];
+
+    for dt in query.iter() {
+        let Some(dp) = ts.at(dt) else {
+            continue;
+        };
+
+        for mode in HeatingMode::variants() {
+            let v = if dp.value == *mode { 100.0 } else { 0.0 };
+
+            rows.push(Row {
+                channel: mode.ext_id().variant_name().to_string(),
+                timestamp: dp.timestamp,
+                value: v,
+            })
+        }
+    }
+
+    csv_response(&rows)
+}
 async fn temperature_stats(api: web::Data<HomeApi>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
 where
     Temperature: TimeSeriesAccess<Temperature>,

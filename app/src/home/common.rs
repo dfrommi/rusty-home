@@ -5,22 +5,28 @@ use crate::{
     core::unit::DegreeCelsius,
     home::{
         command::HeatingTargetState,
-        state::{HeatingDemand, HeatingMode, SetPoint},
+        state::{HeatingDemand, HeatingMode, OpenedArea, SetPoint, Temperature},
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
+#[allow(clippy::enum_variant_names)]
 #[serde(rename_all = "snake_case")]
-pub enum Thermostat {
-    LivingRoomBig,
-    LivingRoomSmall,
+pub enum Room {
+    #[display("LivingRoom")]
+    LivingRoom,
+    #[display("Bedroom")]
     Bedroom,
+    #[display("Kitchen")]
     Kitchen,
+    #[display("RoomOfRequirements")]
     RoomOfRequirements,
+    #[display("Bathroom")]
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HeatingZone {
     #[display("LivingRoom")]
     LivingRoom,
@@ -31,6 +37,17 @@ pub enum HeatingZone {
     #[display("RoomOfRequirements")]
     RoomOfRequirements,
     #[display("Bathroom")]
+    Bathroom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[serde(rename_all = "snake_case")]
+pub enum Thermostat {
+    LivingRoomBig,
+    LivingRoomSmall,
+    Bedroom,
+    Kitchen,
+    RoomOfRequirements,
     Bathroom,
 }
 
@@ -82,6 +99,26 @@ impl HeatingZone {
             HeatingMode::Away => HeatingTargetState::Heat {
                 temperature: default_temperature - DegreeCelsius(2.0),
             },
+        }
+    }
+
+    //TODO use in actions
+    pub fn inside_temperature(&self) -> Temperature {
+        match self {
+            HeatingZone::LivingRoom => Temperature::LivingRoom,
+            HeatingZone::Bedroom => Temperature::Bedroom,
+            HeatingZone::Kitchen => Temperature::Kitchen,
+            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirements,
+            HeatingZone::Bathroom => Temperature::BathroomShower,
+        }
+    }
+
+    pub fn window(&self) -> OpenedArea {
+        match self {
+            HeatingZone::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
+            HeatingZone::Kitchen => OpenedArea::KitchenWindow,
+            HeatingZone::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
+            HeatingZone::Bedroom | HeatingZone::Bathroom => OpenedArea::BedroomWindow,
         }
     }
 }

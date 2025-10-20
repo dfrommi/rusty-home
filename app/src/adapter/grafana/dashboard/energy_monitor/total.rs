@@ -14,7 +14,7 @@ use actix_web::{
 use crate::{
     adapter::grafana::{
         DashboardDisplay,
-        dashboard::{EURO_PER_KWH, Room, TimeRangeQuery},
+        dashboard::{EURO_PER_KWH, TimeRangeQuery},
     },
     core::timeseries::{TimeSeries, interpolate::Estimatable},
     port::TimeSeriesAccess,

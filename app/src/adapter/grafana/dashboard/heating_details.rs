@@ -12,7 +12,7 @@ use crate::{
     port::TimeSeriesAccess,
 };
 
-use super::{Room, TimeRangeQuery, TimeRangeWithIntervalQuery};
+use super::{TimeRangeQuery, TimeRangeWithIntervalQuery};
 
 pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
@@ -39,17 +39,16 @@ struct Row {
 
 async fn temperature_series(
     api: web::Data<HomeApi>,
-    path: Path<Room>,
+    path: Path<HeatingZone>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
 where
     Temperature: TimeSeriesAccess<Temperature>,
     SetPoint: TimeSeriesAccess<SetPoint>,
 {
-    let room = path.into_inner();
-    let heating_zone = room.heating_zone();
+    let heating_zone = path.into_inner();
+    let inside_temp = heating_zone.inside_temperature();
 
-    let inside_temp = room.inside_temperature();
     let (ts_outside, ts_inside) = tokio::try_join!(
         Temperature::Outside.series(query.range(), api.as_ref()),
         inside_temp.series(query.range(), api.as_ref()),
@@ -99,17 +98,16 @@ where
 
 async fn environment_series(
     api: web::Data<HomeApi>,
-    path: Path<Room>,
+    path: Path<HeatingZone>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse
 where
     OpenedArea: TimeSeriesAccess<OpenedArea>,
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
-    let room = path.into_inner();
-    let heating_zone = room.heating_zone();
+    let heating_zone = path.into_inner();
+    let window = heating_zone.window();
 
-    let window = room.window();
     let ts_opened = window
         .series(query.range(), api.as_ref())
         .await
@@ -152,11 +150,10 @@ where
 
 async fn schedule_series(
     api: web::Data<HomeApi>,
-    path: Path<Room>,
+    path: Path<HeatingZone>,
     query: Query<TimeRangeWithIntervalQuery>,
 ) -> GrafanaResponse {
-    let room = path.into_inner();
-    let heating_zone = room.heating_zone();
+    let heating_zone = path.into_inner();
 
     let schedule = match heating_zone {
         HeatingZone::LivingRoom => ScheduledHeatingMode::LivingRoom,
@@ -191,7 +188,11 @@ async fn schedule_series(
 
     csv_response(&rows)
 }
-async fn temperature_stats(api: web::Data<HomeApi>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
+async fn temperature_stats(
+    api: web::Data<HomeApi>,
+    path: Path<HeatingZone>,
+    query: Query<TimeRangeQuery>,
+) -> GrafanaResponse
 where
     Temperature: TimeSeriesAccess<Temperature>,
     SetPoint: TimeSeriesAccess<SetPoint>,
@@ -202,7 +203,8 @@ where
         mean: f64,
     }
 
-    let inside_temp = room.inside_temperature();
+    let heating_zone = path.into_inner();
+    let inside_temp = heating_zone.inside_temperature();
     let (ts_outside, ts_inside) = tokio::try_join!(
         Temperature::Outside.series(query.range(), api.as_ref()),
         inside_temp.series(query.range(), api.as_ref()),
@@ -223,7 +225,11 @@ where
     csv_response(&rows)
 }
 
-async fn environment_stats(api: web::Data<HomeApi>, room: Path<Room>, query: Query<TimeRangeQuery>) -> GrafanaResponse
+async fn environment_stats(
+    api: web::Data<HomeApi>,
+    path: Path<HeatingZone>,
+    query: Query<TimeRangeQuery>,
+) -> GrafanaResponse
 where
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
@@ -235,7 +241,7 @@ where
 
     let mut total_demand_scaled = 0.0;
 
-    let zone = room.heating_zone();
+    let zone = path.into_inner();
     for thermostat in zone.thermostats() {
         let ts_heating = thermostat
             .heating_demand()

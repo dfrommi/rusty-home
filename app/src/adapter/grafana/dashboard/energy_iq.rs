@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange, Duration};
 use crate::core::unit::Percent;
+use crate::home::HeatingZone;
 use crate::home::state::{HeatingDemand, Temperature};
 use actix_web::{
     Responder,
@@ -14,8 +15,6 @@ use crate::{
     core::timeseries::TimeSeries,
     port::TimeSeriesAccess,
 };
-
-use super::Room;
 
 pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
 where
@@ -34,7 +33,7 @@ struct QueryTimeRange {
     to: DateTime,
     offset: Option<Duration>,
     #[serde(deserialize_with = "super::empty_string_as_none")]
-    room: Option<Room>,
+    room: Option<HeatingZone>,
 }
 
 impl QueryTimeRange {
@@ -64,12 +63,12 @@ async fn heating_series_aggregated_sum(
 where
     HeatingDemand: TimeSeriesAccess<HeatingDemand>,
 {
-    let rooms = match &query.room {
+    let zones = match &query.room {
         Some(room) => vec![room.clone()],
-        None => Room::variants().to_vec(),
+        None => HeatingZone::variants().to_vec(),
     };
 
-    let ts = combined_series(api.as_ref(), &rooms, query.ts_range())
+    let ts = combined_series(api.as_ref(), &zones, query.ts_range())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -125,13 +124,10 @@ where
 
 async fn combined_series(
     api: &HomeApi,
-    rooms: &[Room],
+    zones: &[HeatingZone],
     time_range: DateTimeRange,
 ) -> anyhow::Result<TimeSeries<HeatingDemand>> {
-    let thermostats = rooms
-        .iter()
-        .flat_map(|r| r.heating_zone().thermostats())
-        .collect::<Vec<_>>();
+    let thermostats = zones.iter().flat_map(|z| z.thermostats()).collect::<Vec<_>>();
 
     let mut scaled_ts = vec![];
 

@@ -1,11 +1,11 @@
 use crate::adapter::homekit::HomekitCommandTarget;
-use crate::home::Thermostat;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle};
 use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
+use crate::home::{Room, Thermostat};
 
 use super::action::{Dehumidify, HomeAction};
-use super::goal::{HomeGoal, Room};
+use super::goal::HomeGoal;
 use crate::home::action::{
     AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
     ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,

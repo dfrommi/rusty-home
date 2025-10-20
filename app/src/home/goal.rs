@@ -1,17 +1,7 @@
 use crate::core::HomeApi;
-use crate::home::HeatingZone;
 use crate::home::state::Powered;
+use crate::home::{HeatingZone, Room};
 use crate::port::DataPointAccess;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
-#[allow(clippy::enum_variant_names)]
-pub enum Room {
-    LivingRoom,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum HomeGoal {

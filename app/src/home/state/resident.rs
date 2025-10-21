@@ -49,7 +49,7 @@ async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
 
     let in_bed_start_range = DateTimeRange::new(*in_bed_full_range.start(), in_bed_full_range.end().at(t!(3:00)));
 
-    let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(5:00)), *in_bed_full_range.end());
+    let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(6:00)), *in_bed_full_range.end());
 
     //Some has always true value
     let sleeping_started = ts

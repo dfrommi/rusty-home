@@ -19,7 +19,7 @@ pub fn trace_state_access(_attr: TokenStream, item: TokenStream) -> TokenStream 
         #vis #sig {
             use tracing::Instrument;
 
-            let span = tracing::info_span!(
+            let span = tracing::trace_span!(
                 "DataPointAccess::current_data_point",
                 otel.name = tracing::field::Empty,
                 state_type = self.ext_id().type_name(),

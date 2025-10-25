@@ -6,7 +6,7 @@ use crate::home::Thermostat;
 use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::timeseries::DataPoint;
 use crate::home::state::Powered;
@@ -32,7 +32,6 @@ pub enum UserControlled {
 // - is the current state as expected and reached shortly after triggering the command?
 impl DataPointAccess<UserControlled> for UserControlled {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         match self {
             UserControlled::Dehumidifier => current_data_point_for_dehumidifier(api).await,
@@ -146,7 +145,6 @@ impl Estimatable for UserControlled {
 }
 
 impl DataFrameAccess<UserControlled> for UserControlled {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

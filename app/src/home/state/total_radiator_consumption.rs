@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::{
     HomeApi,
@@ -30,14 +30,12 @@ impl Estimatable for TotalRadiatorConsumption {
 
 impl DataPointAccess<TotalRadiatorConsumption> for TotalRadiatorConsumption {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingUnit>> {
         api.current_data_point(self).await
     }
 }
 
 impl DataFrameAccess<TotalRadiatorConsumption> for TotalRadiatorConsumption {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingUnit>> {
         api.get_data_frame(self, range).await
     }

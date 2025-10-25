@@ -5,7 +5,7 @@ use crate::core::unit::DegreeCelsius;
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Temperature};
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use super::{DataPointAccess, OpenedArea, sampled_data_frame};
 
@@ -19,7 +19,6 @@ pub enum ColdAirComingIn {
 
 impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
 
@@ -52,7 +51,6 @@ impl Estimatable for ColdAirComingIn {
 }
 
 impl DataFrameAccess<ColdAirComingIn> for ColdAirComingIn {
-    #[mockable]
     async fn get_data_frame(
         &self,
         range: DateTimeRange,

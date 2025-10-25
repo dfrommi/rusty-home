@@ -3,7 +3,7 @@ use crate::core::time::{DateTime, DateTimeRange};
 use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::timeseries::{
     DataFrame, DataPoint, TimeSeries,
@@ -61,14 +61,12 @@ impl OpenedArea {
 
 impl DataPointAccess<Opened> for Opened {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }
 }
 
 impl DataFrameAccess<Opened> for Opened {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }
@@ -76,7 +74,6 @@ impl DataFrameAccess<Opened> for Opened {
 
 impl DataPointAccess<OpenedArea> for OpenedArea {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let opened_items = self.api_items();
         let futures: Vec<_> = opened_items.iter().map(|o| o.current_data_point(api)).collect();
@@ -94,7 +91,6 @@ fn any_of(opened_dps: Vec<DataPoint<bool>>) -> DataPoint<bool> {
 }
 
 impl DataFrameAccess<OpenedArea> for OpenedArea {
-    #[mockable]
     async fn get_data_frame(
         &self,
         range: DateTimeRange,

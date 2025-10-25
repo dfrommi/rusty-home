@@ -7,7 +7,7 @@ use crate::home::command::CommandTarget;
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Powered};
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::home::command::{Command, CommandExecution, EnergySavingDevice};
 
@@ -21,7 +21,6 @@ pub enum EnergySaving {
 impl DataPointAccess<EnergySaving> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     #[trace_state]
-    #[mockable]
     async fn current_data_point(
         &self,
         api: &HomeApi,
@@ -75,7 +74,6 @@ impl Estimatable for EnergySaving {
 }
 
 impl DataFrameAccess<EnergySaving> for EnergySaving {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

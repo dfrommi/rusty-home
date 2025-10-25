@@ -172,7 +172,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
 
             impl crate::port::DataPointAccess<#home_state_name> for #home_state_name {
-                #[mockable]
                 async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
                     match self {
                         #(#home_state_data_point_matches),*
@@ -181,7 +180,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
 
             impl crate::port::DataFrameAccess<#home_state_name> for #home_state_name {
-                #[mockable]
                 async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
                     let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
                         #(#home_state_data_frame_matches),*

@@ -1,4 +1,4 @@
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::{
     HomeApi,
@@ -26,14 +26,12 @@ impl Estimatable for Powered {
 
 impl DataPointAccess<Powered> for Powered {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }
 }
 
 impl DataFrameAccess<Powered> for Powered {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }

@@ -6,7 +6,7 @@ use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Context, Result, bail};
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use super::{DataPointAccess, TimeSeriesAccess, sampled_data_frame};
 
@@ -20,7 +20,6 @@ pub enum Resident {
 //TODO maybe combination via Baysian to detect resident state
 impl DataPointAccess<Resident> for Resident {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         match self {
             Resident::DennisSleeping => sleeping(Presence::BedDennis, api).await,
@@ -138,7 +137,6 @@ impl Estimatable for Resident {
 }
 
 impl DataFrameAccess<Resident> for Resident {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

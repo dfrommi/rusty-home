@@ -59,7 +59,7 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
 use crate::port::{DataPointAccess, TimeSeriesAccess};
 use crate::t;
-use r#macro::{EnumWithValue, StateTypeInfoDerive, mockable};
+use r#macro::{EnumWithValue, StateTypeInfoDerive};
 
 #[derive(Debug, Clone, PartialEq, EnumWithValue, StateTypeInfoDerive)]
 pub enum HomeStateValue {

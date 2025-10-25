@@ -1,7 +1,6 @@
 mod enum_variants;
 mod enum_with_value;
 mod id_item;
-mod mockable;
 mod state_trace;
 mod state_type_info;
 
@@ -30,11 +29,6 @@ pub fn id_item_delegation_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(EnumVariants)]
 pub fn enum_variants_derive(input: TokenStream) -> TokenStream {
     enum_variants::derive_typed_item(input)
-}
-
-#[proc_macro_attribute]
-pub fn mockable(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    mockable::mockable_state(item)
 }
 
 #[proc_macro_attribute]

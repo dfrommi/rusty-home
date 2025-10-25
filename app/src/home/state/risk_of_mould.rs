@@ -7,7 +7,7 @@ use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};
 use anyhow::Result;
-use r#macro::{EnumVariants, Id, mockable, trace_state};
+use r#macro::{EnumVariants, Id, trace_state};
 
 use super::{DataPointAccess, TimeSeriesAccess, dewpoint::DewPoint, sampled_data_frame};
 
@@ -18,7 +18,6 @@ pub enum RiskOfMould {
 
 impl DataPointAccess<RiskOfMould> for RiskOfMould {
     #[trace_state]
-    #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         let humidity = match self {
             RiskOfMould::Bathroom => RelativeHumidity::BathroomShower,
@@ -81,7 +80,6 @@ impl Estimatable for RiskOfMould {
 }
 
 impl DataFrameAccess<RiskOfMould> for RiskOfMould {
-    #[mockable]
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

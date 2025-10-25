@@ -133,7 +133,8 @@ impl Thermostat {
                 .or_else(|| trigger.value.as_str().and_then(|value| value.parse::<f64>().ok()));
 
             if let Some(target_temp) = target_temp {
-                let temperature = DegreeCelsius(target_temp);
+                //rounded to 0.5 degree celsius steps
+                let temperature = DegreeCelsius((target_temp * 2.0).round() / 2.0);
                 return Some(self.zone_command(HomekitHeatingState::Heat(temperature)));
             }
 

@@ -65,15 +65,20 @@ use r#macro::{EnumWithValue, StateTypeInfoDerive, mockable};
 pub enum HomeStateValue {
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),
-    #[persistent]
-    CurrentPowerUsage(CurrentPowerUsage, Watt),
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
+    OpenedArea(OpenedArea, bool),
+    Resident(Resident, bool),
+    RiskOfMould(RiskOfMould, bool),
+    ScheduledHeatingMode(ScheduledHeatingMode, HeatingMode),
+    UserControlled(UserControlled, bool),
+
+    #[persistent]
+    CurrentPowerUsage(CurrentPowerUsage, Watt),
     #[persistent]
     FanActivity(FanActivity, FanAirflow),
     #[persistent]
     HeatingDemand(HeatingDemand, Percent),
-    OpenedArea(OpenedArea, bool),
     #[persistent]
     Opened(Opened, bool),
     #[persistent]
@@ -82,9 +87,6 @@ pub enum HomeStateValue {
     Presence(Presence, bool),
     #[persistent]
     RelativeHumidity(RelativeHumidity, Percent),
-    Resident(Resident, bool),
-    RiskOfMould(RiskOfMould, bool),
-    ScheduledHeatingMode(ScheduledHeatingMode, HeatingMode),
     #[persistent]
     SetPoint(SetPoint, DegreeCelsius),
     #[persistent]
@@ -95,7 +97,6 @@ pub enum HomeStateValue {
     TotalRadiatorConsumption(TotalRadiatorConsumption, HeatingUnit),
     #[persistent]
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
-    UserControlled(UserControlled, bool),
 }
 
 async fn sampled_data_frame<T>(

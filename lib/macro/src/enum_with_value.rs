@@ -57,12 +57,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
             // Generate matches for From<&EnumValue> for f64
             value_to_f64_matches.push(quote! {
-                #name::#variant_name(item, value) => item.to_f64(value)
+                #name::#variant_name(item, value) => {
+                    <#item_type as crate::core::ValueObject>::to_f64(&item, &value)
+                }
             });
 
             // Generate matches for From<(Enum, f64)> for EnumValue
             tuple_to_value_matches.push(quote! {
-                #target_enum_name::#variant_name(item) => #name::#variant_name(item.clone(), item.from_f64(value))
+                #target_enum_name::#variant_name(item) => #name::#variant_name(
+                    item.clone(),
+                    <#item_type as crate::core::PersistentValueObject>::from_f64(&item, value)
+                )
             });
 
             // Generate matches for value_to_string

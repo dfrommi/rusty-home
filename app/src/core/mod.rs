@@ -24,6 +24,15 @@ where
     type ValueType;
 
     fn to_f64(&self, value: &Self::ValueType) -> f64;
+}
+
+pub trait PersistentValueObject
+where
+    Self::ValueType: Clone,
+{
+    type ValueType;
+
+    fn to_f64(&self, value: &Self::ValueType) -> f64;
     fn from_f64(&self, value: f64) -> Self::ValueType;
 }
 

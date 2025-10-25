@@ -8,14 +8,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let variants = super::enum_variants(input.data);
 
     let mut type_info_impls = Vec::new();
+    let mut persistent_type_impls = Vec::new();
     let mut persistent_variants = Vec::new();
     let mut persistent_enum_variants = Vec::new();
     let mut persistent_conversion_matches = Vec::new();
     let mut persistent_state_conversion_matches = Vec::new();
+    let mut persistent_state_to_f64_matches = Vec::new();
+    let mut persistent_state_from_f64_matches = Vec::new();
 
     // For HomeState implementations
     let mut home_state_to_f64_matches = Vec::new();
-    let mut home_state_from_f64_matches = Vec::new();
     let mut home_state_data_point_matches = Vec::new();
     let mut home_state_data_frame_matches = Vec::new();
 
@@ -56,6 +58,29 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         fn to_f64(&self, value: &#value_type) -> f64 {
                             if *value { 1.0 } else { 0.0 }
                         }
+                    }
+                }
+            } else {
+                quote! {
+                    impl crate::core::ValueObject for #item_type {
+                        type ValueType = #value_type;
+
+                        fn to_f64(&self, value: &#value_type) -> f64 {
+                            value.into()
+                        }
+                    }
+                }
+            };
+            type_info_impls.push(impl_block);
+
+            let persistent_impl_block = if is_bool {
+                quote! {
+                    impl crate::core::PersistentValueObject for #item_type {
+                        type ValueType = #value_type;
+
+                        fn to_f64(&self, value: &#value_type) -> f64 {
+                            if *value { 1.0 } else { 0.0 }
+                        }
 
                         fn from_f64(&self, value: f64) -> #value_type {
                             value > 0.0
@@ -64,7 +89,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             } else {
                 quote! {
-                    impl crate::core::ValueObject for #item_type {
+                    impl crate::core::PersistentValueObject for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -77,7 +102,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     }
                 }
             };
-            type_info_impls.push(impl_block);
+            persistent_type_impls.push(persistent_impl_block);
 
             // Collect persistent variants if this is HomeStateValue
             if is_persistent {
@@ -96,16 +121,27 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 persistent_state_conversion_matches.push(quote! {
                     #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item)
                 });
+
+                persistent_state_to_f64_matches.push(quote! {
+                    #persistent_enum_name::#variant_name(item, value) => {
+                        <#item_type as crate::core::PersistentValueObject>::to_f64(&item, &value)
+                    }
+                });
+
+                persistent_state_from_f64_matches.push(quote! {
+                    #persistent_home_state_name::#variant_name(item) => {
+                        #persistent_enum_name::#variant_name(
+                            item.clone(),
+                            <#item_type as crate::core::PersistentValueObject>::from_f64(&item, value)
+                        )
+                    }
+                });
             }
 
             // Generate HomeState ValueObject and DataPointAccess matches
             home_state_to_f64_matches.push(quote! {
-                #enum_name::#variant_name(item, v) => item.to_f64(v)
-            });
-
-            home_state_from_f64_matches.push(quote! {
-                #home_state_name::#variant_name(item) => {
-                    #enum_name::#variant_name(item.clone(), item.from_f64(value))
+                #enum_name::#variant_name(item, v) => {
+                    <#item_type as crate::core::ValueObject>::to_f64(&item, &v)
                 }
             });
 
@@ -147,6 +183,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     }
                 }
             }
+
+            impl crate::core::PersistentValueObject for #persistent_home_state_name {
+                type ValueType = #persistent_enum_name;
+
+                fn to_f64(&self, value: &Self::ValueType) -> f64 {
+                    match value {
+                        #(#persistent_state_to_f64_matches),*
+                    }
+                }
+
+                fn from_f64(&self, value: f64) -> Self::ValueType {
+                    match self {
+                        #(#persistent_state_from_f64_matches),*
+                    }
+                }
+            }
         }
     } else {
         quote! {}
@@ -161,12 +213,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 fn to_f64(&self, value: &Self::ValueType) -> f64 {
                     match value {
                         #(#home_state_to_f64_matches),*
-                    }
-                }
-
-                fn from_f64(&self, value: f64) -> Self::ValueType {
-                    match self {
-                        #(#home_state_from_f64_matches),*
                     }
                 }
             }
@@ -194,8 +240,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        // Implement ValueObject for each variant
+        // Implement ValueObject and PersistentValueObject for each variant
         #(#type_info_impls)*
+        #(#persistent_type_impls)*
 
         // Generate persistent types if applicable
         #persistent_generation

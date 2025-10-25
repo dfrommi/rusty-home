@@ -78,23 +78,19 @@ impl DataPointAccess<OpenedArea> for OpenedArea {
     #[trace_state]
     #[mockable]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
-        any_of(api, self.api_items()).await
+        let opened_items = self.api_items();
+        let futures: Vec<_> = opened_items.iter().map(|o| o.current_data_point(api)).collect();
+        let values: Vec<_> = futures::future::try_join_all(futures).await?;
+
+        Ok(any_of(values))
     }
 }
 
-async fn any_of(api: &HomeApi, opened_states: Vec<Opened>) -> anyhow::Result<DataPoint<bool>> {
-    let futures: Vec<_> = opened_states.iter().map(|o| o.current_data_point(api)).collect();
-    let res: Result<Vec<_>, _> = futures::future::try_join_all(futures).await;
+fn any_of(opened_dps: Vec<DataPoint<bool>>) -> DataPoint<bool> {
+    let timestamp = opened_dps.iter().map(|v| v.timestamp).max().unwrap_or(t!(now));
+    let value = opened_dps.iter().any(|v| v.value);
 
-    match res {
-        Ok(values) => {
-            let timestamp = values.iter().map(|v| v.timestamp).max().unwrap_or(t!(now));
-            let value = values.iter().any(|v| v.value);
-
-            Ok(DataPoint { value, timestamp })
-        }
-        Err(e) => Err(e),
-    }
+    DataPoint { value, timestamp }
 }
 
 impl DataFrameAccess<OpenedArea> for OpenedArea {
@@ -140,33 +136,27 @@ impl Estimatable for OpenedArea {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::HomeApi;
-
     use super::*;
 
     #[tokio::test]
     async fn test_any_of_some_opened() {
-        let mut api = HomeApi::for_testing();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowLeft, true, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomWindowRight, false, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomWindowSide, true, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomBalconyDoor, false, t!(now));
+        let res = any_of(vec![
+            DataPoint::new(false, t!(5 minutes ago)),
+            DataPoint::new(true, t!(3 minutes ago)),
+            DataPoint::new(false, t!(1 minutes ago)),
+        ]);
 
-        let result = OpenedArea::LivingRoomWindowOrDoor.current_data_point(&api).await;
-
-        assert!(result.unwrap().value);
+        assert!(res.value);
     }
 
     #[tokio::test]
     async fn test_any_of_all_closed() {
-        let mut api = HomeApi::for_testing();
-        api.with_fixed_current_dp(Opened::LivingRoomWindowLeft, false, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomWindowRight, false, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomWindowSide, false, t!(now));
-        api.with_fixed_current_dp(Opened::LivingRoomBalconyDoor, false, t!(now));
+        let res = any_of(vec![
+            DataPoint::new(false, t!(5 minutes ago)),
+            DataPoint::new(false, t!(3 minutes ago)),
+            DataPoint::new(false, t!(1 minutes ago)),
+        ]);
 
-        let result = OpenedArea::LivingRoomWindowOrDoor.current_data_point(&api).await;
-
-        assert!(!result.unwrap().value);
+        assert!(!res.value);
     }
 }

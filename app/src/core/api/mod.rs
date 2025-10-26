@@ -339,7 +339,7 @@ impl HomeApi {
 //
 //         pub fn with_fixed_current_dp<T>(&mut self, state: T, value: impl Into<T::ValueType>, timestamp: DateTime)
 //         where
-//             T: Into<HomeState> + HomeStateValueType + Clone,
+//             T: Into<HomeState> + ValueObject + Clone,
 //         {
 //             let value = value.into();
 //             self.state_dp_mock
@@ -348,7 +348,7 @@ impl HomeApi {
 //
 //         pub fn with_fixed_df<T, V>(&mut self, state: T, values: &[(V, DateTime)])
 //         where
-//             T: Into<HomeState> + HomeStateValueType + Clone,
+//             T: Into<HomeState> + ValueObject + Clone,
 //             V: Into<T::ValueType> + Clone,
 //         {
 //             let dps: Vec<DataPoint<f64>> = values
@@ -362,7 +362,7 @@ impl HomeApi {
 //
 //         pub fn get_fixed_current_dp<T>(&self, state: T) -> Option<DataPoint<T::ValueType>>
 //         where
-//             T: Into<HomeState> + HomeStateValueType + Clone,
+//             T: Into<HomeState> + ValueObject + Clone,
 //         {
 //             self.state_dp_mock
 //                 .get(&state.clone().into())
@@ -371,7 +371,7 @@ impl HomeApi {
 //
 //         pub fn get_fixed_df<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
 //         where
-//             T: Into<HomeState> + HomeStateValueType + Clone,
+//             T: Into<HomeState> + ValueObject + Clone,
 //         {
 //             self.state_df_mock
 //                 .get(&state.clone().into())

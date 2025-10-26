@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::home::Thermostat;
-use crate::home::state::{HeatingDemand, HomeStateValueType, TotalEnergyConsumption};
+use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
 use actix_web::{
     HttpResponse, Responder,
     http::header,
@@ -16,7 +16,7 @@ use crate::{
         dashboard::{EURO_PER_KWH, TimeRangeQuery},
     },
     core::timeseries::{TimeSeries, interpolate::Estimatable},
-    port::TimeSeriesAccess,
+    port::{TimeSeriesAccess, ValueObject},
 };
 
 pub async fn total_power(api: web::Data<HomeApi>, time_range: Query<TimeRangeQuery>) -> impl Responder {
@@ -49,7 +49,7 @@ async fn total_values_response<T, V: Fn(&T, TimeSeries<T>) -> (f64, f64)>(
     value_mapper: V,
 ) -> impl Responder + use<T, V>
 where
-    T: HomeStateValueType
+    T: ValueObject
         + DashboardDisplay
         + Estimatable
         + Clone

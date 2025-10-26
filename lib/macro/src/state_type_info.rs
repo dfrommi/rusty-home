@@ -69,7 +69,7 @@ fn generate_annotated_enum(
             }
 
             item_value_object_impls.push(quote! {
-                impl crate::home::state::HomeStateValueType for #item_type {
+                impl crate::port::ValueObject for #item_type {
                     type ValueType = #value_type;
                 }
             });
@@ -91,7 +91,7 @@ fn generate_annotated_enum(
     }
 
     let home_state_impls = quote! {
-        impl crate::home::state::HomeStateValueType for #home_state_name {
+        impl crate::port::ValueObject for #home_state_name {
             type ValueType = #enum_name;
         }
 

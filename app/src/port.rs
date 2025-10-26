@@ -10,6 +10,10 @@ use anyhow::Result;
 
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 
+pub trait ValueObject {
+    type ValueType: Clone;
+}
+
 pub trait DataPointAccess<T> {
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T>>;
 

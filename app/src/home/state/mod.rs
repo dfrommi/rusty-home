@@ -56,34 +56,9 @@ use crate::core::time::Duration;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
-use crate::port::{DataPointAccess, TimeSeriesAccess};
+use crate::port::{DataPointAccess, TimeSeriesAccess, ValueObject};
 use crate::t;
 use r#macro::StateTypeInfoDerive;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum StateValue {
-    Boolean(bool),
-    DegreeCelsius(DegreeCelsius),
-    Watt(Watt),
-    Percent(Percent),
-    KiloWattHours(KiloWattHours),
-    HeatingUnit(HeatingUnit),
-    KiloCubicMeter(KiloCubicMeter),
-    FanAirflow(FanAirflow),
-    HeatingMode(HeatingMode),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PersistentStateValue {
-    Boolean(bool),
-    DegreeCelsius(DegreeCelsius),
-    Watt(Watt),
-    Percent(Percent),
-    KiloWattHours(KiloWattHours),
-    HeatingUnit(HeatingUnit),
-    KiloCubicMeter(KiloCubicMeter),
-    FanAirflow(FanAirflow),
-}
 
 #[derive(Debug, Clone, PartialEq, StateTypeInfoDerive)]
 pub enum HomeStateValue {
@@ -123,18 +98,33 @@ pub enum HomeStateValue {
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
 }
 
-pub trait HomeStateValueType
-where
-    Self::ValueType: Clone,
-{
-    type ValueType;
+#[derive(Debug, Clone, PartialEq)]
+pub enum StateValue {
+    Boolean(bool),
+    DegreeCelsius(DegreeCelsius),
+    Watt(Watt),
+    Percent(Percent),
+    KiloWattHours(KiloWattHours),
+    HeatingUnit(HeatingUnit),
+    KiloCubicMeter(KiloCubicMeter),
+    FanAirflow(FanAirflow),
+    HeatingMode(HeatingMode),
 }
 
-pub trait PersistentHomeStateValueType
-where
-    Self::ValueType: Clone,
-{
-    type ValueType;
+#[derive(Debug, Clone, PartialEq)]
+pub enum PersistentStateValue {
+    Boolean(bool),
+    DegreeCelsius(DegreeCelsius),
+    Watt(Watt),
+    Percent(Percent),
+    KiloWattHours(KiloWattHours),
+    HeatingUnit(HeatingUnit),
+    KiloCubicMeter(KiloCubicMeter),
+    FanAirflow(FanAirflow),
+}
+
+pub trait PersistentHomeStateValueType {
+    type ValueType: Clone;
 
     fn to_f64(&self, value: &Self::ValueType) -> f64;
     fn from_f64(&self, value: f64) -> Self::ValueType;
@@ -147,7 +137,7 @@ async fn sampled_data_frame<T>(
     api: &HomeApi,
 ) -> anyhow::Result<DataFrame<T::ValueType>>
 where
-    T: HomeStateValueType + DataPointAccess<T::ValueType>,
+    T: ValueObject + DataPointAccess<T::ValueType>,
     T::ValueType: PartialEq,
 {
     let caching_range = DateTimeRange::new(*range.start() - t!(3 hours), *range.end() + t!(3 hours));

@@ -2,15 +2,15 @@ use crate::core::time::{DateTime, FIXED_NOW};
 
 use crate::{
     core::timeseries::DataPoint,
-    home::state::{AutomaticTemperatureIncrease, HomeStateValueType},
-    port::DataPointAccess,
+    home::state::AutomaticTemperatureIncrease,
+    port::{DataPointAccess, ValueObject},
 };
 
 use super::{infrastructure, runtime};
 
 fn get_state_at<T>(iso: &str, item: T) -> DataPoint<T::ValueType>
 where
-    T: DataPointAccess<T::ValueType> + HomeStateValueType + Clone,
+    T: DataPointAccess<T::ValueType> + ValueObject + Clone,
 {
     let fake_now = DateTime::from_iso(iso).unwrap();
 

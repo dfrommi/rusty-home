@@ -1,9 +1,9 @@
 use crate::core::time::DateTime;
-use crate::home::state::HomeStateValueType;
+use crate::port::ValueObject;
 
 use super::DataFrame;
 
-pub trait Estimatable: HomeStateValueType {
+pub trait Estimatable: ValueObject {
     fn interpolate(&self, at: DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType>;
 }
 

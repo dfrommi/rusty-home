@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use crate::core::HomeApi;
 use crate::{
     core::timeseries::DataPoint,
-    home::state::{CurrentPowerUsage, HeatingDemand, HomeStateValueType},
+    home::state::{CurrentPowerUsage, HeatingDemand},
 };
 use actix_web::{
     HttpResponse, Responder,
@@ -11,7 +11,7 @@ use actix_web::{
     web::{self},
 };
 
-use crate::{adapter::grafana::DashboardDisplay, port::DataPointAccess};
+use crate::{adapter::grafana::DashboardDisplay, port::{DataPointAccess, ValueObject}};
 
 pub async fn current_power(api: web::Data<HomeApi>) -> impl Responder {
     current_values_response(api.as_ref(), CurrentPowerUsage::variants()).await
@@ -23,7 +23,7 @@ pub async fn current_heating(api: web::Data<HomeApi>) -> impl Responder {
 
 async fn current_values_response<T>(api: &HomeApi, items: &[T]) -> impl Responder + use<T>
 where
-    T: HomeStateValueType + DashboardDisplay + Clone + DataPointAccess<T::ValueType>,
+    T: ValueObject + DashboardDisplay + Clone + DataPointAccess<T::ValueType>,
     T::ValueType: PartialOrd + AsRef<f64>,
 {
     let values = get_all_states(api, items).await;
@@ -48,7 +48,7 @@ where
 }
 
 //TODO move to repo trait
-async fn get_all_states<T: HomeStateValueType + Clone + DataPointAccess<T::ValueType>>(
+async fn get_all_states<T: ValueObject + Clone + DataPointAccess<T::ValueType>>(
     api: &HomeApi,
     items: &[T],
 ) -> anyhow::Result<Vec<(T, DataPoint<T::ValueType>)>> {

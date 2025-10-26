@@ -150,7 +150,7 @@ pub enum PersistentHomeStateValue {  // From StateTypeInfoDerive
 #### Value Object Pattern
 
 - Each state type implements `ValueObject<ValueType = T>`
-- `ValueObject` exposes the associated `ValueType`; `PersistentHomeStateValueType` adds the numeric conversion helpers
+- `ValueObject` exposes the associated `ValueType`; `PersistentHomeStateTypeInfo` adds the numeric conversion helpers
 - Enables time series storage and mathematical operations
 - Bool types automatically convert: true=1.0, false=0.0
 

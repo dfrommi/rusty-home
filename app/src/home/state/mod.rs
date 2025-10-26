@@ -123,7 +123,7 @@ pub enum PersistentStateValue {
     FanAirflow(FanAirflow),
 }
 
-pub trait PersistentHomeStateValueType {
+pub trait PersistentHomeStateTypeInfo {
     type ValueType: Clone;
 
     fn to_f64(&self, value: &Self::ValueType) -> f64;

@@ -160,7 +160,7 @@ fn generate_persistent_enum(
                 });
 
                 item_persistent_impls.push(quote! {
-                    impl crate::home::state::PersistentHomeStateValueType for #item_type {
+                    impl crate::home::state::PersistentHomeStateTypeInfo for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -181,7 +181,7 @@ fn generate_persistent_enum(
                 });
 
                 item_persistent_impls.push(quote! {
-                    impl crate::home::state::PersistentHomeStateValueType for #item_type {
+                    impl crate::home::state::PersistentHomeStateTypeInfo for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -201,7 +201,7 @@ fn generate_persistent_enum(
 
             persistent_state_to_f64_matches.push(quote! {
                 #persistent_enum_name::#variant_name(item, value) => {
-                    <#item_type as crate::home::state::PersistentHomeStateValueType>::to_f64(&item, &value)
+                    <#item_type as crate::home::state::PersistentHomeStateTypeInfo>::to_f64(&item, &value)
                 }
             });
 
@@ -209,7 +209,7 @@ fn generate_persistent_enum(
                 #persistent_home_state_name::#variant_name(item) => {
                     #persistent_enum_name::#variant_name(
                         item.clone(),
-                        <#item_type as crate::home::state::PersistentHomeStateValueType>::from_f64(&item, value)
+                        <#item_type as crate::home::state::PersistentHomeStateTypeInfo>::from_f64(&item, value)
                     )
                 }
             });
@@ -244,7 +244,7 @@ fn generate_persistent_enum(
             }
         }
 
-        impl crate::home::state::PersistentHomeStateValueType for #persistent_home_state_name {
+        impl crate::home::state::PersistentHomeStateTypeInfo for #persistent_home_state_name {
             type ValueType = #persistent_enum_name;
 
             fn to_f64(&self, value: &Self::ValueType) -> f64 {

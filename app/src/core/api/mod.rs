@@ -7,7 +7,7 @@ use super::timeseries::{DataFrame, DataPoint};
 use crate::core::id::ExternalId;
 use crate::home::availability::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::state::{PersistentHomeState, PersistentHomeStateValue, PersistentHomeStateValueType};
+use crate::home::state::{PersistentHomeState, PersistentHomeStateValue, PersistentHomeStateTypeInfo};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use crate::t;
 use anyhow::Result;
@@ -119,19 +119,19 @@ impl HomeApi {
 
     pub async fn current_data_point<T>(&self, item: &T) -> Result<DataPoint<T::ValueType>>
     where
-        T: Into<PersistentHomeState> + PersistentHomeStateValueType + Clone,
+        T: Into<PersistentHomeState> + PersistentHomeStateTypeInfo + Clone,
     {
         let channel: PersistentHomeState = item.clone().into();
         let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
 
         self.get_datapoint(tag_id, &t!(now))
             .await
-            .map(|dp| DataPoint::new(<T as PersistentHomeStateValueType>::from_f64(item, dp.value), dp.timestamp))
+            .map(|dp| DataPoint::new(<T as PersistentHomeStateTypeInfo>::from_f64(item, dp.value), dp.timestamp))
     }
 
     pub async fn get_data_frame<T>(&self, item: &T, range: DateTimeRange) -> Result<DataFrame<T::ValueType>>
     where
-        T: Into<PersistentHomeState> + PersistentHomeStateValueType + Clone,
+        T: Into<PersistentHomeState> + PersistentHomeStateTypeInfo + Clone,
     {
         let channel: PersistentHomeState = item.clone().into();
         let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
@@ -139,7 +139,7 @@ impl HomeApi {
         let df = self
             .get_dataframe(tag_id, &range)
             .await?
-            .map(|dp| <T as PersistentHomeStateValueType>::from_f64(item, dp.value));
+            .map(|dp| <T as PersistentHomeStateTypeInfo>::from_f64(item, dp.value));
 
         Ok(df)
     }

@@ -19,8 +19,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut target_variants = Vec::new();
     let mut item_to_target_impls = Vec::new();
     let mut source_to_target_impl = Vec::new();
-    let mut value_to_f64_matches = Vec::new();
-    let mut with_value_matches = Vec::new();
     let mut value_to_string_matches = Vec::new();
 
     for variant in variants {
@@ -49,21 +47,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 #name::#variant_name(id, _) => #target_enum_name::#variant_name(id.clone())
             });
 
-            // Generate matches for From<&EnumValue> for f64
-            value_to_f64_matches.push(quote! {
-                #name::#variant_name(item, value) => {
-                    <#item_type as crate::core::ValueObject>::to_f64(&item, &value)
-                }
-            });
-
-            // Generate matches for From<(Enum, f64)> for EnumValue
-            with_value_matches.push(quote! {
-                #target_enum_name::#variant_name(item) => #name::#variant_name(
-                    item.clone(),
-                    <#item_type as crate::core::PersistentValueObject>::from_f64(&item, value)
-                )
-            });
-
             // Generate matches for value_to_string
             value_to_string_matches.push(quote! {
                 #name::#variant_name(_, value) => value.to_string()
@@ -90,22 +73,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #target_enum_name {
-            pub fn with_value(&self, value: f64) -> #name {
-                match self {
-                    #(#with_value_matches),*
-                }
-            }
-        }
-
         // Implement value_to_string method
         impl #name {
-            pub fn value(&self) -> f64 {
-                match self {
-                    #(#value_to_f64_matches),*
-                }
-            }
-
             pub fn value_to_string(&self) -> String {
                 match self {
                     #(#value_to_string_matches),*

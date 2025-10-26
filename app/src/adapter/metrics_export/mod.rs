@@ -1,4 +1,3 @@
-use crate::core::ValueObject;
 use crate::core::timeseries::DataPoint;
 use crate::home::state::{HomeState, HomeStateValue};
 use infrastructure::meter::set;
@@ -20,10 +19,8 @@ impl HomeStateMetricsExporter {
         loop {
             match self.state_updated_rx.recv().await {
                 Ok(data_point) => {
-                    //TODO direct support of to_f64 on HomeStateValue
-                    let state_value = HomeState::from(&data_point.value);
-                    let value = state_value.to_f64(&data_point.value);
-                    let external_id = state_value.ext_id();
+                    let value = data_point.value.value_to_f64();
+                    let external_id = HomeState::from(&data_point.value).ext_id();
 
                     set(
                         "home_state_value",

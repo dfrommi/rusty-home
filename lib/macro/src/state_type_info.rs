@@ -10,12 +10,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut type_info_impls = Vec::new();
     let mut persistent_type_impls = Vec::new();
     let mut persistent_variants = Vec::new();
-    let mut persistent_enum_variants = Vec::new();
     let mut persistent_state_to_f64_matches = Vec::new();
     let mut persistent_state_from_f64_matches = Vec::new();
 
     // For HomeState implementations
-    let mut home_state_to_f64_matches = Vec::new();
+    let mut enum_value_to_f64_matches = Vec::new();
     let mut home_state_data_point_matches = Vec::new();
     let mut home_state_data_frame_matches = Vec::new();
 
@@ -108,10 +107,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     #variant_name(#item_type, #value_type)
                 });
 
-                persistent_enum_variants.push(quote! {
-                    #variant_name(#item_type)
-                });
-
                 persistent_state_to_f64_matches.push(quote! {
                     #persistent_enum_name::#variant_name(item, value) => {
                         <#item_type as crate::core::PersistentValueObject>::to_f64(&item, &value)
@@ -128,8 +123,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 });
             }
 
-            // Generate HomeState ValueObject and DataPointAccess matches
-            home_state_to_f64_matches.push(quote! {
+            enum_value_to_f64_matches.push(quote! {
                 #enum_name::#variant_name(item, v) => {
                     <#item_type as crate::core::ValueObject>::to_f64(&item, &v)
                 }
@@ -158,6 +152,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 #(#persistent_variants),*
             }
 
+            impl #persistent_enum_name {
+                pub fn value_to_f64(&self) -> f64 {
+                    match self {
+                        #(#persistent_state_to_f64_matches),*
+                    }
+                }
+            }
+
+            impl #persistent_home_state_name {
+                pub fn with_value_f64(&self, value: f64) -> #persistent_enum_name {
+                    match self {
+                        #(#persistent_state_from_f64_matches),*
+                    }
+                }
+            }
+
             impl crate::core::PersistentValueObject for #persistent_home_state_name {
                 type ValueType = #persistent_enum_name;
 
@@ -179,38 +189,42 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
 
     // Generate HomeState implementations if this is HomeStateValue
-    let home_state_implementations = if enum_name.to_string().ends_with("Value") {
-        quote! {
-            impl crate::core::ValueObject for #home_state_name {
-                type ValueType = #enum_name;
+    let home_state_implementations = quote! {
+        impl crate::core::ValueObject for #home_state_name {
+            type ValueType = #enum_name;
 
-                fn to_f64(&self, value: &Self::ValueType) -> f64 {
-                    match value {
-                        #(#home_state_to_f64_matches),*
-                    }
-                }
-            }
-
-            impl crate::port::DataPointAccess<#home_state_name> for #home_state_name {
-                async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
-                    match self {
-                        #(#home_state_data_point_matches),*
-                    }
-                }
-            }
-
-            impl crate::port::DataFrameAccess<#home_state_name> for #home_state_name {
-                async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
-                    let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
-                        #(#home_state_data_frame_matches),*
-                    };
-
-                    Ok(df)
+            fn to_f64(&self, value: &Self::ValueType) -> f64 {
+                match value {
+                    #(#enum_value_to_f64_matches),*
                 }
             }
         }
-    } else {
-        quote! {}
+
+        impl #enum_name {
+            pub fn value_to_f64(&self) -> f64 {
+                match self {
+                    #(#enum_value_to_f64_matches),*
+                }
+            }
+        }
+
+        impl crate::port::DataPointAccess<#home_state_name> for #home_state_name {
+            async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
+                match self {
+                    #(#home_state_data_point_matches),*
+                }
+            }
+        }
+
+        impl crate::port::DataFrameAccess<#home_state_name> for #home_state_name {
+            async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
+                let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
+                    #(#home_state_data_frame_matches),*
+                };
+
+                Ok(df)
+            }
+        }
     };
 
     let expanded = quote! {

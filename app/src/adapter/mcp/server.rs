@@ -143,7 +143,7 @@ impl SmartHomeMcp {
                     Ok(data_point) => {
                         results.push(Content::json(DeviceState {
                             device: device_id.clone(),
-                            value: data_point.value.value_to_string(),
+                            value: data_point.value.value().to_string(),
                             last_changed: data_point.timestamp,
                             same_value_duration: data_point.timestamp.elapsed(),
                         })?);
@@ -183,7 +183,7 @@ impl SmartHomeMcp {
 
                     for dp in data_frame.iter() {
                         history.push(DeviceHistoryState {
-                            value: dp.value.value_to_string(),
+                            value: dp.value.value().to_string(),
                             last_changed: dp.timestamp,
                             same_value_duration: dp.timestamp.elapsed(),
                         });

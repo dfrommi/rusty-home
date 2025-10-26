@@ -60,6 +60,31 @@ use crate::port::{DataPointAccess, TimeSeriesAccess};
 use crate::t;
 use r#macro::StateTypeInfoDerive;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum StateValue {
+    Boolean(bool),
+    DegreeCelsius(DegreeCelsius),
+    Watt(Watt),
+    Percent(Percent),
+    KiloWattHours(KiloWattHours),
+    HeatingUnit(HeatingUnit),
+    KiloCubicMeter(KiloCubicMeter),
+    FanAirflow(FanAirflow),
+    HeatingMode(HeatingMode),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PersistentStateValue {
+    Boolean(bool),
+    DegreeCelsius(DegreeCelsius),
+    Watt(Watt),
+    Percent(Percent),
+    KiloWattHours(KiloWattHours),
+    HeatingUnit(HeatingUnit),
+    KiloCubicMeter(KiloCubicMeter),
+    FanAirflow(FanAirflow),
+}
+
 #[derive(Debug, Clone, PartialEq, StateTypeInfoDerive)]
 pub enum HomeStateValue {
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
@@ -103,8 +128,6 @@ where
     Self::ValueType: Clone,
 {
     type ValueType;
-
-    fn to_f64(&self, value: &Self::ValueType) -> f64;
 }
 
 pub trait PersistentHomeStateValueType
@@ -154,4 +177,35 @@ where
     }
 
     DataFrame::new(result)
+}
+
+impl std::fmt::Display for StateValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StateValue::Boolean(bool) => write!(f, "{}", bool),
+            StateValue::DegreeCelsius(degree_celsius) => write!(f, "{}", degree_celsius),
+            StateValue::Watt(watt) => write!(f, "{}", watt),
+            StateValue::Percent(percent) => write!(f, "{}", percent),
+            StateValue::KiloWattHours(kilo_watt_hours) => write!(f, "{}", kilo_watt_hours),
+            StateValue::HeatingUnit(heating_unit) => write!(f, "{}", heating_unit),
+            StateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
+            StateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
+            StateValue::HeatingMode(heating_mode) => write!(f, "{}", heating_mode),
+        }
+    }
+}
+
+impl std::fmt::Display for PersistentStateValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PersistentStateValue::Boolean(bool) => write!(f, "{}", bool),
+            PersistentStateValue::DegreeCelsius(degree_celsius) => write!(f, "{}", degree_celsius),
+            PersistentStateValue::Watt(watt) => write!(f, "{}", watt),
+            PersistentStateValue::Percent(percent) => write!(f, "{}", percent),
+            PersistentStateValue::KiloWattHours(kilo_watt_hours) => write!(f, "{}", kilo_watt_hours),
+            PersistentStateValue::HeatingUnit(heating_unit) => write!(f, "{}", heating_unit),
+            PersistentStateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
+            PersistentStateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
+        }
+    }
 }

@@ -195,7 +195,7 @@ async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQue
             timestamp: dp.timestamp.to_human_readable(),
             type_: id.type_name().to_string(),
             item: id.variant_name().to_string(),
-            value: dp.value.value_to_string(),
+            value: dp.value.value().to_string(),
         }
     });
 

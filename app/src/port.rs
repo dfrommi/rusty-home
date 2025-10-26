@@ -1,7 +1,7 @@
 #![allow(async_fn_in_trait)]
 
-use crate::core::timeseries::DataFrame;
 use crate::core::HomeApi;
+use crate::core::timeseries::DataFrame;
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,

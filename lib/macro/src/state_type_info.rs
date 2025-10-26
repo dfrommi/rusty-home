@@ -39,9 +39,9 @@ fn generate_annotated_enum(
     variants: &[syn::Variant],
 ) -> TokenStream2 {
     let mut item_value_object_impls = Vec::new();
-    let mut enum_value_to_f64_matches = Vec::new();
     let mut home_state_data_point_matches = Vec::new();
     let mut home_state_data_frame_matches = Vec::new();
+    let mut state_value_matches = Vec::new();
 
     for variant in variants {
         if let syn::Fields::Unnamed(fields) = &variant.fields {
@@ -54,30 +54,23 @@ fn generate_annotated_enum(
             let value_type = &fields.unnamed[1].ty;
 
             if is_bool_type(value_type) {
-                item_value_object_impls.push(quote! {
-                    impl crate::home::state::HomeStateValueType for #item_type {
-                        type ValueType = #value_type;
-
-                        fn to_f64(&self, value: &#value_type) -> f64 {
-                            if *value { 1.0 } else { 0.0 }
-                        }
+                state_value_matches.push(quote! {
+                    #enum_name::#variant_name(_, value) => {
+                        crate::home::state::StateValue::Boolean(*value)
                     }
                 });
             } else {
-                item_value_object_impls.push(quote! {
-                    impl crate::home::state::HomeStateValueType for #item_type {
-                        type ValueType = #value_type;
-
-                        fn to_f64(&self, value: &#value_type) -> f64 {
-                            value.into()
-                        }
+                let state_value_variant = value_type_of_variant(value_type);
+                state_value_matches.push(quote! {
+                    #enum_name::#variant_name(_, value) => {
+                        crate::home::state::StateValue::#state_value_variant(value.clone())
                     }
                 });
             }
 
-            enum_value_to_f64_matches.push(quote! {
-                #enum_name::#variant_name(item, v) => {
-                    <#item_type as crate::home::state::HomeStateValueType>::to_f64(&item, &v)
+            item_value_object_impls.push(quote! {
+                impl crate::home::state::HomeStateValueType for #item_type {
+                    type ValueType = #value_type;
                 }
             });
 
@@ -100,18 +93,12 @@ fn generate_annotated_enum(
     let home_state_impls = quote! {
         impl crate::home::state::HomeStateValueType for #home_state_name {
             type ValueType = #enum_name;
-
-            fn to_f64(&self, value: &Self::ValueType) -> f64 {
-                match value {
-                    #(#enum_value_to_f64_matches),*
-                }
-            }
         }
 
         impl #enum_name {
-            pub fn value_to_f64(&self) -> f64 {
+            pub fn value(&self) -> crate::home::state::StateValue {
                 match self {
-                    #(#enum_value_to_f64_matches),*
+                    #(#state_value_matches),*
                 }
             }
         }
@@ -153,6 +140,7 @@ fn generate_persistent_enum(
     let mut persistent_variants = Vec::new();
     let mut persistent_state_to_f64_matches = Vec::new();
     let mut persistent_state_from_f64_matches = Vec::new();
+    let mut persistent_state_value_matches = Vec::new();
 
     for variant in variants {
         if let syn::Fields::Unnamed(fields) = &variant.fields {
@@ -165,6 +153,12 @@ fn generate_persistent_enum(
             let value_type = &fields.unnamed[1].ty;
 
             if is_bool_type(value_type) {
+                persistent_state_value_matches.push(quote! {
+                    #persistent_enum_name::#variant_name(_, value) => {
+                        crate::home::state::PersistentStateValue::Boolean(*value)
+                    }
+                });
+
                 item_persistent_impls.push(quote! {
                     impl crate::home::state::PersistentHomeStateValueType for #item_type {
                         type ValueType = #value_type;
@@ -179,6 +173,13 @@ fn generate_persistent_enum(
                     }
                 });
             } else {
+                let state_value_variant = value_type_of_variant(value_type);
+                persistent_state_value_matches.push(quote! {
+                    #persistent_enum_name::#variant_name(_, value) => {
+                        crate::home::state::PersistentStateValue::#state_value_variant(value.clone())
+                    }
+                });
+
                 item_persistent_impls.push(quote! {
                     impl crate::home::state::PersistentHomeStateValueType for #item_type {
                         type ValueType = #value_type;
@@ -222,6 +223,12 @@ fn generate_persistent_enum(
         }
 
         impl #persistent_enum_name {
+            pub fn value(&self) -> crate::home::state::PersistentStateValue {
+                match self {
+                    #(#persistent_state_value_matches),*
+                }
+            }
+
             pub fn value_to_f64(&self) -> f64 {
                 match self {
                     #(#persistent_state_to_f64_matches),*
@@ -275,7 +282,6 @@ fn generate_enum_without_value(value_enum_name: &syn::Ident, variants: &[syn::Va
     let mut target_variants = Vec::new();
     let mut item_to_target_impls = Vec::new();
     let mut source_to_target_impl = Vec::new();
-    let mut value_to_string_matches = Vec::new();
 
     for variant in variants {
         let variant_name = &variant.ident;
@@ -302,11 +308,6 @@ fn generate_enum_without_value(value_enum_name: &syn::Ident, variants: &[syn::Va
             source_to_target_impl.push(quote! {
                 #value_enum_name::#variant_name(id, _) => #target_enum_name::#variant_name(id.clone())
             });
-
-            // Generate matches for value_to_string
-            value_to_string_matches.push(quote! {
-                #value_enum_name::#variant_name(_, value) => value.to_string()
-            });
         }
     }
 
@@ -328,25 +329,21 @@ fn generate_enum_without_value(value_enum_name: &syn::Ident, variants: &[syn::Va
                 }
             }
         }
-
-        // Implement value_to_string method
-        impl #value_enum_name {
-            pub fn value_to_string(&self) -> String {
-                match self {
-                    #(#value_to_string_matches),*
-                }
-            }
-        }
     }
 }
 
 fn is_bool_type(value_type: &syn::Type) -> bool {
+    value_type_of_variant(value_type) == "bool"
+}
+
+fn value_type_of_variant(value_type: &syn::Type) -> syn::Ident {
     match value_type {
         syn::Type::Path(type_path) => type_path
             .path
             .segments
             .last()
-            .is_some_and(|segment| segment.ident == "bool"),
-        _ => false,
+            .map(|segment| segment.ident.clone())
+            .expect("StateTypeInfoDerive: expected at least one path segment for value type"),
+        _ => panic!("StateTypeInfoDerive: unsupported value type for value() generation"),
     }
 }

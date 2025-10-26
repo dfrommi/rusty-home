@@ -1,15 +1,9 @@
 mod enum_variants;
-mod enum_with_value;
 mod id_item;
 mod state_trace;
 mod state_type_info;
 
 use proc_macro::TokenStream;
-
-#[proc_macro_derive(EnumWithValue)]
-pub fn enum_with_value_derive(input: TokenStream) -> TokenStream {
-    enum_with_value::derive(input)
-}
 
 #[proc_macro_derive(StateTypeInfoDerive, attributes(persistent))]
 pub fn state_type_info_derive(input: TokenStream) -> TokenStream {

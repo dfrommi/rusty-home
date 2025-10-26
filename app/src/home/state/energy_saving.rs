@@ -1,5 +1,4 @@
 use crate::core::HomeApi;
-use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
@@ -21,10 +20,7 @@ pub enum EnergySaving {
 impl DataPointAccess<EnergySaving> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     #[trace_state]
-    async fn current_data_point(
-        &self,
-        api: &HomeApi,
-    ) -> anyhow::Result<DataPoint<<EnergySaving as ValueObject>::ValueType>> {
+    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let is_tv_on = match self {
             EnergySaving::LivingRoomTv => Powered::LivingRoomTv.current_data_point(api).await,
         }?;

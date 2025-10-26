@@ -165,11 +165,7 @@ impl Fan {
                 return self.command_with_state(new_airflow);
             }
 
-            tracing::warn!(
-                "Fan {} received invalid Active payload: {}",
-                self.name,
-                trigger.value
-            );
+            tracing::warn!("Fan {} received invalid Active payload: {}", self.name, trigger.value);
             return None;
         }
 
@@ -188,11 +184,7 @@ impl Fan {
                 return self.command_with_state(new_airflow);
             }
 
-            tracing::warn!(
-                "Fan {} received invalid RotationSpeed payload: {}",
-                self.name,
-                trigger.value
-            );
+            tracing::warn!("Fan {} received invalid RotationSpeed payload: {}", self.name, trigger.value);
             return None;
         }
 

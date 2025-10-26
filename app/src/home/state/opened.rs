@@ -91,11 +91,7 @@ fn any_of(opened_dps: Vec<DataPoint<bool>>) -> DataPoint<bool> {
 }
 
 impl DataFrameAccess<OpenedArea> for OpenedArea {
-    async fn get_data_frame(
-        &self,
-        range: DateTimeRange,
-        api: &HomeApi,
-    ) -> Result<DataFrame<<OpenedArea as crate::core::ValueObject>::ValueType>> {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<bool>> {
         let api_items = self.api_items();
         let context: Opened = api_items[0].clone();
 

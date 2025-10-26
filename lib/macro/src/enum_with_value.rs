@@ -20,7 +20,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut item_to_target_impls = Vec::new();
     let mut source_to_target_impl = Vec::new();
     let mut value_to_f64_matches = Vec::new();
-    let mut tuple_to_value_matches = Vec::new();
+    let mut with_value_matches = Vec::new();
     let mut value_to_string_matches = Vec::new();
 
     for variant in variants {
@@ -42,12 +42,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         #target_enum_name::#variant_name(val)
                     }
                 }
-
-                impl From<&#item_type> for #target_enum_name {
-                    fn from(val: &#item_type) -> Self {
-                        #target_enum_name::#variant_name(val.clone())
-                    }
-                }
             });
 
             // Generate the From<&ChannelValue> for Channel implementation
@@ -63,7 +57,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             });
 
             // Generate matches for From<(Enum, f64)> for EnumValue
-            tuple_to_value_matches.push(quote! {
+            with_value_matches.push(quote! {
                 #target_enum_name::#variant_name(item) => #name::#variant_name(
                     item.clone(),
                     <#item_type as crate::core::PersistentValueObject>::from_f64(&item, value)
@@ -96,27 +90,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        // Implement From<&EnumValue> for f64
-        impl From<&#name> for f64 {
-            fn from(val: &#name) -> Self {
-                match val {
-                    #(#value_to_f64_matches),*
-                }
-            }
-        }
-
-        // Implement From<(Enum, f64)> for EnumValue
-        impl From<(#target_enum_name, f64)> for #name {
-            fn from(val: (#target_enum_name, f64)) -> Self {
-                let (channel, value) = val;
-                match channel {
-                    #(#tuple_to_value_matches),*
+        impl #target_enum_name {
+            pub fn with_value(&self, value: f64) -> #name {
+                match self {
+                    #(#with_value_matches),*
                 }
             }
         }
 
         // Implement value_to_string method
         impl #name {
+            pub fn value(&self) -> f64 {
+                match self {
+                    #(#value_to_f64_matches),*
+                }
+            }
+
             pub fn value_to_string(&self) -> String {
                 match self {
                     #(#value_to_string_matches),*

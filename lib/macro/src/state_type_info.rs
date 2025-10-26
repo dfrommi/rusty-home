@@ -11,8 +11,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut persistent_type_impls = Vec::new();
     let mut persistent_variants = Vec::new();
     let mut persistent_enum_variants = Vec::new();
-    let mut persistent_conversion_matches = Vec::new();
-    let mut persistent_state_conversion_matches = Vec::new();
     let mut persistent_state_to_f64_matches = Vec::new();
     let mut persistent_state_from_f64_matches = Vec::new();
 
@@ -114,14 +112,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     #variant_name(#item_type)
                 });
 
-                persistent_conversion_matches.push(quote! {
-                    #persistent_enum_name::#variant_name(item, value) => #enum_name::#variant_name(item, value)
-                });
-
-                persistent_state_conversion_matches.push(quote! {
-                    #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item)
-                });
-
                 persistent_state_to_f64_matches.push(quote! {
                     #persistent_enum_name::#variant_name(item, value) => {
                         <#item_type as crate::core::PersistentValueObject>::to_f64(&item, &value)
@@ -166,22 +156,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #[derive(Debug, Clone, r#macro::EnumWithValue)]
             pub enum #persistent_enum_name {
                 #(#persistent_variants),*
-            }
-
-            impl From<#persistent_enum_name> for #enum_name {
-                fn from(val: #persistent_enum_name) -> Self {
-                    match val {
-                        #(#persistent_conversion_matches),*
-                    }
-                }
-            }
-
-            impl From<#persistent_home_state_name> for #home_state_name {
-                fn from(val: #persistent_home_state_name) -> Self {
-                    match val {
-                        #(#persistent_state_conversion_matches),*
-                    }
-                }
             }
 
             impl crate::core::PersistentValueObject for #persistent_home_state_name {

@@ -72,8 +72,7 @@ impl super::Database {
 impl super::Database {
     pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
         let tags_id = get_tag_id(&self.pool, value.into(), true).await?;
-
-        let fvalue: f64 = value.into();
+        let fvalue: f64 = value.value();
 
         sqlx::query!(
             r#"WITH latest_value AS (
@@ -124,7 +123,7 @@ impl super::Database {
 
                 match PersistentHomeState::try_from(external_id) {
                     Ok(target) => Some(DataPoint {
-                        value: PersistentHomeStateValue::from((target, row.value)),
+                        value: target.with_value(row.value),
                         timestamp: row.timestamp.into(),
                     }),
                     Err(e) => {

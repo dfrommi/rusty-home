@@ -17,25 +17,6 @@ pub use planner::keep_on_planning;
 #[cfg(test)]
 pub use planner::plan_for_home;
 
-pub trait ValueObject
-where
-    Self::ValueType: Clone,
-{
-    type ValueType;
-
-    fn to_f64(&self, value: &Self::ValueType) -> f64;
-}
-
-pub trait PersistentValueObject
-where
-    Self::ValueType: Clone,
-{
-    type ValueType;
-
-    fn to_f64(&self, value: &Self::ValueType) -> f64;
-    fn from_f64(&self, value: f64) -> Self::ValueType;
-}
-
 pub struct DeviceConfig<V> {
     config: HashMap<String, Vec<V>>,
 }

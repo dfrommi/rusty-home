@@ -1,10 +1,9 @@
 use std::cmp::Ordering;
 
 use crate::core::HomeApi;
-use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::home::Thermostat;
-use crate::home::state::{HeatingDemand, TotalEnergyConsumption};
+use crate::home::state::{HeatingDemand, HomeStateValueType, TotalEnergyConsumption};
 use actix_web::{
     HttpResponse, Responder,
     http::header,
@@ -50,7 +49,7 @@ async fn total_values_response<T, V: Fn(&T, TimeSeries<T>) -> (f64, f64)>(
     value_mapper: V,
 ) -> impl Responder + use<T, V>
 where
-    T: ValueObject
+    T: HomeStateValueType
         + DashboardDisplay
         + Estimatable
         + Clone

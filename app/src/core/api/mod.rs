@@ -1,6 +1,5 @@
 mod cache;
 
-use super::PersistentValueObject;
 use super::persistence::{Database, OfflineItem, UserTriggerRequest};
 use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange};
@@ -8,7 +7,7 @@ use super::timeseries::{DataFrame, DataPoint};
 use crate::core::id::ExternalId;
 use crate::home::availability::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::state::{PersistentHomeState, PersistentHomeStateValue};
+use crate::home::state::{PersistentHomeState, PersistentHomeStateValue, PersistentHomeStateValueType};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use crate::t;
 use anyhow::Result;
@@ -120,19 +119,19 @@ impl HomeApi {
 
     pub async fn current_data_point<T>(&self, item: &T) -> Result<DataPoint<T::ValueType>>
     where
-        T: Into<PersistentHomeState> + PersistentValueObject + Clone,
+        T: Into<PersistentHomeState> + PersistentHomeStateValueType + Clone,
     {
         let channel: PersistentHomeState = item.clone().into();
         let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
 
         self.get_datapoint(tag_id, &t!(now))
             .await
-            .map(|dp| DataPoint::new(<T as PersistentValueObject>::from_f64(item, dp.value), dp.timestamp))
+            .map(|dp| DataPoint::new(<T as PersistentHomeStateValueType>::from_f64(item, dp.value), dp.timestamp))
     }
 
     pub async fn get_data_frame<T>(&self, item: &T, range: DateTimeRange) -> Result<DataFrame<T::ValueType>>
     where
-        T: Into<PersistentHomeState> + PersistentValueObject + Clone,
+        T: Into<PersistentHomeState> + PersistentHomeStateValueType + Clone,
     {
         let channel: PersistentHomeState = item.clone().into();
         let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
@@ -140,7 +139,7 @@ impl HomeApi {
         let df = self
             .get_dataframe(tag_id, &range)
             .await?
-            .map(|dp| <T as PersistentValueObject>::from_f64(item, dp.value));
+            .map(|dp| <T as PersistentHomeStateValueType>::from_f64(item, dp.value));
 
         Ok(df)
     }
@@ -340,7 +339,7 @@ impl HomeApi {
 //
 //         pub fn with_fixed_current_dp<T>(&mut self, state: T, value: impl Into<T::ValueType>, timestamp: DateTime)
 //         where
-//             T: Into<HomeState> + ValueObject + Clone,
+//             T: Into<HomeState> + HomeStateValueType + Clone,
 //         {
 //             let value = value.into();
 //             self.state_dp_mock
@@ -349,7 +348,7 @@ impl HomeApi {
 //
 //         pub fn with_fixed_df<T, V>(&mut self, state: T, values: &[(V, DateTime)])
 //         where
-//             T: Into<HomeState> + ValueObject + Clone,
+//             T: Into<HomeState> + HomeStateValueType + Clone,
 //             V: Into<T::ValueType> + Clone,
 //         {
 //             let dps: Vec<DataPoint<f64>> = values
@@ -363,7 +362,7 @@ impl HomeApi {
 //
 //         pub fn get_fixed_current_dp<T>(&self, state: T) -> Option<DataPoint<T::ValueType>>
 //         where
-//             T: Into<HomeState> + ValueObject + Clone,
+//             T: Into<HomeState> + HomeStateValueType + Clone,
 //         {
 //             self.state_dp_mock
 //                 .get(&state.clone().into())
@@ -372,7 +371,7 @@ impl HomeApi {
 //
 //         pub fn get_fixed_df<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
 //         where
-//             T: Into<HomeState> + ValueObject + Clone,
+//             T: Into<HomeState> + HomeStateValueType + Clone,
 //         {
 //             self.state_df_mock
 //                 .get(&state.clone().into())

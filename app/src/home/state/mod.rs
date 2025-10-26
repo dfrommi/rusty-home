@@ -51,7 +51,6 @@ pub use total_water_consumption::TotalWaterConsumption;
 pub use user_controlled::UserControlled;
 
 use crate::core::HomeApi;
-use crate::core::ValueObject;
 use crate::core::time::DateTimeRange;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataFrame;
@@ -99,6 +98,25 @@ pub enum HomeStateValue {
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
 }
 
+pub trait HomeStateValueType
+where
+    Self::ValueType: Clone,
+{
+    type ValueType;
+
+    fn to_f64(&self, value: &Self::ValueType) -> f64;
+}
+
+pub trait PersistentHomeStateValueType
+where
+    Self::ValueType: Clone,
+{
+    type ValueType;
+
+    fn to_f64(&self, value: &Self::ValueType) -> f64;
+    fn from_f64(&self, value: f64) -> Self::ValueType;
+}
+
 async fn sampled_data_frame<T>(
     item: &T,
     range: DateTimeRange,
@@ -106,7 +124,7 @@ async fn sampled_data_frame<T>(
     api: &HomeApi,
 ) -> anyhow::Result<DataFrame<T::ValueType>>
 where
-    T: ValueObject + DataPointAccess<T>,
+    T: HomeStateValueType + DataPointAccess<T>,
     T::ValueType: PartialEq,
 {
     let caching_range = DateTimeRange::new(*range.start() - t!(3 hours), *range.end() + t!(3 hours));

@@ -55,7 +55,7 @@ fn generate_annotated_enum(
 
             if is_bool_type(value_type) {
                 item_value_object_impls.push(quote! {
-                    impl crate::core::ValueObject for #item_type {
+                    impl crate::home::state::HomeStateValueType for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -65,7 +65,7 @@ fn generate_annotated_enum(
                 });
             } else {
                 item_value_object_impls.push(quote! {
-                    impl crate::core::ValueObject for #item_type {
+                    impl crate::home::state::HomeStateValueType for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -77,7 +77,7 @@ fn generate_annotated_enum(
 
             enum_value_to_f64_matches.push(quote! {
                 #enum_name::#variant_name(item, v) => {
-                    <#item_type as crate::core::ValueObject>::to_f64(&item, &v)
+                    <#item_type as crate::home::state::HomeStateValueType>::to_f64(&item, &v)
                 }
             });
 
@@ -98,7 +98,7 @@ fn generate_annotated_enum(
     }
 
     let home_state_impls = quote! {
-        impl crate::core::ValueObject for #home_state_name {
+        impl crate::home::state::HomeStateValueType for #home_state_name {
             type ValueType = #enum_name;
 
             fn to_f64(&self, value: &Self::ValueType) -> f64 {
@@ -166,7 +166,7 @@ fn generate_persistent_enum(
 
             if is_bool_type(value_type) {
                 item_persistent_impls.push(quote! {
-                    impl crate::core::PersistentValueObject for #item_type {
+                    impl crate::home::state::PersistentHomeStateValueType for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -180,7 +180,7 @@ fn generate_persistent_enum(
                 });
             } else {
                 item_persistent_impls.push(quote! {
-                    impl crate::core::PersistentValueObject for #item_type {
+                    impl crate::home::state::PersistentHomeStateValueType for #item_type {
                         type ValueType = #value_type;
 
                         fn to_f64(&self, value: &#value_type) -> f64 {
@@ -200,7 +200,7 @@ fn generate_persistent_enum(
 
             persistent_state_to_f64_matches.push(quote! {
                 #persistent_enum_name::#variant_name(item, value) => {
-                    <#item_type as crate::core::PersistentValueObject>::to_f64(&item, &value)
+                    <#item_type as crate::home::state::PersistentHomeStateValueType>::to_f64(&item, &value)
                 }
             });
 
@@ -208,7 +208,7 @@ fn generate_persistent_enum(
                 #persistent_home_state_name::#variant_name(item) => {
                     #persistent_enum_name::#variant_name(
                         item.clone(),
-                        <#item_type as crate::core::PersistentValueObject>::from_f64(&item, value)
+                        <#item_type as crate::home::state::PersistentHomeStateValueType>::from_f64(&item, value)
                     )
                 }
             });
@@ -237,7 +237,7 @@ fn generate_persistent_enum(
             }
         }
 
-        impl crate::core::PersistentValueObject for #persistent_home_state_name {
+        impl crate::home::state::PersistentHomeStateValueType for #persistent_home_state_name {
             type ValueType = #persistent_enum_name;
 
             fn to_f64(&self, value: &Self::ValueType) -> f64 {

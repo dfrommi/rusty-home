@@ -1,7 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 use crate::core::timeseries::DataFrame;
-use crate::core::{HomeApi, ValueObject};
+use crate::core::HomeApi;
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
@@ -9,8 +9,9 @@ use crate::{
 use anyhow::Result;
 
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
+use crate::home::state::HomeStateValueType;
 
-pub trait DataPointAccess<T: ValueObject> {
+pub trait DataPointAccess<T: HomeStateValueType> {
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>>;
 
     async fn current(&self, api: &HomeApi) -> Result<T::ValueType> {
@@ -18,7 +19,7 @@ pub trait DataPointAccess<T: ValueObject> {
     }
 }
 
-pub trait DataFrameAccess<T: ValueObject> {
+pub trait DataFrameAccess<T: HomeStateValueType> {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<T::ValueType>>;
 }
 

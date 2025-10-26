@@ -39,14 +39,14 @@ impl Estimatable for CurrentPowerUsage {
     }
 }
 
-impl DataPointAccess<CurrentPowerUsage> for CurrentPowerUsage {
+impl DataPointAccess<Watt> for CurrentPowerUsage {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<Watt>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<CurrentPowerUsage> for CurrentPowerUsage {
+impl DataFrameAccess<Watt> for CurrentPowerUsage {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<Watt>> {
         api.get_data_frame(self, range).await
     }

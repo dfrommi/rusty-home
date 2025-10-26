@@ -55,7 +55,7 @@ impl ScheduledHeatingMode {
     }
 }
 
-impl DataPointAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
+impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingMode>> {
         let (window, temp_increase) = (self.window(), self.temp_increase());
@@ -147,7 +147,7 @@ impl Estimatable for ScheduledHeatingMode {
     }
 }
 
-impl DataFrameAccess<ScheduledHeatingMode> for ScheduledHeatingMode {
+impl DataFrameAccess<HeatingMode> for ScheduledHeatingMode {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingMode>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

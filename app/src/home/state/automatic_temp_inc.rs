@@ -20,7 +20,7 @@ pub enum AutomaticTemperatureIncrease {
 }
 
 //TODO detect active heating and summer mode
-impl DataPointAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+impl DataPointAccess<bool> for AutomaticTemperatureIncrease {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         //TODO define heating schedule lookup and test outside > schedule + 1.0
@@ -108,7 +108,7 @@ impl Estimatable for AutomaticTemperatureIncrease {
     }
 }
 
-impl DataFrameAccess<AutomaticTemperatureIncrease> for AutomaticTemperatureIncrease {
+impl DataFrameAccess<bool> for AutomaticTemperatureIncrease {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

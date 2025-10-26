@@ -26,14 +26,14 @@ impl Estimatable for SetPoint {
     }
 }
 
-impl DataPointAccess<SetPoint> for SetPoint {
+impl DataPointAccess<DegreeCelsius> for SetPoint {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<SetPoint> for SetPoint {
+impl DataFrameAccess<DegreeCelsius> for SetPoint {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
         api.get_data_frame(self, range).await
     }

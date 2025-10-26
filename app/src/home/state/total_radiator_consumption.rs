@@ -28,14 +28,14 @@ impl Estimatable for TotalRadiatorConsumption {
     }
 }
 
-impl DataPointAccess<TotalRadiatorConsumption> for TotalRadiatorConsumption {
+impl DataPointAccess<HeatingUnit> for TotalRadiatorConsumption {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingUnit>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<TotalRadiatorConsumption> for TotalRadiatorConsumption {
+impl DataFrameAccess<HeatingUnit> for TotalRadiatorConsumption {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingUnit>> {
         api.get_data_frame(self, range).await
     }

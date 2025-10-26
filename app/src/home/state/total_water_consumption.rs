@@ -26,14 +26,14 @@ impl Estimatable for TotalWaterConsumption {
     }
 }
 
-impl DataPointAccess<TotalWaterConsumption> for TotalWaterConsumption {
+impl DataPointAccess<KiloCubicMeter> for TotalWaterConsumption {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<KiloCubicMeter>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<TotalWaterConsumption> for TotalWaterConsumption {
+impl DataFrameAccess<KiloCubicMeter> for TotalWaterConsumption {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<KiloCubicMeter>> {
         api.get_data_frame(self, range).await
     }

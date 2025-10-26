@@ -17,7 +17,7 @@ pub enum EnergySaving {
     LivingRoomTv,
 }
 
-impl DataPointAccess<EnergySaving> for EnergySaving {
+impl DataPointAccess<bool> for EnergySaving {
     //energy saving assumed to be reset when device is turned on. Device off means energy saving
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
@@ -69,7 +69,7 @@ impl Estimatable for EnergySaving {
     }
 }
 
-impl DataFrameAccess<EnergySaving> for EnergySaving {
+impl DataFrameAccess<bool> for EnergySaving {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

@@ -24,14 +24,14 @@ impl Estimatable for Powered {
     }
 }
 
-impl DataPointAccess<Powered> for Powered {
+impl DataPointAccess<bool> for Powered {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<Powered> for Powered {
+impl DataFrameAccess<bool> for Powered {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }

@@ -30,14 +30,14 @@ impl Estimatable for Presence {
     }
 }
 
-impl DataPointAccess<Presence> for Presence {
+impl DataPointAccess<bool> for Presence {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<Presence> for Presence {
+impl DataFrameAccess<bool> for Presence {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }

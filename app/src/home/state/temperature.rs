@@ -35,14 +35,14 @@ impl Estimatable for Temperature {
     }
 }
 
-impl DataPointAccess<Temperature> for Temperature {
+impl DataPointAccess<DegreeCelsius> for Temperature {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<Temperature> for Temperature {
+impl DataFrameAccess<DegreeCelsius> for Temperature {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
         api.get_data_frame(self, range).await
     }

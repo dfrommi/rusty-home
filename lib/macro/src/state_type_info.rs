@@ -103,7 +103,7 @@ fn generate_annotated_enum(
             }
         }
 
-        impl crate::port::DataPointAccess<#home_state_name> for #home_state_name {
+        impl crate::port::DataPointAccess<#enum_name> for #home_state_name {
             async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
                 match self {
                     #(#home_state_data_point_matches),*
@@ -111,7 +111,7 @@ fn generate_annotated_enum(
             }
         }
 
-        impl crate::port::DataFrameAccess<#home_state_name> for #home_state_name {
+        impl crate::port::DataFrameAccess<#enum_name> for #home_state_name {
             async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
                 let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
                     #(#home_state_data_frame_matches),*

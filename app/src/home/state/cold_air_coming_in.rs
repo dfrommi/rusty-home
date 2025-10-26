@@ -17,7 +17,7 @@ pub enum ColdAirComingIn {
     RoomOfRequirements,
 }
 
-impl DataPointAccess<ColdAirComingIn> for ColdAirComingIn {
+impl DataPointAccess<bool> for ColdAirComingIn {
     #[trace_state]
     async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let outside_temp = Temperature::Outside.current_data_point(api).await?;
@@ -50,7 +50,7 @@ impl Estimatable for ColdAirComingIn {
     }
 }
 
-impl DataFrameAccess<ColdAirComingIn> for ColdAirComingIn {
+impl DataFrameAccess<bool> for ColdAirComingIn {
     async fn get_data_frame(
         &self,
         range: DateTimeRange,

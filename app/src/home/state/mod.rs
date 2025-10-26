@@ -147,7 +147,7 @@ async fn sampled_data_frame<T>(
     api: &HomeApi,
 ) -> anyhow::Result<DataFrame<T::ValueType>>
 where
-    T: HomeStateValueType + DataPointAccess<T>,
+    T: HomeStateValueType + DataPointAccess<T::ValueType>,
     T::ValueType: PartialEq,
 {
     let caching_range = DateTimeRange::new(*range.start() - t!(3 hours), *range.end() + t!(3 hours));

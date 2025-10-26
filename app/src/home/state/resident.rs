@@ -18,7 +18,7 @@ pub enum Resident {
 }
 
 //TODO maybe combination via Baysian to detect resident state
-impl DataPointAccess<Resident> for Resident {
+impl DataPointAccess<bool> for Resident {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         match self {
@@ -136,7 +136,7 @@ impl Estimatable for Resident {
     }
 }
 
-impl DataFrameAccess<Resident> for Resident {
+impl DataFrameAccess<bool> for Resident {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

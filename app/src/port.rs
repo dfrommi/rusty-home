@@ -9,18 +9,17 @@ use crate::{
 use anyhow::Result;
 
 use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
-use crate::home::state::HomeStateValueType;
 
-pub trait DataPointAccess<T: HomeStateValueType> {
-    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T::ValueType>>;
+pub trait DataPointAccess<T> {
+    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<T>>;
 
-    async fn current(&self, api: &HomeApi) -> Result<T::ValueType> {
+    async fn current(&self, api: &HomeApi) -> Result<T> {
         self.current_data_point(api).await.map(|dp| dp.value)
     }
 }
 
-pub trait DataFrameAccess<T: HomeStateValueType> {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<T::ValueType>>;
+pub trait DataFrameAccess<T> {
+    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<T>>;
 }
 
 pub trait TimeSeriesAccess<T: Estimatable> {
@@ -33,7 +32,7 @@ pub trait TimeSeriesAccess<T: Estimatable> {
 
 impl<T> TimeSeriesAccess<T> for T
 where
-    T: DataFrameAccess<T> + Estimatable + Clone,
+    T: DataFrameAccess<T::ValueType> + Estimatable + Clone,
 {
     async fn series(&self, range: DateTimeRange, api: &HomeApi) -> Result<TimeSeries<T>> {
         let df = self.get_data_frame(range.clone(), api).await?;

@@ -41,14 +41,14 @@ impl Estimatable for FanActivity {
     }
 }
 
-impl DataPointAccess<FanActivity> for FanActivity {
+impl DataPointAccess<FanAirflow> for FanActivity {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<FanAirflow>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<FanActivity> for FanActivity {
+impl DataFrameAccess<FanAirflow> for FanActivity {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<FanAirflow>> {
         api.get_data_frame(self, range).await
     }

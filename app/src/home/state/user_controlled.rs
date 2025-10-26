@@ -30,7 +30,7 @@ pub enum UserControlled {
 // - what is the current state and since when?
 // - what is the expected state and since when?
 // - is the current state as expected and reached shortly after triggering the command?
-impl DataPointAccess<UserControlled> for UserControlled {
+impl DataPointAccess<bool> for UserControlled {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         match self {
@@ -144,7 +144,7 @@ impl Estimatable for UserControlled {
     }
 }
 
-impl DataFrameAccess<UserControlled> for UserControlled {
+impl DataFrameAccess<bool> for UserControlled {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

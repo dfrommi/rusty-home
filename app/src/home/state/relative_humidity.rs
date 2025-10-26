@@ -29,14 +29,14 @@ impl Estimatable for RelativeHumidity {
     }
 }
 
-impl DataPointAccess<RelativeHumidity> for RelativeHumidity {
+impl DataPointAccess<Percent> for RelativeHumidity {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<Percent>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<RelativeHumidity> for RelativeHumidity {
+impl DataFrameAccess<Percent> for RelativeHumidity {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<Percent>> {
         api.get_data_frame(self, range).await
     }

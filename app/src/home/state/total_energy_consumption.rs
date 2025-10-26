@@ -37,14 +37,14 @@ impl Estimatable for TotalEnergyConsumption {
     }
 }
 
-impl DataPointAccess<TotalEnergyConsumption> for TotalEnergyConsumption {
+impl DataPointAccess<KiloWattHours> for TotalEnergyConsumption {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<KiloWattHours>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<TotalEnergyConsumption> for TotalEnergyConsumption {
+impl DataFrameAccess<KiloWattHours> for TotalEnergyConsumption {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<KiloWattHours>> {
         api.get_data_frame(self, range).await
     }

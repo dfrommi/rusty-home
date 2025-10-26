@@ -16,7 +16,7 @@ pub enum RiskOfMould {
     Bathroom,
 }
 
-impl DataPointAccess<RiskOfMould> for RiskOfMould {
+impl DataPointAccess<bool> for RiskOfMould {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         let humidity = match self {
@@ -79,7 +79,7 @@ impl Estimatable for RiskOfMould {
     }
 }
 
-impl DataFrameAccess<RiskOfMould> for RiskOfMould {
+impl DataFrameAccess<bool> for RiskOfMould {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

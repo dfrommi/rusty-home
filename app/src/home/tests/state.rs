@@ -10,7 +10,7 @@ use super::{infrastructure, runtime};
 
 fn get_state_at<T>(iso: &str, item: T) -> DataPoint<T::ValueType>
 where
-    T: DataPointAccess<T> + HomeStateValueType + Clone,
+    T: DataPointAccess<T::ValueType> + HomeStateValueType + Clone,
 {
     let fake_now = DateTime::from_iso(iso).unwrap();
 

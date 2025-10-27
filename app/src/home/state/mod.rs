@@ -11,6 +11,7 @@ mod risk_of_mould;
 //mod set_point;
 //mod temperature;
 //mod total_energy_consumption;
+mod absolute_humidity;
 mod current_power_usage;
 mod energy_saving;
 mod fan_activity;
@@ -28,6 +29,7 @@ mod user_controlled;
 
 use std::fmt::Debug;
 
+pub use absolute_humidity::AbsoluteHumidity;
 pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use current_power_usage::CurrentPowerUsage;
@@ -62,6 +64,7 @@ use r#macro::StateTypeInfoDerive;
 
 #[derive(Debug, Clone, PartialEq, StateTypeInfoDerive)]
 pub enum HomeStateValue {
+    AbsoluteHumidity(AbsoluteHumidity, GramPerCubicMeter),
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),
     DewPoint(DewPoint, DegreeCelsius),
@@ -104,6 +107,7 @@ pub enum StateValue {
     DegreeCelsius(DegreeCelsius),
     Watt(Watt),
     Percent(Percent),
+    GramPerCubicMeter(GramPerCubicMeter),
     KiloWattHours(KiloWattHours),
     HeatingUnit(HeatingUnit),
     KiloCubicMeter(KiloCubicMeter),
@@ -176,6 +180,7 @@ impl std::fmt::Display for StateValue {
             StateValue::DegreeCelsius(degree_celsius) => write!(f, "{}", degree_celsius),
             StateValue::Watt(watt) => write!(f, "{}", watt),
             StateValue::Percent(percent) => write!(f, "{}", percent),
+            StateValue::GramPerCubicMeter(gram_per_cubic_meter) => write!(f, "{}", gram_per_cubic_meter),
             StateValue::KiloWattHours(kilo_watt_hours) => write!(f, "{}", kilo_watt_hours),
             StateValue::HeatingUnit(heating_unit) => write!(f, "{}", heating_unit),
             StateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),

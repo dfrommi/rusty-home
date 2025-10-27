@@ -1,4 +1,5 @@
 mod degree_celsius;
+mod density;
 mod heating;
 mod kwh;
 mod liquid;
@@ -7,6 +8,7 @@ mod probability;
 mod watt;
 
 pub use degree_celsius::DegreeCelsius;
+pub use density::GramPerCubicMeter;
 pub use heating::HeatingUnit;
 pub use kwh::KiloWattHours;
 pub use liquid::KiloCubicMeter;

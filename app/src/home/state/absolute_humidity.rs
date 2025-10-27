@@ -105,9 +105,7 @@ impl DataFrameAccess<GramPerCubicMeter> for AbsoluteHumidity {
             try_join!(temp.series(range.clone(), api), humidity.series(range.clone(), api))?
         };
 
-        DataFrame::<GramPerCubicMeter>::combined(&t_series, &h_series, |temp, humidity| {
-            Self::calculate_abs_humidity(*temp, *humidity)
-        })
+        DataFrame::<GramPerCubicMeter>::combined(t_series, h_series, Self::calculate_abs_humidity)
     }
 }
 

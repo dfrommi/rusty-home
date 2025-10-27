@@ -147,7 +147,7 @@ async fn combined_series(
     //remove to simulate a fold
     let mut result = scaled_ts.remove(0);
     for ts in scaled_ts {
-        result = TimeSeries::combined(&result, &ts, HeatingDemand::LivingRoomBig, |a, b| Percent(a.0 + b.0))?;
+        result = TimeSeries::combined(result, ts, HeatingDemand::LivingRoomBig, |a, b| Percent(a.0 + b.0))?;
     }
 
     Ok(result)

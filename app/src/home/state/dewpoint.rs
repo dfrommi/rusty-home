@@ -99,9 +99,7 @@ impl DataFrameAccess<DegreeCelsius> for DewPoint {
             try_join!(temp.series(range.clone(), api), humidity.series(range.clone(), api))?
         };
 
-        DataFrame::<DegreeCelsius>::combined(&t_series, &h_series, |temp, humidity| {
-            DewPoint::calculate_dew_point(*temp, *humidity)
-        })
+        DataFrame::<DegreeCelsius>::combined(t_series, h_series, DewPoint::calculate_dew_point)
     }
 }
 

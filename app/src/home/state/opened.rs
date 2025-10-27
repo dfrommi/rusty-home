@@ -106,7 +106,7 @@ impl DataFrameAccess<bool> for OpenedArea {
         let all_ts = futures::future::try_join_all(futures).await?;
 
         //TODO work more directly on DataFrame
-        let merged_ts = TimeSeries::reduce(context, all_ts, |&a, &b| a || b)?;
+        let merged_ts = TimeSeries::reduce(context, all_ts, |a, b| a || b)?;
         let merged_df = merged_ts.inner();
 
         //from API-opened into this opened type

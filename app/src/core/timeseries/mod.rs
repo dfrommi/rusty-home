@@ -46,24 +46,24 @@ impl<C: Estimatable> TimeSeries<C> {
     }
 
     pub fn combined<U, V, F>(
-        first_series: &TimeSeries<U>,
-        second_series: &TimeSeries<V>,
+        first_series: TimeSeries<U>,
+        second_series: TimeSeries<V>,
         context: C,
         merge: F,
     ) -> Result<Self>
     where
-        F: Fn(&U::ValueType, &V::ValueType) -> C::ValueType,
+        F: Fn(U::ValueType, V::ValueType) -> C::ValueType,
         U: Estimatable,
         V: Estimatable,
     {
-        let df = DataFrame::<C::ValueType>::combined(first_series, second_series, merge)?;
         let range = first_series.range().intersection_with(&second_series.range());
+        let df = DataFrame::<C::ValueType>::combined(first_series, second_series, merge)?;
         Self::new(context, &df, range)
     }
 
     pub fn reduce<F>(context: C, all_series: Vec<TimeSeries<C>>, reduce: F) -> Result<TimeSeries<C>>
     where
-        F: Fn(&C::ValueType, &C::ValueType) -> C::ValueType,
+        F: Fn(C::ValueType, C::ValueType) -> C::ValueType,
         C: Clone,
     {
         if all_series.is_empty() {
@@ -74,7 +74,7 @@ impl<C: Estimatable> TimeSeries<C> {
         let mut merged = all_series.remove(0);
 
         for ts in all_series {
-            merged = TimeSeries::combined(&merged, &ts, context.clone(), |a, b| reduce(a, b))?
+            merged = TimeSeries::combined(merged, ts, context.clone(), |a, b| reduce(a, b))?
         }
 
         Ok(merged)
@@ -334,7 +334,7 @@ mod combined {
         )
         .unwrap();
 
-        let result = TimeSeries::combined(&t_series, &h_series, DewPoint::LivingRoom, |a, b| DegreeCelsius(a.0 + b.0));
+        let result = TimeSeries::combined(t_series, h_series, DewPoint::LivingRoom, |a, b| DegreeCelsius(a.0 + b.0));
 
         assert_eq!(result.iter().len(), 1);
     }

@@ -55,7 +55,7 @@ async fn is_set_heating_reflected_in_state(
             Thermostat::Bedroom => Ok(Opened::BedroomRadiatorThermostat.current(api).await?),
             Thermostat::Kitchen => Ok(Opened::KitchenRadiatorThermostat.current(api).await?),
             Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),
-            Thermostat::Bathroom => todo!("No smart heating in bath yet"),
+            Thermostat::Bathroom => Ok(Opened::BathroomThermostat.current(api).await?),
         },
     }
 }

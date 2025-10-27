@@ -15,6 +15,7 @@ mod absolute_humidity;
 mod current_power_usage;
 mod energy_saving;
 mod fan_activity;
+mod felt_temperature;
 mod heating_demand;
 mod powered;
 mod presence;
@@ -58,6 +59,7 @@ use crate::core::time::Duration;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
+use crate::home::state::felt_temperature::FeltTemperature;
 use crate::port::{DataPointAccess, TimeSeriesAccess, ValueObject};
 use crate::t;
 use r#macro::StateTypeInfoDerive;
@@ -69,6 +71,7 @@ pub enum HomeStateValue {
     ColdAirComingIn(ColdAirComingIn, bool),
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
+    FeltTemperature(FeltTemperature, DegreeCelsius),
     OpenedArea(OpenedArea, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),

@@ -26,7 +26,8 @@ pub enum Temperature {
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,
-    Thermostat(Thermostat),
+    ThermostatOnDevice(Thermostat),
+    ThermostatExternal(Thermostat),
 }
 
 impl Estimatable for Temperature {

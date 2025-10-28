@@ -4,7 +4,7 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::home::availability::ItemAvailability;
-use crate::home::state::PersistentHomeStateValue;
+use crate::home::state::{PersistentHomeStateValue, Temperature};
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use crate::t;
 use infrastructure::MqttInMessage;
@@ -83,7 +83,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::Thermostat(set_point, demand, opened, temperature, group) => {
+            Z2mChannel::Thermostat(thermostat, set_point, demand, opened, group) => {
                 let payload: Thermostat = serde_json::from_str(&msg.payload)?;
 
                 if let Some(group) = group {
@@ -128,8 +128,16 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     .into(),
                     DataPoint::new(
                         PersistentHomeStateValue::Temperature(
-                            temperature.clone(),
+                            Temperature::ThermostatOnDevice(thermostat.clone()),
                             DegreeCelsius(payload.local_temperature),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::Temperature(
+                            Temperature::ThermostatExternal(thermostat.clone()),
+                            DegreeCelsius(payload.external_measured_room_sensor / 100.0),
                         ),
                         payload.last_seen,
                     )
@@ -233,6 +241,7 @@ struct Thermostat {
     window_open_external: bool,
     load_estimate: i64,
     local_temperature: f64,
+    external_measured_room_sensor: f64,
     last_seen: DateTime,
 }
 

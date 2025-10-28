@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::adapter::command::CommandExecutor;
 use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
+use crate::home::Thermostat;
 use crate::home::state::{
     CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
@@ -31,13 +32,7 @@ pub enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
-    Thermostat(
-        SetPoint,
-        HeatingDemand,
-        Opened,
-        Temperature,
-        Option<Arc<Mutex<ThermostatGroup>>>,
-    ),
+    Thermostat(Thermostat, SetPoint, HeatingDemand, Opened, Option<Arc<Mutex<ThermostatGroup>>>),
 }
 
 #[derive(Debug, Clone)]

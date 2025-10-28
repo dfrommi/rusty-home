@@ -139,60 +139,60 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         (
             "living_room/radiator_thermostat_big",
             Z2mChannel::Thermostat(
+                Thermostat::LivingRoomBig,
                 SetPoint::LivingRoomBig,
                 HeatingDemand::LivingRoomBig,
                 Opened::LivingRoomRadiatorThermostatBig,
-                Temperature::Thermostat(Thermostat::LivingRoomBig),
                 Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
             "living_room/radiator_thermostat_small",
             Z2mChannel::Thermostat(
+                Thermostat::LivingRoomSmall,
                 SetPoint::LivingRoomSmall,
                 HeatingDemand::LivingRoomSmall,
                 Opened::LivingRoomRadiatorThermostatSmall,
-                Temperature::Thermostat(Thermostat::LivingRoomSmall),
                 Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
             "kitchen/radiator_thermostat",
             Z2mChannel::Thermostat(
+                Thermostat::Kitchen,
                 SetPoint::Kitchen,
                 HeatingDemand::Kitchen,
                 Opened::KitchenRadiatorThermostat,
-                Temperature::Thermostat(Thermostat::Kitchen),
                 None,
             ),
         ),
         (
             "bedroom/radiator_thermostat",
             Z2mChannel::Thermostat(
+                Thermostat::Bedroom,
                 SetPoint::Bedroom,
                 HeatingDemand::Bedroom,
                 Opened::BedroomRadiatorThermostat,
-                Temperature::Thermostat(Thermostat::Bedroom),
                 None,
             ),
         ),
         (
             "room_of_requirements/radiator_thermostat",
             Z2mChannel::Thermostat(
+                Thermostat::RoomOfRequirements,
                 SetPoint::RoomOfRequirements,
                 HeatingDemand::RoomOfRequirements,
                 Opened::RoomOfRequirementsThermostat,
-                Temperature::Thermostat(Thermostat::RoomOfRequirements),
                 None,
             ),
         ),
         (
             "bathroom/radiator_thermostat",
             Z2mChannel::Thermostat(
+                Thermostat::Bathroom,
                 SetPoint::Bathroom,
                 HeatingDemand::Bathroom,
                 Opened::BathroomThermostat,
-                Temperature::Thermostat(Thermostat::Bathroom),
                 None,
             ),
         ),

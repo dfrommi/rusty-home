@@ -8,6 +8,8 @@ pub trait Estimatable: ValueObject {
 }
 
 pub mod algo {
+    use crate::core::timeseries::DataPoint;
+
     use super::*;
 
     pub fn last_seen<T>(at: DateTime, df: &DataFrame<T>) -> Option<T>
@@ -27,6 +29,18 @@ pub mod algo {
             (Some(prev), Some(next)) => (prev, next),
             _ => return None,
         };
+
+        linear_dp(at, prev, next)
+    }
+
+    pub fn linear_dp<T>(at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Option<T>
+    where
+        T: From<f64> + Clone,
+        for<'a> &'a T: Into<f64>,
+    {
+        if prev.timestamp > at || next.timestamp < at || prev.timestamp > next.timestamp {
+            return None;
+        }
 
         if prev.timestamp == at {
             return Some(prev.value.clone());

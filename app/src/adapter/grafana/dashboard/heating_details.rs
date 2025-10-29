@@ -55,37 +55,60 @@ where
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
-    let mut ts_set_points = vec![];
+    let mut ts_thermostat_temps = vec![];
     for thermostat in heating_zone.thermostats() {
         let ts_set_point = thermostat
             .set_point()
             .series(query.range(), api.as_ref())
             .await
             .map_err(GrafanaApiError::DataAccessError)?;
-        ts_set_points.push(ts_set_point);
+        let ts_on_device = Temperature::ThermostatOnDevice(thermostat.clone())
+            .series(query.range(), api.as_ref())
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+        let ts_ext_source = Temperature::ThermostatExternal(thermostat.clone())
+            .series(query.range(), api.as_ref())
+            .await
+            .map_err(GrafanaApiError::DataAccessError)?;
+
+        ts_thermostat_temps.push((ts_set_point, ts_on_device, ts_ext_source));
     }
 
     let mut rows: Vec<Row> = vec![];
     for dt in query.iter() {
         if let Some(dp) = ts_outside.at(dt) {
             rows.push(Row {
-                channel: "outside_temperature".to_string(),
+                channel: "outside".to_string(),
                 timestamp: dp.timestamp,
                 value: dp.value.0,
             })
         }
         if let Some(dp) = ts_inside.at(dt) {
             rows.push(Row {
-                channel: "inside_temperature".to_string(),
+                channel: "room".to_string(),
                 timestamp: dp.timestamp,
                 value: dp.value.0,
             })
         }
 
-        for (i, ts_set_point) in ts_set_points.iter().enumerate() {
+        for (i, (ts_set_point, ts_on_device, ts_ext)) in ts_thermostat_temps.iter().enumerate() {
             if let Some(dp) = ts_set_point.at(dt) {
                 rows.push(Row {
-                    channel: format!("target_temperature_{}", i + 1),
+                    channel: format!("set_point_{}", i + 1),
+                    timestamp: dp.timestamp,
+                    value: dp.value.0,
+                })
+            }
+            if let Some(dp) = ts_on_device.at(dt) {
+                rows.push(Row {
+                    channel: format!("thermostat_on_device_{}", i + 1),
+                    timestamp: dp.timestamp,
+                    value: dp.value.0,
+                })
+            }
+            if let Some(dp) = ts_ext.at(dt) {
+                rows.push(Row {
+                    channel: format!("thermostat_ext_source_{}", i + 1),
                     timestamp: dp.timestamp,
                     value: dp.value.0,
                 })
@@ -249,7 +272,7 @@ where
             .await
             .map_err(GrafanaApiError::DataAccessError)?;
 
-        total_demand_scaled = total_demand_scaled + ts_heating.area_in_type_hours() * thermostat.heating_factor();
+        total_demand_scaled += ts_heating.area_in_type_hours() * thermostat.heating_factor();
     }
 
     let rows: Vec<Row> = vec![Row {

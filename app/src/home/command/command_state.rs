@@ -86,7 +86,7 @@ async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
                 return Ok(false); //not reflected
             }
 
-            Ok(created.elapsed() < t!(1 hours))
+            Ok(created.elapsed() < t!(25 minutes))
         }
         Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
         None => Ok(false),

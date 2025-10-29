@@ -3,7 +3,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 use crate::{
     core::{
         HomeApi,
-        time::{DateTime, DateTimeRange},
+        time::{DateTime, DateTimeRange, Duration},
         timeseries::{
             DataFrame, DataPoint,
             interpolate::{self, Estimatable},
@@ -53,6 +53,10 @@ impl ScheduledHeatingMode {
             ScheduledHeatingMode::Kitchen => AutomaticTemperatureIncrease::Kitchen,
         }
     }
+
+    pub fn post_ventilation_duration() -> Duration {
+        t!(30 minutes)
+    }
 }
 
 impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
@@ -79,7 +83,11 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
         }
 
         //TODO take more factors like cold air coming in after ventilation into account
-        if !window_open.value && window_open.timestamp.elapsed() < t!(15 minutes) {
+        //possible improvement: compare room temperature with setpoint and stop post-ventilation
+        //mode when setpoint is reached, but make sure it won't toggle on/off.
+        //Maybe use a hysteresis for that and don't enter mode unless room is below
+        //default-temperature of thermostat
+        if !window_open.value && window_open.timestamp.elapsed() < Self::post_ventilation_duration() {
             tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
             return Ok(DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp));
         }

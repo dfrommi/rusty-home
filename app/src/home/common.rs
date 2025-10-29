@@ -86,16 +86,23 @@ impl HeatingZone {
         let default_temperature = self.default_setpoint();
 
         match mode {
-            HeatingMode::Ventilation | HeatingMode::PostVentilation => HeatingTargetState::WindowOpen,
-            HeatingMode::EnergySaving => HeatingTargetState::Heat {
+            HeatingMode::Ventilation => HeatingTargetState::WindowOpen,
+            HeatingMode::PostVentilation | HeatingMode::EnergySaving => HeatingTargetState::Heat {
                 temperature: default_temperature,
             },
             HeatingMode::Comfort => HeatingTargetState::Heat {
                 temperature: default_temperature + DegreeCelsius(1.0),
             },
-            HeatingMode::Sleep => HeatingTargetState::Heat {
-                temperature: default_temperature - DegreeCelsius(1.0),
-            },
+            HeatingMode::Sleep => {
+                let offset = match self {
+                    HeatingZone::LivingRoom => DegreeCelsius(0.5),
+                    _ => DegreeCelsius(1.0),
+                };
+
+                HeatingTargetState::Heat {
+                    temperature: default_temperature - offset,
+                }
+            }
             HeatingMode::Away => HeatingTargetState::Heat {
                 temperature: default_temperature - DegreeCelsius(2.0),
             },

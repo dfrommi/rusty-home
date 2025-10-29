@@ -161,8 +161,10 @@ where
             .await?;
 
         if previous_value.as_ref() != Some(&dp.value) {
-            //Timestamp might jump back to an old value, as a consequence of calculation and taking the
-            //timestamp from the datapoints.
+            //Timestamp might jump back to an old value, as a consequence of calculation.
+            //It could take another path and then take the timestamp from other/older source datapoints.
+            //Keeping track of seen timestamps to avoid jumping back and forth. Just assuming the
+            //current "now" for such cases.
             if seen_timestamps.contains(&dp.timestamp) {
                 dp = DataPoint::new(dp.value, dt);
             }

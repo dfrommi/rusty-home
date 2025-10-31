@@ -1,5 +1,6 @@
 mod automatic_temp_inc;
 mod cold_air_coming_in;
+mod load;
 //mod current_power_usage;
 mod dewpoint;
 //mod external_auto_control;
@@ -38,6 +39,7 @@ pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
+pub use load::Load;
 pub use opened::Opened;
 pub use opened::OpenedArea;
 pub use powered::Powered;
@@ -84,6 +86,8 @@ pub enum HomeStateValue {
     FanActivity(FanActivity, FanAirflow),
     #[persistent]
     HeatingDemand(HeatingDemand, Percent),
+    #[persistent]
+    Load(Load, Percent),
     #[persistent]
     Opened(Opened, bool),
     #[persistent]

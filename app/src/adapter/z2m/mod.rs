@@ -9,7 +9,8 @@ use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
 use crate::home::Thermostat;
 use crate::home::state::{
-    CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
+    CurrentPowerUsage, HeatingDemand, Load, Opened, Presence, RelativeHumidity, SetPoint, Temperature,
+    TotalEnergyConsumption,
 };
 use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;

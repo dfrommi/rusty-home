@@ -19,6 +19,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
     BathroomShower,
+    BathroomDehumidifier,
     LivingRoom,
     Kitchen,
     KitchenOuterWall,
@@ -31,6 +32,7 @@ impl AbsoluteHumidity {
         match self {
             AbsoluteHumidity::LivingRoom => Temperature::LivingRoom,
             AbsoluteHumidity::BathroomShower => Temperature::BathroomShower,
+            AbsoluteHumidity::BathroomDehumidifier => Temperature::Dehumidifier,
             AbsoluteHumidity::Kitchen => Temperature::Kitchen,
             AbsoluteHumidity::KitchenOuterWall => Temperature::KitchenOuterWall,
             AbsoluteHumidity::RoomOfRequirements => Temperature::RoomOfRequirements,
@@ -42,6 +44,7 @@ impl AbsoluteHumidity {
         match self {
             AbsoluteHumidity::LivingRoom => RelativeHumidity::LivingRoom,
             AbsoluteHumidity::BathroomShower => RelativeHumidity::BathroomShower,
+            AbsoluteHumidity::BathroomDehumidifier => RelativeHumidity::Dehumidifier,
             AbsoluteHumidity::Kitchen => RelativeHumidity::Kitchen,
             AbsoluteHumidity::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
             AbsoluteHumidity::RoomOfRequirements => RelativeHumidity::RoomOfRequirements,

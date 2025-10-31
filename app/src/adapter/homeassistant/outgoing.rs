@@ -117,7 +117,22 @@ impl HaCommandExecutor {
                     )
                     .await?
             }
-            FanAirflow::Forward(fan_speed) => {
+            FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => {
+                let direction = match airflow {
+                    FanAirflow::Forward(_) => "forward",
+                    FanAirflow::Reverse(_) => "reverse",
+                    _ => unreachable!(),
+                };
+                self.client
+                    .call_service(
+                        "fan",
+                        "set_direction",
+                        json!({
+                            "entity_id": vec![id.to_string()],
+                            "direction": direction
+                        }),
+                    )
+                    .await?;
                 self.client
                     .call_service(
                         "fan",
@@ -129,7 +144,6 @@ impl HaCommandExecutor {
                     )
                     .await?
             }
-            FanAirflow::Reverse(_) => anyhow::bail!("Reverse direction not yet supported"),
         };
 
         let channel = match fan {

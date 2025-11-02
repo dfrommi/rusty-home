@@ -13,6 +13,7 @@ pub struct Settings {
     pub homeassistant: crate::adapter::homeassistant::HomeAssitant,
     pub z2m: crate::adapter::z2m::Zigbee2Mqtt,
     pub tasmota: crate::adapter::tasmota::Tasmota,
+    pub metrics: crate::adapter::metrics_export::MetricsExport,
 }
 
 impl Settings {

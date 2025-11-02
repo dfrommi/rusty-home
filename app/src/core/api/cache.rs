@@ -157,7 +157,6 @@ impl HomeApiCache {
         let df = self
             .ts_cache
             .try_get_with(tag_id, async {
-                tracing::debug!("No cached data found for tag {}, fetching from database", tag_id);
                 let cache_range = self.caching_range();
                 self.db.get_dataframe_for_tag(tag_id, &cache_range).await.map(|df| {
                     // Adjust cached range to actual data range, expanded by the cache range
@@ -172,7 +171,7 @@ impl HomeApiCache {
         match df {
             Ok(cached) if cached.covers(range) => Some(cached),
             Err(e) => {
-                tracing::error!("Error fetching dataframe for tag {} from cache or init cacke: {:?}", tag_id, e);
+                tracing::error!("Error fetching dataframe for tag {} from cache or init cache: {:?}", tag_id, e);
                 None
             }
             _ => None,
@@ -187,7 +186,6 @@ impl HomeApiCache {
         let commands = self
             .cmd_cache
             .try_get_with(target.clone(), async {
-                tracing::debug!("No command-cache entry found for target {:?}", target);
                 let cache_range = self.caching_range();
                 self.db
                     .query_all_commands(Some(target.clone()), &cache_range)
@@ -223,10 +221,6 @@ impl HomeApiCache {
         let triggers = self
             .user_trigger_cache
             .try_get_with(target.clone(), async {
-                tracing::debug!(
-                    "No user trigger cache entry found for target {:?}, fetching from database",
-                    target
-                );
                 let cache_range = self.caching_range();
                 self.db
                     .user_triggers_in_range(target, &cache_range)

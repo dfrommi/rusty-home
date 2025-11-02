@@ -3,7 +3,6 @@ use core::{HomeApi, app_event::AppEventListener};
 use infrastructure::Mqtt;
 use settings::Settings;
 
-use crate::adapter::metrics_export::HomeStateMetricsExporter;
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
 use crate::core::command::CommandDispatcher;
 use crate::core::state::HomeStateEventEmitter;
@@ -74,11 +73,14 @@ pub async fn main() {
 
     let keep_planning = core::keep_on_planning(&infrastructure);
 
-    let mut metrics_exporter = HomeStateMetricsExporter::new(home_state_event_emitter.subscribe_updated());
+    let mut metrics_exporter = settings
+        .metrics
+        .new_exporter(home_state_event_emitter.subscribe_updated());
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
         let http_database = infrastructure.database.clone();
+        let metrics = settings.metrics.clone();
 
         async move {
             settings
@@ -88,6 +90,7 @@ pub async fn main() {
                         adapter::energy_meter::EnergyMeter::new_web_service(http_database.clone()),
                         adapter::grafana::new_routes(http_api.clone()),
                         adapter::mcp::new_routes(http_api.clone()),
+                        metrics.new_routes(http_api.clone()),
                     ]
                 })
                 .await

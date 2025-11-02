@@ -129,6 +129,19 @@ impl DateTimeRange {
     pub fn covers(&self, other: &DateTimeRange) -> bool {
         self.start() <= other.start() && other.end() <= self.end()
     }
+
+    pub fn chunked(&self, chunk_duration: Duration) -> Vec<DateTimeRange> {
+        let mut chunks = Vec::new();
+        let mut current_start = self.start.clone();
+
+        while current_start < self.end {
+            let current_end = (current_start.clone() + chunk_duration.clone()).min(self.end.clone());
+            chunks.push(DateTimeRange::new(current_start.clone(), current_end.clone()));
+            current_start = current_end;
+        }
+
+        chunks
+    }
 }
 
 pub struct DateTimeIterator {
@@ -359,5 +372,22 @@ mod tests {
         let range = t!(22:00 - 03:00);
 
         assert_eq!(range.duration(), Duration::hours(5));
+    }
+
+    #[test]
+    fn test_chunked() {
+        let range = DateTimeRange::new(
+            DateTime::from_iso("2024-01-01T10:00:00Z").unwrap(),
+            DateTime::from_iso("2024-01-01T12:30:00Z").unwrap(),
+        );
+        let chunks = range.chunked(t!(60 minutes));
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].start(), &DateTime::from_iso("2024-01-01T10:00:00Z").unwrap());
+        assert_eq!(chunks[0].end(), &DateTime::from_iso("2024-01-01T11:00:00Z").unwrap());
+        assert_eq!(chunks[1].start(), &DateTime::from_iso("2024-01-01T11:00:00Z").unwrap());
+        assert_eq!(chunks[1].end(), &DateTime::from_iso("2024-01-01T12:00:00Z").unwrap());
+        assert_eq!(chunks[2].start(), &DateTime::from_iso("2024-01-01T12:00:00Z").unwrap());
+        assert_eq!(chunks[2].end(), &DateTime::from_iso("2024-01-01T12:30:00Z").unwrap());
     }
 }

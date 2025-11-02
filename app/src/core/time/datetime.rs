@@ -34,6 +34,10 @@ impl DateTime {
         chrono::Local::now().into()
     }
 
+    pub fn millis(&self) -> i64 {
+        self.delegate.timestamp_millis()
+    }
+
     pub fn max_value() -> Self {
         chrono::DateTime::<chrono::Local>::MAX_UTC.into()
     }

@@ -103,6 +103,10 @@ impl<T> DataFrame<T> {
         DataFrame::new(values).expect("Internal error: Error creating data frame of non-empty datapoints")
     }
 
+    pub fn latest_where(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> Option<&DataPoint<T>> {
+        self.data.values().rev().find(|dp| predicate(dp))
+    }
+
     pub fn insert(&mut self, dp: DataPoint<T>) {
         self.data.insert(dp.timestamp, dp);
     }

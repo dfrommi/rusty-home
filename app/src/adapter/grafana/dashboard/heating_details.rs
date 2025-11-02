@@ -14,13 +14,7 @@ use crate::{
 
 use super::{TimeRangeQuery, TimeRangeWithIntervalQuery};
 
-pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope
-where
-    Temperature: TimeSeriesAccess<Temperature>,
-    SetPoint: TimeSeriesAccess<SetPoint>,
-    OpenedArea: TimeSeriesAccess<OpenedArea>,
-    HeatingDemand: TimeSeriesAccess<HeatingDemand>,
-{
+pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
     web::scope("/heating_details/{room}")
         .route("/temperature", web::get().to(temperature_series))
         .route("/temperature/stats", web::get().to(temperature_stats))

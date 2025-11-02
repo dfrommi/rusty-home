@@ -20,6 +20,14 @@ pub trait DataPointAccess<T> {
     async fn current(&self, api: &HomeApi) -> Result<T> {
         self.current_data_point(api).await.map(|dp| dp.value)
     }
+
+    async fn data_point_at(&self, at: DateTime, api: &HomeApi) -> Result<DataPoint<T>> {
+        at.eval_timeshifted(async { self.current_data_point(api).await }).await
+    }
+
+    async fn value_at(&self, at: DateTime, api: &HomeApi) -> Result<T> {
+        self.data_point_at(at, api).await.map(|dp| dp.value)
+    }
 }
 
 pub trait DataFrameAccess<T> {

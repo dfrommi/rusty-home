@@ -21,6 +21,9 @@ macro_rules! t {
     ($amount:literal hours) => {{
         $crate::core::time::Duration::hours($amount)
     }};
+    ($amount:literal days) => {{
+        $crate::core::time::Duration::days($amount)
+    }};
 
     ($amount:literal seconds ago) => {{
         t!(now) - t!($amount seconds)

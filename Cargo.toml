@@ -15,7 +15,7 @@ derive_more = { version = "2", features = [
 
 #Async dependencies
 tokio = { version = "1", features = ["full"] }
-tokio-util = "0.7"
+tokio-stream = "0.1"
 futures = "*"
 
 #Time dependencies
@@ -33,7 +33,7 @@ rumqttc = "*"
 
 #Web dependencies
 actix-web = "4"
-reqwest = { version = "*", features = ["json"] }
+reqwest = { version = "*", features = ["json", "stream"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 

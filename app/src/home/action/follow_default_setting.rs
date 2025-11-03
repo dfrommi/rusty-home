@@ -2,9 +2,9 @@ use r#macro::Id;
 
 use crate::core::HomeApi;
 use crate::home::action::{Rule, RuleResult};
-use crate::home::command::{Command, CommandTarget};
+use crate::home::command::{Command, CommandTarget, HeatingTargetState};
 use crate::home::common::HeatingZone;
-use crate::home::state::{FanAirflow, HeatingMode};
+use crate::home::state::FanAirflow;
 
 #[derive(Debug, Clone, Id)]
 pub struct FollowDefaultSetting(CommandTarget);
@@ -27,7 +27,10 @@ impl Rule for FollowDefaultSetting {
 
                 Command::SetHeating {
                     device,
-                    target_state: heating_zone.heating_state(&HeatingMode::EnergySaving),
+                    target_state: HeatingTargetState::Heat {
+                        temperature: heating_zone.default_setpoint(),
+                        low_priority: true,
+                    },
                 }
             }
             CommandTarget::PushNotify {

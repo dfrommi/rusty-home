@@ -82,33 +82,6 @@ impl HeatingZone {
         }
     }
 
-    pub fn heating_state(&self, mode: &HeatingMode) -> HeatingTargetState {
-        let default_temperature = self.default_setpoint();
-
-        match mode {
-            HeatingMode::Ventilation => HeatingTargetState::WindowOpen,
-            HeatingMode::PostVentilation | HeatingMode::EnergySaving => HeatingTargetState::Heat {
-                temperature: default_temperature,
-            },
-            HeatingMode::Comfort => HeatingTargetState::Heat {
-                temperature: default_temperature + DegreeCelsius(1.0),
-            },
-            HeatingMode::Sleep => {
-                let offset = match self {
-                    HeatingZone::LivingRoom => DegreeCelsius(0.5),
-                    _ => DegreeCelsius(1.0),
-                };
-
-                HeatingTargetState::Heat {
-                    temperature: default_temperature - offset,
-                }
-            }
-            HeatingMode::Away => HeatingTargetState::Heat {
-                temperature: default_temperature - DegreeCelsius(2.0),
-            },
-        }
-    }
-
     //TODO use in actions
     pub fn inside_temperature(&self) -> Temperature {
         match self {

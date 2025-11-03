@@ -149,7 +149,10 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
 fn homekit_heating_actions(zone: HeatingZone, state: HomekitHeatingState) -> Vec<Command> {
     let target_state = match state {
         HomekitHeatingState::Off => HeatingTargetState::Off,
-        HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat { temperature },
+        HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
+            temperature,
+            low_priority: false,
+        },
         HomekitHeatingState::Auto => return vec![],
     };
 

@@ -139,7 +139,11 @@ pub enum PowerToggle {
 pub enum HeatingTargetState {
     Off,
     WindowOpen,
-    Heat { temperature: DegreeCelsius },
+    Heat {
+        temperature: DegreeCelsius,
+        #[serde(default)]
+        low_priority: bool,
+    },
 }
 
 //
@@ -264,14 +268,16 @@ mod test {
             Command::SetHeating {
                 device: Thermostat::RoomOfRequirements,
                 target_state: HeatingTargetState::Heat {
-                    temperature: DegreeCelsius::from(22.5)
+                    temperature: DegreeCelsius::from(22.5),
+                    low_priority: false
                 },
             },
             json!({
                 "type": "set_heating",
                 "device": "room_of_requirements",
                 "mode": "heat",
-                "temperature": 22.5
+                "temperature": 22.5,
+                "low_priority": false
             })
         );
     }

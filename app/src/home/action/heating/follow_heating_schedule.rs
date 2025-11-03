@@ -3,10 +3,11 @@ use crate::{
         HomeApi,
         time::{DateTime, Duration},
         timeseries::{DataPoint, interpolate::algo::linear_dp},
+        unit::DegreeCelsius,
     },
     home::{
         action::{Rule, RuleResult},
-        command::Command,
+        command::{Command, HeatingTargetState},
         common::HeatingZone,
         state::{HeatingMode, ScheduledHeatingMode, Temperature},
     },
@@ -46,35 +47,45 @@ impl Rule for FollowHeatingSchedule {
             return Ok(RuleResult::Skip);
         }
 
-        let target_state = self.zone.heating_state(&self.mode);
-        let mut commands: Vec<Command> = self
-            .zone
-            .thermostats()
-            .iter()
-            .map(|thermostat| Command::SetHeating {
-                target_state: target_state.clone(),
-                device: thermostat.clone(),
-            })
-            .collect();
+        let mut commands: Vec<Command> = vec![];
+        let default_temperature = self.zone.default_setpoint();
 
-        //Hold thermostat ambient temperature in ventilation mode
-        if active_mode == HeatingMode::Ventilation {
-            commands.extend(self.hold_external_temperature(api).await?);
-        }
-
-        //Slowly move towards real temperature to avoid spikes after ventilation
-        if active_mode == HeatingMode::PostVentilation {
-            if mode_active_since.elapsed() < t!(5 minutes) {
+        match self.mode {
+            HeatingMode::Ventilation => {
+                commands.extend(self.heating_state_commands(HeatingTargetState::WindowOpen));
+                //Hold thermostat ambient temperature in ventilation mode
                 commands.extend(self.hold_external_temperature(api).await?);
-            } else {
-                commands.extend(
-                    self.move_towards_real_temperature(
-                        mode_active_since,
-                        ScheduledHeatingMode::post_ventilation_duration(),
-                        api,
-                    )
-                    .await?,
-                );
+            }
+            HeatingMode::PostVentilation => {
+                commands.extend(self.heat_to(default_temperature, api).await?);
+
+                if mode_active_since.elapsed() < t!(5 minutes) {
+                    commands.extend(self.hold_external_temperature(api).await?);
+                } else {
+                    commands.extend(
+                        self.move_towards_real_temperature(
+                            mode_active_since,
+                            ScheduledHeatingMode::post_ventilation_duration(),
+                            api,
+                        )
+                        .await?,
+                    );
+                }
+            }
+            HeatingMode::EnergySaving => {
+                commands.extend(self.heat_to(default_temperature, api).await?);
+            }
+            HeatingMode::Comfort => {
+                commands.extend(self.heat_to(default_temperature + DegreeCelsius(1.0), api).await?);
+            }
+            HeatingMode::Sleep if self.zone == HeatingZone::LivingRoom => {
+                commands.extend(self.heat_to(default_temperature - DegreeCelsius(0.5), api).await?);
+            }
+            HeatingMode::Sleep => {
+                commands.extend(self.heat_to(default_temperature - DegreeCelsius(1.0), api).await?);
+            }
+            HeatingMode::Away => {
+                commands.extend(self.heat_to(default_temperature - DegreeCelsius(2.0), api).await?);
             }
         }
 
@@ -83,6 +94,35 @@ impl Rule for FollowHeatingSchedule {
 }
 
 impl FollowHeatingSchedule {
+    async fn heat_to(&self, set_point: DegreeCelsius, api: &HomeApi) -> anyhow::Result<Vec<Command>> {
+        let mut commands: Vec<Command> = vec![];
+        for thermostat in self.zone.thermostats() {
+            let current_setpoint = thermostat.set_point().current(api).await?;
+            let is_increasing = set_point > current_setpoint;
+
+            commands.push(Command::SetHeating {
+                device: thermostat.clone(),
+                target_state: HeatingTargetState::Heat {
+                    temperature: set_point,
+                    low_priority: is_increasing,
+                },
+            });
+        }
+
+        Ok(commands)
+    }
+
+    fn heating_state_commands(&self, target_state: HeatingTargetState) -> Vec<Command> {
+        self.zone
+            .thermostats()
+            .iter()
+            .map(|thermostat| Command::SetHeating {
+                device: thermostat.clone(),
+                target_state: target_state.clone(),
+            })
+            .collect()
+    }
+
     async fn hold_external_temperature(&self, api: &HomeApi) -> anyhow::Result<Vec<Command>> {
         let mut commands = vec![];
         for thermostat in self.zone.thermostats() {

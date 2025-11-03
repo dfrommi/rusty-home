@@ -48,7 +48,7 @@ async fn is_set_heating_reflected_in_state(
 
     match target_state {
         crate::home::command::HeatingTargetState::Off => Ok(set_point == DegreeCelsius(0.0)),
-        crate::home::command::HeatingTargetState::Heat { temperature } => Ok(&set_point == temperature),
+        crate::home::command::HeatingTargetState::Heat { temperature, .. } => Ok(&set_point == temperature), //priority not reflected in state
         crate::home::command::HeatingTargetState::WindowOpen => match device {
             Thermostat::LivingRoomBig => Ok(Opened::LivingRoomRadiatorThermostatBig.current(api).await?),
             Thermostat::LivingRoomSmall => Ok(Opened::LivingRoomRadiatorThermostatSmall.current(api).await?),

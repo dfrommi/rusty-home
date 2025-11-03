@@ -55,11 +55,25 @@ impl CommandExecutor for Z2mCommandExecutor {
             ) => self.set_heating(device_id, None, true).await,
             (
                 Command::SetHeating {
-                    target_state: HeatingTargetState::Heat { temperature },
+                    target_state:
+                        HeatingTargetState::Heat {
+                            temperature,
+                            low_priority,
+                        },
                     ..
                 },
                 Z2mCommandTarget::Thermostat(device_id),
-            ) => self.set_heating(device_id, Some(*temperature), false).await,
+            ) => {
+                self.set_heating(
+                    device_id,
+                    Some(SetPoint {
+                        temperature: *temperature,
+                        low_priority: *low_priority,
+                    }),
+                    false,
+                )
+                .await
+            }
             (Command::SetThermostatAmbientTemperature { temperature, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
                 self.set_ambient_temperature(device_id, *temperature).await
             }
@@ -71,18 +85,30 @@ impl CommandExecutor for Z2mCommandExecutor {
     }
 }
 
+struct SetPoint {
+    temperature: DegreeCelsius,
+    low_priority: bool,
+}
+
 impl Z2mCommandExecutor {
     async fn set_heating(
         &self,
         device_id: &str,
-        setpoint: Option<DegreeCelsius>,
+        setpoint: Option<SetPoint>,
         window_open: bool,
     ) -> anyhow::Result<bool> {
+        let (high_priority_setpoint, low_priority_setpoint) = match setpoint {
+            Some(sp) if sp.low_priority => (None, Some(sp)),
+            Some(sp) => (Some(sp), None),
+            None => (None, None),
+        };
+
         let msg = MqttOutMessage::transient(
             self.target_topic(device_id),
             serde_json::to_string(&ThermostatCommandPayload {
                 window_open_external: window_open,
-                occupied_heating_setpoint: setpoint.map(|t| t.0),
+                occupied_heating_setpoint: high_priority_setpoint.map(|t| t.temperature.0),
+                occupied_heating_setpoint_scheduled: low_priority_setpoint.map(|t| t.temperature.0),
             })?,
         );
 
@@ -119,6 +145,8 @@ struct ThermostatCommandPayload {
     window_open_external: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     occupied_heating_setpoint: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    occupied_heating_setpoint_scheduled: Option<f64>,
 }
 
 #[derive(Debug, serde::Serialize)]

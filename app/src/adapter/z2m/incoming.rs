@@ -2,9 +2,9 @@ use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::adapter::z2m::outgoing::Z2mCommandExecutor;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
+use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
 use crate::home::availability::ItemAvailability;
-use crate::home::state::{Load, PersistentHomeStateValue, Temperature};
+use crate::home::state::{Load, PersistentHomeStateValue, RawVendorValue, Temperature};
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use crate::t;
 use infrastructure::MqttInMessage;
@@ -142,13 +142,10 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                         payload.last_seen,
                     )
                     .into(),
-                    // Range: discard < -500, max value 3600, below 0 are different levels of zero.
-                    // -8000 invalid
-                    // TODO skip lower than -500 instead of mapping to 0?
                     DataPoint::new(
-                        PersistentHomeStateValue::Load(
-                            Load::Thermostat(thermostat.clone()),
-                            Percent(std::cmp::max(payload.load_estimate, 0) as f64 / 36.0), // 0-3600 to percent
+                        PersistentHomeStateValue::RawVendorValue(
+                            RawVendorValue::AllyLoadEstimate(thermostat.clone()),
+                            RawValue::from(payload.load_estimate as f64),
                         ),
                         payload.last_seen,
                     )

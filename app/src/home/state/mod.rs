@@ -1,6 +1,7 @@
 mod automatic_temp_inc;
 mod cold_air_coming_in;
 mod load;
+mod raw_vendor_value;
 //mod current_power_usage;
 mod dewpoint;
 //mod external_auto_control;
@@ -44,6 +45,7 @@ pub use opened::Opened;
 pub use opened::OpenedArea;
 pub use powered::Powered;
 pub use presence::Presence;
+pub use raw_vendor_value::RawVendorValue;
 pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
@@ -74,6 +76,7 @@ pub enum HomeStateValue {
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
     FeltTemperature(FeltTemperature, DegreeCelsius),
+    Load(Load, Percent),
     OpenedArea(OpenedArea, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
@@ -87,13 +90,13 @@ pub enum HomeStateValue {
     #[persistent]
     HeatingDemand(HeatingDemand, Percent),
     #[persistent]
-    Load(Load, Percent),
-    #[persistent]
     Opened(Opened, bool),
     #[persistent]
     Powered(Powered, bool),
     #[persistent]
     Presence(Presence, bool),
+    #[persistent]
+    RawVendorValue(RawVendorValue, RawValue),
     #[persistent]
     RelativeHumidity(RelativeHumidity, Percent),
     #[persistent]
@@ -120,6 +123,7 @@ pub enum StateValue {
     KiloCubicMeter(KiloCubicMeter),
     FanAirflow(FanAirflow),
     HeatingMode(HeatingMode),
+    RawValue(RawValue),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -132,6 +136,7 @@ pub enum PersistentStateValue {
     HeatingUnit(HeatingUnit),
     KiloCubicMeter(KiloCubicMeter),
     FanAirflow(FanAirflow),
+    RawValue(RawValue),
 }
 
 pub trait PersistentHomeStateTypeInfo {
@@ -195,6 +200,7 @@ impl std::fmt::Display for StateValue {
             StateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
             StateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
             StateValue::HeatingMode(heating_mode) => write!(f, "{}", heating_mode),
+            StateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
         }
     }
 }
@@ -210,6 +216,7 @@ impl std::fmt::Display for PersistentStateValue {
             PersistentStateValue::HeatingUnit(heating_unit) => write!(f, "{}", heating_unit),
             PersistentStateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
             PersistentStateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
+            PersistentStateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
         }
     }
 }

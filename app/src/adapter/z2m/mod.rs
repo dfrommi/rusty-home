@@ -2,21 +2,16 @@ mod config;
 mod incoming;
 mod outgoing;
 
-use std::sync::Arc;
-
 use crate::adapter::command::CommandExecutor;
-use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
 use crate::home::Thermostat;
 use crate::home::state::{
-    CurrentPowerUsage, HeatingDemand, Load, Opened, Presence, RelativeHumidity, SetPoint, Temperature,
-    TotalEnergyConsumption,
+    CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
 use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;
 use serde::Deserialize;
-use tokio::sync::Mutex;
 
 use crate::{Infrastructure, core::DeviceConfig};
 
@@ -33,7 +28,7 @@ pub enum Z2mChannel {
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
     PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
-    Thermostat(Thermostat, SetPoint, HeatingDemand, Opened, Option<Arc<Mutex<ThermostatGroup>>>),
+    Thermostat(Thermostat, SetPoint, HeatingDemand, Opened),
 }
 
 #[derive(Debug, Clone)]

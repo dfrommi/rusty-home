@@ -4,9 +4,8 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
 use crate::home::availability::ItemAvailability;
-use crate::home::state::{Load, PersistentHomeStateValue, RawVendorValue, Temperature};
+use crate::home::state::{PersistentHomeStateValue, RawVendorValue, Temperature};
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
-use crate::t;
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
 
@@ -83,16 +82,8 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::Thermostat(thermostat, set_point, demand, opened, group) => {
+            Z2mChannel::Thermostat(thermostat, set_point, demand, opened) => {
                 let payload: Thermostat = serde_json::from_str(&msg.payload)?;
-
-                if let Some(group) = group {
-                    let mut group = group.lock().await;
-                    group.register_load(device_id, DataPoint::new(payload.load_estimate, payload.last_seen));
-                    if let Err(e) = group.send_if_needed(&self.executor).await {
-                        tracing::error!("Error sending load estimate to thermostat group: {:?}", e);
-                    }
-                }
 
                 vec![
                     DataPoint::new(
@@ -146,6 +137,14 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                         PersistentHomeStateValue::RawVendorValue(
                             RawVendorValue::AllyLoadEstimate(thermostat.clone()),
                             RawValue::from(payload.load_estimate as f64),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::RawVendorValue(
+                            RawVendorValue::AllyLoadMean(thermostat.clone()),
+                            RawValue::from(payload.load_room_mean as f64),
                         ),
                         payload.last_seen,
                     )
@@ -247,6 +246,7 @@ struct Thermostat {
     occupied_heating_setpoint: f64,
     pi_heating_demand: f64,
     window_open_external: bool,
+    load_room_mean: i64,
     load_estimate: i64,
     local_temperature: f64,
     external_measured_room_sensor: f64,
@@ -278,80 +278,4 @@ struct WaterLeakSensor {
 struct RemoteControl {
     action: Option<String>,
     last_seen: DateTime,
-}
-
-#[derive(Debug)]
-pub struct ThermostatGroup {
-    first_id: String,
-    first_factor: f64,
-    first_data: Option<DataPoint<i64>>,
-    second_id: String,
-    second_factor: f64,
-    second_data: Option<DataPoint<i64>>,
-    last_sent_at: DateTime,
-    last_sent_value: i64,
-}
-
-impl ThermostatGroup {
-    pub fn new(first_id: String, first_factor: f64, second_id: String, second_factor: f64) -> Self {
-        Self {
-            first_id,
-            first_factor,
-            first_data: None,
-            second_id,
-            second_factor,
-            second_data: None,
-            last_sent_at: t!(24 hours ago),
-            last_sent_value: -8000,
-        }
-    }
-
-    pub async fn send_if_needed(&mut self, sender: &Z2mCommandExecutor) -> anyhow::Result<bool> {
-        let mean = match self.mean() {
-            Some(mean) => mean,
-            None => {
-                return Ok(false);
-            }
-        };
-
-        if (mean - self.last_sent_value).abs() < 5 || t!(15 minutes ago) < self.last_sent_at {
-            return Ok(false);
-        }
-
-        tracing::debug!(
-            "Sending load estimate mean {} to thermostats {} and {}",
-            mean,
-            self.first_id,
-            self.second_id
-        );
-
-        sender.set_load_room_mean(&self.first_id, mean).await?;
-        sender.set_load_room_mean(&self.second_id, mean).await?;
-        self.last_sent_at = t!(now);
-        self.last_sent_value = mean;
-
-        Ok(true)
-    }
-
-    fn register_load(&mut self, device_id: &str, data: DataPoint<i64>) {
-        let data = if data.value > -500 { Some(data) } else { None };
-
-        if device_id == self.first_id {
-            self.first_data = data;
-        } else if device_id == self.second_id {
-            self.second_data = data;
-        }
-    }
-
-    fn mean(&self) -> Option<i64> {
-        match (&self.first_data, &self.second_data) {
-            (Some(first), Some(second)) => {
-                //weighted by influence of the radiator
-                let v = (self.first_factor * (first.value as f64) + self.second_factor * (second.value as f64))
-                    / (self.first_factor + self.second_factor);
-                Some(v.round() as i64)
-            }
-            _ => None,
-        }
-    }
 }

@@ -1,6 +1,7 @@
 use r#macro::Id;
 
 use crate::core::HomeApi;
+use crate::core::unit::RawValue;
 use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, CommandTarget, HeatingTargetState};
 use crate::home::common::HeatingZone;
@@ -45,6 +46,10 @@ impl Rule for FollowDefaultSetting {
             CommandTarget::ControlFan { device } => Command::ControlFan {
                 device,
                 speed: FanAirflow::Off,
+            },
+            CommandTarget::SetThermostatLoadMean { device } => Command::SetThermostatLoadMean {
+                device,
+                value: RawValue(-8000.0),
             },
             CommandTarget::SetThermostatAmbientTemperature { .. } => {
                 anyhow::bail!("FollowDefaultSetting cannot be applied to SetThermostatAmbientTemperature")

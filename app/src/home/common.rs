@@ -3,10 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     core::unit::DegreeCelsius,
-    home::{
-        command::HeatingTargetState,
-        state::{HeatingDemand, HeatingMode, OpenedArea, SetPoint, Temperature},
-    },
+    home::state::{HeatingDemand, OpenedArea, SetPoint, Temperature},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
@@ -49,6 +46,13 @@ pub enum Thermostat {
     Kitchen,
     RoomOfRequirements,
     Bathroom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadBalancedThermostat {
+    LivingRoomBig,
+    LivingRoomSmall,
 }
 
 impl HeatingZone {
@@ -134,6 +138,15 @@ impl Thermostat {
             Thermostat::Kitchen => HeatingDemand::Kitchen,
             Thermostat::RoomOfRequirements => HeatingDemand::RoomOfRequirements,
             Thermostat::Bathroom => HeatingDemand::Bathroom,
+        }
+    }
+}
+
+impl From<&LoadBalancedThermostat> for Thermostat {
+    fn from(value: &LoadBalancedThermostat) -> Self {
+        match value {
+            LoadBalancedThermostat::LivingRoomBig => Thermostat::LivingRoomBig,
+            LoadBalancedThermostat::LivingRoomSmall => Thermostat::LivingRoomSmall,
         }
     }
 }

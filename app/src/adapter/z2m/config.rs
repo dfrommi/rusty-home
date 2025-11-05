@@ -1,11 +1,7 @@
-use std::sync::Arc;
-
-use tokio::sync::Mutex;
-
 use super::Z2mChannel;
 use super::Z2mCommandTarget;
-use crate::adapter::z2m::incoming::ThermostatGroup;
 use crate::core::unit::KiloWattHours;
+use crate::home::LoadBalancedThermostat;
 use crate::home::Thermostat;
 use crate::home::command::CommandTarget;
 use crate::home::state::Opened;
@@ -63,6 +59,18 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
             Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
         ),
         (
+            CommandTarget::SetThermostatLoadMean {
+                device: LoadBalancedThermostat::LivingRoomBig,
+            },
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
+        ),
+        (
+            CommandTarget::SetThermostatLoadMean {
+                device: LoadBalancedThermostat::LivingRoomSmall,
+            },
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
+        ),
+        (
             CommandTarget::SetThermostatAmbientTemperature {
                 device: Thermostat::Bedroom,
             },
@@ -90,13 +98,6 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
 }
 
 pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
-    let thermostat_group_living_room = Arc::new(Mutex::new(ThermostatGroup::new(
-        "living_room/radiator_thermostat_big".to_string(),
-        Thermostat::LivingRoomBig.heating_factor(),
-        "living_room/radiator_thermostat_small".to_string(),
-        Thermostat::LivingRoomSmall.heating_factor(),
-    )));
-
     vec![
         //
         // CLIMATE SENSORS
@@ -143,7 +144,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::LivingRoomBig,
                 HeatingDemand::LivingRoomBig,
                 Opened::LivingRoomRadiatorThermostatBig,
-                Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
@@ -153,7 +153,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::LivingRoomSmall,
                 HeatingDemand::LivingRoomSmall,
                 Opened::LivingRoomRadiatorThermostatSmall,
-                Some(thermostat_group_living_room.clone()),
             ),
         ),
         (
@@ -163,7 +162,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::Kitchen,
                 HeatingDemand::Kitchen,
                 Opened::KitchenRadiatorThermostat,
-                None,
             ),
         ),
         (
@@ -173,7 +171,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::Bedroom,
                 HeatingDemand::Bedroom,
                 Opened::BedroomRadiatorThermostat,
-                None,
             ),
         ),
         (
@@ -183,7 +180,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::RoomOfRequirements,
                 HeatingDemand::RoomOfRequirements,
                 Opened::RoomOfRequirementsThermostat,
-                None,
             ),
         ),
         (
@@ -193,7 +189,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 SetPoint::Bathroom,
                 HeatingDemand::Bathroom,
                 Opened::BathroomThermostat,
-                None,
             ),
         ),
         //

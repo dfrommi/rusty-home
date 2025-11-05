@@ -37,7 +37,6 @@ pub fn get_state_at(iso: &str, action: impl Into<HomeAction>) -> ActionState {
 
 mod ext_id {
     use crate::adapter::homekit::HomekitCommandTarget;
-    use crate::home::Thermostat;
     use crate::home::action::{
         AutoTurnOff, CoolDownWhenOccupied, Dehumidify, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen,
         ProvideAmbientTemperature, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
@@ -48,6 +47,7 @@ mod ext_id {
     use crate::home::common::HeatingZone;
     use crate::home::state::HeatingMode;
     use crate::home::trigger::{RemoteTarget, UserTriggerTarget};
+    use crate::home::{LoadBalancedThermostat, Thermostat};
 
     #[test]
     fn dehumidify_ext_ids() {
@@ -283,6 +283,12 @@ mod ext_id {
                 CommandTarget::SetThermostatAmbientTemperature {
                     device: Thermostat::Bathroom,
                 } => "set_thermostat_ambient_temperature::bathroom",
+                CommandTarget::SetThermostatLoadMean {
+                    device: LoadBalancedThermostat::LivingRoomBig,
+                } => "set_thermostat_load_mean::living_room_big",
+                CommandTarget::SetThermostatLoadMean {
+                    device: LoadBalancedThermostat::LivingRoomSmall,
+                } => "set_thermostat_load_mean::living_room_small",
                 CommandTarget::PushNotify {
                     recipient: NotificationRecipient::Dennis,
                     notification: Notification::WindowOpened,

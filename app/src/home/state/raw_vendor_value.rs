@@ -16,6 +16,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RawVendorValue {
     AllyLoadEstimate(Thermostat),
+    AllyLoadMean(Thermostat),
 }
 
 impl Estimatable for RawVendorValue {

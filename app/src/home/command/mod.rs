@@ -1,8 +1,8 @@
 mod command_state;
 
-use crate::core::unit::DegreeCelsius;
+use crate::core::unit::{DegreeCelsius, RawValue};
 use crate::core::{id::ExternalId, time::DateTime};
-use crate::home::Thermostat;
+use crate::home::{LoadBalancedThermostat, Thermostat};
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,10 @@ pub enum Command {
     SetThermostatAmbientTemperature {
         device: Thermostat,
         temperature: DegreeCelsius,
+    },
+    SetThermostatLoadMean {
+        device: LoadBalancedThermostat,
+        value: RawValue,
     },
     PushNotify {
         action: NotificationAction,
@@ -52,6 +56,9 @@ pub enum CommandTarget {
     #[display("SetThermostatAmbientTemperature[{}]", device)]
     SetThermostatAmbientTemperature { device: Thermostat },
 
+    #[display("SetThermostatLoadMean[{}]", device)]
+    SetThermostatLoadMean { device: LoadBalancedThermostat },
+
     #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {
         recipient: NotificationRecipient,
@@ -78,6 +85,9 @@ impl From<&Command> for CommandTarget {
             Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
             Command::SetThermostatAmbientTemperature { device, .. } => {
                 CommandTarget::SetThermostatAmbientTemperature { device: device.clone() }
+            }
+            Command::SetThermostatLoadMean { device, .. } => {
+                CommandTarget::SetThermostatLoadMean { device: device.clone() }
             }
             Command::PushNotify {
                 recipient,

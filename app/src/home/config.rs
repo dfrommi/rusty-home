@@ -2,13 +2,13 @@ use crate::adapter::homekit::HomekitCommandTarget;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle};
 use crate::home::common::HeatingZone;
 use crate::home::trigger::RemoteTarget;
-use crate::home::{Room, Thermostat};
+use crate::home::{LoadBalancedThermostat, Room, Thermostat};
 
 use super::action::{Dehumidify, HomeAction};
 use super::goal::HomeGoal;
 use crate::home::action::{
     AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
-    ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
+    ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
 use crate::home::state::HeatingMode;
 
@@ -87,6 +87,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::CoreControl,
         vec![
+            ProvideLoadRoomMean::LivingRoom.into(),
             ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomBig).into(), 
             ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomSmall).into(), 
             ProvideAmbientTemperature::Thermostat(Thermostat::Bedroom).into(), 
@@ -124,6 +125,12 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             }).into(),
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Bathroom,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetThermostatLoadMean {
+                device: LoadBalancedThermostat::LivingRoomBig,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::SetThermostatLoadMean {
+                device: LoadBalancedThermostat::LivingRoomSmall,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,

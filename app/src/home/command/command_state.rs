@@ -1,9 +1,10 @@
-use crate::core::unit::DegreeCelsius;
+use crate::core::unit::{DegreeCelsius, RawValue};
+use crate::home::LoadBalancedThermostat;
 use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{FanActivity, FanAirflow, Opened, Powered, SetPoint};
+use crate::home::state::{FanActivity, FanAirflow, Opened, Powered, RawVendorValue, SetPoint};
 use anyhow::Result;
 
 use crate::{core::HomeApi, t};
@@ -17,7 +18,10 @@ impl Command {
                 is_set_heating_reflected_in_state(device, target_state, api).await
             }
             Command::SetThermostatAmbientTemperature { device, temperature } => {
-                is_set_thermmostat_ambient_templerature_reflected_in_state(device, *temperature, api).await
+                is_set_thermostat_ambient_temperature_reflected_in_state(device, *temperature, api).await
+            }
+            Command::SetThermostatLoadMean { device, value } => {
+                is_set_thermostat_load_mean_reflected_in_state(device, *value, api).await
             }
             Command::PushNotify {
                 recipient,
@@ -60,11 +64,13 @@ async fn is_set_heating_reflected_in_state(
     }
 }
 
-async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
+async fn is_set_thermostat_ambient_temperature_reflected_in_state(
     device: &Thermostat,
     temperature: DegreeCelsius,
     api: &HomeApi,
 ) -> Result<bool> {
+    //TODO from temperature state
+
     let latest_command = api
         .get_latest_command(
             CommandTarget::SetThermostatAmbientTemperature { device: device.clone() },
@@ -91,6 +97,23 @@ async fn is_set_thermmostat_ambient_templerature_reflected_in_state(
         Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
         None => Ok(false),
     }
+}
+
+async fn is_set_thermostat_load_mean_reflected_in_state(
+    device: &LoadBalancedThermostat,
+    value: RawValue,
+    api: &HomeApi,
+) -> Result<bool> {
+    let current_value = RawVendorValue::AllyLoadMean(device.into()).current(api).await?;
+    let latest_command_ts = api
+        .get_latest_command(CommandTarget::SetThermostatLoadMean { device: device.clone() }, t!(2 hours ago))
+        .await?
+        .map(|cmd| cmd.created)
+        .unwrap_or(t!(24 hours ago));
+
+    let is_reflected = (current_value.0 - value.0).abs() < 5.0 && latest_command_ts.elapsed() < t!(15 minutes);
+
+    Ok(is_reflected)
 }
 
 async fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, api: &HomeApi) -> Result<bool> {

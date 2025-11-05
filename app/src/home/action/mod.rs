@@ -63,6 +63,7 @@ pub enum HomeAction {
     Dehumidify(Dehumidify),
     InformWindowOpen(InformWindowOpen),
     ProvideAmbientTemperature(ProvideAmbientTemperature),
+    ProvideLoadRoomMean(ProvideLoadRoomMean),
     AutoTurnOff(AutoTurnOff),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
@@ -95,6 +96,9 @@ impl Action for HomeAction {
                 HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
                     evaluate_rule(provide_ambient_temperature, ext_id, api).await
                 }
+                HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => {
+                    evaluate_rule(provide_load_room_mean, ext_id, api).await
+                }
                 HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, api).await,
                 HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
                     evaluate_rule(reduce_noise_at_night, ext_id, api).await
@@ -123,6 +127,7 @@ impl Action for HomeAction {
             HomeAction::Dehumidify(dehumidify) => dehumidify.ext_id(),
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.ext_id(),
             HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => provide_ambient_temperature.ext_id(),
+            HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => provide_load_room_mean.ext_id(),
             HomeAction::AutoTurnOff(auto_turn_off) => auto_turn_off.ext_id(),
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.ext_id(),
             HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.ext_id(),

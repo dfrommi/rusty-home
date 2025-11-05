@@ -1,6 +1,6 @@
 use crate::{
     adapter::command::CommandExecutor,
-    core::unit::DegreeCelsius,
+    core::unit::{DegreeCelsius, RawValue},
     home::command::{Command, CommandTarget, HeatingTargetState},
 };
 use infrastructure::MqttOutMessage;
@@ -78,6 +78,9 @@ impl CommandExecutor for Z2mCommandExecutor {
                 self.set_ambient_temperature(device_id, *temperature).await
             }
 
+            (Command::SetThermostatLoadMean { value, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
+                self.set_load_room_mean(device_id, *value).await
+            }
             (_, z2m_target) => {
                 anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
             }
@@ -128,10 +131,12 @@ impl Z2mCommandExecutor {
         Ok(true)
     }
 
-    pub async fn set_load_room_mean(&self, device_id: &str, load: i64) -> anyhow::Result<bool> {
+    pub async fn set_load_room_mean(&self, device_id: &str, value: RawValue) -> anyhow::Result<bool> {
+        let value = value.0 as i64;
+
         let msg = MqttOutMessage::transient(
             self.target_topic(device_id),
-            serde_json::to_string(&ThermostatLoadPayload { load_room_mean: load })?,
+            serde_json::to_string(&ThermostatLoadPayload { load_room_mean: value })?,
         );
 
         self.sender.send(msg).await?;

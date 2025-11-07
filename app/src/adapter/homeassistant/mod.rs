@@ -9,6 +9,7 @@ use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
 
 use crate::adapter::command::CommandExecutor;
+use crate::home::state::LightLevel;
 use crate::home::state::{FanActivity, Powered, Presence, RelativeHumidity, Temperature};
 
 use std::collections::HashMap;
@@ -57,7 +58,9 @@ pub enum HaChannel {
     Powered(Powered),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
+    PresenceFromFP2(Presence),
     WindcalmFanSpeed(FanActivity),
+    LightLevel(LightLevel),
 }
 
 #[derive(Debug, Clone)]

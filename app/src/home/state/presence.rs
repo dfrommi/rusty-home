@@ -22,6 +22,11 @@ pub enum Presence {
     CouchLeft,
     CouchCenter,
     CouchRight,
+    KitchenArea,
+    LivingRoomArea,
+    LivingRoomCouch,
+    RoomOfRequirementsArea,
+    RoomOfRequirementsDesk,
 }
 
 impl Estimatable for Presence {

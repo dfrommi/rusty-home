@@ -19,6 +19,7 @@ mod energy_saving;
 mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
+mod light_level;
 mod powered;
 mod presence;
 mod relative_humidity;
@@ -40,6 +41,7 @@ pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
+pub use light_level::LightLevel;
 pub use load::Load;
 pub use opened::Opened;
 pub use opened::OpenedArea;
@@ -90,6 +92,8 @@ pub enum HomeStateValue {
     #[persistent]
     HeatingDemand(HeatingDemand, Percent),
     #[persistent]
+    LightLevel(LightLevel, Lux),
+    #[persistent]
     Opened(Opened, bool),
     #[persistent]
     Powered(Powered, bool),
@@ -124,6 +128,7 @@ pub enum StateValue {
     FanAirflow(FanAirflow),
     HeatingMode(HeatingMode),
     RawValue(RawValue),
+    Lux(Lux),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +142,7 @@ pub enum PersistentStateValue {
     KiloCubicMeter(KiloCubicMeter),
     FanAirflow(FanAirflow),
     RawValue(RawValue),
+    Lux(Lux),
 }
 
 pub trait PersistentHomeStateTypeInfo {
@@ -201,6 +207,7 @@ impl std::fmt::Display for StateValue {
             StateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
             StateValue::HeatingMode(heating_mode) => write!(f, "{}", heating_mode),
             StateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
+            StateValue::Lux(lux) => write!(f, "{}", lux),
         }
     }
 }
@@ -217,6 +224,7 @@ impl std::fmt::Display for PersistentStateValue {
             PersistentStateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
             PersistentStateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
             PersistentStateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
+            PersistentStateValue::Lux(lux) => write!(f, "{}", lux),
         }
     }
 }

@@ -107,5 +107,6 @@ fn to_metrics_value(value: StateValue) -> f64 {
         StateValue::FanAirflow(fan_airflow) => f64::from(&fan_airflow),
         StateValue::HeatingMode(heating_mode) => f64::from(&heating_mode),
         StateValue::RawValue(raw) => f64::from(&raw),
+        StateValue::Lux(lux) => f64::from(&lux),
     }
 }

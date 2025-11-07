@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
-use crate::core::unit::{DegreeCelsius, Percent};
+use crate::core::unit::{DegreeCelsius, Lux, Percent};
 use crate::home::availability::ItemAvailability;
 use crate::{
     core::{time::DateTime, timeseries::DataPoint},
@@ -122,6 +122,12 @@ fn to_persistent_data_point(
         }
         HaChannel::PresenceFromDeviceTracker(channel) => {
             Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "home"), timestamp).into())
+        }
+        HaChannel::LightLevel(channel) => Some(
+            DataPoint::new(PersistentHomeStateValue::LightLevel(channel, Lux(ha_value.parse()?)), timestamp).into(),
+        ),
+        HaChannel::PresenceFromFP2(channel) => {
+            Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::WindcalmFanSpeed(channel) => {
             //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset

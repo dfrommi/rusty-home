@@ -89,10 +89,10 @@ impl HeatingZone {
     //TODO use in actions
     pub fn inside_temperature(&self) -> Temperature {
         match self {
-            HeatingZone::LivingRoom => Temperature::LivingRoom,
-            HeatingZone::Bedroom => Temperature::Bedroom,
+            HeatingZone::LivingRoom => Temperature::LivingRoomTado,
+            HeatingZone::Bedroom => Temperature::BedroomTado,
             HeatingZone::Kitchen => Temperature::Kitchen,
-            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirements,
+            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirementsTado,
             HeatingZone::Bathroom => Temperature::BathroomShower,
         }
     }

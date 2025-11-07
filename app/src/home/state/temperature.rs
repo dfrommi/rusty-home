@@ -28,6 +28,9 @@ pub enum Temperature {
     Dehumidifier,
     ThermostatOnDevice(Thermostat),
     ThermostatExternal(Thermostat),
+    LivingRoomTado,
+    RoomOfRequirementsTado,
+    BedroomTado,
 }
 
 impl Estimatable for Temperature {

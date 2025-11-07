@@ -3,10 +3,9 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     core::HomeApi,
     home::{
-        Thermostat,
+        HeatingZone, Thermostat,
         action::{Rule, RuleResult},
         command::Command,
-        state::Temperature,
     },
     port::DataPointAccess as _,
 };
@@ -18,20 +17,12 @@ pub enum ProvideAmbientTemperature {
 
 impl Rule for ProvideAmbientTemperature {
     async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
-        let (thermostat, temp_sensor) = match self {
-            ProvideAmbientTemperature::Thermostat(thermostat) => (
-                thermostat,
-                match thermostat {
-                    Thermostat::LivingRoomBig | Thermostat::LivingRoomSmall => Temperature::LivingRoom,
-                    Thermostat::Bedroom => Temperature::Bedroom,
-                    Thermostat::Kitchen => Temperature::Kitchen,
-                    Thermostat::RoomOfRequirements => Temperature::RoomOfRequirements,
-                    Thermostat::Bathroom => Temperature::BathroomShower,
-                },
-            ),
-        };
+        let ProvideAmbientTemperature::Thermostat(thermostat) = self;
 
-        let temperature = temp_sensor.current(api).await?;
+        let temperature = HeatingZone::for_thermostat(thermostat)
+            .inside_temperature()
+            .current(api)
+            .await?;
 
         Ok(RuleResult::Execute(vec![Command::SetThermostatAmbientTemperature {
             device: thermostat.clone(),

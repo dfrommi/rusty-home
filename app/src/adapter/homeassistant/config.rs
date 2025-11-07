@@ -1,6 +1,8 @@
 use crate::home::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
-use crate::home::state::{FanActivity, HeatingDemand, Powered, Presence, RelativeHumidity, SetPoint, Temperature};
+use crate::home::state::{
+    FanActivity, HeatingDemand, LightLevel, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
+};
 
 use super::{HaChannel, HaServiceTarget};
 
@@ -53,6 +55,18 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // TEMPERATURE
         //
         ("sensor.home_temperature", HaChannel::Temperature(Temperature::Outside)),
+        (
+            "sensor.wohnzimmer_temperature",
+            HaChannel::Temperature(Temperature::LivingRoomTado),
+        ),
+        (
+            "sensor.schlafzimmer_temperature",
+            HaChannel::Temperature(Temperature::BedroomTado),
+        ),
+        (
+            "sensor.arbeitszimmer_temperature",
+            HaChannel::Temperature(Temperature::RoomOfRequirementsTado),
+        ),
         //
         // HUMIDITY
         //
@@ -88,6 +102,34 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "device_tracker.simi_2",
             HaChannel::PresenceFromDeviceTracker(Presence::AtHomeSabine),
         ),
+        (
+            "binary_sensor.presence_sensor_fp2_2222_presence_sensor_2",
+            HaChannel::PresenceFromFP2(Presence::LivingRoomCouch),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_2222_presence_sensor_3",
+            HaChannel::PresenceFromFP2(Presence::LivingRoomArea),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_2222_presence_sensor_1",
+            HaChannel::PresenceFromFP2(Presence::LivingRoomEntrance),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_d775_presence_sensor_5",
+            HaChannel::PresenceFromFP2(Presence::KitchenEntrance),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_d775_presence_sensor_2",
+            HaChannel::PresenceFromFP2(Presence::KitchenSink),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_d775_presence_sensor_4",
+            HaChannel::PresenceFromFP2(Presence::KitchenWorkingArea),
+        ),
+        (
+            "binary_sensor.presence_sensor_fp2_d775_presence_sensor_3",
+            HaChannel::PresenceFromFP2(Presence::KitchenStove),
+        ),
         //
         // FAN SPEED
         //
@@ -98,6 +140,17 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "fan.ceiling_fan_bedroom",
             HaChannel::WindcalmFanSpeed(FanActivity::BedroomCeilingFan),
+        ),
+        //
+        // LIGHT LEVEL
+        //
+        (
+            "sensor.presence_sensor_fp2_2222_light_sensor_light_level",
+            HaChannel::LightLevel(LightLevel::LivingRoom),
+        ),
+        (
+            "sensor.presence_sensor_fp2_d775_light_sensor_light_level",
+            HaChannel::LightLevel(LightLevel::Kitchen),
         ),
     ]
 }

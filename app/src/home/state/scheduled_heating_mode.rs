@@ -120,10 +120,10 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
         //TODO block comfort mode based on time and occupancy in most rooms
         if self == &ScheduledHeatingMode::LivingRoom {
             //in ventilation check range
-            if let Some(ventilation_range) = t!(17:30 - 19:45).active()
+            if let Some(ventilation_range) = t!(16:30 - 19:45).active()
                 && ventilation_range.contains(&window_open.timestamp)
             {
-                let max_ts = t!(17:30).today().max(*max_ts);
+                let max_ts = t!(16:30).today().max(*max_ts);
                 tracing::trace!("Heating in comfort-mode as living room was ventilated in the evening");
                 return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
             }

@@ -106,10 +106,17 @@ impl Z2mCommandExecutor {
             None => (None, None),
         };
 
+        let operation_mode = if high_priority_setpoint.is_some() || low_priority_setpoint.is_some() {
+            Some("setpoint".to_string())
+        } else {
+            None
+        };
+
         let msg = MqttOutMessage::transient(
             self.target_topic(device_id),
             serde_json::to_string(&ThermostatCommandPayload {
                 window_open_external: window_open,
+                programming_operation_mode: operation_mode,
                 occupied_heating_setpoint: high_priority_setpoint.map(|t| t.temperature.0),
                 occupied_heating_setpoint_scheduled: low_priority_setpoint.map(|t| t.temperature.0),
             })?,
@@ -148,6 +155,7 @@ impl Z2mCommandExecutor {
 #[derive(Debug, serde::Serialize)]
 struct ThermostatCommandPayload {
     window_open_external: bool,
+    programming_operation_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     occupied_heating_setpoint: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]

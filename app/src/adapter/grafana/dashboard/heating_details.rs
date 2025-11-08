@@ -4,6 +4,7 @@ use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::home::HeatingZone;
 use crate::home::state::{HeatingDemand, HeatingMode, ScheduledHeatingMode, SetPoint, Temperature};
+use crate::port::DataFrameAccess;
 use actix_web::web::{self, Path, Query};
 
 use crate::{
@@ -44,8 +45,8 @@ where
     let inside_temp = heating_zone.inside_temperature();
 
     let (ts_outside, ts_inside) = tokio::try_join!(
-        Temperature::Outside.series(query.range(), api.as_ref()),
-        inside_temp.series(query.range(), api.as_ref()),
+        Temperature::Outside.get_data_frame(query.range(), api.as_ref()),
+        inside_temp.get_data_frame(query.range(), api.as_ref()),
     )
     .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -53,15 +54,15 @@ where
     for thermostat in heating_zone.thermostats() {
         let ts_set_point = thermostat
             .set_point()
-            .series(query.range(), api.as_ref())
+            .get_data_frame(query.range(), api.as_ref())
             .await
             .map_err(GrafanaApiError::DataAccessError)?;
         let ts_on_device = Temperature::ThermostatOnDevice(thermostat.clone())
-            .series(query.range(), api.as_ref())
+            .get_data_frame(query.range(), api.as_ref())
             .await
             .map_err(GrafanaApiError::DataAccessError)?;
         let ts_ext_source = Temperature::ThermostatExternal(thermostat.clone())
-            .series(query.range(), api.as_ref())
+            .get_data_frame(query.range(), api.as_ref())
             .await
             .map_err(GrafanaApiError::DataAccessError)?;
 
@@ -70,14 +71,14 @@ where
 
     let mut rows: Vec<Row> = vec![];
     for dt in query.iter() {
-        if let Some(dp) = ts_outside.at(dt) {
+        if let Some(dp) = ts_outside.prev_or_at(dt) {
             rows.push(Row {
                 channel: "outside".to_string(),
-                timestamp: dp.timestamp,
+                timestamp: dt,
                 value: dp.value.0,
             })
         }
-        if let Some(dp) = ts_inside.at(dt) {
+        if let Some(dp) = ts_inside.prev_or_at(dt) {
             rows.push(Row {
                 channel: "room".to_string(),
                 timestamp: dp.timestamp,
@@ -86,21 +87,21 @@ where
         }
 
         for (i, (ts_set_point, ts_on_device, ts_ext)) in ts_thermostat_temps.iter().enumerate() {
-            if let Some(dp) = ts_set_point.at(dt) {
+            if let Some(dp) = ts_set_point.prev_or_at(dt) {
                 rows.push(Row {
                     channel: format!("set_point_{}", i + 1),
-                    timestamp: dp.timestamp,
+                    timestamp: dt,
                     value: dp.value.0,
                 })
             }
-            if let Some(dp) = ts_on_device.at(dt) {
+            if let Some(dp) = ts_on_device.prev_or_at(dt) {
                 rows.push(Row {
                     channel: format!("thermostat_on_device_{}", i + 1),
                     timestamp: dp.timestamp,
                     value: dp.value.0,
                 })
             }
-            if let Some(dp) = ts_ext.at(dt) {
+            if let Some(dp) = ts_ext.prev_or_at(dt) {
                 rows.push(Row {
                     channel: format!("thermostat_ext_source_{}", i + 1),
                     timestamp: dp.timestamp,

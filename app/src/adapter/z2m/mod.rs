@@ -49,7 +49,7 @@ impl Zigbee2Mqtt {
             .await
             .expect("Error subscribing to MQTT topic");
 
-        Z2mIncomingDataSource::new(self.event_topic.to_string(), config, rx, self.new_z2m_command_executor(mqtt))
+        Z2mIncomingDataSource::new(self.event_topic.to_string(), config, rx)
     }
 
     fn new_z2m_command_executor(&self, mqtt: &infrastructure::Mqtt) -> Z2mCommandExecutor {

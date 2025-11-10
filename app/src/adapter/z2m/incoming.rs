@@ -1,5 +1,4 @@
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
-use crate::adapter::z2m::outgoing::Z2mCommandExecutor;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
@@ -17,21 +16,14 @@ pub struct Z2mIncomingDataSource {
     base_topic: String,
     device_config: DeviceConfig<Z2mChannel>,
     mqtt_receiver: mpsc::Receiver<MqttInMessage>,
-    executor: Z2mCommandExecutor,
 }
 
 impl Z2mIncomingDataSource {
-    pub fn new(
-        base_topic: String,
-        config: DeviceConfig<Z2mChannel>,
-        mqtt_rx: mpsc::Receiver<MqttInMessage>,
-        executor: Z2mCommandExecutor,
-    ) -> Self {
+    pub fn new(base_topic: String, config: DeviceConfig<Z2mChannel>, mqtt_rx: mpsc::Receiver<MqttInMessage>) -> Self {
         Self {
             base_topic: base_topic.trim_matches('/').to_owned(),
             device_config: config,
             mqtt_receiver: mqtt_rx,
-            executor,
         }
     }
 }

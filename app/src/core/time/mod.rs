@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod builder;
 mod datetime;
 mod duration;

@@ -1,13 +1,8 @@
 use crate::core::time::DateTime;
 use crate::core::time::DateTimeRange;
 use crate::core::time::Duration;
-use crate::home::HeatingZone;
-use crate::home::state::Temperature;
-use serde::{Deserialize, Serialize};
 
-use crate::home::state::OpenedArea;
 
-use super::display::DashboardDisplay;
 
 pub mod energy_iq;
 pub mod energy_monitor;

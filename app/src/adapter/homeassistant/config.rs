@@ -1,7 +1,7 @@
 use crate::home::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
 use crate::home::state::{
-    FanActivity, HeatingDemand, LightLevel, PowerAvailable, Presence, RelativeHumidity, SetPoint, Temperature,
+    FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature,
 };
 
 use super::{HaChannel, HaServiceTarget};

@@ -20,6 +20,7 @@ mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
 mod light_level;
+mod occupancy;
 mod powered;
 mod presence;
 mod relative_humidity;
@@ -43,6 +44,7 @@ pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
 pub use light_level::LightLevel;
 pub use load::Load;
+pub use occupancy::Occupancy;
 pub use opened::Opened;
 pub use opened::OpenedArea;
 pub use powered::Powered;
@@ -79,6 +81,7 @@ pub enum HomeStateValue {
     EnergySaving(EnergySaving, bool),
     FeltTemperature(FeltTemperature, DegreeCelsius),
     Load(Load, Percent),
+    Occupancy(Occupancy, Probability),
     OpenedArea(OpenedArea, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
@@ -129,6 +132,7 @@ pub enum StateValue {
     HeatingMode(HeatingMode),
     RawValue(RawValue),
     Lux(Lux),
+    Probability(Probability),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -208,6 +212,7 @@ impl std::fmt::Display for StateValue {
             StateValue::HeatingMode(heating_mode) => write!(f, "{}", heating_mode),
             StateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
             StateValue::Lux(lux) => write!(f, "{}", lux),
+            StateValue::Probability(probability) => write!(f, "{}", probability),
         }
     }
 }

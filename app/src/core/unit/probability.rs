@@ -29,11 +29,11 @@ impl From<&Probability> for f64 {
     }
 }
 
-// impl From<f64> for Probability {
-//     fn from(value: f64) -> Self {
-//         Self(value)
-//     }
-// }
+impl From<f64> for Probability {
+    fn from(value: f64) -> Self {
+        Self(value)
+    }
+}
 
 impl Display for Probability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

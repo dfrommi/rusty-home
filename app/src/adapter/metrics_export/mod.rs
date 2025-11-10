@@ -108,5 +108,6 @@ fn to_metrics_value(value: StateValue) -> f64 {
         StateValue::HeatingMode(heating_mode) => f64::from(&heating_mode),
         StateValue::RawValue(raw) => f64::from(&raw),
         StateValue::Lux(lux) => f64::from(&lux),
+        StateValue::Probability(probability) => f64::from(&probability),
     }
 }

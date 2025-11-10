@@ -1,7 +1,7 @@
 use crate::home::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
 use crate::home::state::{
-    FanActivity, HeatingDemand, LightLevel, Powered, Presence, RelativeHumidity, SetPoint, Temperature,
+    FanActivity, HeatingDemand, LightLevel, PowerAvailable, Presence, RelativeHumidity, SetPoint, Temperature,
 };
 
 use super::{HaChannel, HaServiceTarget};
@@ -77,8 +77,11 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //
         //POWERED STATE
         //
-        ("light.hue_go", HaChannel::Powered(Powered::LivingRoomNotificationLight)),
-        ("media_player.lg_webos_smart_tv", HaChannel::Powered(Powered::LivingRoomTv)),
+        ("light.hue_go", HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight)),
+        (
+            "media_player.lg_webos_smart_tv",
+            HaChannel::Powered(PowerAvailable::LivingRoomTv),
+        ),
         //
         // PRESENCE
         //

@@ -1,29 +1,22 @@
+mod absolute_humidity;
 mod automatic_temp_inc;
 mod cold_air_coming_in;
-mod load;
-mod raw_vendor_value;
-//mod current_power_usage;
-mod dewpoint;
-//mod external_auto_control;
-mod opened;
-//mod powered;
-//mod relative_humidity;
-mod resident;
-mod risk_of_mould;
-//mod set_point;
-//mod temperature;
-//mod total_energy_consumption;
-mod absolute_humidity;
 mod current_power_usage;
+mod dewpoint;
 mod energy_saving;
 mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
 mod light_level;
+mod load;
 mod occupancy;
-mod powered;
+mod opened;
+mod power_available;
 mod presence;
+mod raw_vendor_value;
 mod relative_humidity;
+mod resident;
+mod risk_of_mould;
 mod scheduled_heating_mode;
 mod set_point;
 mod temperature;
@@ -47,7 +40,7 @@ pub use load::Load;
 pub use occupancy::Occupancy;
 pub use opened::Opened;
 pub use opened::OpenedArea;
-pub use powered::Powered;
+pub use power_available::PowerAvailable;
 pub use presence::Presence;
 pub use raw_vendor_value::RawVendorValue;
 pub use relative_humidity::RelativeHumidity;
@@ -99,7 +92,7 @@ pub enum HomeStateValue {
     #[persistent]
     Opened(Opened, bool),
     #[persistent]
-    Powered(Powered, bool),
+    PowerAvailable(PowerAvailable, bool),
     #[persistent]
     Presence(Presence, bool),
     #[persistent]

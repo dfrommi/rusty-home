@@ -10,7 +10,7 @@ use outgoing::HaCommandExecutor;
 
 use crate::adapter::command::CommandExecutor;
 use crate::home::state::LightLevel;
-use crate::home::state::{FanActivity, Powered, Presence, RelativeHumidity, Temperature};
+use crate::home::state::{FanActivity, PowerAvailable, Presence, RelativeHumidity, Temperature};
 
 use std::collections::HashMap;
 
@@ -55,7 +55,7 @@ impl HomeAssitant {
 pub enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
-    Powered(Powered),
+    Powered(PowerAvailable),
     PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
     PresenceFromFP2(Presence),

@@ -1,5 +1,5 @@
 use crate::core::HomeApi;
-use crate::home::state::Powered;
+use crate::home::state::PowerAvailable;
 use crate::home::{HeatingZone, Room};
 use crate::port::DataPointAccess;
 
@@ -34,7 +34,7 @@ pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
         HomeGoal::ResetToDefaltSettings,
     ];
 
-    if Powered::LivingRoomTv.current(api).await.unwrap_or(false) {
+    if PowerAvailable::LivingRoomTv.current(api).await.unwrap_or(false) {
         goals.push(HomeGoal::TvControl);
     }
 

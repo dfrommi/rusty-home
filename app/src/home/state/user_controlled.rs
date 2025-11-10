@@ -9,7 +9,7 @@ use crate::t;
 use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::timeseries::DataPoint;
-use crate::home::state::Powered;
+use crate::home::state::PowerAvailable;
 
 use crate::home::command::{Command, CommandExecution, PowerToggle, is_system_generated, is_user_generated};
 
@@ -60,7 +60,7 @@ impl DataPointAccess<bool> for UserControlled {
 }
 
 async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
-    let power = Powered::Dehumidifier.current_data_point(api).await?;
+    let power = PowerAvailable::Dehumidifier.current_data_point(api).await?;
 
     //user-control only valid for 15 minutes
     if power.timestamp < t!(15 minutes ago) {

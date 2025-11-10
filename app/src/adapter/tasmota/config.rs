@@ -1,5 +1,5 @@
 use crate::home::command::{CommandTarget, PowerToggle};
-use crate::home::state::Powered;
+use crate::home::state::PowerAvailable;
 use crate::home::state::{CurrentPowerUsage, TotalEnergyConsumption};
 
 use super::TasmotaChannel;
@@ -44,7 +44,7 @@ pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
             "dehumidifier",
             TasmotaChannel::EnergyMeter(CurrentPowerUsage::Dehumidifier, TotalEnergyConsumption::Dehumidifier),
         ),
-        ("dehumidifier", TasmotaChannel::PowerToggle(Powered::Dehumidifier)),
+        ("dehumidifier", TasmotaChannel::PowerToggle(PowerAvailable::Dehumidifier)),
         (
             "airpurifier",
             TasmotaChannel::EnergyMeter(CurrentPowerUsage::AirPurifier, TotalEnergyConsumption::AirPurifier),
@@ -85,6 +85,6 @@ pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
             "irheater",
             TasmotaChannel::EnergyMeter(CurrentPowerUsage::InfraredHeater, TotalEnergyConsumption::InfraredHeater),
         ),
-        ("irheater", TasmotaChannel::PowerToggle(Powered::InfraredHeater)),
+        ("irheater", TasmotaChannel::PowerToggle(PowerAvailable::InfraredHeater)),
     ]
 }

@@ -4,7 +4,7 @@ mod outgoing;
 
 use crate::{
     adapter::command::CommandExecutor,
-    home::state::{CurrentPowerUsage, Powered, TotalEnergyConsumption},
+    home::state::{CurrentPowerUsage, PowerAvailable, TotalEnergyConsumption},
 };
 
 use incoming::TasmotaIncomingDataSource;
@@ -22,7 +22,7 @@ pub struct Tasmota {
 #[derive(Debug, Clone)]
 pub enum TasmotaChannel {
     EnergyMeter(CurrentPowerUsage, TotalEnergyConsumption),
-    PowerToggle(Powered),
+    PowerToggle(PowerAvailable),
 }
 
 #[derive(Debug, Clone)]

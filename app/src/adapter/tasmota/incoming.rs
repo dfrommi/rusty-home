@@ -118,10 +118,11 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(PersistentHomeStateValue::Powered(powered.clone(), true), t!(now)).into(),
+                        DataPoint::new(PersistentHomeStateValue::PowerAvailable(powered.clone(), true), t!(now)).into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(PersistentHomeStateValue::Powered(powered.clone(), false), t!(now)).into(),
+                        DataPoint::new(PersistentHomeStateValue::PowerAvailable(powered.clone(), false), t!(now))
+                            .into(),
                     ]),
                     _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, msg.payload),
                 }

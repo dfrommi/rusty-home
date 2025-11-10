@@ -115,7 +115,7 @@ fn to_persistent_data_point(
             .into(),
         ),
         HaChannel::Powered(channel) => {
-            Some(DataPoint::new(PersistentHomeStateValue::Powered(channel, ha_value == "on"), timestamp).into())
+            Some(DataPoint::new(PersistentHomeStateValue::PowerAvailable(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::PresenceFromEsp(channel) => {
             Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())

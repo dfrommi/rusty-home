@@ -4,7 +4,7 @@ use crate::core::HomeApi;
 use crate::core::time::Duration;
 use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, PowerToggle};
-use crate::home::state::Powered;
+use crate::home::state::PowerAvailable;
 use crate::t;
 
 use crate::port::DataPointAccess;
@@ -17,7 +17,7 @@ pub enum AutoTurnOff {
 impl Rule for AutoTurnOff {
     async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
         let command = match self {
-            AutoTurnOff::IrHeater if on_for_at_least(Powered::InfraredHeater, t!(1 hours), api).await? => {
+            AutoTurnOff::IrHeater if on_for_at_least(PowerAvailable::InfraredHeater, t!(1 hours), api).await? => {
                 Command::SetPower {
                     device: PowerToggle::InfraredHeater,
                     power_on: false,
@@ -30,7 +30,7 @@ impl Rule for AutoTurnOff {
     }
 }
 
-async fn on_for_at_least(device: Powered, duration: Duration, api: &HomeApi) -> anyhow::Result<bool> {
+async fn on_for_at_least(device: PowerAvailable, duration: Duration, api: &HomeApi) -> anyhow::Result<bool> {
     let current = device.current_data_point(api).await?;
     Ok(current.value && current.timestamp.elapsed() > duration)
 }

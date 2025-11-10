@@ -11,27 +11,27 @@ use crate::core::{
 use crate::port::{DataFrameAccess, DataPointAccess};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
-pub enum Powered {
+pub enum PowerAvailable {
     Dehumidifier,
     LivingRoomNotificationLight,
     InfraredHeater,
     LivingRoomTv,
 }
 
-impl Estimatable for Powered {
+impl Estimatable for PowerAvailable {
     fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
         interpolate::algo::last_seen(at, df)
     }
 }
 
-impl DataPointAccess<bool> for Powered {
+impl DataPointAccess<bool> for PowerAvailable {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         api.current_data_point(self).await
     }
 }
 
-impl DataFrameAccess<bool> for Powered {
+impl DataFrameAccess<bool> for PowerAvailable {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
         api.get_data_frame(self, range).await
     }

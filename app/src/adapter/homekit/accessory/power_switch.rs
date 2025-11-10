@@ -4,7 +4,7 @@ use crate::{
     },
     home::{
         command::PowerToggle,
-        state::{HomeStateValue, Powered},
+        state::{HomeStateValue, PowerAvailable},
     },
 };
 
@@ -24,13 +24,13 @@ impl PowerSwitch {
 
     pub fn export_state(&self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         let powered_item = match self.power_toggle {
-            PowerToggle::Dehumidifier => Powered::Dehumidifier,
-            PowerToggle::InfraredHeater => Powered::InfraredHeater,
-            PowerToggle::LivingRoomNotificationLight => Powered::LivingRoomNotificationLight,
+            PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
+            PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
+            PowerToggle::LivingRoomNotificationLight => PowerAvailable::LivingRoomNotificationLight,
         };
 
         match state {
-            HomeStateValue::Powered(powered, is_on) if powered == &powered_item => vec![HomekitEvent {
+            HomeStateValue::PowerAvailable(powered, is_on) if powered == &powered_item => vec![HomekitEvent {
                 target: HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On),
                 value: serde_json::json!(is_on),
             }],

@@ -4,7 +4,7 @@ use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{FanActivity, FanAirflow, Opened, Powered, RawVendorValue, SetPoint};
+use crate::home::state::{FanActivity, FanAirflow, Opened, PowerAvailable, RawVendorValue, SetPoint};
 use anyhow::Result;
 
 use crate::{core::HomeApi, t};
@@ -118,9 +118,9 @@ async fn is_set_thermostat_load_mean_reflected_in_state(
 
 async fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, api: &HomeApi) -> Result<bool> {
     let powered_item = match device {
-        PowerToggle::Dehumidifier => Powered::Dehumidifier,
-        PowerToggle::LivingRoomNotificationLight => Powered::LivingRoomNotificationLight,
-        PowerToggle::InfraredHeater => Powered::InfraredHeater,
+        PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
+        PowerToggle::LivingRoomNotificationLight => PowerAvailable::LivingRoomNotificationLight,
+        PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
     };
 
     let powered = powered_item.current(api).await?;

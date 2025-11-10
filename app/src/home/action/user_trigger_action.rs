@@ -6,7 +6,7 @@ use crate::core::time::Duration;
 use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, HeatingTargetState};
 use crate::home::common::HeatingZone;
-use crate::home::state::Powered;
+use crate::home::state::PowerAvailable;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
 use crate::t;
 
@@ -74,7 +74,7 @@ impl UserTriggerAction {
             | UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving) => {
-                match Powered::LivingRoomTv.current_data_point(api).await {
+                match PowerAvailable::LivingRoomTv.current_data_point(api).await {
                     Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
                     Err(e) => {

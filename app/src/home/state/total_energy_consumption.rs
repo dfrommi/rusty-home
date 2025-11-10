@@ -28,6 +28,7 @@ pub enum TotalEnergyConsumption {
     KitchenMultiPlug,
     CouchPlug,
     RoomOfRequirementsDesk,
+    RoomOfRequirementsMonitor,
     InfraredHeater,
 }
 

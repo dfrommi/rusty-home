@@ -48,6 +48,7 @@ impl DashboardDisplay for CurrentPowerUsage {
             CurrentPowerUsage::KitchenMultiPlug => "Küche Arbeitsplatte",
             CurrentPowerUsage::CouchPlug => "Couch-Stecker",
             CurrentPowerUsage::RoomOfRequirementsDesk => "Schreibtisch",
+            CurrentPowerUsage::RoomOfRequirementsMonitor => "Monitor",
         }
     }
 }
@@ -72,6 +73,7 @@ impl DashboardDisplay for TotalEnergyConsumption {
             TotalEnergyConsumption::KitchenMultiPlug => "Küche Arbeitsplatte",
             TotalEnergyConsumption::CouchPlug => "Couch-Stecker",
             TotalEnergyConsumption::RoomOfRequirementsDesk => "Schreibtisch",
+            TotalEnergyConsumption::RoomOfRequirementsMonitor => "Monitor",
         }
     }
 }

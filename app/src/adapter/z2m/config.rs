@@ -251,6 +251,14 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 KiloWattHours(0.0),
             ),
         ),
+        (
+            "room_of_requirements/desk_monitor",
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::RoomOfRequirementsMonitor,
+                TotalEnergyConsumption::RoomOfRequirementsMonitor,
+                KiloWattHours(0.0),
+            ),
+        ),
         //
         // PRESENCE
         //

@@ -30,6 +30,7 @@ pub enum CurrentPowerUsage {
     KitchenMultiPlug,
     CouchPlug,
     RoomOfRequirementsDesk,
+    RoomOfRequirementsMonitor,
     InfraredHeater,
 }
 

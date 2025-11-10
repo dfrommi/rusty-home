@@ -160,12 +160,11 @@ impl FollowHeatingSchedule {
             let prev = DataPoint::new(thermostat_external_temp, t!(now));
             let next = DataPoint::new(room_temp, mode_start_time + total_duration.clone());
 
-            if let Some(interpolated_temp) = linear_dp(t!(now), &prev, &next) {
-                commands.push(Command::SetThermostatAmbientTemperature {
-                    device: thermostat.clone(),
-                    temperature: interpolated_temp,
-                });
-            }
+            let interpolated_temp = linear_dp(t!(now), &prev, &next)?;
+            commands.push(Command::SetThermostatAmbientTemperature {
+                device: thermostat.clone(),
+                temperature: interpolated_temp,
+            });
         }
 
         Ok(commands)

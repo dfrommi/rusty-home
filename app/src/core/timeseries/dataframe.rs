@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    core::time::{DateTime, DateTimeRange, Duration},
+    core::{
+        time::{DateTime, DateTimeRange, Duration},
+        timeseries::interpolate::Interpolator,
+    },
     t,
 };
 use anyhow::ensure;
@@ -56,16 +59,35 @@ impl<T> DataFrame<T> {
         DataFrame::new(dps)
     }
 
-    pub fn retain_range(&self, range: &DateTimeRange) -> anyhow::Result<Self>
+    pub fn retain_range(
+        &mut self,
+        range: &DateTimeRange,
+        start_interpolator: impl Interpolator<T>,
+        end_interpolator: impl Interpolator<T>,
+    ) -> anyhow::Result<()>
     where
         T: Clone,
     {
-        Self::new(
-            self.data
-                .iter()
-                .filter(|(k, _)| *k >= range.start() && *k <= range.end())
-                .map(|(_, v)| v.clone()),
-        )
+        let start = *range.start();
+        let end = *range.end();
+
+        if !self.data.contains_key(&start)
+            && let Some(dp_at_start) = start_interpolator.interpolate_df(start, self)?
+        {
+            self.data.insert(start, DataPoint::new(dp_at_start, start));
+        }
+
+        if !self.data.contains_key(&end)
+            && let Some(dp_at_end) = end_interpolator.interpolate_df(end, self)?
+        {
+            self.data.insert(end, DataPoint::new(dp_at_end, end));
+        }
+
+        self.data.retain(|k, _| *k >= start && *k <= end);
+
+        ensure!(!self.data.is_empty(), "data frame is empty after truncation");
+
+        Ok(())
     }
 
     pub fn retain_range_with_context(&self, range: &DateTimeRange) -> anyhow::Result<Self>
@@ -101,6 +123,16 @@ impl<T> DataFrame<T> {
         });
 
         DataFrame::new(values).expect("Internal error: Error creating data frame of non-empty datapoints")
+    }
+
+    pub fn map_interval<U, F>(&self, f: F) -> Vec<U>
+    where
+        F: Fn(&DataPoint<T>, &DataPoint<T>) -> U,
+    {
+        self.current_and_next()
+            .into_iter()
+            .filter_map(|(current, next)| next.map(|n| f(current, n)))
+            .collect::<Vec<_>>()
     }
 
     pub fn latest_where(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> Option<&DataPoint<T>> {
@@ -190,5 +222,27 @@ where
 {
     fn from(val: &DataFrame<T>) -> Self {
         val.map(|dp| dp.value.clone().into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::timeseries::interpolate::LastSeenInterpolator;
+
+    use super::*;
+
+    #[test]
+    fn test_retain_range() {
+        let mut df1 = DataFrame::new(vec![DataPoint::new(true, t!(2 hours ago))]).unwrap();
+
+        let result = df1.retain_range(
+            &DateTimeRange::since(t!(1 hours ago)),
+            LastSeenInterpolator,
+            LastSeenInterpolator,
+        );
+
+        println!("Resulting DF: {:?}", df1);
+
+        assert!(result.is_ok());
     }
 }

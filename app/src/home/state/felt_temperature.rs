@@ -44,7 +44,7 @@ impl FeltTemperature {
     fn calculate_felt_temperature(temperature: DegreeCelsius, abs_humidity: GramPerCubicMeter) -> DegreeCelsius {
         // --- Hohe Feuchte Wirkung ---
         let delta_humid = {
-            let sigmoid_af = Sigmoid::new(GramPerCubicMeter(10.0), 1.0); // ∈ [0, 1]
+            let sigmoid_af = Sigmoid::around(GramPerCubicMeter(10.0), GramPerCubicMeter(4.0)); // ∈ [0, 1]
             let tanh_temp = Tanh::new(DegreeCelsius(21.0), 0.3); // ∈ [-1, 1]
             let max_gain = DegreeCelsius(1.5); // max Korrektur in °C
 
@@ -56,8 +56,8 @@ impl FeltTemperature {
 
         // --- Trockene Luft Wirkung ---
         let delta_dry = {
-            let sigmoid_temp = Sigmoid::new(DegreeCelsius(22.0), 1.0); // ∈ [0, 1]
-            let sigmoid_af = Sigmoid::new(GramPerCubicMeter(6.0), 1.5); // ∈ [0, 1]
+            let sigmoid_temp = Sigmoid::around(DegreeCelsius(22.0), DegreeCelsius(4.0)); // ∈ [0, 1]
+            let sigmoid_af = Sigmoid::around(GramPerCubicMeter(6.0), GramPerCubicMeter(6.0)); // ∈ [0, 1]
             let max_gain = DegreeCelsius(-0.7); // max Korrektur in °C
 
             let abs_humidity_effect = sigmoid_af.eval(abs_humidity); // ∈ [0, 1]

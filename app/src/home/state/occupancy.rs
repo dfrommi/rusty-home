@@ -43,15 +43,6 @@ impl Occupancy {
     }
 }
 
-impl Occupancy {
-    fn presence(&self) -> Presence {
-        match self {
-            Occupancy::LivingRoomCouch => Presence::LivingRoomCouch,
-            Occupancy::RoomOfRequirementsDesk => Presence::RoomOfRequirementsDesk,
-        }
-    }
-}
-
 impl Estimatable for Occupancy {
     fn interpolate(&self, at: DateTime, df: &DataFrame<Probability>) -> Option<Probability> {
         interpolate::algo::linear(at, df)
@@ -61,15 +52,21 @@ impl Estimatable for Occupancy {
 impl DataPointAccess<Probability> for Occupancy {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<Probability>> {
-        let presence_df = self
-            .presence()
-            .get_data_frame(DateTimeRange::since(t!(1 hours ago)), api)
-            .await?;
+        let range = DateTimeRange::since(t!(1 hours ago));
+
+        let main_df = match self {
+            Occupancy::LivingRoomCouch => Presence::LivingRoomCouch.get_data_frame(range.clone(), api).await?,
+            Occupancy::RoomOfRequirementsDesk => {
+                IsRunning::RoomOfRequirementsMonitor
+                    .get_data_frame(range.clone(), api)
+                    .await?
+            }
+        };
 
         let prior: f64 = -1.7968470630447446;
         let w_presence: f64 = 3.733237448369802;
 
-        let probability = Occupancy::calculate(prior, w_presence, presence_df)?;
+        let probability = Occupancy::calculate(prior, w_presence, main_df)?;
 
         Ok(DataPoint::new(probability, t!(now)))
     }

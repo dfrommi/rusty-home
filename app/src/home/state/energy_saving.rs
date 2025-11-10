@@ -1,11 +1,12 @@
 use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
+use crate::core::timeseries::DataPoint;
 use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::home::command::CommandTarget;
+use crate::home::state::IsRunning;
 use crate::port::DataFrameAccess;
 use crate::t;
-use crate::{core::timeseries::DataPoint, home::state::PowerAvailable};
 use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::home::command::{Command, CommandExecution, EnergySavingDevice};
@@ -22,7 +23,7 @@ impl DataPointAccess<bool> for EnergySaving {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
         let is_tv_on = match self {
-            EnergySaving::LivingRoomTv => PowerAvailable::LivingRoomTv.current_data_point(api).await,
+            EnergySaving::LivingRoomTv => IsRunning::LivingRoomTv.current_data_point(api).await,
         }?;
 
         //if device is off, then we save energy

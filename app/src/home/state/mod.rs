@@ -7,6 +7,7 @@ mod energy_saving;
 mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
+mod is_running;
 mod light_level;
 mod load;
 mod occupancy;
@@ -35,6 +36,7 @@ pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
 pub use heating_demand::HeatingDemand;
+pub use is_running::IsRunning;
 pub use light_level::LightLevel;
 pub use load::Load;
 pub use occupancy::Occupancy;
@@ -73,6 +75,7 @@ pub enum HomeStateValue {
     DewPoint(DewPoint, DegreeCelsius),
     EnergySaving(EnergySaving, bool),
     FeltTemperature(FeltTemperature, DegreeCelsius),
+    IsRunning(IsRunning, bool),
     Load(Load, Percent),
     Occupancy(Occupancy, Probability),
     OpenedArea(OpenedArea, bool),

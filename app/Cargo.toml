@@ -39,4 +39,9 @@ reqwest-middleware = { workspace = true }
 
 [dev-dependencies]
 assert-json-diff = { workspace = true }
-mockito = "1"
+mockito = { workspace = true }
+
+linfa = { workspace = true }
+linfa-logistic = { workspace = true }
+linfa-linear = { workspace = true }
+ndarray = { workspace = true }

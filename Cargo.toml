@@ -67,3 +67,9 @@ reqwest-tracing = { version = "0.5", features = ["opentelemetry_0_29"] }
 
 #Test dependencies
 assert-json-diff = "2"
+mockito = "1"
+
+linfa = "0.8"
+linfa-logistic = "0.8"
+linfa-linear = "0.8"
+ndarray = "0.16"

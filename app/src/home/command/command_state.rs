@@ -87,8 +87,8 @@ async fn is_set_thermostat_ambient_temperature_reflected_in_state(
             created,
             ..
         }) => {
-            //Always send with significant changes
-            if (cmd_temp.0 - temperature.0).abs() > 0.1 {
+            //Always send with changes
+            if (cmd_temp.0 - temperature.0).abs() > 0.01 {
                 return Ok(false); //not reflected
             }
 

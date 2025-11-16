@@ -18,6 +18,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Occupancy {
     LivingRoomCouch,
+    BedroomBed,
     RoomOfRequirementsDesk,
 }
 
@@ -56,6 +57,7 @@ impl DataPointAccess<Probability> for Occupancy {
 
         let main_df = match self {
             Occupancy::LivingRoomCouch => Presence::LivingRoomCouch.get_data_frame(range.clone(), api).await?,
+            Occupancy::BedroomBed => Presence::BedroomBed.get_data_frame(range.clone(), api).await?,
             Occupancy::RoomOfRequirementsDesk => {
                 IsRunning::RoomOfRequirementsMonitor
                     .get_data_frame(range.clone(), api)

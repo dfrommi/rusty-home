@@ -1,8 +1,6 @@
 use crate::home::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
-use crate::home::state::{
-    FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature,
-};
+use crate::home::state::{FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature};
 
 use super::{HaChannel, HaServiceTarget};
 
@@ -118,12 +116,8 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             HaChannel::PresenceFromFP2(Presence::KitchenArea),
         ),
         (
-            "binary_sensor.presence_sensor_fp2_2ed8_presence_sensor_1",
-            HaChannel::PresenceFromFP2(Presence::RoomOfRequirementsArea),
-        ),
-        (
-            "binary_sensor.presence_sensor_fp2_2ed8_presence_sensor_3",
-            HaChannel::PresenceFromFP2(Presence::RoomOfRequirementsDesk),
+            "binary_sensor.presence_sensor_fp2_2b4e_presence_sensor_2",
+            HaChannel::PresenceFromFP2(Presence::BedroomBed),
         ),
         //
         // FAN SPEED
@@ -148,8 +142,8 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             HaChannel::LightLevel(LightLevel::Kitchen),
         ),
         (
-            "sensor.presence_sensor_fp2_2ed8_light_sensor_light_level",
-            HaChannel::LightLevel(LightLevel::RoomOfRequirements),
+            "sensor.presence_sensor_fp2_2b4e_light_sensor_light_level",
+            HaChannel::LightLevel(LightLevel::Bedroom),
         ),
     ]
 }

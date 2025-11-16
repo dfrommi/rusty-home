@@ -15,7 +15,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 pub enum LightLevel {
     LivingRoom,
     Kitchen,
-    RoomOfRequirements,
+    Bedroom,
 }
 
 impl Estimatable for LightLevel {

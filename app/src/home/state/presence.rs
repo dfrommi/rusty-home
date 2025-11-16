@@ -25,8 +25,7 @@ pub enum Presence {
     KitchenArea,
     LivingRoomArea,
     LivingRoomCouch,
-    RoomOfRequirementsArea,
-    RoomOfRequirementsDesk,
+    BedroomBed,
 }
 
 impl Estimatable for Presence {

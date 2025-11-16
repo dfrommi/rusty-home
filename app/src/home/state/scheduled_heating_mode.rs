@@ -8,8 +8,9 @@ use crate::{
             DataFrame, DataPoint,
             interpolate::{self, Estimatable},
         },
+        unit::p,
     },
-    home::state::{AutomaticTemperatureIncrease, OpenedArea, Presence, Resident, sampled_data_frame},
+    home::state::{AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident, sampled_data_frame},
     port::{DataFrameAccess, DataPointAccess},
     t,
 };
@@ -71,6 +72,13 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
             Resident::DennisSleeping.current_data_point(api)
         )?;
 
+        let occupancy_item = match self {
+            ScheduledHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
+            ScheduledHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
+            ScheduledHeatingMode::Bedroom => Some(Occupancy::BedroomBed),
+            _ => None,
+        };
+
         if away.value {
             tracing::trace!("Heating in away mode as nobody is at home");
             return Ok(DataPoint::new(HeatingMode::Away, away.timestamp));
@@ -117,21 +125,36 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
         .max()
         .unwrap_or_else(|| t!(now));
 
-        //TODO block comfort mode based on time and occupancy in most rooms
-        if self == &ScheduledHeatingMode::LivingRoom {
-            //in ventilation check range
-            if let Some(ventilation_range) = t!(16:30 - 19:45).active()
-                && ventilation_range.contains(&window_open.timestamp)
-            {
-                let max_ts = t!(16:30).today().max(*max_ts);
-                tracing::trace!("Heating in comfort-mode as living room was ventilated in the evening");
-                return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
-            }
+        if let Some(occupancy_item) = occupancy_item {
+            let threshold_high = p(0.7);
+            let threshold_low = p(0.5);
+            let current_occupancy = occupancy_item.current_data_point(api).await?;
 
-            if t!(19:00 - 23:00).is_now() {
-                let max_ts = t!(19:00).today().max(*max_ts);
-                tracing::trace!("Heating in comfort-mode as it's evening time in the living room");
-                return Ok(DataPoint::new(HeatingMode::Comfort, max_ts));
+            //On with hysteresis
+            if current_occupancy.value >= threshold_high {
+                tracing::trace!("Heating in comfort-mode as room is highly occupied");
+                return Ok(current_occupancy.map_value(|_| HeatingMode::Comfort));
+            } else if current_occupancy.value >= threshold_low {
+                let occupancy_ts = occupancy_item
+                    .get_data_frame(DateTimeRange::since(t!(1 hours ago)), api)
+                    .await?;
+                let last_outlier =
+                    occupancy_ts.latest_where(|dp| dp.value >= threshold_high || dp.value <= threshold_low);
+
+                if let Some(last_outlier) = last_outlier
+                    && last_outlier.value >= threshold_high
+                {
+                    tracing::trace!(
+                        "Heating in comfort-mode as room was highly occupied recently and is now moderately occupied"
+                    );
+                    return Ok(current_occupancy.map_value(|_| HeatingMode::Comfort));
+                } else {
+                    tracing::trace!(
+                        "Room occupancy is moderate, but no high occupancy recently - not switching to comfort mode"
+                    );
+                }
+            } else {
+                tracing::trace!("Room occupancy is low - not switching to comfort mode");
             }
         }
 

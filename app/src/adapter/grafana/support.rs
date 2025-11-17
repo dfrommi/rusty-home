@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use actix_web::{HttpResponse, http::header};
 use anyhow::Context;
 use serde::{Deserialize, Deserializer, de::IntoDeserializer};

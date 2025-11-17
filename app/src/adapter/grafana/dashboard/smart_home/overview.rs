@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{HttpResponse, http::header, web};
-use anyhow::Context;
+use actix_web::web;
 use infrastructure::TraceContext;
 
 use crate::core::id::ExternalId;
@@ -13,86 +12,12 @@ use crate::{
     core::HomeApi,
 };
 
-use super::TraceView;
-
 pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
     web::scope("/overview")
-        .route("/trace", web::get().to(get_trace))
-        .route("/trace/states", web::get().to(get_trace_states))
         .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
         .route("/offline", web::get().to(get_offline_items))
         .app_data(web::Data::from(api))
-}
-
-async fn get_trace(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
-    #[derive(serde::Serialize)]
-    struct Row {
-        state: String,
-        name: String,
-        target: Option<String>,
-    }
-
-    let until = *time_range.range().end();
-
-    let traces: Vec<TraceView> = api
-        .get_latest_planning_trace(until)
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?
-        .into();
-
-    let rows = traces.into_iter().filter_map(|trace| match trace.state.as_str() {
-        "DISABLED" | "UNFULFILLED" => None,
-
-        _ => Some(Row {
-            state: trace.state,
-            name: trace.name,
-            target: trace.target,
-        }),
-    });
-
-    csv_response(rows)
-}
-
-async fn get_trace_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
-    let traces = api
-        .get_planning_traces_in_range(time_range.range())
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?;
-
-    let header_trace = match traces.first() {
-        Some(trace) => trace,
-        None => return Err(GrafanaApiError::NotFound),
-    };
-
-    let mut csv = csv::Writer::from_writer(vec![]);
-    let mut header: Vec<String> = vec!["timestamp".to_string()];
-    for step in header_trace.steps.iter() {
-        header.push(step.action.clone());
-    }
-    csv.serialize(&header)
-        .with_context(|| "Error serializing row")
-        .map_err(GrafanaApiError::InternalError)?;
-
-    for trace in traces {
-        let mut row: Vec<String> = vec![trace.timestamp.to_iso_string()];
-
-        for step in trace.steps {
-            row.push(super::trace_state(&step));
-        }
-
-        csv.serialize(&row)
-            .with_context(|| "Error serializing row")
-            .map_err(GrafanaApiError::InternalError)?;
-    }
-
-    Ok(HttpResponse::Ok()
-        .append_header(header::ContentType(mime::TEXT_CSV))
-        .body(
-            csv.into_inner()
-                .with_context(|| "Error creating CSV")
-                .map_err(GrafanaApiError::InternalError)?,
-        ))
 }
 
 async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
@@ -152,11 +77,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
                     temperature,
                     low_priority,
                 } => {
-                    format!(
-                        "{} [prio {}]",
-                        temperature.to_string(),
-                        if *low_priority { "low" } else { "normal" }
-                    )
+                    format!("{} [prio {}]", temperature, if *low_priority { "low" } else { "normal" })
                 }
             },
         ),

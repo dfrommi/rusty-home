@@ -11,15 +11,10 @@ use actix_web::{
 };
 use derive_more::derive::{Display, Error};
 
-use display::DashboardDisplay;
-
 pub fn new_routes(api: HomeApi) -> actix_web::Scope {
     let api = Arc::new(api);
 
     web::scope("/grafana")
-        .service(dashboard::energy_iq::routes(api.clone()))
-        .service(dashboard::energy_monitor::routes(api.clone()))
-        .service(dashboard::heating_details::routes(api.clone()))
         .service(dashboard::smart_home::routes(api.clone()))
         .service(dashboard::meta::routes())
 }

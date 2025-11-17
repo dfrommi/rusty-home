@@ -1,9 +1,7 @@
 use crate::{
     adapter::metrics_export::MetricLabel,
     core::id::ExternalId,
-    home::state::{
-        CurrentPowerUsage, HeatingDemand, HeatingDemandScaled, HomeState, HomeStateValue, TotalEnergyConsumption,
-    },
+    home::state::{CurrentPowerUsage, HeatingDemand, HomeState, HomeStateValue, TotalEnergyConsumption},
 };
 
 pub fn get_tags(value: &HomeStateValue) -> Vec<MetricLabel> {
@@ -95,14 +93,6 @@ fn friendly_name(state: &HomeState) -> Option<&'static str> {
             HeatingDemand::RoomOfRequirements => "Room of Requirements",
             HeatingDemand::Kitchen => "Küche",
             HeatingDemand::Bathroom => "Bad",
-        }),
-        HomeState::HeatingDemandScaled(s) => Some(match s {
-            HeatingDemandScaled::LivingRoomBig => "Wohnzimmer (groß)",
-            HeatingDemandScaled::LivingRoomSmall => "Wohnzimmer (klein)",
-            HeatingDemandScaled::Bedroom => "Schlafzimmer",
-            HeatingDemandScaled::RoomOfRequirements => "Room of Requirements",
-            HeatingDemandScaled::Kitchen => "Küche",
-            HeatingDemandScaled::Bathroom => "Bad",
         }),
         _ => None,
     }

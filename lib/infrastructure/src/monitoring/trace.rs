@@ -61,6 +61,10 @@ impl TraceContext {
     pub fn span_id(&self) -> String {
         self.otel_ctx.span().span_context().span_id().to_string()
     }
+
+    pub fn set_current_span_name(name: String) {
+        tracing::Span::current().record("otel.name", name.to_string());
+    }
 }
 
 #[cfg(test)]

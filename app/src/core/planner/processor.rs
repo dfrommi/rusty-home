@@ -57,7 +57,7 @@ where
 
 #[tracing::instrument(
     skip_all,
-    fields(action = %context.action, otel.name = %context.action),
+    fields(action = %context.action, otel.name),
 )]
 async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Result<Context<A>> {
     context.trace.correlation_id = TraceContext::current_correlation_id();
@@ -83,6 +83,16 @@ async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Res
             }
         }
         ActionEvaluationResult::Lock(_) | ActionEvaluationResult::Skip => {}
+    }
+
+    if context.trace.locked {
+        TraceContext::set_current_span_name(format!("⏸ {}", context.action));
+    } else if context.trace.triggered == Some(true) {
+        TraceContext::set_current_span_name(format!("▶ {}", context.action));
+    } else if context.trace.fulfilled == Some(true) {
+        TraceContext::set_current_span_name(format!("▷ {}", context.action));
+    } else {
+        TraceContext::set_current_span_name(format!("{}", context.action));
     }
 
     Ok(context)

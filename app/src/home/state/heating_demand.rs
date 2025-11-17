@@ -1,13 +1,16 @@
-use crate::core::{
-    HomeApi,
-    time::{DateTime, DateTimeRange},
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{Estimatable, algo},
-    },
-    unit::Percent,
-};
 use crate::port::{DataFrameAccess, DataPointAccess};
+use crate::{
+    core::{
+        HomeApi,
+        time::{DateTime, DateTimeRange},
+        timeseries::{
+            DataFrame, DataPoint,
+            interpolate::{Estimatable, algo},
+        },
+        unit::Percent,
+    },
+    home::Thermostat,
+};
 use r#macro::{EnumVariants, Id, trace_state};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -18,6 +21,19 @@ pub enum HeatingDemand {
     Kitchen,
     RoomOfRequirements,
     Bathroom,
+}
+
+impl HeatingDemand {
+    pub fn scaling_factor(&self) -> f64 {
+        match self {
+            HeatingDemand::LivingRoomBig => Thermostat::LivingRoomBig.heating_factor(),
+            HeatingDemand::LivingRoomSmall => Thermostat::LivingRoomSmall.heating_factor(),
+            HeatingDemand::Bedroom => Thermostat::Bedroom.heating_factor(),
+            HeatingDemand::Kitchen => Thermostat::Kitchen.heating_factor(),
+            HeatingDemand::RoomOfRequirements => Thermostat::RoomOfRequirements.heating_factor(),
+            HeatingDemand::Bathroom => Thermostat::Bathroom.heating_factor(),
+        }
+    }
 }
 
 impl Estimatable for HeatingDemand {

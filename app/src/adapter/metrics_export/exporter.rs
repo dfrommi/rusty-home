@@ -1,7 +1,7 @@
 use crate::{
     adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::timeseries::DataPoint,
-    home::state::HomeStateValue,
+    home::state::{HomeState, HomeStateValue},
     t,
 };
 
@@ -30,8 +30,17 @@ impl HomeStateMetricsExporter {
         loop {
             match self.state_updated_rx.recv().await {
                 Ok(data_point) => {
+                    let home_state = HomeState::from(&data_point.value);
+
                     //Use now instead of first timestamp to fill gaps
                     let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
+
+                    //Derived metrics
+                    let derived = self.derived_metrics(&metric, home_state);
+                    for dm in derived {
+                        buffer.push(dm);
+                    }
+
                     buffer.push(metric);
 
                     if buffer.len() >= MAX_BATCH || last_flush.elapsed() >= t!(15 seconds) {
@@ -49,5 +58,27 @@ impl HomeStateMetricsExporter {
                 }
             }
         }
+    }
+
+    fn derived_metrics(&self, metric: &Metric, state: HomeState) -> Vec<Metric> {
+        let mut metrics = Vec::new();
+
+        match state {
+            HomeState::HeatingDemand(demand) => {
+                let mut scaled_metric = metric.clone();
+                scaled_metric.id.name = format!("{}_scaled", metric.id.name);
+                scaled_metric.value = metric.value * demand.scaling_factor();
+                metrics.push(scaled_metric);
+            }
+            HomeState::TotalRadiatorConsumption(consumption) => {
+                let mut scaled_metric = metric.clone();
+                scaled_metric.id.name = format!("{}_scaled", metric.id.name);
+                scaled_metric.value = metric.value * consumption.scaling_factor();
+                metrics.push(scaled_metric);
+            }
+            _ => (),
+        }
+
+        metrics
     }
 }

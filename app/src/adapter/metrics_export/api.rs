@@ -102,7 +102,7 @@ async fn backfill_handler(
 
     //Delete existing data
     for state in &variants {
-        let id: MetricId = state.into();
+        let id = MetricId::from(&state.ext_id());
         tracing::info!("Deleting existing data for metric: {}", id);
 
         ctx.repo.delete_series(id.clone()).await.map_err(|e| {

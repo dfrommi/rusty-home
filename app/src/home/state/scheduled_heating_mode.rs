@@ -115,16 +115,6 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
             }
         }
 
-        let max_ts = &[
-            away.timestamp,
-            window_open.timestamp,
-            temp_increase.timestamp,
-            sleeping.timestamp,
-        ]
-        .into_iter()
-        .max()
-        .unwrap_or_else(|| t!(now));
-
         if let Some(occupancy_item) = occupancy_item {
             let threshold_high = p(0.7);
             let threshold_low = p(0.5);

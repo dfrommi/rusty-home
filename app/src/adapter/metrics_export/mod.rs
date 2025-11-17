@@ -1,10 +1,12 @@
 mod api;
 mod exporter;
 mod repository;
+mod tags;
 
 pub use exporter::HomeStateMetricsExporter;
 
 use crate::core::HomeApi;
+use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::home::state::{HomeState, HomeStateValue, StateValue};
@@ -44,27 +46,37 @@ struct MetricId {
 #[derive(Debug, Clone)]
 enum MetricLabel {
     Variant(String),
+    Room(String),
+    FriendlyName(String),
+    EnumVariant(String),
 }
 
 impl From<DataPoint<HomeStateValue>> for Metric {
     fn from(dp: DataPoint<HomeStateValue>) -> Self {
-        let home_state = HomeState::from(&dp.value);
-
         Metric {
-            id: MetricId::from(&home_state),
+            id: MetricId::from(&dp.value),
             value: to_metrics_value(dp.value.value()),
             timestamp: dp.timestamp,
         }
     }
 }
 
-impl From<&HomeState> for MetricId {
-    fn from(state: &HomeState) -> Self {
-        let external_id = state.ext_id();
+impl From<&HomeStateValue> for MetricId {
+    fn from(value: &HomeStateValue) -> Self {
+        let state = HomeState::from(value);
 
         MetricId {
-            name: external_id.type_name().to_string(),
-            labels: vec![MetricLabel::Variant(external_id.variant_name().to_string())],
+            name: state.ext_id().type_name().to_string(),
+            labels: tags::get_tags(value),
+        }
+    }
+}
+
+impl From<&ExternalId> for MetricId {
+    fn from(ext_id: &ExternalId) -> Self {
+        MetricId {
+            name: ext_id.type_name().to_string(),
+            labels: vec![MetricLabel::Variant(ext_id.variant_name().to_string())],
         }
     }
 }
@@ -90,6 +102,9 @@ impl std::fmt::Display for MetricLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MetricLabel::Variant(v) => write!(f, "item=\"{}\"", v),
+            MetricLabel::Room(r) => write!(f, "room=\"{}\"", r),
+            MetricLabel::FriendlyName(n) => write!(f, "friendly_name=\"{}\"", n),
+            MetricLabel::EnumVariant(ev) => write!(f, "enum_variant=\"{}\"", ev),
         }
     }
 }

@@ -12,8 +12,7 @@ use super::{DataPointAccess, TimeSeriesAccess, sampled_data_frame};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Resident {
-    DennisSleeping,
-    SabineSleeping,
+    AnyoneSleeping,
     AnyoneOnCouch,
 }
 
@@ -22,8 +21,7 @@ impl DataPointAccess<bool> for Resident {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
         match self {
-            Resident::DennisSleeping => sleeping(Presence::BedDennis, api).await,
-            Resident::SabineSleeping => sleeping(Presence::BedSabine, api).await,
+            Resident::AnyoneSleeping => sleeping(Presence::BedroomBed, api).await,
             Resident::AnyoneOnCouch => anyone_on_couch(api).await,
         }
     }

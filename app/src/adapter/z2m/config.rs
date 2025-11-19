@@ -260,17 +260,6 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             ),
         ),
         //
-        // PRESENCE
-        //
-        (
-            "bedroom/bed_dennis_occupancy",
-            Z2mChannel::PresenceFromLeakSensor(Presence::BedDennis),
-        ),
-        (
-            "bedroom/bed_sabine_occupancy",
-            Z2mChannel::PresenceFromLeakSensor(Presence::BedSabine),
-        ),
-        //
         // BUTTON PRESS
         //
         ("bedroom/remote", Z2mChannel::RemoteClick(RemoteTarget::BedroomDoor)),

@@ -172,18 +172,6 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::PresenceFromLeakSensor(presence) => {
-                let payload: WaterLeakSensor = serde_json::from_str(&msg.payload)?;
-                vec![
-                    DataPoint::new(
-                        PersistentHomeStateValue::Presence(presence.clone(), payload.water_leak),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    availability(device_id, payload.last_seen),
-                ]
-            }
-
             Z2mChannel::RemoteClick(target) => {
                 let payload: RemoteControl = serde_json::from_str(&msg.payload)?;
                 let mut events = vec![availability(device_id, payload.last_seen)];

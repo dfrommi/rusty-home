@@ -11,14 +11,10 @@ use crate::{
 };
 use r#macro::{EnumVariants, Id, trace_state};
 
-//TODO impl anyoneSleeping. Requires impl of enum from crate
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,
-    BedDennis,
-    BedSabine,
     CouchLeft,
     CouchCenter,
     CouchRight,

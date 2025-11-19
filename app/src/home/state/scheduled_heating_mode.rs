@@ -69,7 +69,7 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
             Presence::away(api),
             window.current_data_point(api),
             temp_increase.current_data_point(api),
-            Resident::DennisSleeping.current_data_point(api)
+            Resident::AnyoneSleeping.current_data_point(api)
         )?;
 
         let occupancy_item = match self {
@@ -100,7 +100,8 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
             return Ok(DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp));
         }
 
-        //TODO more refined per room
+        //Use negative occupancy in living room to detect sleep-mode, but only after is was
+        //occupied for a while
         if sleeping.value {
             tracing::trace!("Heating in sleep-mode as Dennis is sleeping");
             return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));

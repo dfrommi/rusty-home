@@ -1,6 +1,6 @@
 use r#macro::Id;
 
-use crate::core::{HomeApi, timeseries::DataPoint, unit::DegreeCelsius};
+use crate::core::{HomeApi, unit::DegreeCelsius};
 use crate::home::action::{SimpleRule, needs_execution_for_one_shot_of_target};
 use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
@@ -47,23 +47,7 @@ impl CoolDownWhenOccupied {
     }
 
     async fn trigger_when_sleeping(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let anyone_sleeping = {
-            let dennis_sleeping = Resident::DennisSleeping.current_data_point(api).await?;
-            let sabine_sleeping = Resident::SabineSleeping.current_data_point(api).await?;
-
-            match (dennis_sleeping.value, sabine_sleeping.value) {
-                (false, false) => {
-                    DataPoint::new(false, std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp))
-                }
-                (true, false) => dennis_sleeping,
-                (false, true) => sabine_sleeping,
-                (true, true) => {
-                    DataPoint::new(true, std::cmp::min(dennis_sleeping.timestamp, sabine_sleeping.timestamp))
-                }
-            }
-        };
-
-        //anyone sleeping?
+        let anyone_sleeping = Resident::AnyoneSleeping.current_data_point(api).await?;
         if !anyone_sleeping.value {
             tracing::trace!("No cooldown needed, because nobody is sleeping");
             return Ok(false);

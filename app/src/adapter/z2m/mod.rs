@@ -26,7 +26,6 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
-    PresenceFromLeakSensor(Presence),
     RemoteClick(RemoteTarget),
     Thermostat(Thermostat, SetPoint, HeatingDemand, Opened),
 }

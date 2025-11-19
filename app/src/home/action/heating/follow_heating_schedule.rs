@@ -81,6 +81,9 @@ impl Rule for FollowHeatingSchedule {
             HeatingMode::Comfort if self.zone == HeatingZone::LivingRoom => {
                 commands.extend(self.heat_to(default_temperature + DegreeCelsius(0.5), api).await?);
             }
+            HeatingMode::Sleep if self.zone == HeatingZone::Bedroom => {
+                commands.extend(self.heat_to(default_temperature - DegreeCelsius(0.5), api).await?);
+            }
             HeatingMode::Sleep => {
                 commands.extend(self.heat_to(default_temperature - DegreeCelsius(1.0), api).await?);
             }

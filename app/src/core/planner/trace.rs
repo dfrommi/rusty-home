@@ -4,8 +4,6 @@ use crate::core::time::DateTime;
 use crate::t;
 use infrastructure::TraceContext;
 
-use crate::core::HomeApi;
-
 #[derive(Clone, Debug)]
 pub struct PlanningTrace {
     pub timestamp: DateTime,
@@ -67,13 +65,9 @@ impl PlanningTraceStep {
     }
 }
 
-pub async fn display_planning_trace(trace: &PlanningTrace, tracer: &HomeApi) {
+pub async fn display_planning_trace(trace: &PlanningTrace) {
     if planning_trace_has_changed(trace) {
         tracing::info!("Planning result:\n{:?}", trace);
-
-        if let Err(e) = tracer.add_planning_trace(trace).await {
-            tracing::error!("Error logging planning result: {:?}", e);
-        }
     } else {
         tracing::info!("Planning result is unchanged");
     }

@@ -9,7 +9,7 @@ use trace::display_planning_trace;
 use crate::{Infrastructure, core::HomeApi, home::HomePlanning};
 
 pub use action::{Action, ActionEvaluationResult};
-pub use trace::{PlanningTrace, PlanningTraceStep};
+pub use trace::PlanningTrace;
 
 pub fn keep_on_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
     let api = infrastructure.api.clone();
@@ -42,7 +42,7 @@ pub async fn plan_for_home(api: &HomeApi) {
     match res {
         Ok(res) => {
             tracing::info!("Planning done");
-            display_planning_trace(&res, api).await;
+            display_planning_trace(&res).await;
         }
 
         Err(e) => tracing::error!("Error during planning: {:?}", e),

@@ -1,13 +1,12 @@
 mod cache;
 
 use super::persistence::{Database, OfflineItem, UserTriggerRequest};
-use super::planner::PlanningTrace;
 use super::time::{DateTime, DateTimeRange};
 use super::timeseries::{DataFrame, DataPoint};
 use crate::core::id::ExternalId;
 use crate::home::availability::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::state::{PersistentHomeState, PersistentHomeStateValue, PersistentHomeStateTypeInfo};
+use crate::home::state::{PersistentHomeState, PersistentHomeStateTypeInfo, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerTarget};
 use crate::t;
 use anyhow::Result;
@@ -260,15 +259,6 @@ impl HomeApi {
 }
 
 //
-//PLANNING TRACE
-//
-impl HomeApi {
-    pub async fn add_planning_trace(&self, result: &PlanningTrace) -> anyhow::Result<()> {
-        self.db.add_planning_trace(result).await
-    }
-}
-
-//
 // AVAILABILITY
 //
 impl HomeApi {
@@ -295,31 +285,6 @@ impl HomeApi {
             .query_all_commands(None, &DateTimeRange::new(from, until))
             .await?;
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
-    }
-
-    pub async fn get_latest_planning_trace(&self, before: DateTime) -> anyhow::Result<PlanningTrace> {
-        // Apply timeshift: if we're in timeshift mode, limit the search to timeshift "now"
-        let effective_before = if DateTime::is_shifted() {
-            let now = t!(now);
-            if before > now { now } else { before }
-        } else {
-            before
-        };
-        self.db.get_latest_planning_trace(effective_before).await
-    }
-
-    pub async fn get_planning_traces_by_trace_id(&self, trace_id: &str) -> anyhow::Result<Option<PlanningTrace>> {
-        self.db.get_planning_traces_by_trace_id(trace_id).await
-    }
-
-    pub async fn get_trace_ids(&self, range: DateTimeRange) -> anyhow::Result<Vec<(String, DateTime)>> {
-        let trace_ids = self.db.get_trace_ids(range).await?;
-        Ok(self.apply_timeshift_filter(trace_ids, |item| item.1))
-    }
-
-    pub async fn get_planning_traces_in_range(&self, range: DateTimeRange) -> anyhow::Result<Vec<PlanningTrace>> {
-        let traces = self.db.get_planning_traces_in_range(range).await?;
-        Ok(self.apply_timeshift_filter(traces, |trace| trace.timestamp))
     }
 
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {

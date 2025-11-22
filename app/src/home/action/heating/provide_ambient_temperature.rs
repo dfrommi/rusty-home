@@ -19,6 +19,11 @@ impl Rule for ProvideAmbientTemperature {
     async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
         let ProvideAmbientTemperature::Thermostat(thermostat) = self;
 
+        //Sonoff thermostat is not supported
+        if thermostat == &Thermostat::RoomOfRequirements {
+            return Ok(RuleResult::Skip);
+        }
+
         let temperature = HeatingZone::for_thermostat(thermostat)
             .inside_temperature()
             .current(api)

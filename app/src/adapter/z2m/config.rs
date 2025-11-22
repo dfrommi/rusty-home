@@ -34,11 +34,17 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
             },
             Z2mCommandTarget::Thermostat("kitchen/radiator_thermostat"),
         ),
+        // (
+        //     CommandTarget::SetHeating {
+        //         device: Thermostat::RoomOfRequirements,
+        //     },
+        //     Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
+        // ),
         (
-            CommandTarget::SetHeating {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::RoomOfRequirements,
             },
-            Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
+            Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat_sonoff"),
         ),
         (
             CommandTarget::SetHeating {
@@ -82,12 +88,12 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
             },
             Z2mCommandTarget::Thermostat("kitchen/radiator_thermostat"),
         ),
-        (
-            CommandTarget::SetThermostatAmbientTemperature {
-                device: Thermostat::RoomOfRequirements,
-            },
-            Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
-        ),
+        // (
+        //     CommandTarget::SetThermostatAmbientTemperature {
+        //         device: Thermostat::RoomOfRequirements,
+        //     },
+        //     Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
+        // ),
         (
             CommandTarget::SetThermostatAmbientTemperature {
                 device: Thermostat::Bathroom,
@@ -174,7 +180,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             ),
         ),
         (
-            "room_of_requirements/radiator_thermostat",
+            "room_of_requirements/radiator_thermostat_sonoff",
             Z2mChannel::Thermostat(
                 Thermostat::RoomOfRequirements,
                 SetPoint::RoomOfRequirements,

@@ -1,7 +1,7 @@
 use r#macro::Id;
 
 use crate::core::HomeApi;
-use crate::core::unit::RawValue;
+use crate::core::unit::{Percent, RawValue};
 use crate::home::action::{Rule, RuleResult};
 use crate::home::command::{Command, CommandTarget, HeatingTargetState};
 use crate::home::common::HeatingZone;
@@ -54,6 +54,10 @@ impl Rule for FollowDefaultSetting {
             CommandTarget::SetThermostatAmbientTemperature { .. } => {
                 anyhow::bail!("FollowDefaultSetting cannot be applied to SetThermostatAmbientTemperature")
             }
+            CommandTarget::SetThermostatValveOpeningPosition { device } => Command::SetThermostatValveOpeningPosition {
+                device,
+                value: Percent(0.0),
+            },
         };
 
         Ok(RuleResult::Execute(vec![command]))

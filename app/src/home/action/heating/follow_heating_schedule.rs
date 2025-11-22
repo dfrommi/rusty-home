@@ -3,7 +3,7 @@ use crate::{
         HomeApi,
         time::{DateTime, Duration},
         timeseries::{DataPoint, interpolate::algo::linear_dp},
-        unit::DegreeCelsius,
+        unit::{DegreeCelsius, Percent},
     },
     home::{
         action::{Rule, RuleResult},
@@ -50,7 +50,28 @@ impl Rule for FollowHeatingSchedule {
         let mut commands: Vec<Command> = vec![];
         let default_temperature = self.zone.default_setpoint();
 
+        let target_temperature = match self.mode {
+            HeatingMode::Ventilation => DegreeCelsius(0.0),
+            HeatingMode::PostVentilation => default_temperature,
+            HeatingMode::EnergySaving => default_temperature,
+            HeatingMode::Sleep if self.zone == HeatingZone::LivingRoom => default_temperature - DegreeCelsius(0.5),
+            HeatingMode::Comfort if self.zone == HeatingZone::LivingRoom => default_temperature + DegreeCelsius(0.5),
+            HeatingMode::Sleep if self.zone == HeatingZone::Bedroom => default_temperature - DegreeCelsius(0.5),
+            HeatingMode::Sleep => default_temperature - DegreeCelsius(1.0),
+            HeatingMode::Comfort => default_temperature + DegreeCelsius(1.0),
+            HeatingMode::Away => default_temperature - DegreeCelsius(2.0),
+        };
+
         match self.mode {
+            _ if self.zone == HeatingZone::RoomOfRequirements => {
+                let current_temp = self.zone.inside_temperature().current(api).await?;
+                let max_opened = match self.mode {
+                    HeatingMode::Ventilation => Percent(0.0),
+                    HeatingMode::PostVentilation => Percent(25.0),
+                    _ => Percent(80.0),
+                };
+                commands.extend(self.valve_open_position_command(target_temperature, current_temp, max_opened));
+            }
             HeatingMode::Ventilation => {
                 commands.extend(self.heating_state_commands(HeatingTargetState::WindowOpen));
                 //Hold thermostat ambient temperature in ventilation mode
@@ -72,26 +93,9 @@ impl Rule for FollowHeatingSchedule {
                     );
                 }
             }
-            HeatingMode::EnergySaving => {
-                commands.extend(self.heat_to(default_temperature, api).await?);
-            }
-            HeatingMode::Sleep if self.zone == HeatingZone::LivingRoom => {
-                commands.extend(self.heat_to(default_temperature - DegreeCelsius(0.5), api).await?);
-            }
-            HeatingMode::Comfort if self.zone == HeatingZone::LivingRoom => {
-                commands.extend(self.heat_to(default_temperature + DegreeCelsius(0.5), api).await?);
-            }
-            HeatingMode::Sleep if self.zone == HeatingZone::Bedroom => {
-                commands.extend(self.heat_to(default_temperature - DegreeCelsius(0.5), api).await?);
-            }
-            HeatingMode::Sleep => {
-                commands.extend(self.heat_to(default_temperature - DegreeCelsius(1.0), api).await?);
-            }
-            HeatingMode::Comfort => {
-                commands.extend(self.heat_to(default_temperature + DegreeCelsius(1.0), api).await?);
-            }
-            HeatingMode::Away => {
-                commands.extend(self.heat_to(default_temperature - DegreeCelsius(2.0), api).await?);
+
+            _ => {
+                commands.extend(self.heat_to(target_temperature, api).await?);
             }
         }
 
@@ -100,6 +104,36 @@ impl Rule for FollowHeatingSchedule {
 }
 
 impl FollowHeatingSchedule {
+    //stupid heuristic. To be replaced with PID
+    fn valve_open_position_command(
+        &self,
+        target_temperature: DegreeCelsius,
+        current_temperature: DegreeCelsius,
+        max_opened: Percent,
+    ) -> Vec<Command> {
+        let temp_diff = (target_temperature - current_temperature).0;
+        //0.5 degree -> 20% opening
+        let opening = (temp_diff * 2.0 * 20.0).clamp(0.0, max_opened.0).round();
+        let opening_position = Percent(opening);
+
+        tracing::trace!(
+            "Setting valve opening position in zone {:?} to {:?} (target: {:?}, current: {:?})",
+            self.zone,
+            opening_position,
+            target_temperature,
+            current_temperature
+        );
+
+        self.zone
+            .thermostats()
+            .iter()
+            .map(|thermostat| Command::SetThermostatValveOpeningPosition {
+                device: thermostat.clone(),
+                value: opening_position,
+            })
+            .collect()
+    }
+
     async fn heat_to(&self, set_point: DegreeCelsius, api: &HomeApi) -> anyhow::Result<Vec<Command>> {
         let mut commands: Vec<Command> = vec![];
         for thermostat in self.zone.thermostats() {

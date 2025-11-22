@@ -306,6 +306,24 @@ mod ext_id {
                 CommandTarget::ControlFan {
                     device: Fan::BedroomCeilingFan,
                 } => "control_fan::bedroom_ceiling_fan",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::RoomOfRequirements,
+                } => "set_thermostat_valve_opening_position::room_of_requirements",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::LivingRoomBig,
+                } => "set_thermostat_valve_opening_position::living_room_big",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::LivingRoomSmall,
+                } => "set_thermostat_valve_opening_position::living_room_small",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::Bedroom,
+                } => "set_thermostat_valve_opening_position::bedroom",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::Kitchen,
+                } => "set_thermostat_valve_opening_position::kitchen",
+                CommandTarget::SetThermostatValveOpeningPosition {
+                    device: Thermostat::Bathroom,
+                } => "set_thermostat_valve_opening_position::bathroom",
             };
 
             let ext_id = FollowDefaultSetting::new(target).ext_id();

@@ -1,4 +1,4 @@
-use crate::core::unit::{DegreeCelsius, RawValue};
+use crate::core::unit::{DegreeCelsius, Percent, RawValue};
 use crate::home::LoadBalancedThermostat;
 use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
@@ -22,6 +22,9 @@ impl Command {
             }
             Command::SetThermostatLoadMean { device, value } => {
                 is_set_thermostat_load_mean_reflected_in_state(device, *value, api).await
+            }
+            Command::SetThermostatValveOpeningPosition { device, value } => {
+                is_set_thermostat_valve_opening_position_reflected_in_state(device, value, api).await
             }
             Command::PushNotify {
                 recipient,
@@ -62,6 +65,15 @@ async fn is_set_heating_reflected_in_state(
             Thermostat::Bathroom => Ok(Opened::BathroomThermostat.current(api).await?),
         },
     }
+}
+
+async fn is_set_thermostat_valve_opening_position_reflected_in_state(
+    device: &Thermostat,
+    value: &Percent,
+    api: &HomeApi,
+) -> Result<bool> {
+    let heating_demand = device.heating_demand().current(api).await?;
+    Ok(heating_demand.0 as i32 == value.0 as i32)
 }
 
 async fn is_set_thermostat_ambient_temperature_reflected_in_state(

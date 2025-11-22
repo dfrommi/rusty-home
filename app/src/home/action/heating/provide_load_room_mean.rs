@@ -42,7 +42,7 @@ impl Rule for ProvideLoadRoomMean {
             return Ok(RuleResult::Skip);
         }
 
-        let mean = (factor1 * load1.0 + factor2 * load2.0) / (factor1 + factor2);
+        let mean = ((factor1 * load1.0 + factor2 * load2.0) / (factor1 + factor2)).round();
 
         Ok(RuleResult::Execute(vec![
             Command::SetThermostatLoadMean {

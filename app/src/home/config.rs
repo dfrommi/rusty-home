@@ -117,9 +117,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Bedroom,
             }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::RoomOfRequirements,
-            }).into(),
+            // FollowDefaultSetting::new(CommandTarget::SetHeating {
+            //     device: Thermostat::RoomOfRequirements,
+            // }).into(),
             FollowDefaultSetting::new(CommandTarget::SetHeating {
                 device: Thermostat::Kitchen,
             }).into(),

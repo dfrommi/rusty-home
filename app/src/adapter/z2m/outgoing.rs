@@ -1,6 +1,6 @@
 use crate::{
     adapter::command::CommandExecutor,
-    core::unit::{DegreeCelsius, RawValue},
+    core::unit::{DegreeCelsius, Percent, RawValue},
     home::command::{Command, CommandTarget, HeatingTargetState},
 };
 use infrastructure::MqttOutMessage;
@@ -87,6 +87,9 @@ impl CommandExecutor for Z2mCommandExecutor {
             (Command::SetThermostatAmbientTemperature { temperature, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
                 self.set_ambient_temperature(device_id, *temperature).await
             }
+            (Command::SetThermostatValveOpeningPosition { value, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
+                self.set_valve_opening_position(device_id, *value).await
+            }
 
             (Command::SetThermostatLoadMean { value, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
                 self.set_load_room_mean(device_id, *value).await
@@ -154,6 +157,25 @@ impl Z2mCommandExecutor {
         let msg = MqttOutMessage::transient(
             self.target_topic(device_id),
             serde_json::to_string(&ThermostatLoadPayload { load_room_mean: value })?,
+        );
+
+        self.sender.send(msg).await?;
+        Ok(true)
+    }
+
+    pub async fn set_valve_opening_position(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
+        let system_mode = if value.0 > 0.0 { "heat" } else { "off" };
+        let opened_percentage = (value.0.round() as i64).clamp(0, 100);
+        let closed_percentage = 100 - opened_percentage;
+
+        let msg = MqttOutMessage::transient(
+            self.target_topic(device_id),
+            json!({
+                "system_mode": system_mode,
+                "valve_opening_degree": opened_percentage,
+                "valve_closing_degree": closed_percentage,
+            })
+            .to_string(),
         );
 
         self.sender.send(msg).await?;

@@ -87,6 +87,9 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
         Command::SetThermostatLoadMean { device, value } => {
             ("SetThermostatLoadMean", device.to_string(), value.to_string())
         }
+        Command::SetThermostatValveOpeningPosition { device, value } => {
+            ("SetThermostatValveOpeningPosition", device.to_string(), value.to_string())
+        }
         Command::PushNotify {
             action,
             notification,

@@ -1,6 +1,6 @@
 mod command_state;
 
-use crate::core::unit::{DegreeCelsius, RawValue};
+use crate::core::unit::{DegreeCelsius, Percent, RawValue};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::home::{LoadBalancedThermostat, Thermostat};
 use derive_more::derive::{Display, From};
@@ -28,6 +28,10 @@ pub enum Command {
     SetThermostatLoadMean {
         device: LoadBalancedThermostat,
         value: RawValue,
+    },
+    SetThermostatValveOpeningPosition {
+        device: Thermostat,
+        value: Percent,
     },
     PushNotify {
         action: NotificationAction,
@@ -59,6 +63,9 @@ pub enum CommandTarget {
     #[display("SetThermostatLoadMean[{}]", device)]
     SetThermostatLoadMean { device: LoadBalancedThermostat },
 
+    #[display("SetThermostatValveOpeningPosition[{}]", device)]
+    SetThermostatValveOpeningPosition { device: Thermostat },
+
     #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {
         recipient: NotificationRecipient,
@@ -88,6 +95,9 @@ impl From<&Command> for CommandTarget {
             }
             Command::SetThermostatLoadMean { device, .. } => {
                 CommandTarget::SetThermostatLoadMean { device: device.clone() }
+            }
+            Command::SetThermostatValveOpeningPosition { device, .. } => {
+                CommandTarget::SetThermostatValveOpeningPosition { device: device.clone() }
             }
             Command::PushNotify {
                 recipient,

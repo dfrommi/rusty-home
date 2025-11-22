@@ -2,6 +2,7 @@ use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
+use crate::home::Thermostat;
 use crate::home::availability::ItemAvailability;
 use crate::home::state::{PersistentHomeStateValue, RawVendorValue, Temperature};
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
@@ -74,8 +75,54 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
+            //Sonoff thermostats
+            Z2mChannel::Thermostat(thermostat, set_point, demand, opened)
+                if thermostat == &Thermostat::RoomOfRequirements =>
+            {
+                let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
+
+                vec![
+                    DataPoint::new(
+                        PersistentHomeStateValue::HeatingDemand(
+                            demand.clone(),
+                            Percent(if payload.system_mode == "heat" {
+                                payload.valve_opening_degree
+                            } else {
+                                0.0 //off
+                            }),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::Temperature(
+                            Temperature::ThermostatOnDevice(thermostat.clone()),
+                            DegreeCelsius(payload.local_temperature),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    availability(device_id, payload.last_seen),
+                    //Resetting unsupported values
+                    DataPoint::new(
+                        PersistentHomeStateValue::Temperature(
+                            Temperature::ThermostatExternal(thermostat.clone()),
+                            DegreeCelsius(0.0),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(
+                        PersistentHomeStateValue::SetPoint(set_point.clone(), DegreeCelsius(0.0)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                    DataPoint::new(PersistentHomeStateValue::Opened(opened.clone(), false), payload.last_seen).into(),
+                ]
+            }
+
             Z2mChannel::Thermostat(thermostat, set_point, demand, opened) => {
-                let payload: Thermostat = serde_json::from_str(&msg.payload)?;
+                let payload: AllyThermostatPayload = serde_json::from_str(&msg.payload)?;
 
                 vec![
                     DataPoint::new(
@@ -217,7 +264,7 @@ struct ClimateSensor {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-struct Thermostat {
+struct AllyThermostatPayload {
     occupied_heating_setpoint: f64,
     pi_heating_demand: f64,
     window_open_external: bool,
@@ -225,6 +272,14 @@ struct Thermostat {
     load_estimate: i64,
     local_temperature: f64,
     external_measured_room_sensor: f64,
+    last_seen: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct SonoffThermostatPayload {
+    system_mode: String,
+    valve_opening_degree: f64,
+    local_temperature: f64,
     last_seen: DateTime,
 }
 
@@ -240,12 +295,6 @@ struct PowerPlug {
     current_power_w: f64,
     #[serde(rename = "energy")]
     total_energy_kwh: f64,
-    last_seen: DateTime,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct WaterLeakSensor {
-    water_leak: bool,
     last_seen: DateTime,
 }
 

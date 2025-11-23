@@ -21,6 +21,9 @@ pub enum RelativeHumidity {
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,
+    LivingRoomTado,
+    RoomOfRequirementsTado,
+    BedroomTado,
 }
 
 impl Estimatable for RelativeHumidity {

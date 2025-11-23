@@ -29,7 +29,7 @@ impl DataPointAccess<bool> for Resident {
 
 async fn sleeping(in_bed: Presence, api: &HomeApi) -> Result<DataPoint<bool>> {
     let now = t!(now);
-    let in_bed_full_range = t!(21:00 - 13:00).active_or_previous_at(now);
+    let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(now);
 
     if !in_bed_full_range.contains(&now) {
         tracing::trace!("Not sleeping, because out of bedtime range");

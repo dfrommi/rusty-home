@@ -24,6 +24,9 @@ pub enum AbsoluteHumidity {
     Kitchen,
     KitchenOuterWall,
     RoomOfRequirements,
+    LivingRoomTado,
+    RoomOfRequirementsTado,
+    BedroomTado,
     Outside,
 }
 
@@ -36,6 +39,9 @@ impl AbsoluteHumidity {
             AbsoluteHumidity::Kitchen => Temperature::Kitchen,
             AbsoluteHumidity::KitchenOuterWall => Temperature::KitchenOuterWall,
             AbsoluteHumidity::RoomOfRequirements => Temperature::RoomOfRequirements,
+            AbsoluteHumidity::LivingRoomTado => Temperature::LivingRoomTado,
+            AbsoluteHumidity::RoomOfRequirementsTado => Temperature::RoomOfRequirementsTado,
+            AbsoluteHumidity::BedroomTado => Temperature::BedroomTado,
             AbsoluteHumidity::Outside => Temperature::Outside,
         }
     }
@@ -48,6 +54,9 @@ impl AbsoluteHumidity {
             AbsoluteHumidity::Kitchen => RelativeHumidity::Kitchen,
             AbsoluteHumidity::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
             AbsoluteHumidity::RoomOfRequirements => RelativeHumidity::RoomOfRequirements,
+            AbsoluteHumidity::LivingRoomTado => RelativeHumidity::LivingRoomTado,
+            AbsoluteHumidity::RoomOfRequirementsTado => RelativeHumidity::RoomOfRequirementsTado,
+            AbsoluteHumidity::BedroomTado => RelativeHumidity::BedroomTado,
             AbsoluteHumidity::Outside => RelativeHumidity::Outside,
         }
     }

@@ -7,7 +7,7 @@ use crate::core::id::ExternalId;
 use crate::home::availability::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
 use crate::home::state::{PersistentHomeState, PersistentHomeStateTypeInfo, PersistentHomeStateValue};
-use crate::home::trigger::{UserTrigger, UserTriggerTarget};
+use crate::home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget};
 use crate::t;
 use anyhow::Result;
 use infrastructure::TraceContext;
@@ -84,7 +84,7 @@ impl HomeApi {
         self.cache.invalidate_user_trigger_cache(target).await;
     }
 
-    pub async fn invalidate_user_trigger_cache_by_id(&self, id: i64) -> anyhow::Result<()> {
+    pub async fn invalidate_user_trigger_cache_by_id(&self, id: &UserTriggerId) -> anyhow::Result<()> {
         match self.db.user_trigger_target_by_id(id).await? {
             Some(target) => self.invalidate_user_trigger_cache(&target).await,
             None => tracing::warn!("Can not invalidate user trigger cache, id {} not found", id),
@@ -168,9 +168,14 @@ impl HomeApi {
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 
-    pub async fn save_command(&self, command: Command, action_id: &ExternalId) -> Result<()> {
+    pub async fn save_command(
+        &self,
+        command: Command,
+        action_id: &ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+    ) -> Result<()> {
         self.db
-            .save_command(&command, action_id, TraceContext::current_correlation_id())
+            .save_command(&command, action_id, user_trigger_id, TraceContext::current_correlation_id())
             .await?;
 
         // Invalidate command cache after saving command

@@ -8,6 +8,7 @@ use tracing::Instrument;
 use crate::core::id::ExternalId;
 use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
 use crate::home::command::{Command, CommandTarget};
+use crate::home::trigger::UserTriggerId;
 use crate::t;
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
@@ -76,13 +77,17 @@ async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Res
 
     //EXECUTION
     match evaluation_result {
-        ActionEvaluationResult::Execute(command, source) => execute_action(&mut context, command, source, &api).await,
-        ActionEvaluationResult::ExecuteMulti(commands, source) => {
+        ActionEvaluationResult::Execute(commands, source) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), &api).await;
+                execute_action(&mut context, command, source.clone(), None, &api).await;
             }
         }
-        ActionEvaluationResult::Lock(_) | ActionEvaluationResult::Skip => {}
+        ActionEvaluationResult::ExecuteTrigger(commands, source, user_trigger_id) => {
+            for command in commands {
+                execute_action(&mut context, command, source.clone(), Some(user_trigger_id.clone()), &api).await;
+            }
+        }
+        ActionEvaluationResult::Skip => {}
     }
 
     if context.trace.locked {
@@ -111,11 +116,14 @@ async fn evaluate_action<A: Action>(context: &mut Context<A>, api: &HomeApi) -> 
     };
 
     //Treat empty result as skipped to prevent further checks for empty
-    if let ActionEvaluationResult::ExecuteMulti(commands, _) = &result
-        && commands.is_empty()
-    {
-        tracing::warn!("Received empty commands list from action {}. Skipping.", context.action);
-        result = ActionEvaluationResult::Skip
+    match &result {
+        ActionEvaluationResult::Execute(commands, _) | ActionEvaluationResult::ExecuteTrigger(commands, _, _)
+            if commands.is_empty() =>
+        {
+            tracing::warn!("Received empty commands list from action {}. Skipping.", context.action);
+            result = ActionEvaluationResult::Skip
+        }
+        _ => {}
     }
 
     context.trace.fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
@@ -130,12 +138,12 @@ fn check_locked<A>(
     resource_lock: &mut ResourceLock<CommandTarget>,
 ) -> ActionEvaluationResult {
     let locking_keys = match &evaluation_result {
-        ActionEvaluationResult::Lock(target) => vec![target.clone()],
-        ActionEvaluationResult::Execute(command, _) => vec![CommandTarget::from(command.clone())],
-        ActionEvaluationResult::ExecuteMulti(commands, _) => commands
-            .iter()
-            .map(|command| CommandTarget::from(command.clone()))
-            .collect(),
+        ActionEvaluationResult::Execute(commands, _) | ActionEvaluationResult::ExecuteTrigger(commands, _, _) => {
+            commands
+                .iter()
+                .map(|command| CommandTarget::from(command.clone()))
+                .collect()
+        }
         ActionEvaluationResult::Skip => vec![],
     };
 
@@ -180,11 +188,17 @@ async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -
 }
 
 #[tracing::instrument(skip(context, api))]
-async fn execute_action<A: Action>(context: &mut Context<A>, command: Command, source: ExternalId, api: &HomeApi) {
+async fn execute_action<A: Action>(
+    context: &mut Context<A>,
+    command: Command,
+    source: ExternalId,
+    user_trigger_id: Option<UserTriggerId>,
+    api: &HomeApi,
+) {
     let target: CommandTarget = command.clone().into();
 
     match should_execute(&command, &source, api).await {
-        Ok(true) => match api.save_command(command, &source).await {
+        Ok(true) => match api.save_command(command, &source, user_trigger_id).await {
             Ok(_) => {
                 tracing::info!("Started command {} via action {}", target, context.action);
                 context.trace.triggered = Some(true);

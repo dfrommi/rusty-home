@@ -58,6 +58,7 @@ mod support {
     use crate::core::time::{DateTime, DateTimeRange};
     use crate::home::command::Command;
 
+    use crate::home::trigger::UserTriggerId;
     use crate::{core::planner::PlanningTrace, home::tests::infrastructure};
 
     pub struct TestDatabase {
@@ -106,6 +107,7 @@ mod support {
             &self,
             command: Command,
             source: ExternalId,
+            _: Option<UserTriggerId>,
             _: Option<String>,
         ) -> anyhow::Result<()> {
             println!("Pretend executing command in test: {command:?} with source: {source:?}");

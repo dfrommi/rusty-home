@@ -112,8 +112,12 @@ impl FollowHeatingSchedule {
         max_opened: Percent,
     ) -> Vec<Command> {
         let temp_diff = (target_temperature - current_temperature).0;
-        //0.5 degree -> 20% opening
-        let opening = (temp_diff * 2.0 * 20.0).clamp(0.0, max_opened.0).round();
+        //0.2 degree -> 20% opening
+        let mut opening = (temp_diff / 0.2 * 20.0).clamp(0.0, max_opened.0).round();
+        if opening < 10.0 {
+            opening = 0.0; //deadzone
+        }
+
         let opening_position = Percent(opening);
 
         tracing::trace!(

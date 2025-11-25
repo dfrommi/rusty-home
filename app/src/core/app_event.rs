@@ -86,7 +86,7 @@ impl AppEventListener {
                         state_changed_sent = true;
                     }
                     DbEvent::UserTriggerInsert { id } if !user_trigger_sent => {
-                        if let Err(e) = self.api.invalidate_user_trigger_cache_by_id(id).await {
+                        if let Err(e) = self.api.invalidate_user_trigger_cache_by_id(&id).await {
                             tracing::error!("Error invalidating user trigger cache for database event {}: {:?}", id, e);
                         }
                         if let Err(e) = self.user_trigger_tx.send(UserTriggerEvent) {

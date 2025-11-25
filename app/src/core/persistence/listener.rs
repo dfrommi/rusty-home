@@ -1,4 +1,5 @@
 use crate::core::time::Duration;
+use crate::home::trigger::UserTriggerId;
 use serde::Deserialize;
 use sqlx::postgres::{PgListener, PgNotification};
 
@@ -18,7 +19,7 @@ pub enum DbEvent {
     StateValueAdded { id: i64, tag_id: i64 },
     CommandAdded { id: i64 },
     EnergyReadingInsert { id: i64 },
-    UserTriggerInsert { id: i64 },
+    UserTriggerInsert { id: UserTriggerId },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -39,7 +40,7 @@ struct EnergyReadingInsertPayload {
 
 #[derive(Debug, Clone, Deserialize)]
 struct UserTriggerInsertPayload {
-    pub id: i64,
+    pub id: UserTriggerId,
 }
 
 impl DbEventListener {

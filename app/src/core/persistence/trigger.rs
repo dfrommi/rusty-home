@@ -2,13 +2,13 @@ use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use crate::{
     core::timeseries::DataPoint,
-    home::trigger::{UserTrigger, UserTriggerTarget},
+    home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
 };
 use anyhow::Context;
 
 #[derive(Debug, Clone)]
 pub struct UserTriggerRequest {
-    pub id: i64,
+    pub id: UserTriggerId,
     pub trigger: UserTrigger,
     pub timestamp: DateTime,
     pub correlation_id: Option<String>,
@@ -116,7 +116,7 @@ impl super::Database {
             let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
             let timestamp = row.timestamp.into();
             result.push(UserTriggerRequest {
-                id: row.id,
+                id: row.id.into(),
                 trigger,
                 timestamp,
                 correlation_id: row.correlation_id,
@@ -126,8 +126,8 @@ impl super::Database {
         Ok(result)
     }
 
-    pub async fn user_trigger_target_by_id(&self, id: i64) -> anyhow::Result<Option<UserTriggerTarget>> {
-        let record = sqlx::query!(r#"SELECT trigger FROM user_trigger WHERE id = $1"#, id)
+    pub async fn user_trigger_target_by_id(&self, id: &UserTriggerId) -> anyhow::Result<Option<UserTriggerTarget>> {
+        let record = sqlx::query!(r#"SELECT trigger FROM user_trigger WHERE id = $1"#, id as &UserTriggerId)
             .fetch_optional(&self.pool)
             .await?;
 

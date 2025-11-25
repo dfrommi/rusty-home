@@ -63,7 +63,7 @@ impl Rule for UserTriggerAction {
 
         tracing::trace!(?commands, ?latest_trigger, "User-trigger action(s) ready to be executed");
 
-        Ok(RuleResult::Execute(commands))
+        Ok(RuleResult::ExecuteTrigger(commands, latest_trigger.id))
     }
 }
 

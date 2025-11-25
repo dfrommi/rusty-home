@@ -3,15 +3,15 @@ use std::{fmt::Display, future::Future, pin::Pin};
 use anyhow::Result;
 
 use crate::core::id::ExternalId;
-use crate::home::command::{Command, CommandTarget};
+use crate::home::command::Command;
 
 use crate::core::HomeApi;
+use crate::home::trigger::UserTriggerId;
 
 #[derive(Debug, Clone)]
 pub enum ActionEvaluationResult {
-    Lock(CommandTarget),
-    Execute(Command, ExternalId),
-    ExecuteMulti(Vec<Command>, ExternalId),
+    Execute(Vec<Command>, ExternalId),
+    ExecuteTrigger(Vec<Command>, ExternalId, UserTriggerId),
     Skip,
 }
 

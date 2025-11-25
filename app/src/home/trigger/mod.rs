@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
 
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, sqlx::Type,
+)]
+#[sqlx(transparent)]
+pub struct UserTriggerId(i64);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTrigger {

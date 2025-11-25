@@ -1,6 +1,7 @@
 use crate::core::id::ExternalId;
 use crate::core::time::DateTimeRange;
 use crate::home::command::{Command, CommandExecution, CommandState, CommandTarget};
+use crate::home::trigger::UserTriggerId;
 use crate::t;
 use anyhow::Result;
 use schema::*;
@@ -13,7 +14,7 @@ impl super::Database {
         let mut tx = self.pool.begin().await?;
 
         let maybe_rec = sqlx::query!(
-            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id
+            r#"SELECT id, command, created, status as "status: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id, user_trigger_id as "user_trigger_id: UserTriggerId"
                 from THING_COMMAND
                 where status = $1
                 order by created DESC
@@ -45,6 +46,7 @@ impl super::Database {
                             state: CommandState::InProgress,
                             created: rec.created.into(),
                             source,
+                            user_trigger_id: rec.user_trigger_id,
                             correlation_id: rec.correlation_id,
                         })
                     }
@@ -75,18 +77,20 @@ impl super::Database {
         &self,
         command: &Command,
         source: &ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
         correlation_id: Option<String>,
     ) -> Result<()> {
         let db_command = serde_json::json!(command);
 
         sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             db_command,
             t!(now).into_db(),
             DbCommandState::Pending as DbCommandState,
             source.type_name(),
             source.variant_name(),
-            correlation_id
+            correlation_id,
+            user_trigger_id as Option<UserTriggerId>
         )
         .execute(&self.pool)
         .await?;
@@ -113,20 +117,20 @@ impl super::Database {
         let db_target = target.map(|j| serde_json::json!(j));
 
         let records = sqlx::query!(
-            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id
+            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id, user_trigger_id
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created >= $2
                 and created <= $3)
             UNION ALL
-            (SELECT id, command, created, status, error, source_type, source_id, correlation_id
+            (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created < $2
                 order by created DESC
                 limit 1)
             UNION ALL
-            (SELECT id, command, created, status, error, source_type, source_id, correlation_id
+            (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
                 from thing_command 
                 where (command @> $1 or $1 is null)
                 and created > $3
@@ -151,6 +155,7 @@ impl super::Database {
                         state: CommandState::from((row.status, row.error)),
                         created: row.created.unwrap().into(),
                         source,
+                        user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
                         correlation_id: row.correlation_id,
                     }),
                     Err(e) => {

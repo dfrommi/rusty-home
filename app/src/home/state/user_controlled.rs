@@ -11,7 +11,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 use crate::core::timeseries::DataPoint;
 use crate::home::state::PowerAvailable;
 
-use crate::home::command::{Command, CommandExecution, PowerToggle, is_system_generated, is_user_generated};
+use crate::home::command::{Command, CommandExecution, PowerToggle};
 
 use super::{DataPointAccess, sampled_data_frame};
 
@@ -82,10 +82,10 @@ async fn current_data_point_for_dehumidifier(api: &HomeApi) -> anyhow::Result<Da
     let system_powered = match last_command {
         Some(CommandExecution {
             command: Command::SetPower { power_on, .. },
-            source,
             created,
+            user_trigger_id,
             ..
-        }) if is_system_generated(&source) => DataPoint::new(power_on, created),
+        }) if user_trigger_id.is_none() => DataPoint::new(power_on, created),
 
         _ => {
             tracing::trace!(
@@ -127,7 +127,7 @@ async fn current_data_point_for_thermostat(
         .unwrap_or_else(|| t!(now));
 
     match latest_command_exec {
-        Some(command) if is_user_generated(&command.source) => {
+        Some(command) if command.is_user_generated() => {
             tracing::trace!("User controlled based on latest command source is User");
             Ok(DataPoint::new(true, timestamp))
         }

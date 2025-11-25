@@ -2,6 +2,7 @@ mod command_state;
 
 use crate::core::unit::{DegreeCelsius, Percent, RawValue};
 use crate::core::{id::ExternalId, time::DateTime};
+use crate::home::trigger::UserTriggerId;
 use crate::home::{LoadBalancedThermostat, Thermostat};
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};
@@ -120,6 +121,7 @@ pub struct CommandExecution {
     pub state: CommandState,
     pub created: DateTime,
     pub source: ExternalId,
+    pub user_trigger_id: Option<UserTriggerId>,
     pub correlation_id: Option<String>,
 }
 
@@ -132,12 +134,14 @@ pub enum CommandState {
     Error(String),
 }
 
-pub fn is_user_generated(source: &ExternalId) -> bool {
-    source.type_name() == "user_trigger_action"
-}
+impl CommandExecution {
+    pub fn is_user_generated(&self) -> bool {
+        self.user_trigger_id.is_some()
+    }
 
-pub fn is_system_generated(source: &ExternalId) -> bool {
-    !is_user_generated(source)
+    pub fn is_system_generated(&self) -> bool {
+        !self.is_user_generated()
+    }
 }
 
 //

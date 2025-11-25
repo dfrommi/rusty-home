@@ -3,8 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 use infrastructure::TraceContext;
 
-use crate::core::id::ExternalId;
-use crate::home::command::{Command, is_user_generated};
+use crate::home::command::{Command, CommandExecution};
 use crate::home::state::PersistentHomeState;
 
 use crate::{
@@ -42,7 +41,8 @@ async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQ
 
     let rows = commands.into_iter().map(|cmd| {
         let (command_type, target, state) = command_as_string(&cmd.command);
-        let (icon, source) = source_as_string(&cmd.source);
+        let source = cmd.source.to_string();
+        let icon = if cmd.is_user_generated() { "USER" } else { "SYSTEM" };
 
         let trace_id = cmd
             .correlation_id
@@ -158,9 +158,4 @@ async fn get_offline_items(api: web::Data<HomeApi>) -> GrafanaResponse {
     });
 
     csv_response(rows)
-}
-
-fn source_as_string(source: &ExternalId) -> (&str, String) {
-    let icon = if is_user_generated(source) { "USER" } else { "SYSTEM" };
-    (icon, source.to_string())
 }

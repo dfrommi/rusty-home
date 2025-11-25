@@ -13,6 +13,7 @@ use std::pin::Pin;
 
 use crate::core::id::ExternalId;
 use crate::home::command::Command;
+use crate::home::trigger::UserTriggerId;
 use anyhow::Result;
 
 use crate::core::time::DateTime;
@@ -34,6 +35,7 @@ use crate::port::*;
 #[derive(Debug, Clone)]
 pub enum RuleResult {
     Execute(Vec<Command>),
+    ExecuteTrigger(Vec<Command>, UserTriggerId),
     Skip,
 }
 
@@ -143,7 +145,10 @@ impl Action for HomeAction {
 
 async fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, api: &HomeApi) -> Result<ActionEvaluationResult> {
     match rule.evaluate(api).await? {
-        RuleResult::Execute(commands) => Ok(ActionEvaluationResult::ExecuteMulti(commands, ext_id)),
+        RuleResult::Execute(commands) => Ok(ActionEvaluationResult::Execute(commands, ext_id)),
+        RuleResult::ExecuteTrigger(commands, user_trigger_id) => {
+            Ok(ActionEvaluationResult::ExecuteTrigger(commands, ext_id, user_trigger_id))
+        }
         RuleResult::Skip => Ok(ActionEvaluationResult::Skip),
     }
 }

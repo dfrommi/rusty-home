@@ -174,37 +174,3 @@ impl DataFrameAccess<HeatingMode> for ScheduledHeatingMode {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }
 }
-
-impl From<&HeatingMode> for f64 {
-    fn from(value: &HeatingMode) -> Self {
-        match value {
-            HeatingMode::Sleep => 10.0,
-            HeatingMode::EnergySaving => 11.0,
-            HeatingMode::Comfort => 12.0,
-            HeatingMode::Ventilation => 1.0,
-            HeatingMode::PostVentilation => 2.0,
-            HeatingMode::Away => -1.0,
-        }
-    }
-}
-
-impl From<f64> for HeatingMode {
-    fn from(value: f64) -> Self {
-        if value < 0.0 {
-            HeatingMode::Away
-        } else if value == 1.0 {
-            HeatingMode::Ventilation
-        } else if value == 2.0 {
-            HeatingMode::PostVentilation
-        } else if value == 10.0 {
-            HeatingMode::Sleep
-        } else if value == 11.0 {
-            HeatingMode::EnergySaving
-        } else if value == 12.0 {
-            HeatingMode::Comfort
-        } else {
-            tracing::warn!("Trying to convert unsupported value {value} to HeatingMode. Fallback to EnergySaving");
-            HeatingMode::EnergySaving
-        }
-    }
-}

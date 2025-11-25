@@ -9,7 +9,7 @@ use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::home::state::{HomeState, HomeStateValue, StateValue};
+use crate::home::state::{HeatingMode, HomeState, HomeStateValue, StateValue};
 use serde::Deserialize;
 use tokio::sync::broadcast::Receiver;
 
@@ -120,9 +120,16 @@ fn to_metrics_value(value: StateValue) -> f64 {
         StateValue::HeatingUnit(heating_unit) => f64::from(&heating_unit),
         StateValue::KiloCubicMeter(kilo_cubic_meter) => f64::from(&kilo_cubic_meter),
         StateValue::FanAirflow(fan_airflow) => f64::from(&fan_airflow),
-        StateValue::HeatingMode(heating_mode) => f64::from(&heating_mode),
         StateValue::RawValue(raw) => f64::from(&raw),
         StateValue::Lux(lux) => f64::from(&lux),
         StateValue::Probability(probability) => f64::from(&probability),
+        StateValue::HeatingMode(heating_mode) => match heating_mode {
+            HeatingMode::Sleep => 10.0,
+            HeatingMode::EnergySaving => 11.0,
+            HeatingMode::Comfort => 12.0,
+            HeatingMode::Ventilation => 1.0,
+            HeatingMode::PostVentilation => 2.0,
+            HeatingMode::Away => -1.0,
+        },
     }
 }

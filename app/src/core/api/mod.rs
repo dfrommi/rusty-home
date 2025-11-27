@@ -91,6 +91,14 @@ impl HomeApi {
         }
         Ok(())
     }
+
+    pub async fn cancel_triggers_before_excluding(
+        &self,
+        before: DateTime,
+        exclude_ids: &[UserTriggerId],
+    ) -> anyhow::Result<u64> {
+        self.db.cancel_triggers_before_excluding(before, exclude_ids).await
+    }
 }
 
 //

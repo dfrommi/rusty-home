@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::home::command::CommandTarget;
+use crate::home::{command::CommandTarget, trigger::UserTriggerId};
 use tokio::sync::oneshot;
 
 use super::{resource_lock::ResourceLock, trace::PlanningTraceStep};
@@ -8,6 +8,7 @@ use super::{resource_lock::ResourceLock, trace::PlanningTraceStep};
 pub struct Context<A> {
     pub action: A,
     pub goal_active: bool,
+    pub user_trigger_id: Option<UserTriggerId>,
     pub trace: PlanningTraceStep,
     lock_rx: oneshot::Receiver<ResourceLock<CommandTarget>>,
     lock_tx: Option<oneshot::Sender<ResourceLock<CommandTarget>>>,
@@ -27,6 +28,7 @@ impl<A: Display> Context<A> {
         Self {
             action,
             goal_active,
+            user_trigger_id: None,
             trace,
             lock_rx,
             lock_tx: Some(lock_tx),

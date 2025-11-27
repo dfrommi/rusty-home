@@ -6,6 +6,7 @@ use tokio::{sync::oneshot, task::yield_now};
 use tracing::Instrument;
 
 use crate::core::id::ExternalId;
+use crate::core::time::DateTime;
 use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
 use crate::home::command::{Command, CommandTarget};
 use crate::home::trigger::UserTriggerId;
@@ -18,6 +19,8 @@ where
     G: Eq + Display,
     A: Action + Clone + Send + Sync + 'static,
 {
+    let planning_start = t!(now);
+
     let (first_tx, mut prev_rx) = oneshot::channel();
     let mut handles = Vec::new();
 
@@ -52,8 +55,24 @@ where
         results.push(context);
     }
 
+    let used_triggers = results
+        .iter()
+        .filter_map(|c| c.user_trigger_id.clone())
+        .collect::<Vec<UserTriggerId>>();
+    cancel_unused_triggers(planning_start, used_triggers, api).await?;
+
     let steps = results.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
+}
+
+async fn cancel_unused_triggers(
+    planning_start: DateTime,
+    used_triggers: Vec<UserTriggerId>,
+    api: &HomeApi,
+) -> anyhow::Result<()> {
+    api.cancel_triggers_before_excluding(planning_start, &used_triggers)
+        .await
+        .map(|_| ())
 }
 
 #[tracing::instrument(
@@ -196,6 +215,8 @@ async fn execute_action<A: Action>(
     api: &HomeApi,
 ) {
     let target: CommandTarget = command.clone().into();
+
+    context.user_trigger_id = user_trigger_id.clone();
 
     match should_execute(&command, &source, api).await {
         Ok(true) => match api.save_command(command, &source, user_trigger_id).await {

@@ -32,6 +32,28 @@ impl UserTriggerRequest {
 // Methods for storing and retrieving user-triggered events and interactions
 impl super::Database {
     #[tracing::instrument(skip(self))]
+    pub async fn cancel_triggers_before_excluding(
+        &self,
+        before: DateTime,
+        exclude_ids: &[UserTriggerId],
+    ) -> anyhow::Result<u64> {
+        let result = sqlx::query!(
+            r#"UPDATE user_trigger
+               SET active_until = $1
+               WHERE active_until IS NULL
+               AND timestamp < $1
+               AND id != ALL($2)"#,
+            before.into_db(),
+            exclude_ids as &[UserTriggerId],
+        )
+        .execute(&self.pool)
+        .await
+        .context("Error cancelling user triggers")?;
+
+        Ok(result.rows_affected())
+    }
+
+    #[tracing::instrument(skip(self))]
     pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
@@ -54,15 +76,18 @@ impl super::Database {
         since: DateTime,
     ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
         let db_target = serde_json::json!(target);
+        let now = t!(now);
 
         let rec = sqlx::query!(
             r#"SELECT trigger, timestamp FROM user_trigger
                 WHERE trigger @> $1
                 AND timestamp >= $2
+                AND (active_until IS NULL OR active_until >= $3)
                 ORDER BY timestamp DESC
                 LIMIT 1"#,
             db_target,
             since.into_db(),
+            now.into_db(),
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -81,18 +106,21 @@ impl super::Database {
         range: &DateTimeRange,
     ) -> anyhow::Result<Vec<UserTriggerRequest>> {
         let db_target = serde_json::json!(target);
+        let now = t!(now);
 
         let records = sqlx::query!(
             r#"(SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
                     FROM user_trigger
                     WHERE trigger @> $1
                     AND timestamp >= $2
-                    AND timestamp <= $3)
+                    AND timestamp <= $3
+                    AND (active_until IS NULL OR active_until >= $4))
                UNION ALL
                (SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
                     FROM user_trigger
                     WHERE trigger @> $1
                     AND timestamp < $2
+                    AND (active_until IS NULL OR active_until >= $4)
                     ORDER BY timestamp DESC
                     LIMIT 1)
                UNION ALL
@@ -100,12 +128,14 @@ impl super::Database {
                     FROM user_trigger
                     WHERE trigger @> $1
                     AND timestamp > $3
+                    AND (active_until IS NULL OR active_until >= $4)
                     ORDER BY timestamp ASC
                     LIMIT 1)
                ORDER BY 2 ASC"#,
             db_target,
             range.start().into_db(),
-            range.end().into_db()
+            range.end().into_db(),
+            now.into_db(),
         )
         .fetch_all(&self.pool)
         .await?;
@@ -127,9 +157,14 @@ impl super::Database {
     }
 
     pub async fn user_trigger_target_by_id(&self, id: &UserTriggerId) -> anyhow::Result<Option<UserTriggerTarget>> {
-        let record = sqlx::query!(r#"SELECT trigger FROM user_trigger WHERE id = $1"#, id as &UserTriggerId)
-            .fetch_optional(&self.pool)
-            .await?;
+        let now = t!(now);
+        let record = sqlx::query!(
+            r#"SELECT trigger FROM user_trigger WHERE id = $1 AND (active_until IS NULL OR active_until >= $2)"#,
+            id as &UserTriggerId,
+            now.into_db()
+        )
+        .fetch_optional(&self.pool)
+        .await?;
 
         match record {
             Some(row) => {

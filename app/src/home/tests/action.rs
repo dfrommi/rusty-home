@@ -156,49 +156,18 @@ mod ext_id {
     #[test]
     fn follow_heating_schedule_ext_ids() {
         for zone in HeatingZone::variants() {
-            for mode in HeatingMode::variants() {
-                let expected_variant = match (&zone, &mode) {
-                    (HeatingZone::LivingRoom, HeatingMode::EnergySaving) => "living_room::energy_saving",
-                    (HeatingZone::LivingRoom, HeatingMode::Comfort) => "living_room::comfort",
-                    (HeatingZone::LivingRoom, HeatingMode::Sleep) => "living_room::sleep",
-                    (HeatingZone::LivingRoom, HeatingMode::Ventilation) => "living_room::ventilation",
-                    (HeatingZone::LivingRoom, HeatingMode::PostVentilation) => "living_room::post_ventilation",
-                    (HeatingZone::LivingRoom, HeatingMode::Away) => "living_room::away",
-                    (HeatingZone::Bedroom, HeatingMode::EnergySaving) => "bedroom::energy_saving",
-                    (HeatingZone::Bedroom, HeatingMode::Comfort) => "bedroom::comfort",
-                    (HeatingZone::Bedroom, HeatingMode::Sleep) => "bedroom::sleep",
-                    (HeatingZone::Bedroom, HeatingMode::Ventilation) => "bedroom::ventilation",
-                    (HeatingZone::Bedroom, HeatingMode::PostVentilation) => "bedroom::post_ventilation",
-                    (HeatingZone::Bedroom, HeatingMode::Away) => "bedroom::away",
-                    (HeatingZone::Kitchen, HeatingMode::EnergySaving) => "kitchen::energy_saving",
-                    (HeatingZone::Kitchen, HeatingMode::Comfort) => "kitchen::comfort",
-                    (HeatingZone::Kitchen, HeatingMode::Sleep) => "kitchen::sleep",
-                    (HeatingZone::Kitchen, HeatingMode::Ventilation) => "kitchen::ventilation",
-                    (HeatingZone::Kitchen, HeatingMode::PostVentilation) => "kitchen::post_ventilation",
-                    (HeatingZone::Kitchen, HeatingMode::Away) => "kitchen::away",
-                    (HeatingZone::RoomOfRequirements, HeatingMode::EnergySaving) => {
-                        "room_of_requirements::energy_saving"
-                    }
-                    (HeatingZone::RoomOfRequirements, HeatingMode::Comfort) => "room_of_requirements::comfort",
-                    (HeatingZone::RoomOfRequirements, HeatingMode::Sleep) => "room_of_requirements::sleep",
-                    (HeatingZone::RoomOfRequirements, HeatingMode::Ventilation) => "room_of_requirements::ventilation",
-                    (HeatingZone::RoomOfRequirements, HeatingMode::PostVentilation) => {
-                        "room_of_requirements::post_ventilation"
-                    }
-                    (HeatingZone::RoomOfRequirements, HeatingMode::Away) => "room_of_requirements::away",
-                    (HeatingZone::Bathroom, HeatingMode::EnergySaving) => "bathroom::energy_saving",
-                    (HeatingZone::Bathroom, HeatingMode::Comfort) => "bathroom::comfort",
-                    (HeatingZone::Bathroom, HeatingMode::Sleep) => "bathroom::sleep",
-                    (HeatingZone::Bathroom, HeatingMode::Ventilation) => "bathroom::ventilation",
-                    (HeatingZone::Bathroom, HeatingMode::PostVentilation) => "bathroom::post_ventilation",
-                    (HeatingZone::Bathroom, HeatingMode::Away) => "bathroom::away",
-                };
-                let action = FollowHeatingSchedule::new(zone.clone(), mode.clone());
-                let ext_id = action.ext_id();
+            let expected_variant = match &zone {
+                HeatingZone::LivingRoom => "living_room",
+                HeatingZone::Bedroom => "bedroom",
+                HeatingZone::Kitchen => "kitchen",
+                HeatingZone::RoomOfRequirements => "room_of_requirements",
+                HeatingZone::Bathroom => "bathroom",
+            };
+            let action = FollowHeatingSchedule::new(zone.clone());
+            let ext_id = action.ext_id();
 
-                assert_eq!(ext_id.type_name(), "follow_heating_schedule");
-                assert_eq!(ext_id.variant_name(), expected_variant);
-            }
+            assert_eq!(ext_id.type_name(), "follow_heating_schedule");
+            assert_eq!(ext_id.variant_name(), expected_variant);
         }
     }
 

@@ -127,6 +127,7 @@ fn to_metrics_value(value: StateValue) -> f64 {
             HeatingMode::Sleep => 10.0,
             HeatingMode::EnergySaving => 11.0,
             HeatingMode::Comfort => 12.0,
+            HeatingMode::Manual(_, _) => 13.0,
             HeatingMode::Ventilation => 1.0,
             HeatingMode::PostVentilation => 2.0,
             HeatingMode::Away => -1.0,

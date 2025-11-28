@@ -10,7 +10,6 @@ use crate::home::action::{
     AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
     ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
-use crate::home::state::HeatingMode;
 
 #[rustfmt::skip]
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -153,22 +152,17 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
 
 fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
     vec![
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Away).into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Ventilation).into(),
-        UserTriggerAction::new(
-            match zone {
-                HeatingZone::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
-                HeatingZone::Bedroom => HomekitCommandTarget::BedroomHeatingState,
-                HeatingZone::Kitchen => HomekitCommandTarget::KitchenHeatingState,
-                HeatingZone::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
-                HeatingZone::Bathroom => HomekitCommandTarget::BathroomHeatingState,
-            }
-            .into(),
-        )
-        .into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::PostVentilation).into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Sleep).into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::Comfort).into(),
-        FollowHeatingSchedule::new(zone.clone(), HeatingMode::EnergySaving).into(),
+        FollowHeatingSchedule::new(zone.clone()).into(),
+        // UserTriggerAction::new(
+        //     match zone {
+        //         HeatingZone::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
+        //         HeatingZone::Bedroom => HomekitCommandTarget::BedroomHeatingState,
+        //         HeatingZone::Kitchen => HomekitCommandTarget::KitchenHeatingState,
+        //         HeatingZone::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
+        //         HeatingZone::Bathroom => HomekitCommandTarget::BathroomHeatingState,
+        //     }
+        //     .into(),
+        // )
+        // .into(),
     ]
 }

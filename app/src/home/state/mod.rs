@@ -18,8 +18,8 @@ mod raw_vendor_value;
 mod relative_humidity;
 mod resident;
 mod risk_of_mould;
-mod scheduled_heating_mode;
 mod set_point;
+mod target_heating_mode;
 mod temperature;
 mod total_energy_consumption;
 mod total_radiator_consumption;
@@ -48,8 +48,8 @@ pub use raw_vendor_value::RawVendorValue;
 pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
-pub use scheduled_heating_mode::*;
 pub use set_point::SetPoint;
+pub use target_heating_mode::*;
 pub use temperature::Temperature;
 pub use total_energy_consumption::TotalEnergyConsumption;
 pub use total_radiator_consumption::TotalRadiatorConsumption;
@@ -81,7 +81,7 @@ pub enum HomeStateValue {
     OpenedArea(OpenedArea, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
-    ScheduledHeatingMode(ScheduledHeatingMode, HeatingMode),
+    TargetHeatingMode(TargetHeatingMode, HeatingMode),
     UserControlled(UserControlled, bool),
 
     #[persistent]

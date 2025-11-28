@@ -100,7 +100,7 @@ fn friendly_name(state: &HomeState) -> Option<&'static str> {
 
 fn enum_variant(value: &HomeStateValue) -> Option<String> {
     match value {
-        HomeStateValue::ScheduledHeatingMode(_, v) => Some(v.ext_id().variant_name().to_string()),
+        // HomeStateValue::TargetHeatingMode(_, v) => Some(v.ext_id().variant_name().to_string()),
         _ => None,
     }
 }
@@ -111,8 +111,8 @@ mod tests {
 
     #[test]
     fn enum_variant_scheduled_heating_mode() {
-        let value = HomeStateValue::ScheduledHeatingMode(
-            crate::home::state::ScheduledHeatingMode::LivingRoom,
+        let value = HomeStateValue::TargetHeatingMode(
+            crate::home::state::TargetHeatingMode::LivingRoom,
             crate::home::state::HeatingMode::Comfort,
         );
 

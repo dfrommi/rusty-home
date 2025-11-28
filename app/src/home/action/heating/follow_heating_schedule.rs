@@ -9,7 +9,7 @@ use crate::{
         action::{Rule, RuleResult},
         command::{Command, HeatingTargetState},
         common::HeatingZone,
-        state::{HeatingMode, ScheduledHeatingMode, Temperature},
+        state::{HeatingMode, TargetHeatingMode, Temperature},
     },
     port::DataPointAccess,
     t,
@@ -19,23 +19,22 @@ use r#macro::Id;
 #[derive(Debug, Clone, Id)]
 pub struct FollowHeatingSchedule {
     zone: HeatingZone,
-    mode: HeatingMode,
 }
 
 impl FollowHeatingSchedule {
-    pub fn new(zone: HeatingZone, mode: HeatingMode) -> Self {
-        Self { zone, mode }
+    pub fn new(zone: HeatingZone) -> Self {
+        Self { zone }
     }
 }
 
 impl Rule for FollowHeatingSchedule {
     async fn evaluate(&self, api: &crate::core::HomeApi) -> anyhow::Result<RuleResult> {
         let active_mode_dp = match self.zone {
-            HeatingZone::RoomOfRequirements => ScheduledHeatingMode::RoomOfRequirements,
-            HeatingZone::LivingRoom => ScheduledHeatingMode::LivingRoom,
-            HeatingZone::Bedroom => ScheduledHeatingMode::Bedroom,
-            HeatingZone::Kitchen => ScheduledHeatingMode::Kitchen,
-            HeatingZone::Bathroom => ScheduledHeatingMode::Bathroom,
+            HeatingZone::RoomOfRequirements => TargetHeatingMode::RoomOfRequirements,
+            HeatingZone::LivingRoom => TargetHeatingMode::LivingRoom,
+            HeatingZone::Bedroom => TargetHeatingMode::Bedroom,
+            HeatingZone::Kitchen => TargetHeatingMode::Kitchen,
+            HeatingZone::Bathroom => TargetHeatingMode::Bathroom,
         }
         .current_data_point(api)
         .await?;
@@ -43,14 +42,11 @@ impl Rule for FollowHeatingSchedule {
         let active_mode = active_mode_dp.value;
         let mode_active_since = active_mode_dp.timestamp;
 
-        if active_mode != self.mode {
-            return Ok(RuleResult::Skip);
-        }
-
         let mut commands: Vec<Command> = vec![];
         let default_temperature = self.zone.default_setpoint();
 
-        let target_temperature = match self.mode {
+        let target_temperature = match active_mode {
+            HeatingMode::Manual(t, _) => t,
             HeatingMode::Ventilation => DegreeCelsius(0.0),
             HeatingMode::PostVentilation => default_temperature,
             HeatingMode::EnergySaving => default_temperature,
@@ -62,10 +58,10 @@ impl Rule for FollowHeatingSchedule {
             HeatingMode::Away => default_temperature - DegreeCelsius(2.0),
         };
 
-        match self.mode {
+        match active_mode {
             _ if self.zone == HeatingZone::RoomOfRequirements => {
                 let current_temp = self.zone.inside_temperature().current(api).await?;
-                let max_opened = match self.mode {
+                let max_opened = match active_mode {
                     HeatingMode::Ventilation => Percent(0.0),
                     HeatingMode::PostVentilation => Percent(25.0),
                     _ => Percent(80.0),
@@ -86,7 +82,7 @@ impl Rule for FollowHeatingSchedule {
                     commands.extend(
                         self.move_towards_real_temperature(
                             mode_active_since,
-                            ScheduledHeatingMode::post_ventilation_duration(),
+                            TargetHeatingMode::post_ventilation_duration(),
                             api,
                         )
                         .await?,
@@ -99,7 +95,11 @@ impl Rule for FollowHeatingSchedule {
             }
         }
 
-        Ok(RuleResult::Execute(commands))
+        Ok(if let HeatingMode::Manual(_, trigger_id) = active_mode {
+            RuleResult::ExecuteTrigger(commands, trigger_id)
+        } else {
+            RuleResult::Execute(commands)
+        })
     }
 }
 

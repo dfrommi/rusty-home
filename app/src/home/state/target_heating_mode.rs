@@ -1,6 +1,7 @@
 use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::{
+    adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     core::{
         HomeApi,
         time::{DateTime, DateTimeRange, Duration},
@@ -8,14 +9,17 @@ use crate::{
             DataFrame, DataPoint,
             interpolate::{self, Estimatable},
         },
-        unit::p,
+        unit::{DegreeCelsius, p},
     },
-    home::state::{AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident, sampled_data_frame},
+    home::{
+        state::{AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident, sampled_data_frame},
+        trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
+    },
     port::{DataFrameAccess, DataPointAccess},
     t,
 };
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, derive_more::Display)]
 pub enum HeatingMode {
     EnergySaving,
     Comfort,
@@ -25,10 +29,13 @@ pub enum HeatingMode {
     PostVentilation,
 
     Away,
+
+    #[display("Manual[{}]", _0)]
+    Manual(DegreeCelsius, UserTriggerId),
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
-pub enum ScheduledHeatingMode {
+pub enum TargetHeatingMode {
     LivingRoom,
     Bedroom,
     Kitchen,
@@ -36,22 +43,22 @@ pub enum ScheduledHeatingMode {
     Bathroom,
 }
 
-impl ScheduledHeatingMode {
+impl TargetHeatingMode {
     fn window(&self) -> OpenedArea {
         match self {
-            ScheduledHeatingMode::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
-            ScheduledHeatingMode::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
-            ScheduledHeatingMode::Bedroom | ScheduledHeatingMode::Bathroom => OpenedArea::BedroomWindow,
-            ScheduledHeatingMode::Kitchen => OpenedArea::KitchenWindow,
+            TargetHeatingMode::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
+            TargetHeatingMode::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
+            TargetHeatingMode::Bedroom | TargetHeatingMode::Bathroom => OpenedArea::BedroomWindow,
+            TargetHeatingMode::Kitchen => OpenedArea::KitchenWindow,
         }
     }
 
     fn temp_increase(&self) -> AutomaticTemperatureIncrease {
         match self {
-            ScheduledHeatingMode::RoomOfRequirements => AutomaticTemperatureIncrease::RoomOfRequirements,
-            ScheduledHeatingMode::LivingRoom => AutomaticTemperatureIncrease::LivingRoom,
-            ScheduledHeatingMode::Bedroom | ScheduledHeatingMode::Bathroom => AutomaticTemperatureIncrease::Bedroom,
-            ScheduledHeatingMode::Kitchen => AutomaticTemperatureIncrease::Kitchen,
+            TargetHeatingMode::RoomOfRequirements => AutomaticTemperatureIncrease::RoomOfRequirements,
+            TargetHeatingMode::LivingRoom => AutomaticTemperatureIncrease::LivingRoom,
+            TargetHeatingMode::Bedroom | TargetHeatingMode::Bathroom => AutomaticTemperatureIncrease::Bedroom,
+            TargetHeatingMode::Kitchen => AutomaticTemperatureIncrease::Kitchen,
         }
     }
 
@@ -60,34 +67,47 @@ impl ScheduledHeatingMode {
     }
 }
 
-impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
+impl DataPointAccess<HeatingMode> for TargetHeatingMode {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingMode>> {
         let (window, temp_increase) = (self.window(), self.temp_increase());
 
-        let (away, window_open, temp_increase, sleeping) = tokio::try_join!(
+        let (away, window_open, temp_increase, sleeping, user_override) = tokio::try_join!(
             Presence::away(api),
             window.current_data_point(api),
             temp_increase.current_data_point(api),
-            Resident::AnyoneSleeping.current_data_point(api)
+            Resident::AnyoneSleeping.current_data_point(api),
+            self.get_user_override(api)
         )?;
 
         let occupancy_item = match self {
-            ScheduledHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
-            ScheduledHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
-            ScheduledHeatingMode::Bedroom => Some(Occupancy::BedroomBed),
+            TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
+            TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
+            TargetHeatingMode::Bedroom => Some(Occupancy::BedroomBed),
             _ => None,
         };
 
-        if away.value {
+        //away and no later override
+        if away.value && user_override.clone().is_none_or(|o| o.timestamp < away.timestamp) {
             tracing::trace!("Heating in away mode as nobody is at home");
             return Ok(DataPoint::new(HeatingMode::Away, away.timestamp));
         }
 
         //Or cold-air coming in?
-        if window_open.value {
+        if window_open.value && window_open.timestamp.elapsed() > t!(20 seconds) {
             tracing::trace!("Heating in ventilation mode as window is open");
             return Ok(DataPoint::new(HeatingMode::Ventilation, window_open.timestamp));
+        }
+
+        if let Some(user_override) = user_override {
+            tracing::trace!(
+                "Heating in manual mode as user override is active to {}°C",
+                user_override.target_temperature.0
+            );
+            return Ok(DataPoint::new(
+                HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id),
+                user_override.timestamp,
+            ));
         }
 
         //TODO take more factors like cold air coming in after ventilation into account
@@ -163,13 +183,62 @@ impl DataPointAccess<HeatingMode> for ScheduledHeatingMode {
     }
 }
 
-impl Estimatable for ScheduledHeatingMode {
+#[derive(Debug, Clone)]
+struct UserHeatingOverride {
+    timestamp: DateTime,
+    target_temperature: DegreeCelsius,
+    trigger_id: UserTriggerId,
+}
+
+impl TargetHeatingMode {
+    async fn get_user_override(&self, api: &HomeApi) -> anyhow::Result<Option<UserHeatingOverride>> {
+        let user_trigger = api
+            .latest_trigger_since(
+                &UserTriggerTarget::Homekit(match self {
+                    TargetHeatingMode::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
+                    TargetHeatingMode::Bedroom => HomekitCommandTarget::BedroomHeatingState,
+                    TargetHeatingMode::Kitchen => HomekitCommandTarget::KitchenHeatingState,
+                    TargetHeatingMode::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
+                    TargetHeatingMode::Bathroom => HomekitCommandTarget::BathroomHeatingState,
+                }),
+                t!(5 hours ago),
+            )
+            .await?;
+
+        if let Some(user_trigger) = user_trigger {
+            let target_temperature = match user_trigger.trigger {
+                UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(state))
+                | UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(state))
+                | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(state))
+                | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state))
+                | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => match state {
+                    HomekitHeatingState::Off => Some(DegreeCelsius(0.0)),
+                    HomekitHeatingState::Heat(target_temperature) => Some(target_temperature),
+                    HomekitHeatingState::Auto => None,
+                },
+                _ => anyhow::bail!("Unexpected user trigger type for heating override"),
+            };
+
+            if let Some(target_temperature) = target_temperature {
+                return Ok(Some(UserHeatingOverride {
+                    timestamp: user_trigger.timestamp,
+                    target_temperature,
+                    trigger_id: user_trigger.id,
+                }));
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+impl Estimatable for TargetHeatingMode {
     fn interpolate(&self, at: DateTime, df: &DataFrame<HeatingMode>) -> Option<HeatingMode> {
         interpolate::algo::last_seen(at, df)
     }
 }
 
-impl DataFrameAccess<HeatingMode> for ScheduledHeatingMode {
+impl DataFrameAccess<HeatingMode> for TargetHeatingMode {
     async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingMode>> {
         sampled_data_frame(self, range, t!(30 seconds), api).await
     }

@@ -1,13 +1,16 @@
-use crate::core::{
-    HomeApi,
-    time::{DateTime, DateTimeRange},
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{Estimatable, algo},
-    },
-    unit::DegreeCelsius,
-};
 use crate::port::{DataFrameAccess, DataPointAccess};
+use crate::{
+    core::{
+        HomeApi,
+        time::{DateTime, DateTimeRange},
+        timeseries::{
+            DataFrame, DataPoint,
+            interpolate::{Estimatable, algo},
+        },
+        unit::DegreeCelsius,
+    },
+    home::{HeatingZone, state::TargetHeatingMode},
+};
 use r#macro::{EnumVariants, Id, trace_state};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
@@ -29,7 +32,16 @@ impl Estimatable for SetPoint {
 impl DataPointAccess<DegreeCelsius> for SetPoint {
     #[trace_state]
     async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
-        api.current_data_point(self).await
+        //TODO temp workaround for migration
+        match self {
+            SetPoint::RoomOfRequirements => {
+                let mode = TargetHeatingMode::RoomOfRequirements.current_data_point(api).await?;
+                let value = HeatingZone::RoomOfRequirements.setpoint_for_mode(&mode.value);
+                Ok(DataPoint::new(value, mode.timestamp))
+            }
+
+            _ => api.current_data_point(self).await,
+        }
     }
 }
 

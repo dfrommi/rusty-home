@@ -43,20 +43,8 @@ impl Rule for FollowHeatingSchedule {
         let mode_active_since = active_mode_dp.timestamp;
 
         let mut commands: Vec<Command> = vec![];
-        let default_temperature = self.zone.default_setpoint();
 
-        let target_temperature = match active_mode {
-            HeatingMode::Manual(t, _) => t,
-            HeatingMode::Ventilation => DegreeCelsius(0.0),
-            HeatingMode::PostVentilation => default_temperature,
-            HeatingMode::EnergySaving => default_temperature,
-            HeatingMode::Sleep if self.zone == HeatingZone::LivingRoom => default_temperature - DegreeCelsius(0.5),
-            HeatingMode::Comfort if self.zone == HeatingZone::LivingRoom => default_temperature + DegreeCelsius(0.5),
-            HeatingMode::Sleep if self.zone == HeatingZone::Bedroom => default_temperature - DegreeCelsius(0.5),
-            HeatingMode::Sleep => default_temperature - DegreeCelsius(1.0),
-            HeatingMode::Comfort => default_temperature + DegreeCelsius(1.0),
-            HeatingMode::Away => default_temperature - DegreeCelsius(2.0),
-        };
+        let target_temperature = self.zone.setpoint_for_mode(&active_mode);
 
         match active_mode {
             _ if self.zone == HeatingZone::RoomOfRequirements => {
@@ -74,7 +62,7 @@ impl Rule for FollowHeatingSchedule {
                 commands.extend(self.hold_external_temperature(api).await?);
             }
             HeatingMode::PostVentilation => {
-                commands.extend(self.heat_to(default_temperature, api).await?);
+                commands.extend(self.heat_to(target_temperature, api).await?);
 
                 if mode_active_since.elapsed() < t!(5 minutes) {
                     commands.extend(self.hold_external_temperature(api).await?);

@@ -24,7 +24,6 @@ mod temperature;
 mod total_energy_consumption;
 mod total_radiator_consumption;
 mod total_water_consumption;
-mod user_controlled;
 
 use std::fmt::Debug;
 
@@ -54,7 +53,6 @@ pub use temperature::Temperature;
 pub use total_energy_consumption::TotalEnergyConsumption;
 pub use total_radiator_consumption::TotalRadiatorConsumption;
 pub use total_water_consumption::TotalWaterConsumption;
-pub use user_controlled::UserControlled;
 
 use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
@@ -82,7 +80,6 @@ pub enum HomeStateValue {
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
     TargetHeatingMode(TargetHeatingMode, HeatingMode),
-    UserControlled(UserControlled, bool),
 
     #[persistent]
     CurrentPowerUsage(CurrentPowerUsage, Watt),

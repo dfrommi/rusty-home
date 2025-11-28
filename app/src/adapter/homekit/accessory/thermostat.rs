@@ -6,7 +6,7 @@ use crate::{
     core::unit::DegreeCelsius,
     home::{
         HeatingZone,
-        state::{HeatingDemand, HomeStateValue, SetPoint, Temperature, UserControlled},
+        state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature},
     },
 };
 
@@ -22,43 +22,43 @@ pub struct Thermostat {
     zone: HeatingZone,
     temperature: Temperature,
     set_point: SetPoint,
-    user_controlled: UserControlled,
+    target_heating_mode: TargetHeatingMode,
     heating_demand: HeatingDemand,
     status: ThermostatStatus,
 }
 
 impl Thermostat {
     pub fn new(name: &'static str, zone: HeatingZone) -> Self {
-        let (temperature, set_point, user_controlled, heating_demand) = match zone {
+        let (temperature, set_point, target_heating_mode, heating_demand) = match zone {
             //TODO handle multiple radiators properly
             HeatingZone::LivingRoom => (
                 zone.inside_temperature(),
                 SetPoint::LivingRoomBig,
-                UserControlled::LivingRoomThermostatBig,
+                TargetHeatingMode::LivingRoom,
                 HeatingDemand::LivingRoomBig,
             ),
             HeatingZone::Bedroom => (
                 zone.inside_temperature(),
                 SetPoint::Bedroom,
-                UserControlled::BedroomThermostat,
+                TargetHeatingMode::Bedroom,
                 HeatingDemand::Bedroom,
             ),
             HeatingZone::Kitchen => (
                 zone.inside_temperature(),
                 SetPoint::Kitchen,
-                UserControlled::KitchenThermostat,
+                TargetHeatingMode::Kitchen,
                 HeatingDemand::Kitchen,
             ),
             HeatingZone::RoomOfRequirements => (
                 zone.inside_temperature(),
                 SetPoint::RoomOfRequirements,
-                UserControlled::RoomOfRequirementsThermostat,
+                TargetHeatingMode::RoomOfRequirements,
                 HeatingDemand::RoomOfRequirements,
             ),
             HeatingZone::Bathroom => (
                 zone.inside_temperature(),
                 SetPoint::Bathroom,
-                UserControlled::BathroomThermostat,
+                TargetHeatingMode::Bathroom,
                 HeatingDemand::Bathroom,
             ),
         };
@@ -68,7 +68,7 @@ impl Thermostat {
             zone,
             temperature,
             set_point,
-            user_controlled,
+            target_heating_mode,
             heating_demand,
             status: ThermostatStatus::default(),
         }
@@ -108,8 +108,9 @@ impl Thermostat {
                     events.push(event);
                 }
             }
-            HomeStateValue::UserControlled(user_controlled, value) if *user_controlled == self.user_controlled => {
-                self.status.user_controlled = Some(*value);
+            HomeStateValue::TargetHeatingMode(heating_mode, value) if *heating_mode == self.target_heating_mode => {
+                let user_controlled = matches!(value, HeatingMode::Manual(_, _));
+                self.status.user_controlled = Some(user_controlled);
 
                 if let Some(event) = self.target_state_event() {
                     events.push(event);

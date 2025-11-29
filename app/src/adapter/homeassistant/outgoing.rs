@@ -1,6 +1,6 @@
 use crate::adapter::command::CommandExecutor;
 use crate::home::command::{Command, CommandTarget, Fan};
-use crate::home::state::{FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
+use crate::home::state::{EnergySaving, FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
 use crate::t;
 use serde_json::json;
 
@@ -237,6 +237,15 @@ impl HaCommandExecutor {
                     .await?;
             }
         }
+
+        //store state directly as homeassistant as there is no back-channel. still unreliable but
+        //for now the best we can do
+        self.api
+            .add_state(
+                &PersistentHomeStateValue::EnergySaving(EnergySaving::LivingRoomTv, energy_saving),
+                &t!(now),
+            )
+            .await?;
 
         Ok(())
     }

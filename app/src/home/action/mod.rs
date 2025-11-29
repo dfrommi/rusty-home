@@ -1,4 +1,3 @@
-mod cool_down_when_occupied;
 mod dehumidify;
 mod follow_default_setting;
 mod heating;
@@ -16,9 +15,6 @@ use crate::home::command::Command;
 use crate::home::trigger::UserTriggerId;
 use anyhow::Result;
 
-use crate::core::time::DateTime;
-use crate::t;
-pub use cool_down_when_occupied::CoolDownWhenOccupied;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
@@ -71,7 +67,6 @@ pub enum HomeAction {
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
     SupportVentilationWithFan(SupportVentilationWithFan),
-    CoolDownWhenOccupied(CoolDownWhenOccupied),
     FollowHeatingSchedule(FollowHeatingSchedule),
 }
 
@@ -114,9 +109,6 @@ impl Action for HomeAction {
                 HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                     evaluate_rule(support_ventilation_with_fan, ext_id, api).await
                 }
-                HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => {
-                    evaluate_rule(cool_down_when_occupied, ext_id, api).await
-                }
                 HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
                     evaluate_rule(follow_heating_schedule, ext_id, api).await
                 }
@@ -137,7 +129,6 @@ impl Action for HomeAction {
             HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                 support_ventilation_with_fan.ext_id()
             }
-            HomeAction::CoolDownWhenOccupied(cool_down_when_occupied) => cool_down_when_occupied.ext_id(),
             HomeAction::FollowHeatingSchedule(follow_heating_schedule) => follow_heating_schedule.ext_id(),
         }
     }
@@ -151,70 +142,4 @@ async fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, api: &HomeApi) -> R
         }
         RuleResult::Skip => Ok(ActionEvaluationResult::Skip),
     }
-}
-
-//trigger and keep running until something else changes state
-async fn needs_execution_for_one_shot_of_target(
-    command: &Command,
-    ext_id: &ExternalId,
-    oneshot_range_start: DateTime,
-    api: &HomeApi,
-) -> Result<bool> {
-    let source = ext_id.clone();
-    let executions = api
-        .get_all_commands_for_target(command.clone(), oneshot_range_start)
-        .await?;
-
-    let already_triggered = executions.iter().any(|e| e.source == source && e.command == *command);
-
-    //first trigger still pending -> start it
-    if !already_triggered {
-        tracing::trace!(
-            ?command,
-            since = ?oneshot_range_start,
-            result = true,
-            "Command was not triggered yet, starting it"
-        );
-        return Ok(true);
-    }
-
-    //return if something else happened after first trigger -> no longer fulfilled
-    let this_as_last_execution = match executions.iter().last() {
-        Some(e) if e.source == source && e.command == *command => e,
-        Some(other) => {
-            tracing::trace!(
-                ?command,
-                ?other,
-                since = ?oneshot_range_start,
-                result = false,
-                "Superseded by other command, no longer fulfilled"
-            );
-            return Ok(false);
-        }
-        None => {
-            tracing::warn!(
-                ?command,
-                result = false,
-                "Logical error: no last execution found for command, but case should have been covered before"
-            );
-            return Ok(false);
-        }
-    };
-
-    //cover for delay between sending command and receiving state change -> external change happened
-    let just_triggered = this_as_last_execution.created > t!(30 seconds ago);
-    let is_reflected_in_state = command.is_reflected_in_state(api).await?;
-    let is_effectively_reflected = just_triggered || is_reflected_in_state;
-
-    tracing::trace!(
-        ?command,
-        %just_triggered,
-        %is_reflected_in_state,
-        since = ?oneshot_range_start,
-        result = %is_effectively_reflected,
-        "Command {}",
-        if is_effectively_reflected { "is effectively reflected" } else { "not effectively reflected" },
-    );
-
-    Ok(is_effectively_reflected)
 }

@@ -47,7 +47,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomCeilingFanSpeed.into()).into(),
-            //CoolDownWhenOccupied::LivingRoom.into(),
         ]
     ),
     (
@@ -55,7 +54,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
             UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
-            //CoolDownWhenOccupied::Bedroom.into(),
         ]
     ),
     (

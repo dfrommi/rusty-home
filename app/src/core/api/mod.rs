@@ -214,16 +214,6 @@ impl HomeApi {
         let commands = self.get_commands(&target, &range).await?;
         Ok(commands.into_iter().max_by_key(|cmd| cmd.created))
     }
-
-    pub async fn get_all_commands_for_target(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> Result<Vec<CommandExecution>> {
-        let target = target.into();
-        let range = DateTimeRange::new(since, t!(now));
-        self.get_commands(&target, &range).await
-    }
 }
 
 //

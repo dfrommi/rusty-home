@@ -11,8 +11,6 @@ pub mod state;
 pub mod trigger;
 
 mod common;
-#[cfg(test)]
-mod tests;
 
 use crate::core::HomeApi;
 pub use common::*;

@@ -71,7 +71,6 @@ pub enum HomeStateValue {
     AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),
     DewPoint(DewPoint, DegreeCelsius),
-    EnergySaving(EnergySaving, bool),
     FeltTemperature(FeltTemperature, DegreeCelsius),
     IsRunning(IsRunning, bool),
     Load(Load, Percent),
@@ -81,6 +80,8 @@ pub enum HomeStateValue {
     RiskOfMould(RiskOfMould, bool),
     TargetHeatingMode(TargetHeatingMode, HeatingMode),
 
+    #[persistent]
+    EnergySaving(EnergySaving, bool),
     #[persistent]
     CurrentPowerUsage(CurrentPowerUsage, Watt),
     #[persistent]

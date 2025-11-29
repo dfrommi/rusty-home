@@ -8,9 +8,8 @@ use crate::home::command::{Command, HeatingTargetState};
 use crate::home::common::HeatingZone;
 use crate::home::state::PowerAvailable;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
+use crate::port::DataPointAccess as _;
 use crate::t;
-
-use super::{DataPointAccess, needs_execution_for_one_shot_of_target};
 
 #[derive(Debug, Clone, Id)]
 pub struct UserTriggerAction {
@@ -43,22 +42,6 @@ impl Rule for UserTriggerAction {
         if commands.is_empty() {
             tracing::trace!("Trigger not handled by this action, skipping");
             return Ok(RuleResult::Skip);
-        } else if commands.len() > 2 {
-            tracing::error!(
-                "Error: more than 2 action are tried to be scheduled for {}. Skipping",
-                self.target
-            );
-            return Ok(RuleResult::Skip);
-        }
-
-        for command in &commands {
-            let needs_execution =
-                needs_execution_for_one_shot_of_target(command, &self.ext_id(), latest_trigger.timestamp, api).await?;
-
-            if !needs_execution {
-                tracing::trace!("User-trigger action skipped due to one-shot conditions");
-                return Ok(RuleResult::Skip);
-            }
         }
 
         tracing::trace!(?commands, ?latest_trigger, "User-trigger action(s) ready to be executed");

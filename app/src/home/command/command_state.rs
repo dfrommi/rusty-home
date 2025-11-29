@@ -169,7 +169,13 @@ async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on
 
     let is_energy_saving = state_device.current(api).await?;
 
-    Ok(is_energy_saving == on)
+    let recent_command = api
+        .get_latest_command(CommandTarget::SetEnergySaving { device: device.clone() }, t!(24 hours ago))
+        .await?
+        .is_some();
+
+    //sent in last 24 hours and state matches => retrigger daily in case of external changes
+    Ok(recent_command && is_energy_saving == on)
 }
 
 async fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, api: &HomeApi) -> Result<bool> {

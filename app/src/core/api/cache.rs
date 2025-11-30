@@ -160,9 +160,7 @@ impl HomeApiCache {
                 let cache_range = self.caching_range();
                 self.db.get_dataframe_for_tag(tag_id, &cache_range).await.map(|df| {
                     // Adjust cached range to actual data range, expanded by the cache range
-                    let actual_data_range = df.range();
-                    let effective_range =
-                        Self::extend_range(&cache_range, Some((*actual_data_range.start(), *actual_data_range.end())));
+                    let effective_range = Self::extend_range(&cache_range, &df.range());
                     CacheSlice::new(effective_range, df)
                 })
             })
@@ -192,8 +190,7 @@ impl HomeApiCache {
                     .await
                     .map(|cmds| {
                         // Adjust cached range to actual data range, expanded by the cache range
-                        let bounds = Self::calculate_bounds(cmds.iter().map(|cmd| cmd.created));
-                        let effective_range = Self::extend_range(&cache_range, bounds);
+                        let effective_range = Self::merge_ranges(&cache_range, cmds.iter().map(|cmd| cmd.created));
                         CacheSlice::new(effective_range, cmds)
                     })
             })
@@ -226,8 +223,7 @@ impl HomeApiCache {
                     .user_triggers_in_range(target, &cache_range)
                     .await
                     .map(|entries| {
-                        let bounds = Self::calculate_bounds(entries.iter().map(|req| req.timestamp));
-                        let effective_range = Self::extend_range(&cache_range, bounds);
+                        let effective_range = Self::merge_ranges(&cache_range, entries.iter().map(|req| req.timestamp));
                         CacheSlice::new(effective_range, entries)
                     })
             })
@@ -247,23 +243,12 @@ impl HomeApiCache {
         }
     }
 
-    fn extend_range(cache_range: &DateTimeRange, bounds: Option<(DateTime, DateTime)>) -> DateTimeRange {
-        match bounds {
-            Some((min_ts, max_ts)) => DateTimeRange::new(
-                std::cmp::min(*cache_range.start(), min_ts),
-                std::cmp::max(*cache_range.end(), max_ts),
-            ),
-            None => cache_range.clone(),
-        }
-    }
-
-    fn calculate_bounds<I>(mut timestamps: I) -> Option<(DateTime, DateTime)>
+    fn merge_ranges<I>(cache_range: &DateTimeRange, timestamps: I) -> DateTimeRange
     where
         I: Iterator<Item = DateTime>,
     {
-        let first = timestamps.next()?;
-        let mut min_ts = first;
-        let mut max_ts = first;
+        let mut min_ts = *cache_range.start();
+        let mut max_ts = *cache_range.end();
 
         for ts in timestamps {
             if ts < min_ts {
@@ -274,6 +259,10 @@ impl HomeApiCache {
             }
         }
 
-        Some((min_ts, max_ts))
+        DateTimeRange::new(min_ts, max_ts)
+    }
+
+    fn extend_range(a: &DateTimeRange, b: &DateTimeRange) -> DateTimeRange {
+        DateTimeRange::new(std::cmp::min(*a.start(), *b.start()), std::cmp::max(*a.end(), *b.end()))
     }
 }

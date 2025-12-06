@@ -61,6 +61,8 @@ use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
 use crate::home::state::felt_temperature::FeltTemperature;
+use crate::home::state_registry::DerivedStateProvider;
+use crate::home::state_registry::StateCalculationContext;
 use crate::port::{DataPointAccess, TimeSeriesAccess, ValueObject};
 use crate::t;
 use r#macro::StateTypeInfoDerive;
@@ -112,7 +114,7 @@ pub enum HomeStateValue {
     TotalWaterConsumption(TotalWaterConsumption, KiloCubicMeter),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, derive_more::From)]
 pub enum StateValue {
     Boolean(bool),
     DegreeCelsius(DegreeCelsius),
@@ -141,6 +143,103 @@ pub enum PersistentStateValue {
     FanAirflow(FanAirflow),
     RawValue(RawValue),
     Lux(Lux),
+}
+
+pub struct HomeStateDerivedStateProvider;
+
+impl DerivedStateProvider<HomeState, StateValue> for HomeStateDerivedStateProvider {
+    fn calculate_current(&self, id: HomeState, ctx: &StateCalculationContext) -> Option<DataPoint<StateValue>> {
+        match id {
+            HomeState::AbsoluteHumidity(id) => absolute_humidity::AbsoluteHumidityStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                }),
+            HomeState::AutomaticTemperatureIncrease(id) => {
+                automatic_temp_inc::AutomaticTemperatureIncreaseStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            HomeState::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                }),
+            HomeState::DewPoint(id) => dewpoint::DewPointStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                }),
+            HomeState::FeltTemperature(id) => felt_temperature::FeltTemperatureStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                }),
+            HomeState::IsRunning(id) => {
+                is_running::IsRunningStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            HomeState::Load(id) => load::LoadStateProvider.calculate_current(id, ctx).map(|dp| DataPoint {
+                value: dp.value.into(),
+                timestamp: dp.timestamp,
+            }),
+            HomeState::Occupancy(id) => {
+                occupancy::OccupancyStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            HomeState::OpenedArea(id) => {
+                opened::OpenedAreaStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            HomeState::Resident(id) => resident::ResidentStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                }),
+            HomeState::RiskOfMould(id) => {
+                risk_of_mould::RiskOfMouldStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            HomeState::TargetHeatingMode(id) => {
+                TargetHeatingModeStateProvider
+                    .calculate_current(id, ctx)
+                    .map(|dp| DataPoint {
+                        value: dp.value.into(),
+                        timestamp: dp.timestamp,
+                    })
+            }
+            _ if id.is_persistent() => {
+                tracing::warn!("Trying to calculate persistent state {:?}", id);
+                None
+            }
+            //to be changed when HomeState gets catch-all for persistent states
+            _ => unreachable!("This can't happen as all persistent states are covered above"),
+        }
+    }
 }
 
 pub trait PersistentHomeStateTypeInfo {
@@ -189,6 +288,23 @@ where
     }
 
     DataFrame::new(result)
+}
+
+impl From<PersistentStateValue> for StateValue {
+    fn from(persistent: PersistentStateValue) -> Self {
+        match persistent {
+            PersistentStateValue::Boolean(bool) => StateValue::Boolean(bool),
+            PersistentStateValue::DegreeCelsius(degree_celsius) => StateValue::DegreeCelsius(degree_celsius),
+            PersistentStateValue::Watt(watt) => StateValue::Watt(watt),
+            PersistentStateValue::Percent(percent) => StateValue::Percent(percent),
+            PersistentStateValue::KiloWattHours(kilo_watt_hours) => StateValue::KiloWattHours(kilo_watt_hours),
+            PersistentStateValue::HeatingUnit(heating_unit) => StateValue::HeatingUnit(heating_unit),
+            PersistentStateValue::KiloCubicMeter(kilo_cubic_meter) => StateValue::KiloCubicMeter(kilo_cubic_meter),
+            PersistentStateValue::FanAirflow(fan_airflow) => StateValue::FanAirflow(fan_airflow),
+            PersistentStateValue::RawValue(raw_value) => StateValue::RawValue(raw_value),
+            PersistentStateValue::Lux(lux) => StateValue::Lux(lux),
+        }
+    }
 }
 
 impl std::fmt::Display for StateValue {

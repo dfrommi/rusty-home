@@ -1,15 +1,15 @@
 use std::{
     collections::HashMap,
-    str::{from_utf8, Utf8Error},
+    str::{Utf8Error, from_utf8},
     time::{Duration, Instant},
 };
 
 use rumqttc::v5::{
-    mqttbytes::{
-        v5::{ConnectProperties, Publish, SubscribeProperties},
-        QoS,
-    },
     AsyncClient, EventLoop, MqttOptions,
+    mqttbytes::{
+        QoS,
+        v5::{ConnectProperties, Publish, SubscribeProperties},
+    },
 };
 
 use rumqttc::v5::Event::Incoming;

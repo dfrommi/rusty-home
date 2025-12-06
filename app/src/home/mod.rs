@@ -8,6 +8,7 @@ pub mod command;
 mod config;
 mod goal;
 pub mod state;
+pub mod state_registry;
 pub mod trigger;
 
 mod common;

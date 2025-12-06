@@ -126,6 +126,11 @@ impl DateTimeRange {
         datetime >= &self.start && datetime <= &self.end
     }
 
+    pub fn is_active(&self) -> bool {
+        let now = t!(now);
+        self.contains(&now)
+    }
+
     pub fn covers(&self, other: &DateTimeRange) -> bool {
         self.start() <= other.start() && other.end() <= self.end()
     }

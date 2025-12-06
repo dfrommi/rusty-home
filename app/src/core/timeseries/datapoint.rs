@@ -27,3 +27,36 @@ impl<V: std::fmt::Display> std::fmt::Display for DataPoint<V> {
         write!(f, "{} @ {})", self.value, self.timestamp.to_human_readable())
     }
 }
+
+impl std::ops::Not for DataPoint<bool> {
+    type Output = DataPoint<bool>;
+
+    fn not(self) -> Self::Output {
+        DataPoint {
+            value: !self.value,
+            timestamp: self.timestamp,
+        }
+    }
+}
+
+impl std::ops::BitOr for DataPoint<bool> {
+    type Output = DataPoint<bool>;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        DataPoint {
+            value: self.value | rhs.value,
+            timestamp: std::cmp::max(self.timestamp, rhs.timestamp),
+        }
+    }
+}
+
+impl std::ops::BitAnd for DataPoint<bool> {
+    type Output = DataPoint<bool>;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        DataPoint {
+            value: self.value & rhs.value,
+            timestamp: std::cmp::max(self.timestamp, rhs.timestamp),
+        }
+    }
+}

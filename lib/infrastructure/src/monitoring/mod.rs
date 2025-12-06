@@ -11,11 +11,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use opentelemetry::KeyValue;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{ExporterBuildError, WithExportConfig};
-use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::Resource;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
 use std::error::Error;
-use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::prelude::*;
 
 pub use trace::TraceContext;
 

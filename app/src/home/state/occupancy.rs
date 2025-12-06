@@ -22,6 +22,37 @@ pub enum Occupancy {
     RoomOfRequirementsDesk,
 }
 
+pub struct OccupancyStateProvider;
+
+impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
+    fn calculate_current(&self, id: Occupancy, ctx: &StateCalculationContext) -> Option<DataPoint<Probability>> {
+        let range = DateTimeRange::since(t!(1 hours ago));
+
+        let mut main_df = match id {
+            Occupancy::LivingRoomCouch => ctx.all_since(Presence::LivingRoomCouch, *range.start())?,
+            Occupancy::BedroomBed => ctx.all_since(Presence::BedroomBed, *range.start())?,
+            Occupancy::RoomOfRequirementsDesk => ctx.all_since(IsRunning::RoomOfRequirementsMonitor, *range.start())?,
+        };
+
+        if let Err(e) = main_df.retain_range(&range, LastSeenInterpolator, LastSeenInterpolator) {
+            tracing::error!(
+                "Error retaining range with interpolation that was previously requested and not empty: {}",
+                e
+            );
+            return None;
+        };
+
+        let prior: f64 = -1.7968470630447446;
+        let w_presence: f64 = 3.733237448369802;
+
+        let sigmoid = Sigmoid::default();
+        let s1 = main_df.weighted_aged_sum(t!(30 minutes), LastSeenInterpolator);
+        let probability = sigmoid.eval(prior + w_presence * s1);
+
+        Some(DataPoint::new(probability, t!(now)))
+    }
+}
+
 impl Occupancy {
     pub fn calculate_presence(mut presence: DataFrame<bool>) -> anyhow::Result<f64> {
         presence.retain_range(

@@ -2,6 +2,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::unit::Watt;
 use crate::home::state::CurrentPowerUsage;
+use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::{
     core::{
@@ -19,6 +20,20 @@ use crate::{
 pub enum IsRunning {
     LivingRoomTv,
     RoomOfRequirementsMonitor,
+}
+
+pub struct IsRunningStateProvider;
+
+impl DerivedStateProvider<IsRunning, bool> for IsRunningStateProvider {
+    fn calculate_current(&self, id: IsRunning, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+        match id {
+            IsRunning::LivingRoomTv => ctx.get(PowerAvailable::LivingRoomTv),
+            IsRunning::RoomOfRequirementsMonitor => {
+                let power_usage_dp = ctx.get(CurrentPowerUsage::RoomOfRequirementsMonitor)?;
+                Some(DataPoint::new(power_usage_dp.value > Watt(15.0), power_usage_dp.timestamp))
+            }
+        }
+    }
 }
 
 impl Estimatable for IsRunning {

@@ -156,6 +156,38 @@ impl super::Database {
         Ok(result)
     }
 
+    pub async fn all_user_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerRequest>> {
+        let now = t!(now);
+
+        let records = sqlx::query!(
+            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
+                    FROM user_trigger
+                    WHERE timestamp >= $1
+                    AND timestamp <= $2
+                    AND (active_until IS NULL OR active_until >= $2)
+               ORDER BY 2 ASC"#,
+            since.into_db(),
+            now.into_db(),
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut result = Vec::with_capacity(records.len());
+
+        for row in records {
+            let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+            let timestamp = row.timestamp.into();
+            result.push(UserTriggerRequest {
+                id: row.id.into(),
+                trigger,
+                timestamp,
+                correlation_id: row.correlation_id,
+            });
+        }
+
+        Ok(result)
+    }
+
     pub async fn user_trigger_target_by_id(&self, id: &UserTriggerId) -> anyhow::Result<Option<UserTriggerTarget>> {
         let now = t!(now);
         let record = sqlx::query!(

@@ -2,6 +2,7 @@
 
 use crate::core::HomeApi;
 use crate::core::timeseries::DataFrame;
+use crate::home::state::StateValue;
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
@@ -12,6 +13,9 @@ use crate::core::timeseries::{DataPoint, TimeSeries, interpolate::Estimatable};
 
 pub trait ValueObject {
     type ValueType: Clone;
+
+    fn as_state_value(value: Self::ValueType) -> StateValue;
+    fn project_state_value(value: StateValue) -> Option<Self::ValueType>;
 }
 
 pub trait DataPointAccess<T> {
@@ -19,14 +23,6 @@ pub trait DataPointAccess<T> {
 
     async fn current(&self, api: &HomeApi) -> Result<T> {
         self.current_data_point(api).await.map(|dp| dp.value)
-    }
-
-    async fn data_point_at(&self, at: DateTime, api: &HomeApi) -> Result<DataPoint<T>> {
-        at.eval_timeshifted(async { self.current_data_point(api).await }).await
-    }
-
-    async fn value_at(&self, at: DateTime, api: &HomeApi) -> Result<T> {
-        self.data_point_at(at, api).await.map(|dp| dp.value)
     }
 }
 

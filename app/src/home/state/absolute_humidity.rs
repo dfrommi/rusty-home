@@ -1,9 +1,12 @@
-use crate::core::{
-    HomeApi,
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{self, Estimatable},
+use crate::{
+    core::{
+        HomeApi,
+        timeseries::{
+            DataFrame, DataPoint,
+            interpolate::{self, Estimatable},
+        },
     },
+    home::state_registry::{DerivedStateProvider, StateCalculationContext},
 };
 
 use super::*;
@@ -28,6 +31,26 @@ pub enum AbsoluteHumidity {
     RoomOfRequirementsTado,
     BedroomTado,
     Outside,
+}
+
+pub struct AbsoluteHumidityStateProvider;
+
+impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumidityStateProvider {
+    fn calculate_current(
+        &self,
+        id: AbsoluteHumidity,
+        ctx: &StateCalculationContext,
+    ) -> Option<DataPoint<GramPerCubicMeter>> {
+        let temperature_dp = ctx.get(id.temperature())?;
+        let humidity_dp = ctx.get(id.relative_humidity())?;
+
+        let abs_humidity_value = AbsoluteHumidity::calculate_abs_humidity(temperature_dp.value, humidity_dp.value);
+
+        Some(DataPoint {
+            value: abs_humidity_value,
+            timestamp: std::cmp::max(temperature_dp.timestamp, humidity_dp.timestamp),
+        })
+    }
 }
 
 impl AbsoluteHumidity {

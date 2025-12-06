@@ -259,6 +259,10 @@ impl HomeApi {
 
         Ok(triggers.into_iter().max_by_key(|it| it.timestamp))
     }
+
+    pub async fn all_user_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerRequest>> {
+        self.db.all_user_triggers_since(since).await
+    }
 }
 
 //

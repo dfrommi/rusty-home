@@ -1,5 +1,6 @@
 use crate::core::unit::RawValue;
 use crate::home::state::RawVendorValue;
+use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::{
     core::{
@@ -18,6 +19,19 @@ use r#macro::{EnumVariants, Id, trace_state};
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Load {
     Thermostat(Thermostat),
+}
+
+pub struct LoadStateProvider;
+
+impl DerivedStateProvider<Load, Percent> for LoadStateProvider {
+    fn calculate_current(&self, id: Load, ctx: &StateCalculationContext) -> Option<DataPoint<Percent>> {
+        match id {
+            Load::Thermostat(thermostat) => {
+                let raw = ctx.get(RawVendorValue::AllyLoadEstimate(thermostat.clone()))?;
+                Some(DataPoint::new(percent_load_for_ally(raw.value), raw.timestamp))
+            }
+        }
+    }
 }
 
 impl Estimatable for Load {

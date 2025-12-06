@@ -116,6 +116,30 @@ impl<T> DataFrame<T> {
         Self::new(points)
     }
 
+    pub fn retain_range_with_context_before(&self, range: &DateTimeRange) -> Option<Self>
+    where
+        T: Clone,
+    {
+        let in_range = self.data.range(*range.start()..=*range.end());
+        let before = self.prev(*range.start());
+
+        let mut points = Vec::new();
+
+        if let Some(dp) = before {
+            points.push(dp.clone());
+        }
+
+        for (_, dp) in in_range {
+            points.push(dp.clone());
+        }
+
+        if points.is_empty() {
+            return None;
+        }
+
+        DataFrame::new(points).ok()
+    }
+
     pub fn map<U>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
         let values = self.data.values().map(|dp| {
             let ts = dp.timestamp;
@@ -139,8 +163,16 @@ impl<T> DataFrame<T> {
         self.data.values().rev().find(|dp| predicate(dp))
     }
 
-    pub fn insert(&mut self, dp: DataPoint<T>) {
-        self.data.insert(dp.timestamp, dp);
+    pub fn insert(&mut self, dp: DataPoint<T>)
+    where
+        T: PartialEq,
+    {
+        //depuplicate values
+        let prev = self.prev(dp.timestamp);
+        match prev {
+            Some(prev_dp) if prev_dp.value == dp.value => return,
+            _ => self.data.insert(dp.timestamp, dp),
+        };
     }
 
     pub fn len(&self) -> usize {

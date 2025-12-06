@@ -1,5 +1,6 @@
 use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange};
+use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;
@@ -56,6 +57,21 @@ impl OpenedArea {
                 Opened::RoomOfRequirementsWindowSide,
             ],
         }
+    }
+}
+
+pub struct OpenedAreaStateProvider;
+
+impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
+    fn calculate_current(&self, id: OpenedArea, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+        let opened_items = id.api_items();
+        let opened_dps: Vec<_> = opened_items.iter().filter_map(|o| ctx.get(o.clone())).collect();
+
+        if opened_dps.is_empty() {
+            return None;
+        }
+
+        Some(any_of(opened_dps))
     }
 }
 

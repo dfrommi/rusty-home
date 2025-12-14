@@ -4,14 +4,11 @@ use moka::future::Cache;
 
 use crate::{
     core::{
-        persistence::{Database, UserTriggerRequest},
+        persistence::Database,
         time::{DateTime, DateTimeRange, Duration},
         timeseries::DataFrame,
     },
-    home::{
-        command::{CommandExecution, CommandTarget},
-        trigger::UserTriggerTarget,
-    },
+    home::command::{CommandExecution, CommandTarget},
 };
 
 #[derive(Clone)]
@@ -20,7 +17,6 @@ pub struct HomeApiCache {
     caching_range: CachingRange,
     ts_cache: Cache<i64, CacheSlice<DataFrame<f64>>>,
     cmd_cache: Cache<CommandTarget, CacheSlice<Vec<CommandExecution>>>,
-    user_trigger_cache: Cache<UserTriggerTarget, CacheSlice<Vec<UserTriggerRequest>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,9 +59,6 @@ impl HomeApiCache {
             cmd_cache: Cache::builder()
                 .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
                 .build(),
-            user_trigger_cache: Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
-                .build(),
         }
     }
 
@@ -85,29 +78,6 @@ impl HomeApiCache {
         }
     }
 
-    pub async fn preload_user_trigger_cache(&self) -> anyhow::Result<()> {
-        tracing::debug!("Start preloading user trigger cache");
-
-        let targets = UserTriggerTarget::variants();
-        let cache_range = self.caching_range();
-
-        let futures: Vec<_> = targets
-            .into_iter()
-            .map(|target| {
-                let cache_range = cache_range.clone();
-                async move {
-                    self.get_user_triggers_from_cache(&target, &cache_range).await;
-                    target
-                }
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-
-        tracing::debug!("Preloading user trigger cache done for {} targets", results.len());
-        Ok(())
-    }
-
     pub async fn invalidate_ts_cache(&self, tag_id: i64) {
         tracing::debug!("Invalidating timeseries cache for tag {}", tag_id);
         self.ts_cache.invalidate(&tag_id).await;
@@ -116,11 +86,6 @@ impl HomeApiCache {
     pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
         tracing::debug!("Invalidating command cache for target {:?}", target);
         self.cmd_cache.invalidate(target).await;
-    }
-
-    pub async fn invalidate_user_trigger_cache(&self, target: &UserTriggerTarget) {
-        tracing::debug!("Invalidating user trigger cache for target {:?}", target);
-        self.user_trigger_cache.invalidate(target).await;
     }
 
     pub async fn get_commands_from_cache(
@@ -148,39 +113,6 @@ impl HomeApiCache {
             Err(e) => {
                 tracing::error!(
                     "Error fetching commands for target {:?} from cache or init cache: {:?}",
-                    target,
-                    e
-                );
-                None
-            }
-            _ => None,
-        }
-    }
-
-    pub async fn get_user_triggers_from_cache(
-        &self,
-        target: &UserTriggerTarget,
-        range: &DateTimeRange,
-    ) -> Option<CacheSlice<Vec<UserTriggerRequest>>> {
-        let triggers = self
-            .user_trigger_cache
-            .try_get_with(target.clone(), async {
-                let cache_range = self.caching_range();
-                self.db
-                    .user_triggers_in_range(target, &cache_range)
-                    .await
-                    .map(|entries| {
-                        let effective_range = Self::merge_ranges(&cache_range, entries.iter().map(|req| req.timestamp));
-                        CacheSlice::new(effective_range, entries)
-                    })
-            })
-            .await;
-
-        match triggers {
-            Ok(cached) if cached.covers(range) => Some(cached),
-            Err(e) => {
-                tracing::error!(
-                    "Error fetching user triggers for target {:?} from cache or init cache: {:?}",
                     target,
                     e
                 );

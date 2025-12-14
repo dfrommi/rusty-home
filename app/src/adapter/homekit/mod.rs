@@ -19,6 +19,7 @@ use crate::{
         unit::{DegreeCelsius, FanAirflow},
     },
     home_state::HomeStateValue,
+    trigger::TriggerClient,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -112,6 +113,7 @@ impl Homekit {
     pub async fn new_runner(
         &self,
         infrastructure: &mut Infrastructure,
+        trigger_client: TriggerClient,
         state_change_rx: Receiver<DataPoint<HomeStateValue>>,
     ) -> HomekitRunner {
         let mqtt_receiver = infrastructure
@@ -126,7 +128,7 @@ impl Homekit {
             infrastructure.mqtt_client.new_publisher(),
             mqtt_receiver,
             self.base_topic.clone(),
-            infrastructure.api.clone(),
+            trigger_client,
         )
     }
 }

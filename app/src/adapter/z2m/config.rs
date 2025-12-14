@@ -5,7 +5,7 @@ use crate::device_state::*;
 use crate::home::LoadBalancedThermostat;
 use crate::home::Thermostat;
 use crate::home::command::CommandTarget;
-use crate::home::trigger::RemoteTarget;
+use crate::trigger::RemoteTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![

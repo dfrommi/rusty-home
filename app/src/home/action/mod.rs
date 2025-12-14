@@ -9,11 +9,11 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use crate::core::id::ExternalId;
-use crate::core::persistence::UserTriggerRequest;
 use crate::core::timeseries::DataPoint;
 use crate::home::command::Command;
-use crate::home::trigger::UserTriggerId;
-use crate::home::trigger::UserTriggerTarget;
+use crate::trigger::UserTriggerExecution;
+use crate::trigger::UserTriggerId;
+use crate::trigger::UserTriggerTarget;
 use anyhow::Result;
 
 pub use dehumidify::Dehumidify;
@@ -65,7 +65,7 @@ impl RuleEvaluationContext {
         self.current_dp(id).map(|dp| dp.value)
     }
 
-    pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerRequest> {
+    pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
         self.snapshot.user_trigger(target)
     }
 }

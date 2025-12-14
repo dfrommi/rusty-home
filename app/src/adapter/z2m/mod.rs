@@ -8,7 +8,7 @@ use crate::device_state::{
     CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
 use crate::home::Thermostat;
-use crate::home::trigger::RemoteTarget;
+use crate::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;
 use serde::Deserialize;

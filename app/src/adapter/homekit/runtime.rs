@@ -12,9 +12,9 @@ use super::{
     hap::HomekitCharacteristic,
 };
 use crate::{
-    core::{HomeApi, timeseries::DataPoint},
-    home::trigger::UserTrigger,
+    core::timeseries::DataPoint,
     home_state::HomeStateValue,
+    trigger::{TriggerClient, UserTrigger},
 };
 
 pub struct HomekitRunner {
@@ -23,7 +23,7 @@ pub struct HomekitRunner {
     mqtt_sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
     mqtt_receiver: tokio::sync::mpsc::Receiver<MqttInMessage>,
     mqtt_base_topic: String,
-    api: HomeApi,
+    trigger_client: TriggerClient,
     trigger_debounce: HashMap<HomekitTarget, JoinHandle<()>>,
 }
 
@@ -34,7 +34,7 @@ impl HomekitRunner {
         mqtt_sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
         mqtt_receiver: tokio::sync::mpsc::Receiver<MqttInMessage>,
         mqtt_base_topic: String,
-        api: HomeApi,
+        trigger_client: TriggerClient,
     ) -> Self {
         Self {
             registry,
@@ -42,7 +42,7 @@ impl HomekitRunner {
             mqtt_sender,
             mqtt_receiver,
             mqtt_base_topic,
-            api,
+            trigger_client,
             trigger_debounce: HashMap::new(),
         }
     }
@@ -147,12 +147,12 @@ impl HomekitRunner {
 
             tracing::info!("Debouncing Homekit command for target: {:?}", state.target);
 
-            let api = self.api.clone();
+            let trigger_client = self.trigger_client.clone();
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
 
                 tracing::info!("Received Homekit command: {:?}", command);
-                if let Err(e) = api.add_user_trigger(UserTrigger::Homekit(command.clone())).await {
+                if let Err(e) = trigger_client.add_trigger(UserTrigger::Homekit(command.clone())).await {
                     tracing::error!("Error processing Homekit command {:?}: {:?}", command, e);
                 }
             });

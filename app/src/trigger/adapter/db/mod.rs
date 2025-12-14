@@ -1,9 +1,17 @@
 use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
-use crate::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget};
+use crate::trigger::{UserTrigger, UserTriggerExecution, UserTriggerId, UserTriggerTarget};
 use anyhow::Context;
 
-impl super::Database {
+pub struct TriggerRepository {
+    pool: sqlx::PgPool,
+}
+
+impl TriggerRepository {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self { pool }
+    }
+
     #[tracing::instrument(skip(self))]
     pub async fn cancel_triggers_before_excluding(
         &self,
@@ -27,7 +35,7 @@ impl super::Database {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+    pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
         sqlx::query!(
@@ -98,7 +106,7 @@ impl super::Database {
         Ok(result)
     }
 
-    pub async fn all_user_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerExecution>> {
+    pub async fn get_all_active_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let now = t!(now);
 
         let records = sqlx::query!(

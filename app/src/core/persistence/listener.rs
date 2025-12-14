@@ -1,5 +1,5 @@
 use crate::core::time::Duration;
-use crate::home::trigger::UserTriggerId;
+use crate::trigger::UserTriggerId;
 use serde::Deserialize;
 use sqlx::postgres::{PgListener, PgNotification};
 

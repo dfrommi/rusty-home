@@ -5,7 +5,7 @@ use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
 use crate::device_state::{DeviceStateValue, RawVendorValue, Temperature};
 use crate::home::Thermostat;
 use crate::home::availability::ItemAvailability;
-use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
+use crate::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
 

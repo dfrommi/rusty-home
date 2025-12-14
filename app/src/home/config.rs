@@ -1,8 +1,8 @@
 use crate::adapter::homekit::HomekitCommandTarget;
 use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle};
 use crate::home::common::HeatingZone;
-use crate::home::trigger::RemoteTarget;
 use crate::home::{LoadBalancedThermostat, Room, Thermostat};
+use crate::trigger::RemoteTarget;
 
 use super::action::{Dehumidify, HomeAction};
 use super::goal::HomeGoal;

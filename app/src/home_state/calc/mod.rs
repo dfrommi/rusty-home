@@ -1,10 +1,8 @@
 use crate::{
-    core::{
-        HomeApi,
-        time::{DateTimeRange, Duration},
-    },
+    core::time::{DateTimeRange, Duration},
     device_state::DeviceStateClient,
     t,
+    trigger::TriggerClient,
 };
 
 mod context;
@@ -17,7 +15,7 @@ pub use snapshot::StateSnapshot;
 
 pub async fn bootstrap_snapshot(
     duration: Duration,
-    api: &HomeApi,
+    trigger_client: &TriggerClient,
     device_state: &DeviceStateClient,
 ) -> anyhow::Result<StateSnapshot> {
     let range = DateTimeRange::new(t!(now) - duration.clone(), t!(now));
@@ -26,7 +24,7 @@ pub async fn bootstrap_snapshot(
     for dt in range.step_by(t!(30 seconds)) {
         current = dt
             .eval_timeshifted(async {
-                context::calculate_new_snapshot(duration.clone(), &current, api, device_state).await
+                context::calculate_new_snapshot(duration.clone(), &current, device_state, &trigger_client).await
             })
             .await?;
     }

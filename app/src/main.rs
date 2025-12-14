@@ -15,6 +15,7 @@ mod home;
 mod home_state;
 pub mod port;
 mod settings;
+mod trigger;
 
 struct Infrastructure {
     api: HomeApi,
@@ -34,24 +35,28 @@ pub async fn main() {
     let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
 
     let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.database.pool.clone());
+    let trigger_runner = trigger::TriggerRunner::new(infrastructure.database.pool.clone());
 
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
         infrastructure.event_listener.new_state_changed_listener(),
         infrastructure.event_listener.new_user_trigger_event_listener(),
-        infrastructure.api.clone(),
+        trigger_runner.client(),
         device_state_runner.client(),
     );
 
-    let planning_runner =
-        PlanningRunner::new(home_state_runner.subscribe_snapshot_updated(), infrastructure.api.clone());
+    let planning_runner = PlanningRunner::new(
+        home_state_runner.subscribe_snapshot_updated(),
+        infrastructure.api.clone(),
+        trigger_runner.client(),
+    );
 
     let ha_incoming_data_processing = {
         let ds = settings
             .homeassistant
             .new_incoming_data_source(&mut infrastructure)
             .await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
     };
     let ha_cmd_executor = {
         let executor = settings
@@ -62,7 +67,7 @@ pub async fn main() {
 
     let z2m_incoming_data_processing = {
         let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
     };
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
@@ -71,7 +76,7 @@ pub async fn main() {
 
     let tasmota_incoming_data_processing = {
         let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
     };
     let tasmota_cmd_executor = {
         let executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -80,12 +85,16 @@ pub async fn main() {
 
     let energy_meter_processing = {
         let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
     };
 
     let homekit_runner = settings
         .homebridge
-        .new_runner(&mut infrastructure, home_state_runner.subscribe_state_changed())
+        .new_runner(
+            &mut infrastructure,
+            trigger_runner.client(),
+            home_state_runner.subscribe_state_changed(),
+        )
         .await;
 
     let mut metrics_exporter = settings

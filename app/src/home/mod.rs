@@ -7,7 +7,6 @@ mod action;
 pub mod command;
 mod config;
 mod goal;
-pub mod trigger;
 
 mod common;
 

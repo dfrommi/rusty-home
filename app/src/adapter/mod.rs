@@ -14,9 +14,10 @@ mod incoming {
     use tokio::sync::mpsc;
 
     use crate::{
-        core::{HomeApi, timeseries::DataPoint},
+        core::timeseries::DataPoint,
         device_state::{DeviceAvailability, DeviceStateIncomingEvent, DeviceStateValue},
-        home::{availability::ItemAvailability, trigger::UserTrigger},
+        home::availability::ItemAvailability,
+        trigger::{TriggerClient, UserTrigger},
     };
 
     #[derive(Debug, Clone, derive_more::From)]
@@ -53,7 +54,7 @@ mod incoming {
         S: IncomingDataSource<M, C>,
     {
         source: S,
-        api: HomeApi,
+        trigger_client: TriggerClient,
         device_tx: mpsc::Sender<DeviceStateIncomingEvent>,
         _marker: std::marker::PhantomData<(M, C)>,
     }
@@ -64,10 +65,14 @@ mod incoming {
         C: std::fmt::Debug,
         S: IncomingDataSource<M, C>,
     {
-        pub fn new(source: S, api: HomeApi, device_tx: mpsc::Sender<DeviceStateIncomingEvent>) -> Self {
+        pub fn new(
+            source: S,
+            trigger_client: TriggerClient,
+            device_tx: mpsc::Sender<DeviceStateIncomingEvent>,
+        ) -> Self {
             Self {
                 source,
-                api,
+                trigger_client,
                 device_tx,
                 _marker: std::marker::PhantomData,
             }
@@ -130,7 +135,7 @@ mod incoming {
                     }
 
                     IncomingData::UserTrigger(trigger) => {
-                        if let Err(e) = self.api.add_user_trigger(trigger.clone()).await {
+                        if let Err(e) = self.trigger_client.add_trigger(trigger.clone()).await {
                             tracing::error!("Error processing user trigger {:?}: {:?}", trigger, e);
                         }
                     }

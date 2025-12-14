@@ -1,19 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    core::{
-        persistence::UserTriggerRequest,
-        timeseries::{DataFrame, DataPoint},
-    },
-    home::trigger::UserTriggerTarget,
+    core::timeseries::{DataFrame, DataPoint},
     home_state::{HomeState, StateValue},
     port::ValueObject,
+    trigger::{UserTriggerExecution, UserTriggerTarget},
 };
 
 #[derive(Clone)]
 pub struct StateSnapshot {
     data: Arc<HashMap<HomeState, DataFrame<StateValue>>>,
-    active_user_triggers: Arc<HashMap<UserTriggerTarget, UserTriggerRequest>>,
+    active_user_triggers: Arc<HashMap<UserTriggerTarget, UserTriggerExecution>>,
 }
 
 impl Default for StateSnapshot {
@@ -28,7 +25,7 @@ impl Default for StateSnapshot {
 impl StateSnapshot {
     pub fn new(
         data: HashMap<HomeState, DataFrame<StateValue>>,
-        active_user_triggers: HashMap<UserTriggerTarget, UserTriggerRequest>,
+        active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     ) -> Self {
         StateSnapshot {
             data: Arc::new(data),
@@ -62,7 +59,7 @@ impl StateSnapshot {
     //     self.data.get(&id)?.retain_range_with_context_before(&range)
     // }
 
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerRequest> {
+    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
         self.active_user_triggers.get(&target)
     }
 

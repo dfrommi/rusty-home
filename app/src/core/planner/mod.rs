@@ -7,7 +7,7 @@ mod trace;
 use tokio::sync::broadcast::Receiver;
 use trace::display_planning_trace;
 
-use crate::{core::HomeApi, home::HomePlanning, home_state::StateSnapshot};
+use crate::{core::HomeApi, home::HomePlanning, home_state::StateSnapshot, trigger::TriggerClient};
 
 pub use action::{Action, ActionEvaluationResult};
 pub use trace::PlanningTrace;
@@ -15,13 +15,15 @@ pub use trace::PlanningTrace;
 pub struct PlanningRunner {
     snapshot_updated_rx: Receiver<StateSnapshot>,
     api: HomeApi,
+    trigger_client: TriggerClient,
 }
 
 impl PlanningRunner {
-    pub fn new(snapshot_updated_rx: Receiver<StateSnapshot>, api: HomeApi) -> Self {
+    pub fn new(snapshot_updated_rx: Receiver<StateSnapshot>, api: HomeApi, trigger_client: TriggerClient) -> Self {
         Self {
             snapshot_updated_rx,
             api,
+            trigger_client,
         }
     }
 
@@ -39,19 +41,19 @@ impl PlanningRunner {
             };
 
             if let Some(ref snapshot) = last_snapshot {
-                plan_for_home(snapshot, &self.api).await;
+                plan_for_home(snapshot, &self.api, &self.trigger_client).await;
             }
         }
     }
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn plan_for_home(snapshot: &StateSnapshot, api: &HomeApi) {
+pub async fn plan_for_home(snapshot: &StateSnapshot, api: &HomeApi, trigger_client: &TriggerClient) {
     tracing::info!("Start planning");
     let active_goals = HomePlanning::active_goals(snapshot.clone());
     let config = HomePlanning::config();
 
-    let res = processor::plan_and_execute(&active_goals, config, snapshot.clone(), api).await;
+    let res = processor::plan_and_execute(&active_goals, config, snapshot.clone(), api, trigger_client).await;
 
     match res {
         Ok(res) => {

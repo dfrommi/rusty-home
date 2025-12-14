@@ -6,7 +6,7 @@ use crate::core::id::ExternalId;
 use crate::home::command::Command;
 
 use crate::home::RuleEvaluationContext;
-use crate::home::trigger::UserTriggerId;
+use crate::trigger::UserTriggerId;
 
 #[derive(Debug, Clone)]
 pub enum ActionEvaluationResult {

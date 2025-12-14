@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use crate::home::{command::CommandTarget, trigger::UserTriggerId};
+use crate::home::command::CommandTarget;
+use crate::trigger::UserTriggerId;
 use tokio::sync::oneshot;
 
 use super::{resource_lock::ResourceLock, trace::PlanningTraceStep};

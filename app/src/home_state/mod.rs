@@ -7,7 +7,6 @@ pub use items::*;
 use calc::StateCalculationContext;
 use tokio::sync::broadcast::{Receiver, Sender};
 
-use crate::core::HomeApi;
 use crate::core::app_event::StateChangedEvent;
 use crate::core::app_event::UserTriggerEvent;
 use crate::core::time::Duration;
@@ -15,12 +14,13 @@ use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::home_state::calc::bootstrap_snapshot;
 use crate::home_state::calc::calculate_new_snapshot;
+use crate::trigger::TriggerClient;
 
 pub struct HomeStateRunner {
     duration: Duration,
-    api: HomeApi,
     device_state: DeviceStateClient,
     snapshot: StateSnapshot,
+    trigger_client: TriggerClient,
     state_changed_rx: Receiver<StateChangedEvent>,
     user_trigger_rx: Receiver<UserTriggerEvent>,
     home_state_updated_tx: Sender<DataPoint<HomeStateValue>>,
@@ -33,14 +33,14 @@ impl HomeStateRunner {
         duration: Duration,
         rx_state: Receiver<StateChangedEvent>,
         rx_trigger: Receiver<UserTriggerEvent>,
-        api: HomeApi,
+        trigger_client: TriggerClient,
         device_state: DeviceStateClient,
     ) -> Self {
         Self {
             duration,
-            api,
             device_state,
             snapshot: StateSnapshot::default(),
+            trigger_client,
             state_changed_rx: rx_state,
             user_trigger_rx: rx_trigger,
             home_state_updated_tx: tokio::sync::broadcast::channel(256).0,
@@ -50,7 +50,7 @@ impl HomeStateRunner {
     }
 
     pub async fn bootstrap_snapshot(&mut self) -> anyhow::Result<()> {
-        self.snapshot = bootstrap_snapshot(self.duration.clone(), &self.api, &self.device_state).await?;
+        self.snapshot = bootstrap_snapshot(self.duration.clone(), &self.trigger_client, &self.device_state).await?;
         Ok(())
     }
 
@@ -77,15 +77,20 @@ impl HomeStateRunner {
             }
 
             let old_snapshot = self.snapshot.clone();
-            let new_snapshot =
-                match calculate_new_snapshot(self.duration.clone(), &old_snapshot, &self.api, &self.device_state).await
-                {
-                    Ok(snapshot) => snapshot,
-                    Err(e) => {
-                        tracing::error!("Error calculating new home state snapshot: {:?}", e);
-                        continue;
-                    }
-                };
+            let new_snapshot = match calculate_new_snapshot(
+                self.duration.clone(),
+                &old_snapshot,
+                &self.device_state,
+                &self.trigger_client,
+            )
+            .await
+            {
+                Ok(snapshot) => snapshot,
+                Err(e) => {
+                    tracing::error!("Error calculating new home state snapshot: {:?}", e);
+                    continue;
+                }
+            };
 
             if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
                 tracing::error!("Error sending snapshot updated event: {}", e);

@@ -11,8 +11,8 @@ use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
 use crate::home::RuleEvaluationContext;
 use crate::home::command::{Command, CommandTarget};
 use crate::home_state::StateSnapshot;
-use crate::home::trigger::UserTriggerId;
 use crate::t;
+use crate::trigger::{TriggerClient, UserTriggerId};
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
@@ -21,6 +21,7 @@ pub async fn plan_and_execute<G, A>(
     config: &[(G, Vec<A>)],
     snapshot: StateSnapshot,
     api: &HomeApi,
+    trigger_client: &TriggerClient,
 ) -> Result<PlanningTrace>
 where
     G: Eq + Display,
@@ -68,7 +69,7 @@ where
         .iter()
         .filter_map(|c| c.user_trigger_id.clone())
         .collect::<Vec<UserTriggerId>>();
-    cancel_unused_triggers(planning_start, used_triggers, api).await?;
+    cancel_unused_triggers(planning_start, used_triggers, trigger_client).await?;
 
     let steps = results.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
@@ -77,9 +78,10 @@ where
 async fn cancel_unused_triggers(
     planning_start: DateTime,
     used_triggers: Vec<UserTriggerId>,
-    api: &HomeApi,
+    trigger_client: &TriggerClient,
 ) -> anyhow::Result<()> {
-    api.cancel_triggers_before_excluding(planning_start, &used_triggers)
+    trigger_client
+        .disable_triggers_before_except(planning_start, &used_triggers)
         .await
         .map(|_| ())
 }

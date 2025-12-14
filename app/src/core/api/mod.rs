@@ -1,12 +1,12 @@
 mod cache;
 
-use super::persistence::{Database, UserTriggerRequest};
+use super::persistence::Database;
 use super::time::{DateTime, DateTimeRange};
 use super::timeseries::{DataFrame, DataPoint};
 use crate::core::id::ExternalId;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget};
 use crate::t;
+use crate::trigger::UserTriggerId;
 use anyhow::Result;
 use infrastructure::TraceContext;
 
@@ -67,26 +67,6 @@ impl HomeApi {
 
     pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
         self.cache.invalidate_command_cache(target).await;
-    }
-
-    pub async fn invalidate_user_trigger_cache(&self, target: &UserTriggerTarget) {
-        self.cache.invalidate_user_trigger_cache(target).await;
-    }
-
-    pub async fn invalidate_user_trigger_cache_by_id(&self, id: &UserTriggerId) -> anyhow::Result<()> {
-        match self.db.user_trigger_target_by_id(id).await? {
-            Some(target) => self.invalidate_user_trigger_cache(&target).await,
-            None => tracing::warn!("Can not invalidate user trigger cache, id {} not found", id),
-        }
-        Ok(())
-    }
-
-    pub async fn cancel_triggers_before_excluding(
-        &self,
-        before: DateTime,
-        exclude_ids: &[UserTriggerId],
-    ) -> anyhow::Result<u64> {
-        self.db.cancel_triggers_before_excluding(before, exclude_ids).await
     }
 }
 
@@ -151,22 +131,6 @@ impl HomeApi {
 }
 
 //
-//USER TRIGGER
-//
-impl HomeApi {
-    pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        let target = trigger.target();
-        self.db.add_user_trigger(trigger).await?;
-        self.invalidate_user_trigger_cache(&target).await;
-        Ok(())
-    }
-
-    pub async fn all_user_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerRequest>> {
-        self.db.all_user_triggers_since(since).await
-    }
-}
-
-//
 // GRAFANA ONLY
 //
 impl HomeApi {
@@ -178,56 +142,3 @@ impl HomeApi {
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     impl HomeApi {
-//         pub fn for_testing() -> Self {
-//             let pool = sqlx::PgPool::connect_lazy("postgres://dummy:dummy@localhost/dummy").unwrap();
-//             Self::new(Database::new(pool))
-//         }
-//
-//         pub fn with_fixed_current_dp<T>(&mut self, state: T, value: impl Into<T::ValueType>, timestamp: DateTime)
-//         where
-//             T: Into<HomeState> + ValueObject + Clone,
-//         {
-//             let value = value.into();
-//             self.state_dp_mock
-//                 .insert(state.clone().into(), DataPoint::new(state.to_f64(&value), timestamp));
-//         }
-//
-//         pub fn with_fixed_df<T, V>(&mut self, state: T, values: &[(V, DateTime)])
-//         where
-//             T: Into<HomeState> + ValueObject + Clone,
-//             V: Into<T::ValueType> + Clone,
-//         {
-//             let dps: Vec<DataPoint<f64>> = values
-//                 .iter()
-//                 .map(|(v, ts)| DataPoint::new(state.to_f64(&v.clone().into()), *ts))
-//                 .collect();
-//             let df = DataFrame::new(dps).expect("Error creating test timeseries");
-//
-//             self.state_df_mock.insert(state.into(), df);
-//         }
-//
-//         pub fn get_fixed_current_dp<T>(&self, state: T) -> Option<DataPoint<T::ValueType>>
-//         where
-//             T: Into<HomeState> + ValueObject + Clone,
-//         {
-//             self.state_dp_mock
-//                 .get(&state.clone().into())
-//                 .map(|dp| DataPoint::new(state.from_f64(dp.value), dp.timestamp))
-//         }
-//
-//         pub fn get_fixed_df<T>(&self, state: T) -> Option<DataFrame<T::ValueType>>
-//         where
-//             T: Into<HomeState> + ValueObject + Clone,
-//         {
-//             self.state_df_mock
-//                 .get(&state.clone().into())
-//                 .map(|df| df.map(|dp| state.from_f64(dp.value)))
-//         }
-//     }
-// }

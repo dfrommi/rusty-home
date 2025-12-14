@@ -11,8 +11,8 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
-    home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
     t,
+    trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
 };
 
 #[derive(Debug, Clone, PartialEq, derive_more::Display)]
@@ -84,7 +84,7 @@ impl TargetHeatingModeStateProvider {
             | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state))
             | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => match state {
                 HomekitHeatingState::Off => Some(DegreeCelsius(0.0)),
-                HomekitHeatingState::Heat(target_temperature) => Some(target_temperature).cloned(),
+                HomekitHeatingState::Heat(target_temperature) => Some(target_temperature.clone()),
                 HomekitHeatingState::Auto => None,
             },
             _ => None,

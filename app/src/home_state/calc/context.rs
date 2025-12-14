@@ -2,16 +2,14 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     core::{
-        HomeApi,
-        persistence::UserTriggerRequest,
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{DataFrame, DataPoint},
     },
     device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem, DeviceStateValue},
-    home::trigger::UserTriggerTarget,
     home_state::{HomeState, HomeStateDerivedStateProvider, StateValue},
     port::ValueObject,
     t,
+    trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
 };
 
 use super::StateSnapshot;
@@ -19,10 +17,10 @@ use super::StateSnapshot;
 pub async fn calculate_new_snapshot(
     truncate_before: Duration,
     history: &StateSnapshot,
-    api: &HomeApi,
     device_state: &DeviceStateClient,
+    trigger_client: &TriggerClient,
 ) -> anyhow::Result<StateSnapshot> {
-    let context = create_new_calculation_context(history, api, device_state).await?;
+    let context = create_new_calculation_context(history, device_state, trigger_client).await?;
 
     //preload all current values
     for id in HomeState::variants().iter() {
@@ -37,12 +35,10 @@ pub async fn calculate_new_snapshot(
 //TODO optimize creation of context using less copy and loops, ideally Arc
 async fn create_new_calculation_context(
     history: &StateSnapshot,
-    api: &HomeApi,
     device_state: &DeviceStateClient,
+    trigger_client: &TriggerClient,
 ) -> anyhow::Result<StateCalculationContext> {
-    let max_user_trigger_age = t!(48 hours ago);
-
-    let triggers = api.all_user_triggers_since(max_user_trigger_age).await?;
+    let triggers = trigger_client.get_all_active_triggers().await?;
     let mut active_triggers = HashMap::new();
 
     for trigger in triggers {
@@ -68,7 +64,7 @@ pub struct StateCalculationContext {
     current: RefCell<HashMap<HomeState, DataPoint<StateValue>>>,
     history: HashMap<HomeState, DataFrame<StateValue>>,
     device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
-    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerRequest>,
+    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
 }
 
 pub trait DerivedStateProvider<ID, T> {
@@ -168,7 +164,7 @@ impl StateCalculationContext {
         }
     }
 
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerRequest> {
+    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
         self.active_user_triggers.get(&target)
     }
 

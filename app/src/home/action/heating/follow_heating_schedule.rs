@@ -1,17 +1,15 @@
 use crate::{
     core::{
-        HomeApi,
         time::{DateTime, Duration},
         timeseries::{DataPoint, interpolate::algo::linear_dp},
         unit::{DegreeCelsius, Percent},
     },
     home::{
-        action::{Rule, RuleResult},
+        action::{Rule, RuleEvaluationContext, RuleResult},
         command::{Command, HeatingTargetState},
         common::HeatingZone,
         state::{HeatingMode, TargetHeatingMode, Temperature},
     },
-    port::DataPointAccess,
     t,
 };
 use r#macro::Id;
@@ -28,16 +26,15 @@ impl FollowHeatingSchedule {
 }
 
 impl Rule for FollowHeatingSchedule {
-    async fn evaluate(&self, api: &crate::core::HomeApi) -> anyhow::Result<RuleResult> {
-        let active_mode_dp = match self.zone {
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
+        let active_mode_item = match self.zone {
             HeatingZone::RoomOfRequirements => TargetHeatingMode::RoomOfRequirements,
             HeatingZone::LivingRoom => TargetHeatingMode::LivingRoom,
             HeatingZone::Bedroom => TargetHeatingMode::Bedroom,
             HeatingZone::Kitchen => TargetHeatingMode::Kitchen,
             HeatingZone::Bathroom => TargetHeatingMode::Bathroom,
-        }
-        .current_data_point(api)
-        .await?;
+        };
+        let active_mode_dp = ctx.current_dp(active_mode_item)?;
 
         let active_mode = active_mode_dp.value;
         let mode_active_since = active_mode_dp.timestamp;
@@ -48,7 +45,7 @@ impl Rule for FollowHeatingSchedule {
 
         match active_mode {
             _ if self.zone == HeatingZone::RoomOfRequirements => {
-                let current_temp = self.zone.inside_temperature().current(api).await?;
+                let current_temp = ctx.current(self.zone.inside_temperature())?;
                 let max_opened = match active_mode {
                     HeatingMode::Ventilation => Percent(0.0),
                     HeatingMode::PostVentilation => Percent(25.0),
@@ -59,27 +56,24 @@ impl Rule for FollowHeatingSchedule {
             HeatingMode::Ventilation => {
                 commands.extend(self.heating_state_commands(HeatingTargetState::WindowOpen));
                 //Hold thermostat ambient temperature in ventilation mode
-                commands.extend(self.hold_external_temperature(api).await?);
+                commands.extend(self.hold_external_temperature(ctx)?);
             }
             HeatingMode::PostVentilation => {
-                commands.extend(self.heat_to(target_temperature, api).await?);
+                commands.extend(self.heat_to(target_temperature, ctx)?);
 
                 if mode_active_since.elapsed() < t!(5 minutes) {
-                    commands.extend(self.hold_external_temperature(api).await?);
+                    commands.extend(self.hold_external_temperature(ctx)?);
                 } else {
-                    commands.extend(
-                        self.move_towards_real_temperature(
-                            mode_active_since,
-                            TargetHeatingMode::post_ventilation_duration(),
-                            api,
-                        )
-                        .await?,
-                    );
+                    commands.extend(self.move_towards_real_temperature(
+                        mode_active_since,
+                        TargetHeatingMode::post_ventilation_duration(),
+                        ctx,
+                    )?);
                 }
             }
 
             _ => {
-                commands.extend(self.heat_to(target_temperature, api).await?);
+                commands.extend(self.heat_to(target_temperature, ctx)?);
             }
         }
 
@@ -126,10 +120,10 @@ impl FollowHeatingSchedule {
             .collect()
     }
 
-    async fn heat_to(&self, set_point: DegreeCelsius, api: &HomeApi) -> anyhow::Result<Vec<Command>> {
+    fn heat_to(&self, set_point: DegreeCelsius, ctx: &RuleEvaluationContext) -> anyhow::Result<Vec<Command>> {
         let mut commands: Vec<Command> = vec![];
         for thermostat in self.zone.thermostats() {
-            let current_setpoint = thermostat.set_point().current(api).await?;
+            let current_setpoint = ctx.current(thermostat.set_point())?;
             let is_increasing = set_point > current_setpoint;
 
             commands.push(Command::SetHeating {
@@ -155,10 +149,10 @@ impl FollowHeatingSchedule {
             .collect()
     }
 
-    async fn hold_external_temperature(&self, api: &HomeApi) -> anyhow::Result<Vec<Command>> {
+    fn hold_external_temperature(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<Vec<Command>> {
         let mut commands = vec![];
         for thermostat in self.zone.thermostats() {
-            let thermostat_external_temp = Temperature::ThermostatExternal(thermostat.clone()).current(api).await?;
+            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat.clone()))?;
             commands.push(Command::SetThermostatAmbientTemperature {
                 device: thermostat.clone(),
                 temperature: thermostat_external_temp,
@@ -168,17 +162,17 @@ impl FollowHeatingSchedule {
         Ok(commands)
     }
 
-    async fn move_towards_real_temperature(
+    fn move_towards_real_temperature(
         &self,
         mode_start_time: DateTime,
         total_duration: Duration,
-        api: &HomeApi,
+        ctx: &RuleEvaluationContext,
     ) -> anyhow::Result<Vec<Command>> {
         let mut commands = vec![];
-        let room_temp = self.zone.inside_temperature().current(api).await?;
+        let room_temp = ctx.current(self.zone.inside_temperature())?;
 
         for thermostat in self.zone.thermostats() {
-            let thermostat_external_temp = Temperature::ThermostatExternal(thermostat.clone()).current(api).await?;
+            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat.clone()))?;
 
             if room_temp >= thermostat_external_temp {
                 continue;

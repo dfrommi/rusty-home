@@ -5,7 +5,8 @@ use settings::Settings;
 
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
 use crate::core::command::CommandDispatcher;
-use crate::core::state::HomeStateEventEmitter;
+use crate::core::planner::PlanningRunner;
+use crate::home::state::HomeStateRunner;
 
 mod adapter;
 mod core;
@@ -29,7 +30,15 @@ pub async fn main() {
         .expect("Error initializing infrastructure");
 
     let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
-    let mut home_state_event_emitter = HomeStateEventEmitter::new(&infrastructure);
+
+    let mut home_state_runner = HomeStateRunner::new(
+        t!(3 hours),
+        infrastructure.event_listener.new_state_changed_listener(),
+        infrastructure.api.clone(),
+    );
+
+    let planning_runner =
+        PlanningRunner::new(home_state_runner.subscribe_snapshot_updated(), infrastructure.api.clone());
 
     let ha_incoming_data_processing = {
         let ds = settings
@@ -68,14 +77,12 @@ pub async fn main() {
 
     let homekit_runner = settings
         .homebridge
-        .new_runner(&mut infrastructure, home_state_event_emitter.subscribe_changed())
+        .new_runner(&mut infrastructure, home_state_runner.subscribe_state_changed())
         .await;
-
-    let keep_planning = core::keep_on_planning(&infrastructure);
 
     let mut metrics_exporter = settings
         .metrics
-        .new_exporter(home_state_event_emitter.subscribe_updated());
+        .new_exporter(home_state_runner.subscribe_state_updated());
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
@@ -100,22 +107,36 @@ pub async fn main() {
 
     //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
     //in between preloading and actual use)
+    tracing::info!("Preloading time-series cache");
+    infrastructure
+        .api
+        .create_missing_tags()
+        .await
+        .expect("Error creating missing tags");
+
     infrastructure
         .api
         .preload_ts_cache()
         .await
         .expect("Error preloading cache");
+    tracing::info!("Time-series cache preloading completed");
+
+    tracing::info!("Starting state bootstrapping");
+    home_state_runner
+        .bootstrap_snapshot()
+        .await
+        .expect("Error bootstrapping state");
+    tracing::info!("State bootstrapping completed");
 
     tracing::info!("Starting infrastructure processing");
-
     let process_infrastucture = infrastructure.process();
 
     tracing::info!("Starting main loop");
 
     tokio::select!(
         _ = process_infrastucture => {},
-        _ = home_state_event_emitter.run() => {},
-        _ = keep_planning => {}, //TODO spawn into new thread
+        _ = home_state_runner.run() => {},
+        _ = planning_runner.run() => {},
         _ = command_dispatcher.dispatch() => {},
         _ = energy_meter_processing.run() => {},
         _ = ha_incoming_data_processing.run() => {},

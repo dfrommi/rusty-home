@@ -8,18 +8,26 @@ use tracing::Instrument;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
+use crate::home::RuleEvaluationContext;
 use crate::home::command::{Command, CommandTarget};
+use crate::home::state::StateSnapshot;
 use crate::home::trigger::UserTriggerId;
 use crate::t;
 
 use super::{PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
-pub async fn plan_and_execute<G, A>(active_goals: &[G], config: &[(G, Vec<A>)], api: &HomeApi) -> Result<PlanningTrace>
+pub async fn plan_and_execute<G, A>(
+    active_goals: &[G],
+    config: &[(G, Vec<A>)],
+    snapshot: StateSnapshot,
+    api: &HomeApi,
+) -> Result<PlanningTrace>
 where
     G: Eq + Display,
     A: Action + Clone + Send + Sync + 'static,
 {
     let planning_start = t!(now);
+    let rule_ctx = RuleEvaluationContext::new(snapshot);
 
     let (first_tx, mut prev_rx) = oneshot::channel();
     let mut handles = Vec::new();
@@ -37,8 +45,9 @@ where
             prev_rx = rx;
 
             let api = api.clone();
+            let rule_ctx = rule_ctx.clone();
             handles.push(tokio::spawn(
-                async move { process_action(context, api).await }.instrument(goal_span.clone()),
+                async move { process_action(context, rule_ctx, api).await }.instrument(goal_span.clone()),
             ));
         }
     }
@@ -79,11 +88,15 @@ async fn cancel_unused_triggers(
     skip_all,
     fields(action = %context.action, otel.name),
 )]
-async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Result<Context<A>> {
+async fn process_action<A: Action>(
+    mut context: Context<A>,
+    ctx: RuleEvaluationContext,
+    api: HomeApi,
+) -> Result<Context<A>> {
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
     //EVALUATION
-    let evaluation_result = evaluate_action(&mut context, &api).await;
+    let evaluation_result = evaluate_action(&mut context, ctx).await;
     // Yield so other actions can start evaluating before we attempt to acquire the lock.
     yield_now().await;
 
@@ -123,9 +136,9 @@ async fn process_action<A: Action>(mut context: Context<A>, api: HomeApi) -> Res
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<A: Action>(context: &mut Context<A>, api: &HomeApi) -> ActionEvaluationResult {
+async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: RuleEvaluationContext) -> ActionEvaluationResult {
     let mut result = if context.goal_active {
-        context.action.evaluate(api).await.unwrap_or_else(|e| {
+        context.action.evaluate(&ctx).unwrap_or_else(|e| {
             tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
             ActionEvaluationResult::Skip
         })

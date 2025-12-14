@@ -7,9 +7,10 @@ use crate::{
         timeseries::DataPoint,
         unit::{DegreeCelsius, GramPerCubicMeter},
     },
-    home::{
-        state::{AbsoluteHumidity, Temperature, sampled_data_frame},
-        state_registry::{DerivedStateProvider, StateCalculationContext},
+    home::state::{
+        AbsoluteHumidity, Temperature,
+        calc::{DerivedStateProvider, StateCalculationContext},
+        items::sampled_data_frame,
     },
     port::{DataFrameAccess, DataPointAccess},
 };

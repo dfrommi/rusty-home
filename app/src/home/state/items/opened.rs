@@ -1,6 +1,6 @@
 use crate::core::HomeApi;
 use crate::core::time::{DateTime, DateTimeRange};
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;

@@ -105,6 +105,10 @@ impl DateTimeRange {
         Self::new(start, t!(now))
     }
 
+    pub fn of_last(duration: Duration) -> Self {
+        Self::new(t!(now) - duration, t!(now))
+    }
+
     pub fn non_future(&self) -> Self {
         let now = t!(now);
         Self::new(now.min(self.start), now.min(self.end))

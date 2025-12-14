@@ -15,35 +15,30 @@ use crate::{
     t,
 };
 
-async fn bootstrap_snapshot(duration: Duration, api: HomeApi) -> anyhow::Result<StateSnapshot> {
-    let range = DateTimeRange::new(t!(now) - duration, t!(now));
-    let mut current = StateSnapshot::new(HashMap::new());
+use super::StateSnapshot;
 
-    for dt in range.step_by(t!(30 seconds)) {
-        current = dt
-            .eval_timeshifted(async { calculate_new_snapshot(current, &api).await })
-            .await?;
-    }
-
-    Ok(current)
-}
-
-async fn calculate_new_snapshot(history: StateSnapshot, api: &HomeApi) -> anyhow::Result<StateSnapshot> {
+pub async fn calculate_new_snapshot(
+    range: DateTimeRange,
+    history: StateSnapshot,
+    api: &HomeApi,
+) -> anyhow::Result<StateSnapshot> {
+    tracing::debug!("Calculating new state snapshot for range {:?}...", range);
     let context = create_new_calculation_context(history, api).await?;
 
     //preload all current values
+    tracing::debug!("Preloading current state values...");
     for id in HomeState::variants().iter() {
         if !id.is_persistent() {
             context.load(id.clone());
         }
     }
 
-    let snapshot = context.into_snapshot();
+    let snapshot = context.into_snapshot(range);
     Ok(snapshot)
 }
 
 //TODO optimize creation of context using less copy and loops, ideally Arc
-async fn create_new_calculation_context(
+pub async fn create_new_calculation_context(
     history: StateSnapshot,
     api: &HomeApi,
 ) -> anyhow::Result<StateCalculationContext> {
@@ -58,15 +53,18 @@ async fn create_new_calculation_context(
     let mut persistent_states: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
     let state_range = DateTimeRange::since(t!(8 hours ago));
     for item in PersistentHomeState::variants().iter() {
-        let df: DataFrame<StateValue> = api
-            .get_data_frame(item, state_range.clone())
-            .await?
-            .map(|dp| dp.value.value().into());
+        let df = match api.get_data_frame(item, state_range.clone()).await {
+            Err(e) => {
+                tracing::error!("Error loading persistent state {:?}: {:?}", item, e);
+                continue;
+            }
+            Ok(df) => df.map(|dp| dp.value.value().into()),
+        };
         persistent_states.insert(HomeState::from(item.clone()), df);
     }
 
     let mut history_map: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
-    for (id, value) in history.data.iter() {
+    for (id, value) in history.home_state_iter() {
         if !id.is_persistent() {
             history_map.insert(id.clone(), value.clone());
         }
@@ -90,28 +88,8 @@ pub struct StateCalculationContext {
     active_user_triggers: HashMap<UserTriggerTarget, UserTriggerRequest>,
 }
 
-struct StateSnapshot {
-    data: HashMap<HomeState, DataFrame<StateValue>>,
-}
-
 pub trait DerivedStateProvider<ID, T> {
     fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<DataPoint<T>>;
-}
-
-//TODO type downcast return value
-impl StateSnapshot {
-    pub fn new(data: HashMap<HomeState, DataFrame<StateValue>>) -> Self {
-        Self { data }
-    }
-
-    //Maybe not Option?
-    pub fn current_dp(&self, id: HomeState) -> Option<DataPoint<StateValue>> {
-        Some(self.data.get(&id)?.last().clone())
-    }
-
-    pub fn data_frame(&self, id: HomeState, range: DateTimeRange) -> Option<DataFrame<StateValue>> {
-        self.data.get(&id)?.retain_range_with_context_before(&range)
-    }
 }
 
 impl StateCalculationContext {
@@ -133,15 +111,18 @@ impl StateCalculationContext {
             return self.persistent_state.get(&id).map(|df| df.last().clone());
         }
 
-        let current = self.current.borrow();
+        let current_value = {
+            let current = self.current.borrow();
+            current.get(&id).cloned()
+        };
 
-        match current.get(&id) {
-            Some(dp) => Some(dp.clone()),
+        match current_value {
+            Some(dp) => Some(dp),
             None => {
                 let mut calculated_dp = HomeStateDerivedStateProvider.calculate_current(id.clone(), self)?;
                 if calculated_dp.timestamp > self.now {
                     calculated_dp.timestamp = self.now;
-                } else if let Some(last_history_ts) = self.last_history_timestanp(&id)
+                } else if let Some(last_history_ts) = self.last_history_timestamp(&id)
                     && calculated_dp.timestamp <= last_history_ts
                 {
                     calculated_dp.timestamp = self.now;
@@ -154,7 +135,7 @@ impl StateCalculationContext {
         }
     }
 
-    fn last_history_timestanp(&self, id: &HomeState) -> Option<DateTime> {
+    fn last_history_timestamp(&self, id: &HomeState) -> Option<DateTime> {
         self.history.get(id).map(|df| df.last().timestamp)
     }
 
@@ -208,7 +189,7 @@ impl StateCalculationContext {
         let _ = self.get_home_state_value(id);
     }
 
-    fn into_snapshot(self) -> StateSnapshot {
+    fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
         let mut data = HashMap::new();
 
         for (id, current) in self.current.borrow().iter() {
@@ -216,7 +197,8 @@ impl StateCalculationContext {
             let combined_df = match df {
                 Some(mut df) => {
                     df.insert(current.clone());
-                    df
+                    df.retain_range_with_context_before(&range)
+                        .expect("Internal error: Error retaining range in data frame of non-empty datapoints")
                 }
                 None => DataFrame::new(vec![current.clone()])
                     .expect("Internal error: Error creating data frame of non-empty datapoints"),
@@ -228,7 +210,7 @@ impl StateCalculationContext {
             data.insert(key.clone(), df.clone());
         }
 
-        StateSnapshot::new(data)
+        StateSnapshot::new(data, self.active_user_triggers)
     }
 }
 

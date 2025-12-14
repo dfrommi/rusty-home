@@ -1,12 +1,9 @@
-use crate::core::HomeApi;
-use crate::home::action::SimpleRule;
+use crate::home::action::{RuleEvaluationContext, SimpleRule};
 use crate::home::command::{Command, PowerToggle};
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
 use crate::home::state::RiskOfMould;
-
-use super::DataPointAccess;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum Dehumidify {
@@ -23,9 +20,9 @@ impl SimpleRule for Dehumidify {
         }
     }
 
-    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool> {
+    fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> Result<bool> {
         match self {
-            Dehumidify::Dehumidifier => RiskOfMould::Bathroom.current(api).await,
+            Dehumidify::Dehumidifier => ctx.current(RiskOfMould::Bathroom),
         }
     }
 }

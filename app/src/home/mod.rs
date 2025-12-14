@@ -8,12 +8,12 @@ pub mod command;
 mod config;
 mod goal;
 pub mod state;
-pub mod state_registry;
 pub mod trigger;
 
 mod common;
 
 use crate::core::HomeApi;
+pub use action::RuleEvaluationContext;
 pub use common::*;
 pub use goal::get_active_goals;
 

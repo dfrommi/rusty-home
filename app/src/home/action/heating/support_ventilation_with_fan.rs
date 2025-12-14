@@ -1,13 +1,12 @@
 use r#macro::Id;
 
-use crate::core::HomeApi;
 use crate::core::unit::DegreeCelsius;
-use crate::home::action::SimpleRule;
+use crate::home::action::{RuleEvaluationContext, SimpleRule};
 use crate::home::command::{Command, Fan};
 use crate::home::state::{FanAirflow, FanSpeed, Temperature};
 use crate::t;
 
-use super::{DataPointAccess, OpenedArea};
+use super::OpenedArea;
 
 #[derive(Debug, Clone, Id)]
 pub struct SupportVentilationWithFan(Fan);
@@ -26,16 +25,16 @@ impl SimpleRule for SupportVentilationWithFan {
         }
     }
 
-    async fn preconditions_fulfilled(&self, api: &HomeApi) -> anyhow::Result<bool> {
+    fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
         let (window, temp_sensor) = match self.0 {
             Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoom),
             Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::Bedroom),
         };
 
-        let opened_dp = window.current_data_point(api).await?;
+        let opened_dp = ctx.current_dp(window)?;
         let elapsed = opened_dp.timestamp.elapsed();
 
-        if temp_sensor.current(api).await? < DegreeCelsius(24.0) {
+        if ctx.current(temp_sensor)? < DegreeCelsius(24.0) {
             tracing::trace!("Temperature too low, not starting fan");
             return Ok(false);
         }

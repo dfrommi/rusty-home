@@ -4,7 +4,7 @@ use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::unit::DegreeCelsius;
 use crate::core::{HomeApi, timeseries::DataPoint};
 use crate::home::state::Temperature;
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::DataFrameAccess;
 use crate::t;
 use r#macro::{EnumVariants, Id, trace_state};

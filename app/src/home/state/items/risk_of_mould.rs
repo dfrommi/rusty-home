@@ -3,7 +3,7 @@ use crate::core::time::DateTimeRange;
 use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::core::timeseries::{DataFrame, TimeSeries};
 use crate::core::unit::{DegreeCelsius, Percent};
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::RelativeHumidity};

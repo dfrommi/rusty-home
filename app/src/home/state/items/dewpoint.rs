@@ -1,12 +1,9 @@
-use crate::{
-    core::{
-        HomeApi,
-        timeseries::{
-            DataFrame, DataPoint,
-            interpolate::{self, Estimatable},
-        },
+use crate::core::{
+    HomeApi,
+    timeseries::{
+        DataFrame, DataPoint,
+        interpolate::{self, Estimatable},
     },
-    home::state_registry::{DerivedStateProvider, StateCalculationContext},
 };
 
 use super::*;

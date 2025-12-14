@@ -4,40 +4,57 @@ mod processor;
 mod resource_lock;
 mod trace;
 
+use tokio::sync::broadcast::Receiver;
 use trace::display_planning_trace;
 
-use crate::{Infrastructure, core::HomeApi, home::HomePlanning};
+use crate::{
+    core::HomeApi,
+    home::{HomePlanning, state::StateSnapshot},
+};
 
 pub use action::{Action, ActionEvaluationResult};
 pub use trace::PlanningTrace;
 
-pub fn keep_on_planning(infrastructure: &Infrastructure) -> impl Future<Output = ()> + use<> {
-    let api = infrastructure.api.clone();
-    let mut state_changed_events = infrastructure.event_listener.new_state_changed_listener();
-    let mut user_trigger_events = infrastructure.event_listener.new_user_trigger_event_listener();
+pub struct PlanningRunner {
+    snapshot_updated_rx: Receiver<StateSnapshot>,
+    api: HomeApi,
+}
 
-    async move {
+impl PlanningRunner {
+    pub fn new(snapshot_updated_rx: Receiver<StateSnapshot>, api: HomeApi) -> Self {
+        Self {
+            snapshot_updated_rx,
+            api,
+        }
+    }
+
+    pub async fn run(mut self) {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut last_snapshot: Option<StateSnapshot> = None;
 
         loop {
             tokio::select! {
                 _ = timer.tick() => {},
-                _ = state_changed_events.recv() => {},
-                _ = user_trigger_events.recv() => {},
+
+                Ok(new_snapshot) = self.snapshot_updated_rx.recv() => {
+                    last_snapshot = Some(new_snapshot);
+                },
             };
 
-            plan_for_home(&api).await;
+            if let Some(ref snapshot) = last_snapshot {
+                plan_for_home(snapshot, &self.api).await;
+            }
         }
     }
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn plan_for_home(api: &HomeApi) {
+pub async fn plan_for_home(snapshot: &StateSnapshot, api: &HomeApi) {
     tracing::info!("Start planning");
     let active_goals = HomePlanning::active_goals(api).await;
     let config = HomePlanning::config();
 
-    let res = processor::plan_and_execute(&active_goals, config, api).await;
+    let res = processor::plan_and_execute(&active_goals, config, snapshot.clone(), api).await;
 
     match res {
         Ok(res) => {

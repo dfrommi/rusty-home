@@ -5,7 +5,6 @@ pub mod id;
 pub mod math;
 pub mod persistence;
 pub mod planner;
-pub mod state;
 pub mod time;
 pub mod timeseries;
 pub mod unit;
@@ -13,10 +12,6 @@ pub mod unit;
 use std::collections::HashMap;
 
 pub use api::HomeApi;
-pub use planner::keep_on_planning;
-
-#[cfg(test)]
-pub use planner::plan_for_home;
 
 pub struct DeviceConfig<V> {
     config: HashMap<String, Vec<V>>,

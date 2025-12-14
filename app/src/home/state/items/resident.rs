@@ -2,7 +2,7 @@ use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::interpolate::{self, Estimatable};
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};

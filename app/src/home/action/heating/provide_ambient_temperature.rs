@@ -1,13 +1,9 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::{
-    core::HomeApi,
-    home::{
-        HeatingZone, Thermostat,
-        action::{Rule, RuleResult},
-        command::Command,
-    },
-    port::DataPointAccess as _,
+use crate::home::{
+    HeatingZone, Thermostat,
+    action::{Rule, RuleEvaluationContext, RuleResult},
+    command::Command,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Id, EnumVariants)]
@@ -16,7 +12,7 @@ pub enum ProvideAmbientTemperature {
 }
 
 impl Rule for ProvideAmbientTemperature {
-    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
         let ProvideAmbientTemperature::Thermostat(thermostat) = self;
 
         //Sonoff thermostat is not supported
@@ -24,10 +20,7 @@ impl Rule for ProvideAmbientTemperature {
             return Ok(RuleResult::Skip);
         }
 
-        let temperature = HeatingZone::for_thermostat(thermostat)
-            .inside_temperature()
-            .current(api)
-            .await?;
+        let temperature = ctx.current(HeatingZone::for_thermostat(thermostat).inside_temperature())?;
 
         Ok(RuleResult::Execute(vec![Command::SetThermostatAmbientTemperature {
             device: thermostat.clone(),

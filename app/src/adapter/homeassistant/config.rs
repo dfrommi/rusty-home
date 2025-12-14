@@ -72,6 +72,18 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
         ),
+        (
+            "sensor.wohnzimmer_humidity",
+            HaChannel::RelativeHumidity(RelativeHumidity::LivingRoomTado),
+        ),
+        (
+            "sensor.schlafzimmer_humidity",
+            HaChannel::RelativeHumidity(RelativeHumidity::BedroomTado),
+        ),
+        (
+            "sensor.arbeitszimmer_humidity",
+            HaChannel::RelativeHumidity(RelativeHumidity::RoomOfRequirementsTado),
+        ),
         //
         //POWERED STATE
         //

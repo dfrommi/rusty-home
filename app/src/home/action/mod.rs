@@ -7,12 +7,13 @@ mod user_trigger_action;
 
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::future::Future;
-use std::pin::Pin;
 
 use crate::core::id::ExternalId;
+use crate::core::persistence::UserTriggerRequest;
+use crate::core::timeseries::DataPoint;
 use crate::home::command::Command;
 use crate::home::trigger::UserTriggerId;
+use crate::home::trigger::UserTriggerTarget;
 use anyhow::Result;
 
 pub use dehumidify::Dehumidify;
@@ -22,7 +23,6 @@ pub use inform_window_open::InformWindowOpen;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use user_trigger_action::UserTriggerAction;
 
-use crate::core::HomeApi;
 use crate::core::planner::Action;
 use crate::core::planner::ActionEvaluationResult;
 use crate::home::state::*;
@@ -35,18 +35,49 @@ pub enum RuleResult {
     Skip,
 }
 
+#[derive(Clone)]
+pub struct RuleEvaluationContext {
+    snapshot: StateSnapshot,
+}
+
+impl RuleEvaluationContext {
+    pub fn new(snapshot: StateSnapshot) -> Self {
+        Self { snapshot }
+    }
+
+    pub fn current_dp<S>(&self, id: S) -> Result<DataPoint<S::ValueType>>
+    where
+        S: Into<HomeState> + ValueObject + Clone,
+    {
+        self.snapshot
+            .get(id.clone())
+            .ok_or_else(|| anyhow::anyhow!("Current value for state {:?} not found", id.into()))
+    }
+
+    pub fn current<S>(&self, id: S) -> Result<S::ValueType>
+    where
+        S: Into<HomeState> + ValueObject + Clone,
+    {
+        self.current_dp(id).map(|dp| dp.value)
+    }
+
+    pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerRequest> {
+        self.snapshot.user_trigger(target)
+    }
+}
+
 pub trait Rule {
-    async fn evaluate(&self, api: &HomeApi) -> Result<RuleResult>;
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<RuleResult>;
 }
 
 pub trait SimpleRule {
     fn command(&self) -> Command;
-    async fn preconditions_fulfilled(&self, api: &HomeApi) -> Result<bool>;
+    fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> Result<bool>;
 }
 
 impl<T: SimpleRule> Rule for T {
-    async fn evaluate(&self, api: &HomeApi) -> Result<RuleResult> {
-        let preconditions_fulfilled = self.preconditions_fulfilled(api).await?;
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<RuleResult> {
+        let preconditions_fulfilled = self.preconditions_fulfilled(ctx)?;
 
         if !preconditions_fulfilled {
             return Ok(RuleResult::Skip);
@@ -78,42 +109,31 @@ impl Display for HomeAction {
 }
 
 impl Action for HomeAction {
-    fn evaluate<'a>(
-        &'a self,
-        api: &'a HomeApi,
-    ) -> Pin<Box<dyn Future<Output = Result<ActionEvaluationResult>> + Send + 'a>> {
-        Box::pin(async move {
-            let ext_id = self.ext_id();
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
+        let ext_id = self.ext_id();
 
-            match self {
-                HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, api).await,
-                HomeAction::InformWindowOpen(inform_window_open) => {
-                    evaluate_rule(inform_window_open, ext_id, api).await
-                }
-                HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
-                    evaluate_rule(provide_ambient_temperature, ext_id, api).await
-                }
-                HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => {
-                    evaluate_rule(provide_load_room_mean, ext_id, api).await
-                }
-                HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, api).await,
-                HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => {
-                    evaluate_rule(reduce_noise_at_night, ext_id, api).await
-                }
-                HomeAction::FollowDefaultSetting(follow_default_setting) => {
-                    evaluate_rule(follow_default_setting, ext_id, api).await
-                }
-                HomeAction::UserTriggerAction(user_trigger_action) => {
-                    evaluate_rule(user_trigger_action, ext_id, api).await
-                }
-                HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
-                    evaluate_rule(support_ventilation_with_fan, ext_id, api).await
-                }
-                HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
-                    evaluate_rule(follow_heating_schedule, ext_id, api).await
-                }
+        match self {
+            HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, ctx),
+            HomeAction::InformWindowOpen(inform_window_open) => evaluate_rule(inform_window_open, ext_id, ctx),
+            HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
+                evaluate_rule(provide_ambient_temperature, ext_id, ctx)
             }
-        })
+            HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => {
+                evaluate_rule(provide_load_room_mean, ext_id, ctx)
+            }
+            HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, ctx),
+            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => evaluate_rule(reduce_noise_at_night, ext_id, ctx),
+            HomeAction::FollowDefaultSetting(follow_default_setting) => {
+                evaluate_rule(follow_default_setting, ext_id, ctx)
+            }
+            HomeAction::UserTriggerAction(user_trigger_action) => evaluate_rule(user_trigger_action, ext_id, ctx),
+            HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
+                evaluate_rule(support_ventilation_with_fan, ext_id, ctx)
+            }
+            HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
+                evaluate_rule(follow_heating_schedule, ext_id, ctx)
+            }
+        }
     }
 
     fn ext_id(&self) -> ExternalId {
@@ -134,8 +154,8 @@ impl Action for HomeAction {
     }
 }
 
-async fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, api: &HomeApi) -> Result<ActionEvaluationResult> {
-    match rule.evaluate(api).await? {
+fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
+    match rule.evaluate(ctx)? {
         RuleResult::Execute(commands) => Ok(ActionEvaluationResult::Execute(commands, ext_id)),
         RuleResult::ExecuteTrigger(commands, user_trigger_id) => {
             Ok(ActionEvaluationResult::ExecuteTrigger(commands, ext_id, user_trigger_id))

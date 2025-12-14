@@ -12,8 +12,11 @@ use crate::{
         unit::{DegreeCelsius, Probability, p},
     },
     home::{
-        state::{AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident, sampled_data_frame},
-        state_registry::{DerivedStateProvider, StateCalculationContext},
+        state::{
+            AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident,
+            calc::{DerivedStateProvider, StateCalculationContext},
+            items::sampled_data_frame,
+        },
         trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
     },
     port::{DataFrameAccess, DataPointAccess},

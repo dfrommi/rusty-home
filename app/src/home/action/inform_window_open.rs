@@ -1,17 +1,14 @@
 use futures::future::try_join_all;
 use r#macro::{EnumVariants, Id};
 
-use crate::core::HomeApi;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::home::action::{Rule, RuleResult};
+use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
 use crate::home::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
 use crate::home::state::Presence;
 use crate::t;
 
 use crate::home::state::ColdAirComingIn;
-
-use super::DataPointAccess;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum InformWindowOpen {
@@ -20,18 +17,16 @@ pub enum InformWindowOpen {
 }
 
 impl Rule for InformWindowOpen {
-    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<super::RuleResult> {
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<super::RuleResult> {
         let command = match self {
-            InformWindowOpen::PushNotification(recipient)
-                if self.preconditions_fulfilled_push(recipient, api).await? =>
-            {
+            InformWindowOpen::PushNotification(recipient) if self.preconditions_fulfilled_push(recipient, ctx)? => {
                 Command::PushNotify {
                     action: NotificationAction::Notify,
                     notification: Notification::WindowOpened,
                     recipient: recipient.clone(),
                 }
             }
-            InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(api).await? => {
+            InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(ctx)? => {
                 Command::SetPower {
                     device: PowerToggle::LivingRoomNotificationLight,
                     power_on: true,
@@ -46,35 +41,32 @@ impl Rule for InformWindowOpen {
 }
 
 impl InformWindowOpen {
-    async fn preconditions_fulfilled_push(
+    fn preconditions_fulfilled_push(
         &self,
         recipient: &NotificationRecipient,
-        api: &HomeApi,
+        ctx: &RuleEvaluationContext,
     ) -> anyhow::Result<bool> {
         let presence_item = match recipient {
             NotificationRecipient::Dennis => Presence::AtHomeDennis,
             NotificationRecipient::Sabine => Presence::AtHomeSabine,
         };
-        let at_home = presence_item.current(api).await?;
 
-        let cold_air_coming_in = try_join_all(
-            ColdAirComingIn::variants()
-                .iter()
-                .map(|item| item.current_data_point(api)),
-        )
-        .await?;
+        let at_home = ctx.current(presence_item)?;
+
+        let cold_air_coming_in = ColdAirComingIn::variants()
+            .iter()
+            .map(|item| ctx.current_dp(item.clone()))
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(should_send_push_notification(cold_air_coming_in, at_home))
     }
 
-    async fn preconditions_fulfilled_light(&self, api: &HomeApi) -> anyhow::Result<bool> {
-        let cold_air_coming_in = try_join_all(
-            ColdAirComingIn::variants()
-                .iter()
-                .filter(|&it| it != &ColdAirComingIn::LivingRoom)
-                .map(|item| item.current_data_point(api)),
-        )
-        .await?;
+    fn preconditions_fulfilled_light(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
+        let cold_air_coming_in = ColdAirComingIn::variants()
+            .iter()
+            .filter(|&it| it != &ColdAirComingIn::LivingRoom)
+            .map(|item| ctx.current_dp(item.clone()))
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(should_turn_on_light(cold_air_coming_in))
     }

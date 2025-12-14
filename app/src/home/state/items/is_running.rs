@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id, trace_state};
 
 use crate::core::unit::Watt;
 use crate::home::state::CurrentPowerUsage;
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::{
     core::{

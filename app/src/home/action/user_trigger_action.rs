@@ -1,14 +1,12 @@
 use r#macro::Id;
 
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
-use crate::core::HomeApi;
 use crate::core::time::Duration;
-use crate::home::action::{Rule, RuleResult};
+use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
 use crate::home::command::{Command, HeatingTargetState};
 use crate::home::common::HeatingZone;
 use crate::home::state::PowerAvailable;
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
-use crate::port::DataPointAccess as _;
 use crate::t;
 
 #[derive(Debug, Clone, Id)]
@@ -23,19 +21,24 @@ impl UserTriggerAction {
 }
 
 impl Rule for UserTriggerAction {
-    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
-        let start_of_range = match self.default_duration(api).await {
-            Some(duration) => t!(now) - duration,
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
+        let trigger_max_duration = match self.default_duration(ctx) {
+            Some(duration) => duration,
             None => {
                 tracing::trace!("User-trigger action currently disabled, skipping");
                 return Ok(RuleResult::Skip);
             }
         };
 
-        let Some(latest_trigger) = api.latest_trigger_since(&self.target, start_of_range).await? else {
+        let Some(latest_trigger) = ctx.latest_trigger(self.target.clone()) else {
             tracing::trace!("No user-trigger found, skipping");
             return Ok(RuleResult::Skip);
         };
+
+        if latest_trigger.timestamp.elapsed() > trigger_max_duration {
+            tracing::trace!("Trigger expired after {}, skipping", trigger_max_duration);
+            return Ok(RuleResult::Skip);
+        }
 
         let commands = into_command(&latest_trigger.trigger);
 
@@ -46,18 +49,18 @@ impl Rule for UserTriggerAction {
 
         tracing::trace!(?commands, ?latest_trigger, "User-trigger action(s) ready to be executed");
 
-        Ok(RuleResult::ExecuteTrigger(commands, latest_trigger.id))
+        Ok(RuleResult::ExecuteTrigger(commands, latest_trigger.id.clone()))
     }
 }
 
 impl UserTriggerAction {
-    async fn default_duration(&self, api: &HomeApi) -> Option<Duration> {
+    fn default_duration(&self, ctx: &RuleEvaluationContext) -> Option<Duration> {
         match self.target {
             UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving) => {
-                match PowerAvailable::LivingRoomTv.current_data_point(api).await {
+                match ctx.current_dp(PowerAvailable::LivingRoomTv) {
                     Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
                     Err(e) => {

@@ -105,6 +105,14 @@ impl HomeApi {
 //STATE
 //
 impl HomeApi {
+    pub async fn create_missing_tags(&self) -> Result<()> {
+        for id in PersistentHomeState::variants() {
+            let tag_id = self.db.get_tag_id(id.clone(), true).await?;
+        }
+
+        Ok(())
+    }
+
     async fn get_datapoint(&self, tag_id: i64, at: &DateTime) -> Result<DataPoint<f64>> {
         let range = DateTimeRange::new(*at - t!(2 minutes), *at);
         match self.get_dataframe(tag_id, &range).await?.prev_or_at(*at) {

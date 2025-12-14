@@ -1,6 +1,6 @@
 use crate::core::unit::RawValue;
 use crate::home::state::RawVendorValue;
-use crate::home::state_registry::{DerivedStateProvider, StateCalculationContext};
+use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::port::{DataFrameAccess, DataPointAccess};
 use crate::{
     core::{

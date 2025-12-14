@@ -1,14 +1,13 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::{HomeApi, unit::RawValue},
+    core::unit::RawValue,
     home::{
         LoadBalancedThermostat, Thermostat,
-        action::{Rule, RuleResult},
+        action::{Rule, RuleEvaluationContext, RuleResult},
         command::Command,
         state::RawVendorValue,
     },
-    port::DataPointAccess as _,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Id, EnumVariants)]
@@ -17,7 +16,7 @@ pub enum ProvideLoadRoomMean {
 }
 
 impl Rule for ProvideLoadRoomMean {
-    async fn evaluate(&self, api: &HomeApi) -> anyhow::Result<RuleResult> {
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
         let ((factor1, thermostat1), (factor2, thermostat2)) = match self {
             ProvideLoadRoomMean::LivingRoom => (
                 (
@@ -31,12 +30,8 @@ impl Rule for ProvideLoadRoomMean {
             ),
         };
 
-        let load1 = RawVendorValue::AllyLoadEstimate(Thermostat::from(&thermostat1))
-            .current(api)
-            .await?;
-        let load2 = RawVendorValue::AllyLoadEstimate(Thermostat::from(&thermostat2))
-            .current(api)
-            .await?;
+        let load1 = ctx.current(RawVendorValue::AllyLoadEstimate(Thermostat::from(&thermostat1)))?;
+        let load2 = ctx.current(RawVendorValue::AllyLoadEstimate(Thermostat::from(&thermostat2)))?;
 
         if !is_valid(load1) || !is_valid(load2) {
             return Ok(RuleResult::Skip);

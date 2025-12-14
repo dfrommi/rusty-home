@@ -13,15 +13,14 @@ use crate::core::app_event::UserTriggerEvent;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
-use crate::home::state::calc::bootstrap_snapshot;
-use crate::home::state::calc::calculate_new_snapshot;
+use crate::home_state::calc::bootstrap_snapshot;
+use crate::home_state::calc::calculate_new_snapshot;
 
 pub struct HomeStateRunner {
     duration: Duration,
     api: HomeApi,
     device_state: DeviceStateClient,
     snapshot: StateSnapshot,
-    //TODO make a persistent state change event
     state_changed_rx: Receiver<StateChangedEvent>,
     user_trigger_rx: Receiver<UserTriggerEvent>,
     home_state_updated_tx: Sender<DataPoint<HomeStateValue>>,

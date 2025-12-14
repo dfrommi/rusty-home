@@ -2,7 +2,7 @@ use crate::{
     adapter::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    home::state::{HomeStateValue, RelativeHumidity, Temperature},
+    home_state::{HomeStateValue, RelativeHumidity, Temperature},
 };
 
 pub struct ClimateSensor {

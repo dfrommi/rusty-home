@@ -7,7 +7,6 @@ mod action;
 pub mod command;
 mod config;
 mod goal;
-pub mod state;
 pub mod trigger;
 
 mod common;
@@ -16,7 +15,7 @@ pub use action::RuleEvaluationContext;
 pub use common::*;
 pub use goal::get_active_goals;
 
-use crate::home::state::StateSnapshot;
+use crate::home_state::StateSnapshot;
 
 pub struct HomePlanning;
 

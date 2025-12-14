@@ -50,13 +50,13 @@ fn generate_annotated_enum(
             if is_bool_type(value_type) {
                 state_value_matches.push(quote! {
                     #enum_name::#variant_name(_, value) => {
-                        crate::home::state::StateValue::Boolean(*value)
+                        crate::home_state::StateValue::Boolean(*value)
                     }
                 });
             } else {
                 state_value_matches.push(quote! {
                     #enum_name::#variant_name(_, value) => {
-                        crate::home::state::StateValue::#state_value_variant(value.clone())
+                        crate::home_state::StateValue::#state_value_variant(value.clone())
                     }
                 });
             }
@@ -65,21 +65,21 @@ fn generate_annotated_enum(
                 impl crate::port::ValueObject for #item_type {
                     type ValueType = #value_type;
 
-                    fn project_state_value(&self, value: crate::home::state::StateValue) -> Option<#value_type> {
+                    fn project_state_value(&self, value: crate::home_state::StateValue) -> Option<#value_type> {
                         match value {
-                            crate::home::state::StateValue::#state_value_variant(v) => Some(v),
+                            crate::home_state::StateValue::#state_value_variant(v) => Some(v),
                             _ => None,
                         }
                     }
 
-                    fn as_state_value(value: #value_type) -> crate::home::state::StateValue {
-                        crate::home::state::StateValue::#state_value_variant(value)
+                    fn as_state_value(value: #value_type) -> crate::home_state::StateValue {
+                        crate::home_state::StateValue::#state_value_variant(value)
                     }
                 }
             });
 
             home_state_project_matches.push(quote! {
-                (#home_state_name::#variant_name(item), crate::home::state::StateValue::#state_value_variant(value)) => {
+                (#home_state_name::#variant_name(item), crate::home_state::StateValue::#state_value_variant(value)) => {
                     Some(#enum_name::#variant_name(item.clone(), value))
                 }
             });
@@ -90,20 +90,20 @@ fn generate_annotated_enum(
         impl crate::port::ValueObject for #home_state_name {
             type ValueType = #enum_name;
 
-            fn project_state_value(&self, value: crate::home::state::StateValue) -> Option<Self::ValueType> {
+            fn project_state_value(&self, value: crate::home_state::StateValue) -> Option<Self::ValueType> {
                 match (self, value) {
                     #(#home_state_project_matches),*,
                     _ => None,
                 }
             }
 
-            fn as_state_value(value: Self::ValueType) -> crate::home::state::StateValue {
+            fn as_state_value(value: Self::ValueType) -> crate::home_state::StateValue {
                 value.value()
             }
         }
 
         impl #enum_name {
-            pub fn value(&self) -> crate::home::state::StateValue {
+            pub fn value(&self) -> crate::home_state::StateValue {
                 match self {
                     #(#state_value_matches),*
                 }

@@ -10,7 +10,7 @@ use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::{DeviceStateEvent, DeviceStateId, DeviceStateValue};
-use crate::home::state::{HeatingMode, HomeState, HomeStateValue, StateValue};
+use crate::home_state::{HeatingMode, HomeState, HomeStateValue, StateValue};
 use serde::Deserialize;
 use tokio::sync::broadcast::Receiver;
 

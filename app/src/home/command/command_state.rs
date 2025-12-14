@@ -4,12 +4,12 @@ use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{FanActivity, OpenedArea, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
+use crate::home_state::{FanActivity, OpenedArea, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
 use crate::t;
 use anyhow::Result;
 
 use crate::core::HomeApi;
-use crate::home::state::EnergySaving;
+use crate::home_state::EnergySaving;
 
 impl Command {
     pub async fn is_reflected_in_state(&self, snapshot: &StateSnapshot, api: &HomeApi) -> Result<bool> {

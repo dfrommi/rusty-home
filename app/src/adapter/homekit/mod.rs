@@ -18,7 +18,7 @@ use crate::{
         timeseries::DataPoint,
         unit::{DegreeCelsius, FanAirflow},
     },
-    home::state::HomeStateValue,
+    home_state::HomeStateValue,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

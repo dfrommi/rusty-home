@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum PowerAvailable {

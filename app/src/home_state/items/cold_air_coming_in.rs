@@ -1,6 +1,6 @@
 use crate::core::unit::DegreeCelsius;
-use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
-use crate::{core::timeseries::DataPoint, home::state::Temperature};
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::{core::timeseries::DataPoint, home_state::Temperature};
 use r#macro::{EnumVariants, Id};
 
 use super::OpenedArea;

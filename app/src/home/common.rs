@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     core::unit::DegreeCelsius,
-    home::state::{HeatingDemand, HeatingMode, OpenedArea, SetPoint, Temperature},
+    home_state::{HeatingDemand, HeatingMode, OpenedArea, SetPoint, Temperature},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]

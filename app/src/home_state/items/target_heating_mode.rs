@@ -1,5 +1,9 @@
 use r#macro::{EnumVariants, Id};
 
+use crate::home_state::{
+    AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident,
+    calc::{DerivedStateProvider, StateCalculationContext},
+};
 use crate::{
     adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     core::{
@@ -7,13 +11,7 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
-    home::{
-        state::{
-            AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident,
-            calc::{DerivedStateProvider, StateCalculationContext},
-        },
-        trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
-    },
+    home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
     t,
 };
 

@@ -3,7 +3,7 @@ use r#macro::Id;
 use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed};
 use crate::home::action::{RuleEvaluationContext, SimpleRule};
 use crate::home::command::{Command, Fan};
-use crate::home::state::Temperature;
+use crate::home_state::Temperature;
 use crate::t;
 
 use super::OpenedArea;

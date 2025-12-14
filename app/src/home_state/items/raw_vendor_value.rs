@@ -2,10 +2,8 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::unit::RawValue,
-    home::{
-        Thermostat,
-        state::calc::{DerivedStateProvider, StateCalculationContext},
-    },
+    home::Thermostat,
+    home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]

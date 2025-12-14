@@ -1,7 +1,7 @@
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::DegreeCelsius;
-use crate::home::state::Temperature;
-use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::home_state::Temperature;
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
 use r#macro::{EnumVariants, Id};
 

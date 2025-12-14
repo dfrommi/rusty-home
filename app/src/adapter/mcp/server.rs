@@ -1,7 +1,7 @@
 use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange, Duration};
-use crate::home::state::HomeState;
+use crate::home_state::HomeState;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema, Schema, json_schema};
 use rmcp::tool;

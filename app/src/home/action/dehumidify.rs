@@ -3,7 +3,7 @@ use crate::home::command::{Command, PowerToggle};
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
-use crate::home::state::RiskOfMould;
+use crate::home_state::RiskOfMould;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum Dehumidify {

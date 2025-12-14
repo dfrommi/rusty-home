@@ -13,7 +13,8 @@ use super::{
 };
 use crate::{
     core::{HomeApi, timeseries::DataPoint},
-    home::{state::HomeStateValue, trigger::UserTrigger},
+    home::trigger::UserTrigger,
+    home_state::HomeStateValue,
 };
 
 pub struct HomekitRunner {

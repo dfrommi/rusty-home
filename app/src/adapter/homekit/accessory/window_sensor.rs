@@ -2,7 +2,7 @@ use crate::{
     adapter::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    home::state::{HomeStateValue, OpenedArea},
+    home_state::{HomeStateValue, OpenedArea},
 };
 
 pub struct WindowSensor {

@@ -4,10 +4,10 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
 use crate::home::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
-use crate::home::state::Presence;
+use crate::home_state::Presence;
 use crate::t;
 
-use crate::home::state::ColdAirComingIn;
+use crate::home_state::ColdAirComingIn;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum InformWindowOpen {

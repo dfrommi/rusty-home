@@ -1,13 +1,11 @@
+use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
 use crate::{
     adapter::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitHeatingState, HomekitService, HomekitTarget,
         HomekitTargetConfig,
     },
     core::unit::DegreeCelsius,
-    home::{
-        HeatingZone,
-        state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature},
-    },
+    home::HeatingZone,
 };
 
 #[derive(Default, Clone, Copy)]

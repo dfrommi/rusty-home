@@ -3,7 +3,7 @@ use r#macro::{EnumVariants, Id};
 use crate::core::time::Duration;
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
 use crate::home::command::{Command, PowerToggle};
-use crate::home::state::PowerAvailable;
+use crate::home_state::PowerAvailable;
 use crate::t;
 
 #[derive(Debug, Clone, Id, EnumVariants)]

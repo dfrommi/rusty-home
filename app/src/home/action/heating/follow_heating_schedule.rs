@@ -11,8 +11,8 @@ use crate::{
         action::{Rule, RuleEvaluationContext, RuleResult},
         command::{Command, HeatingTargetState},
         common::HeatingZone,
-        state::{HeatingMode, TargetHeatingMode, Temperature},
     },
+    home_state::{HeatingMode, TargetHeatingMode, Temperature},
     t,
 };
 use r#macro::Id;
@@ -117,7 +117,7 @@ impl FollowHeatingSchedule {
             .thermostats()
             .iter()
             .map(|thermostat| Command::SetThermostatValveOpeningPosition {
-                device: thermostat.clone(),
+                device: *thermostat,
                 value: opening_position,
             })
             .collect()
@@ -130,7 +130,7 @@ impl FollowHeatingSchedule {
             let is_increasing = set_point > current_setpoint;
 
             commands.push(Command::SetHeating {
-                device: thermostat.clone(),
+                device: thermostat,
                 target_state: HeatingTargetState::Heat {
                     temperature: set_point,
                     low_priority: is_increasing,
@@ -146,7 +146,7 @@ impl FollowHeatingSchedule {
             .thermostats()
             .iter()
             .map(|thermostat| Command::SetHeating {
-                device: thermostat.clone(),
+                device: *thermostat,
                 target_state: target_state.clone(),
             })
             .collect()
@@ -155,9 +155,9 @@ impl FollowHeatingSchedule {
     fn hold_external_temperature(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<Vec<Command>> {
         let mut commands = vec![];
         for thermostat in self.zone.thermostats() {
-            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat.clone()))?;
+            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat))?;
             commands.push(Command::SetThermostatAmbientTemperature {
-                device: thermostat.clone(),
+                device: thermostat,
                 temperature: thermostat_external_temp,
             });
         }
@@ -175,7 +175,7 @@ impl FollowHeatingSchedule {
         let room_temp = ctx.current(self.zone.inside_temperature())?;
 
         for thermostat in self.zone.thermostats() {
-            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat.clone()))?;
+            let thermostat_external_temp = ctx.current(Temperature::ThermostatExternal(thermostat))?;
 
             if room_temp >= thermostat_external_temp {
                 continue;
@@ -188,7 +188,7 @@ impl FollowHeatingSchedule {
 
             let interpolated_temp = LinearInterpolator.interpolate(t!(now), &prev, &next)?;
             commands.push(Command::SetThermostatAmbientTemperature {
-                device: thermostat.clone(),
+                device: thermostat,
                 temperature: interpolated_temp,
             });
         }

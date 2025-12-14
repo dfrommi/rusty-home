@@ -1,4 +1,4 @@
-use crate::home::state::StateValue;
+use crate::home_state::StateValue;
 
 pub trait ValueObject {
     type ValueType: Clone;

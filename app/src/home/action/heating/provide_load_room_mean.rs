@@ -6,8 +6,8 @@ use crate::{
         LoadBalancedThermostat, Thermostat,
         action::{Rule, RuleEvaluationContext, RuleResult},
         command::Command,
-        state::RawVendorValue,
     },
+    home_state::RawVendorValue,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Id, EnumVariants)]

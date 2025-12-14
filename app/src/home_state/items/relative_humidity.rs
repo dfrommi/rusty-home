@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::{timeseries::DataPoint, unit::Percent},
-    home::state::calc::{DerivedStateProvider, StateCalculationContext},
+    home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]

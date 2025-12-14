@@ -3,7 +3,7 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::{FanAirflow, FanSpeed};
 use crate::device_state::{DeviceStateIncomingEvent, DeviceStateValue};
 use crate::home::command::{Command, CommandTarget, Fan};
-use crate::home::state::{EnergySaving, FanActivity};
+use crate::home_state::{EnergySaving, FanActivity};
 use crate::t;
 use serde_json::json;
 use tokio::sync::mpsc;

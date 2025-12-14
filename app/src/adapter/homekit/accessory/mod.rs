@@ -1,3 +1,4 @@
+use crate::home_state::{FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
 use crate::{
     adapter::homekit::{
         HomekitCommand, HomekitEvent, HomekitTargetConfig,
@@ -6,11 +7,7 @@ use crate::{
             window_sensor::WindowSensor,
         },
     },
-    home::{
-        HeatingZone,
-        command::PowerToggle,
-        state::{FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature},
-    },
+    home::{HeatingZone, command::PowerToggle},
 };
 
 mod climate_sensor;

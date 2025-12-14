@@ -3,8 +3,8 @@ use r#macro::{EnumVariants, Id};
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::Watt;
 use crate::device_state::CurrentPowerUsage;
-use crate::home::state::PowerAvailable;
-use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::home_state::PowerAvailable;
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum IsRunning {

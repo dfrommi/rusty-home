@@ -1,4 +1,4 @@
-use crate::home::{HeatingZone, Room, state::*};
+use crate::home::{HeatingZone, Room};
 
 pub trait DashboardDisplay {
     fn display(&self) -> &'static str;

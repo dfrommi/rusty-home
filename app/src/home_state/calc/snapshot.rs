@@ -5,10 +5,8 @@ use crate::{
         persistence::UserTriggerRequest,
         timeseries::{DataFrame, DataPoint},
     },
-    home::{
-        state::{HomeState, StateValue},
-        trigger::UserTriggerTarget,
-    },
+    home::trigger::UserTriggerTarget,
+    home_state::{HomeState, StateValue},
     port::ValueObject,
 };
 

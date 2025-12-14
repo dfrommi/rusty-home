@@ -11,9 +11,8 @@ use crate::{
     core::{
         HomeApi,
         time::{DateTime, DateTimeRange},
-        timeseries::DataPoint,
     },
-    home::state::HomeState,
+    home_state::HomeState,
     t,
 };
 

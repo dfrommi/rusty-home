@@ -2,13 +2,12 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
-    home::{
-        HeatingZone,
-        state::{
-            TargetHeatingMode,
-            calc::{DerivedStateProvider, StateCalculationContext},
-        },
-    },
+    home::HeatingZone,
+};
+
+use crate::home_state::{
+    TargetHeatingMode,
+    calc::{DerivedStateProvider, StateCalculationContext},
 };
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]

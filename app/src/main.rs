@@ -6,12 +6,13 @@ use settings::Settings;
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
 use crate::core::command::CommandDispatcher;
 use crate::core::planner::PlanningRunner;
-use crate::home::state::HomeStateRunner;
+use crate::home_state::HomeStateRunner;
 
 mod adapter;
 mod core;
 mod device_state;
 mod home;
+mod home_state;
 pub mod port;
 mod settings;
 

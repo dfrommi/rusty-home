@@ -1,8 +1,8 @@
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
-use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
-use crate::{core::timeseries::DataPoint, home::state::Presence};
+use crate::{core::timeseries::DataPoint, home_state::Presence};
 use anyhow::{Result, bail};
 use r#macro::{EnumVariants, Id};
 

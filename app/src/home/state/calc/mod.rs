@@ -21,7 +21,7 @@ pub async fn bootstrap_snapshot(duration: Duration, api: &HomeApi) -> anyhow::Re
     for dt in range.step_by(t!(30 seconds)) {
         let current_range = DateTimeRange::new(dt - duration.clone(), dt);
         current = dt
-            .eval_timeshifted(async { context::calculate_new_snapshot(current_range, current, api).await })
+            .eval_timeshifted(async { context::calculate_new_snapshot(current_range, &current, api).await })
             .await?;
     }
 

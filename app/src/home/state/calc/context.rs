@@ -8,7 +8,7 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
     },
     home::{
-        state::{HomeState, HomeStateDerivedStateProvider, PersistentHomeState, StateValue},
+        state::{HomeState, HomeStateDerivedStateProvider, PersistentHomeState, SetPoint, StateValue},
         trigger::UserTriggerTarget,
     },
     port::ValueObject,
@@ -19,18 +19,14 @@ use super::StateSnapshot;
 
 pub async fn calculate_new_snapshot(
     range: DateTimeRange,
-    history: StateSnapshot,
+    history: &StateSnapshot,
     api: &HomeApi,
 ) -> anyhow::Result<StateSnapshot> {
-    tracing::debug!("Calculating new state snapshot for range {:?}...", range);
     let context = create_new_calculation_context(history, api).await?;
 
     //preload all current values
-    tracing::debug!("Preloading current state values...");
     for id in HomeState::variants().iter() {
-        if !id.is_persistent() {
-            context.load(id.clone());
-        }
+        context.load(id.clone());
     }
 
     let snapshot = context.into_snapshot(range);
@@ -39,7 +35,7 @@ pub async fn calculate_new_snapshot(
 
 //TODO optimize creation of context using less copy and loops, ideally Arc
 pub async fn create_new_calculation_context(
-    history: StateSnapshot,
+    history: &StateSnapshot,
     api: &HomeApi,
 ) -> anyhow::Result<StateCalculationContext> {
     let triggers = api.all_user_triggers_since(t!(48 hours ago)).await?;
@@ -95,10 +91,10 @@ pub trait DerivedStateProvider<ID, T> {
 impl StateCalculationContext {
     pub fn get<S>(&self, id: S) -> Option<DataPoint<S::ValueType>>
     where
-        S: Into<HomeState> + ValueObject,
+        S: Into<HomeState> + ValueObject + Clone,
     {
-        let state_value = self.get_home_state_value(id.into())?;
-        let value = S::project_state_value(state_value.value)?;
+        let state_value = self.get_home_state_value(id.clone().into())?;
+        let value = id.project_state_value(state_value.value)?;
 
         Some(DataPoint {
             value,
@@ -107,6 +103,21 @@ impl StateCalculationContext {
     }
 
     fn get_home_state_value(&self, id: HomeState) -> Option<DataPoint<StateValue>> {
+        //TODO temporary workaround for migration.
+        //Setpoint is for now derived and persistent. Accept non-cached for now
+        if let HomeState::SetPoint(ref setpoint) = id {
+            if let Some(dp) = setpoint.get_derived_setpoint(self) {
+                tracing::debug!("Derived setpoint for {:?} as {:?}", setpoint, dp);
+                let calculated_dp = DataPoint {
+                    value: dp.value.into(),
+                    timestamp: dp.timestamp,
+                };
+                let mut current_mut = self.current.borrow_mut();
+                current_mut.insert(id.clone(), calculated_dp.clone());
+                return Some(calculated_dp);
+            }
+        }
+
         if id.is_persistent() {
             return self.persistent_state.get(&id).map(|df| df.last().clone());
         }
@@ -143,22 +154,23 @@ impl StateCalculationContext {
     //TODO dataframe slices and use reference
     pub fn all_of_last<S>(&self, id: S, duration: Duration) -> Option<DataFrame<S::ValueType>>
     where
-        S: Into<HomeState> + ValueObject,
+        S: Into<HomeState> + ValueObject + Clone,
     {
-        let df = self.data_frame(id.into(), DateTimeRange::new(self.now - duration, self.now))?;
-        downcast_df::<S>(&df)
+        let df = self.data_frame(id.clone().into(), DateTimeRange::new(self.now - duration, self.now))?;
+        downcast_df(id, &df)
     }
 
     pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::ValueType>>
     where
-        S: Into<HomeState> + ValueObject,
+        S: Into<HomeState> + ValueObject + Clone,
     {
-        let df = self.data_frame(id.into(), DateTimeRange::new(timestamp, self.now))?;
-        downcast_df::<S>(&df)
+        let df = self.data_frame(id.clone().into(), DateTimeRange::new(timestamp, self.now))?;
+        downcast_df(id, &df)
     }
 
     fn data_frame(&self, id: HomeState, range: DateTimeRange) -> Option<DataFrame<StateValue>> {
-        if id.is_persistent() {
+        //TODO temporary workaround for migration.
+        if id.is_persistent() && id != HomeState::SetPoint(SetPoint::RoomOfRequirements) {
             return self
                 .persistent_state
                 .get(&id)
@@ -192,6 +204,11 @@ impl StateCalculationContext {
     fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
         let mut data = HashMap::new();
 
+        //Has to be before derived so that is can be overridden
+        for (key, df) in self.persistent_state.iter() {
+            data.insert(key.clone(), df.clone());
+        }
+
         for (id, current) in self.current.borrow().iter() {
             let df = self.history.get(id).cloned();
             let combined_df = match df {
@@ -206,17 +223,14 @@ impl StateCalculationContext {
             data.insert(id.clone(), combined_df);
         }
 
-        for (key, df) in self.persistent_state.iter() {
-            data.insert(key.clone(), df.clone());
-        }
-
         StateSnapshot::new(data, self.active_user_triggers)
     }
 }
 
-fn downcast_df<S: ValueObject + Into<HomeState>>(df: &DataFrame<StateValue>) -> Option<DataFrame<S::ValueType>> {
+fn downcast_df<S: ValueObject + Into<HomeState>>(id: S, df: &DataFrame<StateValue>) -> Option<DataFrame<S::ValueType>> {
     Some(df.map(|dp: &DataPoint<StateValue>| {
         //TODO fail gracefully
-        S::project_state_value(dp.value.clone()).expect("Internal error: State value projection failed in downcast_df")
+        id.project_state_value(dp.value.clone())
+            .expect("Internal error: State value projection failed in downcast_df")
     }))
 }

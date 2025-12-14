@@ -51,7 +51,7 @@ impl PlanningRunner {
 #[tracing::instrument(skip_all)]
 pub async fn plan_for_home(snapshot: &StateSnapshot, api: &HomeApi) {
     tracing::info!("Start planning");
-    let active_goals = HomePlanning::active_goals(api).await;
+    let active_goals = HomePlanning::active_goals(snapshot.clone());
     let config = HomePlanning::config();
 
     let res = processor::plan_and_execute(&active_goals, config, snapshot.clone(), api).await;

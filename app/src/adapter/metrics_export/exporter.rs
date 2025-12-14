@@ -48,6 +48,7 @@ impl HomeStateMetricsExporter {
                             tracing::error!("Error pushing metrics to VictoriaMetrics: {:?}", e);
                             continue; //keep trying
                         }
+                        tracing::info!("Flushed {} metrics to VictoriaMetrics", buffer.len());
                         buffer.clear();
                         last_flush = t!(now);
                     }

@@ -1,9 +1,6 @@
 use crate::core::time::{DateTime, DateTimeRange};
+use crate::home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget};
 use crate::t;
-use crate::{
-    core::timeseries::DataPoint,
-    home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
-};
 use anyhow::Context;
 
 #[derive(Debug, Clone)]
@@ -17,14 +14,6 @@ pub struct UserTriggerRequest {
 impl UserTriggerRequest {
     pub fn target(&self) -> UserTriggerTarget {
         self.trigger.target()
-    }
-
-    pub fn into_datapoint(self) -> DataPoint<UserTrigger> {
-        DataPoint::new(self.trigger, self.timestamp)
-    }
-
-    pub fn to_datapoint(&self) -> DataPoint<UserTrigger> {
-        DataPoint::new(self.trigger.clone(), self.timestamp)
     }
 }
 
@@ -67,37 +56,6 @@ impl super::Database {
         .await
         .map(|_| ())
         .context("Error adding user trigger")
-    }
-
-    #[tracing::instrument(name = "get_latest_user_trigger", skip(self))]
-    pub async fn latest_trigger_since(
-        &self,
-        target: &UserTriggerTarget,
-        since: DateTime,
-    ) -> anyhow::Result<Option<DataPoint<UserTrigger>>> {
-        let db_target = serde_json::json!(target);
-        let now = t!(now);
-
-        let rec = sqlx::query!(
-            r#"SELECT trigger, timestamp FROM user_trigger
-                WHERE trigger @> $1
-                AND timestamp >= $2
-                AND (active_until IS NULL OR active_until >= $3)
-                ORDER BY timestamp DESC
-                LIMIT 1"#,
-            db_target,
-            since.into_db(),
-            now.into_db(),
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        let result = match rec {
-            Some(row) => Some(DataPoint::new(serde_json::from_value(row.trigger)?, row.timestamp.into())),
-            None => None,
-        };
-
-        Ok(result)
     }
 
     pub async fn user_triggers_in_range(

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 use infrastructure::TraceContext;
 
-use crate::home::command::{Command, CommandExecution};
+use crate::home::command::Command;
 use crate::home::state::PersistentHomeState;
 
 use crate::{

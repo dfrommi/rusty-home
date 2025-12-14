@@ -45,6 +45,10 @@ impl RuleEvaluationContext {
         Self { snapshot }
     }
 
+    pub fn inner(&self) -> &StateSnapshot {
+        &self.snapshot
+    }
+
     pub fn current_dp<S>(&self, id: S) -> Result<DataPoint<S::ValueType>>
     where
         S: Into<HomeState> + ValueObject + Clone,

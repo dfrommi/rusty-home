@@ -43,8 +43,6 @@ fn generate_annotated_enum(
     variants: &[syn::Variant],
 ) -> TokenStream2 {
     let mut item_value_object_impls = Vec::new();
-    let mut home_state_data_point_matches = Vec::new();
-    let mut home_state_data_frame_matches = Vec::new();
     let mut state_value_matches = Vec::new();
     let mut home_state_persistence_matches = Vec::new();
     let mut home_state_project_matches = Vec::new();
@@ -83,7 +81,7 @@ fn generate_annotated_enum(
                 impl crate::port::ValueObject for #item_type {
                     type ValueType = #value_type;
 
-                    fn project_state_value(value: crate::home::state::StateValue) -> Option<#value_type> {
+                    fn project_state_value(&self, value: crate::home::state::StateValue) -> Option<#value_type> {
                         match value {
                             crate::home::state::StateValue::#state_value_variant(v) => Some(v),
                             _ => None,
@@ -94,20 +92,6 @@ fn generate_annotated_enum(
                         crate::home::state::StateValue::#state_value_variant(value)
                     }
                 }
-            });
-
-            home_state_data_point_matches.push(quote! {
-                #home_state_name::#variant_name(item) => {
-                    let dp = item.current_data_point(api).await?;
-                    Ok(dp.map_value(|v| #enum_name::#variant_name(item.clone(), v.clone())))
-                }
-            });
-
-            home_state_data_frame_matches.push(quote! {
-                #home_state_name::#variant_name(item) => item
-                    .get_data_frame(range, api)
-                    .await?
-                    .map(|dp| #enum_name::#variant_name(item.clone(), dp.value.clone()))
             });
 
             let is_persistent = variant.attrs.iter().any(|attr| attr.path().is_ident("persistent"));
@@ -133,10 +117,11 @@ fn generate_annotated_enum(
         impl crate::port::ValueObject for #home_state_name {
             type ValueType = #enum_name;
 
-            fn project_state_value(value: crate::home::state::StateValue) -> Option<Self::ValueType> {
-                #home_state_name::variants()
-                    .into_iter()
-                    .find_map(|state| state.project_value(value.clone()))
+            fn project_state_value(&self, value: crate::home::state::StateValue) -> Option<Self::ValueType> {
+                match (self, value) {
+                    #(#home_state_project_matches),*,
+                    _ => None,
+                }
             }
 
             fn as_state_value(value: Self::ValueType) -> crate::home::state::StateValue {
@@ -159,30 +144,6 @@ fn generate_annotated_enum(
                 }
             }
 
-            pub fn project_value(&self, value: crate::home::state::StateValue) -> Option<#enum_name> {
-                match (self, value) {
-                    #(#home_state_project_matches),*,
-                    _ => None,
-                }
-            }
-        }
-
-        impl crate::port::DataPointAccess<#enum_name> for #home_state_name {
-            async fn current_data_point(&self, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataPoint<#enum_name>> {
-                match self {
-                    #(#home_state_data_point_matches),*
-                }
-            }
-        }
-
-        impl crate::port::DataFrameAccess<#enum_name> for #home_state_name {
-            async fn get_data_frame(&self, range: crate::core::time::DateTimeRange, api: &crate::core::HomeApi) -> anyhow::Result<crate::core::timeseries::DataFrame<#enum_name>> {
-                let df: crate::core::timeseries::DataFrame<#enum_name> = match self {
-                    #(#home_state_data_frame_matches),*
-                };
-
-                Ok(df)
-            }
         }
     };
 

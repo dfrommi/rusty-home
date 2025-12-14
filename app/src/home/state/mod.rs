@@ -10,6 +10,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::core::HomeApi;
 use crate::core::app_event::StateChangedEvent;
+use crate::core::app_event::UserTriggerEvent;
 use crate::core::time::DateTimeRange;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
@@ -22,18 +23,25 @@ pub struct HomeStateRunner {
     snapshot: StateSnapshot,
     //TODO make a persistent state change event
     state_changed_rx: Receiver<StateChangedEvent>,
+    user_trigger_rx: Receiver<UserTriggerEvent>,
     home_state_updated_tx: Sender<DataPoint<HomeStateValue>>,
     home_state_changed_tx: Sender<DataPoint<HomeStateValue>>,
     snapshot_updated_tx: Sender<StateSnapshot>,
 }
 
 impl HomeStateRunner {
-    pub fn new(duration: Duration, rx: Receiver<StateChangedEvent>, api: HomeApi) -> Self {
+    pub fn new(
+        duration: Duration,
+        rx_state: Receiver<StateChangedEvent>,
+        rx_trigger: Receiver<UserTriggerEvent>,
+        api: HomeApi,
+    ) -> Self {
         Self {
             duration,
             api,
             snapshot: StateSnapshot::default(),
-            state_changed_rx: rx,
+            state_changed_rx: rx_state,
+            user_trigger_rx: rx_trigger,
             home_state_updated_tx: tokio::sync::broadcast::channel(256).0,
             home_state_changed_tx: tokio::sync::broadcast::channel(256).0,
             snapshot_updated_tx: tokio::sync::broadcast::channel(64).0,
@@ -63,12 +71,14 @@ impl HomeStateRunner {
         loop {
             tokio::select! {
                 _ = self.state_changed_rx.recv() => {},
+                _ = self.user_trigger_rx.recv() => {},
                 _ = timer.tick() => {},
             }
 
             let range = DateTimeRange::of_last(self.duration.clone());
 
-            let new_snapshot = match calculate_new_snapshot(range, self.snapshot.clone(), &self.api).await {
+            let old_snapshot = self.snapshot.clone();
+            self.snapshot = match calculate_new_snapshot(range, &old_snapshot, &self.api).await {
                 Ok(snapshot) => snapshot,
                 Err(e) => {
                     tracing::error!("Error calculating new home state snapshot: {:?}", e);
@@ -76,18 +86,18 @@ impl HomeStateRunner {
                 }
             };
 
-            if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
+            if let Err(e) = self.snapshot_updated_tx.send(self.snapshot.clone()) {
                 tracing::error!("Error sending snapshot updated event: {}", e);
             }
 
             for state in HomeState::variants() {
-                if let Some(data_point) = new_snapshot.get(state.clone()) {
+                if let Some(data_point) = self.snapshot.get(state.clone()) {
                     if let Err(e) = self.home_state_updated_tx.send(data_point.clone()) {
                         tracing::error!("Error sending home state updated event: {:?}", e);
                     }
 
-                    let is_different = match self.snapshot.get(state) {
-                        Some(last) => last.value != data_point.value,
+                    let is_different = match old_snapshot.get(state.clone()) {
+                        Some(previous) => previous.value != data_point.value,
                         None => true,
                     };
 

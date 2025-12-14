@@ -34,6 +34,7 @@ pub async fn main() {
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
         infrastructure.event_listener.new_state_changed_listener(),
+        infrastructure.event_listener.new_user_trigger_event_listener(),
         infrastructure.api.clone(),
     );
 

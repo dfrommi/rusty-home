@@ -1,17 +1,9 @@
-use crate::core::HomeApi;
-use crate::core::time::{DateTime, DateTimeRange};
 use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
-use crate::port::{DataFrameAccess, TimeSeriesAccess as _};
 use crate::t;
 use anyhow::Result;
-use r#macro::{EnumVariants, Id, trace_state};
+use r#macro::{EnumVariants, Id};
 
-use crate::core::timeseries::{
-    DataFrame, DataPoint, TimeSeries,
-    interpolate::{Estimatable, algo},
-};
-
-use super::DataPointAccess;
+use crate::core::timeseries::DataPoint;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum OpenedArea {
@@ -75,71 +67,11 @@ impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
     }
 }
 
-impl DataPointAccess<bool> for Opened {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
-        api.current_data_point(self).await
-    }
-}
-
-impl DataFrameAccess<bool> for Opened {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
-        api.get_data_frame(self, range).await
-    }
-}
-
-impl DataPointAccess<bool> for OpenedArea {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<bool>> {
-        let opened_items = self.api_items();
-        let futures: Vec<_> = opened_items.iter().map(|o| o.current_data_point(api)).collect();
-        let values: Vec<_> = futures::future::try_join_all(futures).await?;
-
-        Ok(any_of(values))
-    }
-}
-
 fn any_of(opened_dps: Vec<DataPoint<bool>>) -> DataPoint<bool> {
     let timestamp = opened_dps.iter().map(|v| v.timestamp).max().unwrap_or(t!(now));
     let value = opened_dps.iter().any(|v| v.value);
 
     DataPoint { value, timestamp }
-}
-
-impl DataFrameAccess<bool> for OpenedArea {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<bool>> {
-        let api_items = self.api_items();
-        let context: Opened = api_items[0].clone();
-
-        let futures = api_items
-            .into_iter()
-            .map(|item| {
-                let range = range.clone();
-                async move { item.series(range, api).await }
-            })
-            .collect::<Vec<_>>();
-
-        let all_ts = futures::future::try_join_all(futures).await?;
-
-        //TODO work more directly on DataFrame
-        let merged_ts = TimeSeries::reduce(context, all_ts, |a, b| a || b)?;
-        let merged_df = merged_ts.inner();
-
-        //from API-opened into this opened type
-        Ok(merged_df.map(|dp| dp.value))
-    }
-}
-
-impl Estimatable for Opened {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
-        algo::last_seen(at, df)
-    }
-}
-
-impl Estimatable for OpenedArea {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<bool>) -> Option<bool> {
-        algo::last_seen(at, df)
-    }
 }
 
 #[cfg(test)]

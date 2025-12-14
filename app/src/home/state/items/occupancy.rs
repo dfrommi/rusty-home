@@ -1,19 +1,14 @@
 use crate::core::{
-    HomeApi,
     math::Sigmoid,
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{self, Estimatable, LastSeenInterpolator},
-    },
+    timeseries::{DataFrame, DataPoint, interpolate::LastSeenInterpolator},
 };
 
 use super::*;
-use crate::port::DataFrameAccess;
 use anyhow::Result;
 
 use crate::core::math::DataFrameStatsExt as _;
-use crate::core::time::{DateTime, DateTimeRange};
-use r#macro::{EnumVariants, Id, trace_state};
+use crate::core::time::DateTimeRange;
+use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Occupancy {
@@ -28,28 +23,19 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
     fn calculate_current(&self, id: Occupancy, ctx: &StateCalculationContext) -> Option<DataPoint<Probability>> {
         let range = DateTimeRange::since(t!(1 hours ago));
 
-        let mut main_df = match id {
+        let main_df = match id {
             Occupancy::LivingRoomCouch => ctx.all_since(Presence::LivingRoomCouch, *range.start())?,
             Occupancy::BedroomBed => ctx.all_since(Presence::BedroomBed, *range.start())?,
             Occupancy::RoomOfRequirementsDesk => ctx.all_since(IsRunning::RoomOfRequirementsMonitor, *range.start())?,
         };
 
-        if let Err(e) = main_df.retain_range(&range, LastSeenInterpolator, LastSeenInterpolator) {
-            tracing::error!(
-                "Error retaining range with interpolation that was previously requested and not empty: {}",
-                e
-            );
-            return None;
-        };
-
         let prior: f64 = -1.7968470630447446;
         let w_presence: f64 = 3.733237448369802;
 
-        let sigmoid = Sigmoid::default();
-        let s1 = main_df.weighted_aged_sum(t!(30 minutes), LastSeenInterpolator);
-        let probability = sigmoid.eval(prior + w_presence * s1);
-
-        Some(DataPoint::new(probability, t!(now)))
+        match Occupancy::calculate(prior, w_presence, main_df) {
+            Ok(probability) => Some(DataPoint::new(probability, t!(now))),
+            Err(_) => None,
+        }
     }
 }
 
@@ -75,42 +61,6 @@ impl Occupancy {
     }
 }
 
-impl Estimatable for Occupancy {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Probability>) -> Option<Probability> {
-        interpolate::algo::linear(at, df)
-    }
-}
-
-impl DataPointAccess<Probability> for Occupancy {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<Probability>> {
-        let range = DateTimeRange::since(t!(1 hours ago));
-
-        let main_df = match self {
-            Occupancy::LivingRoomCouch => Presence::LivingRoomCouch.get_data_frame(range.clone(), api).await?,
-            Occupancy::BedroomBed => Presence::BedroomBed.get_data_frame(range.clone(), api).await?,
-            Occupancy::RoomOfRequirementsDesk => {
-                IsRunning::RoomOfRequirementsMonitor
-                    .get_data_frame(range.clone(), api)
-                    .await?
-            }
-        };
-
-        let prior: f64 = -1.7968470630447446;
-        let w_presence: f64 = 3.733237448369802;
-
-        let probability = Occupancy::calculate(prior, w_presence, main_df)?;
-
-        Ok(DataPoint::new(probability, t!(now)))
-    }
-}
-
-impl DataFrameAccess<Probability> for Occupancy {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<Probability>> {
-        sampled_data_frame(self, range, t!(30 seconds), api).await
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,7 +68,10 @@ mod tests {
     use linfa_linear::LinearRegression;
     use ndarray::array;
 
-    use crate::core::{math::Sigmoid, timeseries::DataPoint};
+    use crate::core::{
+        math::Sigmoid,
+        timeseries::{DataFrame, DataPoint},
+    };
 
     #[test]
     fn training() {

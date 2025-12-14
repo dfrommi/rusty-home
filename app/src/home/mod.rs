@@ -12,16 +12,17 @@ pub mod trigger;
 
 mod common;
 
-use crate::core::HomeApi;
 pub use action::RuleEvaluationContext;
 pub use common::*;
 pub use goal::get_active_goals;
 
+use crate::home::state::StateSnapshot;
+
 pub struct HomePlanning;
 
 impl HomePlanning {
-    pub async fn active_goals(api: &HomeApi) -> Vec<HomeGoal> {
-        get_active_goals(api).await
+    pub fn active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
+        get_active_goals(snapshot)
     }
 
     pub fn config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {

@@ -57,13 +57,8 @@ pub use total_water_consumption::TotalWaterConsumption;
 
 use super::DerivedStateProvider;
 use super::StateCalculationContext;
-use crate::core::HomeApi;
-use crate::core::time::DateTimeRange;
-use crate::core::time::Duration;
-use crate::core::timeseries::DataFrame;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
-use crate::port::{DataPointAccess, TimeSeriesAccess, ValueObject};
 use crate::t;
 use r#macro::StateTypeInfoDerive;
 
@@ -247,47 +242,6 @@ pub trait PersistentHomeStateTypeInfo {
 
     fn to_f64(&self, value: &Self::ValueType) -> f64;
     fn from_f64(&self, value: f64) -> Self::ValueType;
-}
-
-async fn sampled_data_frame<T>(
-    item: &T,
-    range: DateTimeRange,
-    rate: Duration,
-    api: &HomeApi,
-) -> anyhow::Result<DataFrame<T::ValueType>>
-where
-    T: ValueObject + DataPointAccess<T::ValueType>,
-    T::ValueType: PartialEq,
-{
-    let caching_range = DateTimeRange::new(*range.start() - t!(3 hours), *range.end() + t!(3 hours));
-    let api = api.for_processing_of_range(caching_range);
-
-    let mut result = vec![];
-    let mut previous_value: Option<T::ValueType> = None;
-
-    let mut seen_timestamps = std::collections::BTreeSet::new();
-
-    for dt in range.step_by(rate) {
-        let mut dp = dt
-            .eval_timeshifted(async { item.current_data_point(&api).await })
-            .await?;
-
-        if previous_value.as_ref() != Some(&dp.value) {
-            //Timestamp might jump back to an old value, as a consequence of calculation.
-            //It could take another path and then take the timestamp from other/older source datapoints.
-            //Keeping track of seen timestamps to avoid jumping back and forth. Just assuming the
-            //current "now" for such cases.
-            if seen_timestamps.contains(&dp.timestamp) {
-                dp = DataPoint::new(dp.value, dt);
-            }
-
-            result.push(dp.clone());
-            previous_value = Some(dp.value.clone());
-            seen_timestamps.insert(dp.timestamp);
-        }
-    }
-
-    DataFrame::new(result)
 }
 
 impl From<PersistentStateValue> for StateValue {

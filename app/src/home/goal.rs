@@ -1,7 +1,5 @@
-use crate::core::HomeApi;
-use crate::home::state::{IsRunning, PowerAvailable};
+use crate::home::state::{IsRunning, StateSnapshot};
 use crate::home::{HeatingZone, Room};
-use crate::port::DataPointAccess;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum HomeGoal {
@@ -17,7 +15,7 @@ pub enum HomeGoal {
 }
 
 //TODO select goals based on current state
-pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
+pub fn get_active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
     //TODO auto-detect summer mode
     let mut goals = vec![
         HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
@@ -34,7 +32,11 @@ pub async fn get_active_goals(api: &HomeApi) -> Vec<HomeGoal> {
         HomeGoal::ResetToDefaltSettings,
     ];
 
-    if IsRunning::LivingRoomTv.current(api).await.unwrap_or(false) {
+    if snapshot
+        .get(IsRunning::LivingRoomTv)
+        .map(|dp| dp.value)
+        .unwrap_or(false)
+    {
         goals.push(HomeGoal::TvControl);
     }
 

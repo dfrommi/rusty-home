@@ -1,19 +1,6 @@
-use r#macro::{EnumVariants, Id, trace_state};
+use r#macro::{EnumVariants, Id};
 
-use crate::port::{DataFrameAccess, DataPointAccess};
-use crate::{
-    core::{
-        HomeApi,
-        time::{DateTime, DateTimeRange},
-        timeseries::{
-            DataFrame, DataPoint,
-            interpolate::{self, Estimatable},
-        },
-    },
-    home::Thermostat,
-};
-
-use super::HeatingUnit;
+use crate::home::Thermostat;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum TotalRadiatorConsumption {
@@ -35,24 +22,5 @@ impl TotalRadiatorConsumption {
             TotalRadiatorConsumption::RoomOfRequirements => Thermostat::RoomOfRequirements.heating_factor(),
             TotalRadiatorConsumption::Bathroom => Thermostat::Bathroom.heating_factor(),
         }
-    }
-}
-
-impl Estimatable for TotalRadiatorConsumption {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<HeatingUnit>) -> Option<HeatingUnit> {
-        interpolate::algo::linear(at, df)
-    }
-}
-
-impl DataPointAccess<HeatingUnit> for TotalRadiatorConsumption {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingUnit>> {
-        api.current_data_point(self).await
-    }
-}
-
-impl DataFrameAccess<HeatingUnit> for TotalRadiatorConsumption {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingUnit>> {
-        api.get_data_frame(self, range).await
     }
 }

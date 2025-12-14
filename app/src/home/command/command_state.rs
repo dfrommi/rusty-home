@@ -4,75 +4,81 @@ use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{FanActivity, FanAirflow, Opened, PowerAvailable, RawVendorValue, SetPoint};
+use crate::home::state::{FanActivity, FanAirflow, Opened, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
+use crate::t;
 use anyhow::Result;
 
-use crate::{core::HomeApi, t};
-use crate::{home::state::EnergySaving, port::DataPointAccess};
+use crate::core::HomeApi;
+use crate::home::state::EnergySaving;
 
 impl Command {
-    pub async fn is_reflected_in_state(&self, api: &HomeApi) -> Result<bool> {
+    pub async fn is_reflected_in_state(&self, snapshot: &StateSnapshot, api: &HomeApi) -> Result<bool> {
         match self {
-            Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, api).await,
+            Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, snapshot),
             Command::SetHeating { device, target_state } => {
-                is_set_heating_reflected_in_state(device, target_state, api).await
+                is_set_heating_reflected_in_state(device, target_state, snapshot)
             }
             Command::SetThermostatAmbientTemperature { device, temperature } => {
                 is_set_thermostat_ambient_temperature_reflected_in_state(device, *temperature, api).await
             }
             Command::SetThermostatLoadMean { device, value } => {
-                is_set_thermostat_load_mean_reflected_in_state(device, *value, api).await
+                is_set_thermostat_load_mean_reflected_in_state(device, *value, api, snapshot).await
             }
             Command::SetThermostatValveOpeningPosition { device, value } => {
-                is_set_thermostat_valve_opening_position_reflected_in_state(device, value, api).await
+                is_set_thermostat_valve_opening_position_reflected_in_state(device, value, snapshot)
             }
             Command::PushNotify {
                 recipient,
                 notification,
                 action,
             } => is_push_notify_reflected_in_state(recipient, notification, action, api).await,
-            Command::SetEnergySaving { device, on } => is_set_energy_saving_reflected_in_state(device, *on, api).await,
-            Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, api).await,
+            Command::SetEnergySaving { device, on } => {
+                is_set_energy_saving_reflected_in_state(device, *on, api, snapshot).await
+            }
+            Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
         }
     }
 }
 
-async fn is_set_heating_reflected_in_state(
+fn is_set_heating_reflected_in_state(
     device: &Thermostat,
     target_state: &HeatingTargetState,
-    api: &HomeApi,
+    snapshot: &StateSnapshot,
 ) -> Result<bool> {
-    let set_point = match device {
+    let set_point_item = match device {
         Thermostat::LivingRoomBig => SetPoint::LivingRoomBig,
         Thermostat::LivingRoomSmall => SetPoint::LivingRoomSmall,
         Thermostat::Bedroom => SetPoint::Bedroom,
         Thermostat::RoomOfRequirements => SetPoint::RoomOfRequirements,
         Thermostat::Kitchen => SetPoint::Kitchen,
         Thermostat::Bathroom => SetPoint::Bathroom,
-    }
-    .current(api)
-    .await?;
+    };
+
+    let set_point = snapshot.try_get(set_point_item)?.value;
 
     match target_state {
         crate::home::command::HeatingTargetState::Off => Ok(set_point == DegreeCelsius(0.0)),
         crate::home::command::HeatingTargetState::Heat { temperature, .. } => Ok(&set_point == temperature), //priority not reflected in state
-        crate::home::command::HeatingTargetState::WindowOpen => match device {
-            Thermostat::LivingRoomBig => Ok(Opened::LivingRoomRadiatorThermostatBig.current(api).await?),
-            Thermostat::LivingRoomSmall => Ok(Opened::LivingRoomRadiatorThermostatSmall.current(api).await?),
-            Thermostat::Bedroom => Ok(Opened::BedroomRadiatorThermostat.current(api).await?),
-            Thermostat::Kitchen => Ok(Opened::KitchenRadiatorThermostat.current(api).await?),
-            Thermostat::RoomOfRequirements => Ok(Opened::RoomOfRequirementsThermostat.current(api).await?),
-            Thermostat::Bathroom => Ok(Opened::BathroomThermostat.current(api).await?),
-        },
+        crate::home::command::HeatingTargetState::WindowOpen => {
+            let open_item = match device {
+                Thermostat::LivingRoomBig => Opened::LivingRoomRadiatorThermostatBig,
+                Thermostat::LivingRoomSmall => Opened::LivingRoomRadiatorThermostatSmall,
+                Thermostat::Bedroom => Opened::BedroomRadiatorThermostat,
+                Thermostat::Kitchen => Opened::KitchenRadiatorThermostat,
+                Thermostat::RoomOfRequirements => Opened::RoomOfRequirementsThermostat,
+                Thermostat::Bathroom => Opened::BathroomThermostat,
+            };
+            Ok(snapshot.try_get(open_item)?.value)
+        }
     }
 }
 
-async fn is_set_thermostat_valve_opening_position_reflected_in_state(
+fn is_set_thermostat_valve_opening_position_reflected_in_state(
     device: &Thermostat,
     value: &Percent,
-    api: &HomeApi,
+    snapshot: &StateSnapshot,
 ) -> Result<bool> {
-    let heating_demand = device.heating_demand().current(api).await?;
+    let heating_demand = snapshot.try_get(device.heating_demand())?.value;
     Ok(heating_demand.0 as i32 == value.0 as i32)
 }
 
@@ -115,8 +121,9 @@ async fn is_set_thermostat_load_mean_reflected_in_state(
     device: &LoadBalancedThermostat,
     value: RawValue,
     api: &HomeApi,
+    snapshot: &StateSnapshot,
 ) -> Result<bool> {
-    let current_value = RawVendorValue::AllyLoadMean(device.into()).current(api).await?;
+    let current_value = snapshot.try_get(RawVendorValue::AllyLoadMean(device.into()))?.value;
     let latest_command_ts = api
         .get_latest_command(CommandTarget::SetThermostatLoadMean { device: device.clone() }, t!(2 hours ago))
         .await?
@@ -128,14 +135,14 @@ async fn is_set_thermostat_load_mean_reflected_in_state(
     Ok(is_reflected)
 }
 
-async fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, api: &HomeApi) -> Result<bool> {
+fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapshot: &StateSnapshot) -> Result<bool> {
     let powered_item = match device {
         PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
         PowerToggle::LivingRoomNotificationLight => PowerAvailable::LivingRoomNotificationLight,
         PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
     };
 
-    let powered = powered_item.current(api).await?;
+    let powered = snapshot.try_get(powered_item)?.value;
     Ok(powered == power_on)
 }
 
@@ -162,12 +169,17 @@ async fn is_push_notify_reflected_in_state(
 }
 
 //Energy saving not reflected on HA. Trying to guess from actions
-async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on: bool, api: &HomeApi) -> Result<bool> {
+async fn is_set_energy_saving_reflected_in_state(
+    device: &EnergySavingDevice,
+    on: bool,
+    api: &HomeApi,
+    snapshot: &StateSnapshot,
+) -> Result<bool> {
     let state_device = match device {
         crate::home::command::EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
     };
 
-    let is_energy_saving = state_device.current(api).await?;
+    let is_energy_saving = snapshot.try_get(state_device)?.value;
 
     let recent_command = api
         .get_latest_command(CommandTarget::SetEnergySaving { device: device.clone() }, t!(24 hours ago))
@@ -178,13 +190,13 @@ async fn is_set_energy_saving_reflected_in_state(device: &EnergySavingDevice, on
     Ok(recent_command && is_energy_saving == on)
 }
 
-async fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, api: &HomeApi) -> Result<bool> {
+fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, snapshot: &StateSnapshot) -> Result<bool> {
     let state_device = match device {
         crate::home::command::Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
         crate::home::command::Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
     };
 
-    let current_flow = state_device.current(api).await?;
+    let current_flow = snapshot.try_get(state_device)?.value;
 
     Ok(current_flow == *airflow)
 }

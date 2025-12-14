@@ -68,10 +68,6 @@ impl HomeApi {
         self.cache.preload_user_trigger_cache().await
     }
 
-    pub async fn preload_user_trigger_cache(&self) -> anyhow::Result<()> {
-        self.cache.preload_user_trigger_cache().await
-    }
-
     pub async fn invalidate_ts_cache(&self, tag_id: i64) {
         self.cache.invalidate_ts_cache(tag_id).await;
     }
@@ -107,18 +103,10 @@ impl HomeApi {
 impl HomeApi {
     pub async fn create_missing_tags(&self) -> Result<()> {
         for id in PersistentHomeState::variants() {
-            let tag_id = self.db.get_tag_id(id.clone(), true).await?;
+            self.db.get_tag_id(id.clone(), true).await?;
         }
 
         Ok(())
-    }
-
-    async fn get_datapoint(&self, tag_id: i64, at: &DateTime) -> Result<DataPoint<f64>> {
-        let range = DateTimeRange::new(*at - t!(2 minutes), *at);
-        match self.get_dataframe(tag_id, &range).await?.prev_or_at(*at) {
-            Some(dp) => Ok(dp.clone()),
-            None => anyhow::bail!("No data point found for tag {} at {}", tag_id, at),
-        }
     }
 
     async fn get_dataframe(&self, tag_id: i64, range: &DateTimeRange) -> Result<DataFrame<f64>> {
@@ -130,18 +118,6 @@ impl HomeApi {
             }
         };
         self.apply_timeshift_filter_to_dataframe(df)
-    }
-
-    pub async fn current_data_point<T>(&self, item: &T) -> Result<DataPoint<T::ValueType>>
-    where
-        T: Into<PersistentHomeState> + PersistentHomeStateTypeInfo + Clone,
-    {
-        let channel: PersistentHomeState = item.clone().into();
-        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
-
-        self.get_datapoint(tag_id, &t!(now))
-            .await
-            .map(|dp| DataPoint::new(<T as PersistentHomeStateTypeInfo>::from_f64(item, dp.value), dp.timestamp))
     }
 
     pub async fn get_data_frame<T>(&self, item: &T, range: DateTimeRange) -> Result<DataFrame<T::ValueType>>
@@ -228,44 +204,11 @@ impl HomeApi {
 //USER TRIGGER
 //
 impl HomeApi {
-    async fn get_user_triggers(
-        &self,
-        target: &UserTriggerTarget,
-        range: &DateTimeRange,
-    ) -> anyhow::Result<Vec<UserTriggerRequest>> {
-        let triggers = match self.cache.get_user_triggers_from_cache(target, range).await {
-            Some(cached) => cached
-                .data()
-                .iter()
-                .filter(|req| range.contains(&req.timestamp))
-                .cloned()
-                .collect(),
-            None => {
-                tracing::warn!("No cached user triggers found for target {:?}, fetching from database", target);
-                self.db.user_triggers_in_range(target, range).await?
-            }
-        };
-
-        Ok(self.apply_timeshift_filter(triggers, |req| req.timestamp))
-    }
-
     pub async fn add_user_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let target = trigger.target();
         self.db.add_user_trigger(trigger).await?;
         self.invalidate_user_trigger_cache(&target).await;
         Ok(())
-    }
-
-    pub async fn latest_trigger_since(
-        &self,
-        target: &UserTriggerTarget,
-        since: DateTime,
-    ) -> anyhow::Result<Option<UserTriggerRequest>> {
-        let now = t!(now);
-        let range = DateTimeRange::new(since, now);
-        let triggers = self.get_user_triggers(target, &range).await?;
-
-        Ok(triggers.into_iter().max_by_key(|it| it.timestamp))
     }
 
     pub async fn all_user_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerRequest>> {

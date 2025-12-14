@@ -138,10 +138,6 @@ impl CommandExecution {
     pub fn is_user_generated(&self) -> bool {
         self.user_trigger_id.is_some()
     }
-
-    pub fn is_system_generated(&self) -> bool {
-        !self.is_user_generated()
-    }
 }
 
 //

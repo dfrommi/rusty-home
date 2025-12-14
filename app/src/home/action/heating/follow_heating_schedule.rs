@@ -1,7 +1,10 @@
 use crate::{
     core::{
         time::{DateTime, Duration},
-        timeseries::{DataPoint, interpolate::algo::linear_dp},
+        timeseries::{
+            DataPoint,
+            interpolate::{Interpolator, LinearInterpolator},
+        },
         unit::{DegreeCelsius, Percent},
     },
     home::{
@@ -183,7 +186,7 @@ impl FollowHeatingSchedule {
             let prev = DataPoint::new(thermostat_external_temp, t!(now));
             let next = DataPoint::new(room_temp, mode_start_time + total_duration.clone());
 
-            let interpolated_temp = linear_dp(t!(now), &prev, &next)?;
+            let interpolated_temp = LinearInterpolator.interpolate(t!(now), &prev, &next)?;
             commands.push(Command::SetThermostatAmbientTemperature {
                 device: thermostat.clone(),
                 temperature: interpolated_temp,

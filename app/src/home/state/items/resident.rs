@@ -1,15 +1,10 @@
-use crate::core::HomeApi;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::DataFrame;
-use crate::core::timeseries::interpolate::{self, Estimatable};
 use crate::home::state::calc::{DerivedStateProvider, StateCalculationContext};
-use crate::port::DataFrameAccess;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home::state::Presence};
 use anyhow::{Result, bail};
-use r#macro::{EnumVariants, Id, trace_state};
-
-use super::{DataPointAccess, sampled_data_frame};
+use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Resident {
@@ -43,33 +38,6 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
                 );
 
                 Some(anyone_on_couch(left, center, right))
-            }
-        }
-    }
-}
-
-//TODO maybe combination via Baysian to detect resident state
-impl DataPointAccess<bool> for Resident {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<bool>> {
-        match self {
-            Resident::AnyoneSleeping => {
-                let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(t!(now));
-                let in_bed_df = Presence::BedroomBed
-                    .get_data_frame(DateTimeRange::since(*in_bed_full_range.start()), api)
-                    .await?;
-
-                sleeping(in_bed_full_range, in_bed_df)
-            }
-
-            Resident::AnyoneOnCouch => {
-                let (left, center, right) = tokio::try_join!(
-                    Presence::CouchLeft.current_data_point(api),
-                    Presence::CouchCenter.current_data_point(api),
-                    Presence::CouchRight.current_data_point(api)
-                )?;
-
-                Ok(anyone_on_couch(left, center, right))
             }
         }
     }
@@ -158,16 +126,4 @@ fn anyone_on_couch(left: DataPoint<bool>, center: DataPoint<bool>, right: DataPo
             .min()
             .expect("Internal error: no minimum of non-empty vec"),
     )
-}
-
-impl Estimatable for Resident {
-    fn interpolate(&self, at: crate::core::time::DateTime, df: &DataFrame<Self::ValueType>) -> Option<Self::ValueType> {
-        interpolate::algo::last_seen(at, df)
-    }
-}
-
-impl DataFrameAccess<bool> for Resident {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<bool>> {
-        sampled_data_frame(self, range, t!(30 seconds), api).await
-    }
 }

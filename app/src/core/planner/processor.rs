@@ -96,7 +96,7 @@ async fn process_action<A: Action>(
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
     //EVALUATION
-    let evaluation_result = evaluate_action(&mut context, ctx).await;
+    let evaluation_result = evaluate_action(&mut context, &ctx).await;
     // Yield so other actions can start evaluating before we attempt to acquire the lock.
     yield_now().await;
 
@@ -111,12 +111,12 @@ async fn process_action<A: Action>(
     match evaluation_result {
         ActionEvaluationResult::Execute(commands, source) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), None, &api).await;
+                execute_action(&mut context, command, source.clone(), None, &api, &ctx).await;
             }
         }
         ActionEvaluationResult::ExecuteTrigger(commands, source, user_trigger_id) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), Some(user_trigger_id.clone()), &api).await;
+                execute_action(&mut context, command, source.clone(), Some(user_trigger_id.clone()), &api, &ctx).await;
             }
         }
         ActionEvaluationResult::Skip => {}
@@ -136,9 +136,9 @@ async fn process_action<A: Action>(
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: RuleEvaluationContext) -> ActionEvaluationResult {
+async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: &RuleEvaluationContext) -> ActionEvaluationResult {
     let mut result = if context.goal_active {
-        context.action.evaluate(&ctx).unwrap_or_else(|e| {
+        context.action.evaluate(ctx).unwrap_or_else(|e| {
             tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
             ActionEvaluationResult::Skip
         })
@@ -193,8 +193,13 @@ fn check_locked<A>(
     evaluation_result
 }
 
-#[tracing::instrument(skip(api))]
-async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -> anyhow::Result<bool> {
+#[tracing::instrument(skip(api, ctx))]
+async fn should_execute(
+    command: &Command,
+    source: &ExternalId,
+    api: &HomeApi,
+    ctx: &RuleEvaluationContext,
+) -> anyhow::Result<bool> {
     let target: CommandTarget = command.clone().into();
     let last_execution = api
         .get_latest_command(target.clone(), t!(48 hours ago))
@@ -209,7 +214,7 @@ async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -
         return Ok(false);
     }
 
-    let is_reflected_in_state = command.is_reflected_in_state(api).await?;
+    let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), api).await?;
     if is_reflected_in_state {
         tracing::trace!("Command for {target} is already reflected in state, skipping");
         return Ok(false);
@@ -219,19 +224,20 @@ async fn should_execute(command: &Command, source: &ExternalId, api: &HomeApi) -
     Ok(true)
 }
 
-#[tracing::instrument(skip(context, api))]
+#[tracing::instrument(skip(context, api, ctx))]
 async fn execute_action<A: Action>(
     context: &mut Context<A>,
     command: Command,
     source: ExternalId,
     user_trigger_id: Option<UserTriggerId>,
     api: &HomeApi,
+    ctx: &RuleEvaluationContext,
 ) {
     let target: CommandTarget = command.clone().into();
 
     context.user_trigger_id = user_trigger_id.clone();
 
-    match should_execute(&command, &source, api).await {
+    match should_execute(&command, &source, api, ctx).await {
         Ok(true) => match api.save_command(command, &source, user_trigger_id).await {
             Ok(_) => {
                 tracing::info!("Started command {} via action {}", target, context.action);

@@ -1,25 +1,19 @@
-use r#macro::{EnumVariants, Id, trace_state};
+use r#macro::{EnumVariants, Id};
 
 use crate::{
     adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     core::{
-        HomeApi,
-        time::{DateTime, DateTimeRange, Duration},
-        timeseries::{
-            DataFrame, DataPoint,
-            interpolate::{self, Estimatable},
-        },
+        time::{DateTime, Duration},
+        timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
     home::{
         state::{
             AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident,
             calc::{DerivedStateProvider, StateCalculationContext},
-            items::sampled_data_frame,
         },
         trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
     },
-    port::{DataFrameAccess, DataPointAccess},
     t,
 };
 
@@ -235,179 +229,9 @@ fn calculate_heating_mode(
     DataPoint::new(HeatingMode::EnergySaving, *max_ts)
 }
 
-impl DataPointAccess<HeatingMode> for TargetHeatingMode {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<HeatingMode>> {
-        let (window, temp_increase) = (self.window(), self.temp_increase());
-
-        let (away, window_open, temp_increase, sleeping, user_override) = tokio::try_join!(
-            Presence::away(api),
-            window.current_data_point(api),
-            temp_increase.current_data_point(api),
-            Resident::AnyoneSleeping.current_data_point(api),
-            self.get_user_override(api)
-        )?;
-
-        let occupancy_item = match self {
-            TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
-            TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
-            TargetHeatingMode::Bedroom => Some(Occupancy::BedroomBed),
-            _ => None,
-        };
-
-        //away and no later override
-        if away.value && user_override.clone().is_none_or(|o| o.timestamp < away.timestamp) {
-            tracing::trace!("Heating in away mode as nobody is at home");
-            return Ok(DataPoint::new(HeatingMode::Away, away.timestamp));
-        }
-
-        //Or cold-air coming in?
-        if window_open.value && window_open.timestamp.elapsed() > t!(20 seconds) {
-            tracing::trace!("Heating in ventilation mode as window is open");
-            return Ok(DataPoint::new(HeatingMode::Ventilation, window_open.timestamp));
-        }
-
-        if let Some(user_override) = user_override {
-            tracing::trace!(
-                "Heating in manual mode as user override is active to {}°C",
-                user_override.target_temperature.0
-            );
-            return Ok(DataPoint::new(
-                HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id),
-                user_override.timestamp,
-            ));
-        }
-
-        //TODO take more factors like cold air coming in after ventilation into account
-        //possible improvement: compare room temperature with setpoint and stop post-ventilation
-        //mode when setpoint is reached, but make sure it won't toggle on/off.
-        //Maybe use a hysteresis for that and don't enter mode unless room is below
-        //default-temperature of thermostat
-        if !window_open.value && window_open.timestamp.elapsed() < Self::post_ventilation_duration() {
-            tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
-            return Ok(DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp));
-        }
-
-        //Use negative occupancy in living room to detect sleep-mode, but only after is was
-        //occupied for a while
-        if sleeping.value {
-            tracing::trace!("Heating in sleep-mode as Dennis is sleeping");
-            return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));
-        }
-
-        //sleeping preseved until ventilation in that room
-        if let Some(morning_timerange) = t!(5:30 - 12:30).active() {
-            //some tampering with window, but not in morning hours
-            if !morning_timerange.contains(&window_open.timestamp) {
-                tracing::trace!("Heating in sleep-mode as not yet ventilated");
-                return Ok(DataPoint::new(HeatingMode::Sleep, sleeping.timestamp));
-            }
-        }
-
-        if let Some(occupancy_item) = occupancy_item {
-            let threshold_high = p(0.7);
-            let threshold_low = p(0.5);
-            let current_occupancy = occupancy_item.current_data_point(api).await?;
-
-            //On with hysteresis
-            if current_occupancy.value >= threshold_high {
-                tracing::trace!("Heating in comfort-mode as room is highly occupied");
-                return Ok(current_occupancy.map_value(|_| HeatingMode::Comfort));
-            } else if current_occupancy.value >= threshold_low {
-                let occupancy_ts = occupancy_item
-                    .get_data_frame(DateTimeRange::since(t!(1 hours ago)), api)
-                    .await?;
-                let last_outlier =
-                    occupancy_ts.latest_where(|dp| dp.value >= threshold_high || dp.value <= threshold_low);
-
-                if let Some(last_outlier) = last_outlier
-                    && last_outlier.value >= threshold_high
-                {
-                    tracing::trace!(
-                        "Heating in comfort-mode as room was highly occupied recently and is now moderately occupied"
-                    );
-                    return Ok(current_occupancy.map_value(|_| HeatingMode::Comfort));
-                } else {
-                    tracing::trace!(
-                        "Room occupancy is moderate, but no high occupancy recently - not switching to comfort mode"
-                    );
-                }
-            } else {
-                tracing::trace!("Room occupancy is low - not switching to comfort mode");
-            }
-        }
-
-        let max_ts = &[
-            away.timestamp,
-            window_open.timestamp,
-            temp_increase.timestamp,
-            sleeping.timestamp,
-        ]
-        .into_iter()
-        .max()
-        .unwrap_or_else(|| t!(now));
-        tracing::trace!("Heating in energy-saving-mode (fallback) as no higher-prio rule applied");
-        Ok(DataPoint::new(HeatingMode::EnergySaving, *max_ts))
-    }
-}
-
 #[derive(Debug, Clone)]
 struct UserHeatingOverride {
     timestamp: DateTime,
     target_temperature: DegreeCelsius,
     trigger_id: UserTriggerId,
-}
-
-impl TargetHeatingMode {
-    async fn get_user_override(&self, api: &HomeApi) -> anyhow::Result<Option<UserHeatingOverride>> {
-        let user_trigger = api
-            .latest_trigger_since(
-                &UserTriggerTarget::Homekit(match self {
-                    TargetHeatingMode::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
-                    TargetHeatingMode::Bedroom => HomekitCommandTarget::BedroomHeatingState,
-                    TargetHeatingMode::Kitchen => HomekitCommandTarget::KitchenHeatingState,
-                    TargetHeatingMode::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
-                    TargetHeatingMode::Bathroom => HomekitCommandTarget::BathroomHeatingState,
-                }),
-                t!(5 hours ago),
-            )
-            .await?;
-
-        if let Some(user_trigger) = user_trigger {
-            let target_temperature = match user_trigger.trigger {
-                UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(state))
-                | UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(state))
-                | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(state))
-                | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state))
-                | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => match state {
-                    HomekitHeatingState::Off => Some(DegreeCelsius(0.0)),
-                    HomekitHeatingState::Heat(target_temperature) => Some(target_temperature),
-                    HomekitHeatingState::Auto => None,
-                },
-                _ => anyhow::bail!("Unexpected user trigger type for heating override"),
-            };
-
-            if let Some(target_temperature) = target_temperature {
-                return Ok(Some(UserHeatingOverride {
-                    timestamp: user_trigger.timestamp,
-                    target_temperature,
-                    trigger_id: user_trigger.id,
-                }));
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-impl Estimatable for TargetHeatingMode {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<HeatingMode>) -> Option<HeatingMode> {
-        interpolate::algo::last_seen(at, df)
-    }
-}
-
-impl DataFrameAccess<HeatingMode> for TargetHeatingMode {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<HeatingMode>> {
-        sampled_data_frame(self, range, t!(30 seconds), api).await
-    }
 }

@@ -1,16 +1,4 @@
-use r#macro::{EnumVariants, Id, trace_state};
-
-use crate::core::{
-    HomeApi,
-    time::{DateTime, DateTimeRange},
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{self, Estimatable},
-    },
-};
-use crate::port::{DataFrameAccess, DataPointAccess};
-
-use super::Watt;
+use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum CurrentPowerUsage {
@@ -32,23 +20,4 @@ pub enum CurrentPowerUsage {
     RoomOfRequirementsDesk,
     RoomOfRequirementsMonitor,
     InfraredHeater,
-}
-
-impl Estimatable for CurrentPowerUsage {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<Watt>) -> Option<Watt> {
-        interpolate::algo::last_seen(at, df)
-    }
-}
-
-impl DataPointAccess<Watt> for CurrentPowerUsage {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<Watt>> {
-        api.current_data_point(self).await
-    }
-}
-
-impl DataFrameAccess<Watt> for CurrentPowerUsage {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<Watt>> {
-        api.get_data_frame(self, range).await
-    }
 }

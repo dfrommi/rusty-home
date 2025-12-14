@@ -14,7 +14,6 @@ use crate::{
         timeseries::DataPoint,
     },
     home::state::HomeState,
-    port::DataFrameAccess,
     t,
 };
 
@@ -120,33 +119,34 @@ async fn backfill_handler(
             .for_processing_of_range(DateTimeRange::new(*range.start() - t!(1 days), *range.end()));
         let _ = api.preload_ts_cache().await;
 
-        for state in &variants {
-            //This is expected for states that were added later
-            let Ok(frame) = state.get_data_frame(range.clone(), &api).await else {
-                tracing::debug!("No data frame found for state {} in range {}, skipping", state.ext_id(), range);
-                continue;
-            };
-
-            for dt in range.step_by(rate.clone()) {
-                let dp_at = frame.prev_or_at(dt);
-
-                if let Some(dp) = dp_at {
-                    let dp = DataPoint::new(dp.value.clone(), dt);
-                    buffer.push(dp.into());
-
-                    if buffer.len() >= BATCH_SIZE {
-                        ctx.repo.push(&buffer).await.map_err(|e| {
-                            actix_web::error::ErrorInternalServerError(format!(
-                                "Error pushing metrics to VictoriaMetrics: {}",
-                                e
-                            ))
-                        })?;
-
-                        buffer.clear();
-                    }
-                }
-            }
-        }
+        //TODO fix for StateSnapshot
+        //     for state in &variants {
+        //         //This is expected for states that were added later
+        //         let Ok(frame) = state.get_data_frame(range.clone(), &api).await else {
+        //             tracing::debug!("No data frame found for state {} in range {}, skipping", state.ext_id(), range);
+        //             continue;
+        //         };
+        //
+        //         for dt in range.step_by(rate.clone()) {
+        //             let dp_at = frame.prev_or_at(dt);
+        //
+        //             if let Some(dp) = dp_at {
+        //                 let dp = DataPoint::new(dp.value.clone(), dt);
+        //                 buffer.push(dp.into());
+        //
+        //                 if buffer.len() >= BATCH_SIZE {
+        //                     ctx.repo.push(&buffer).await.map_err(|e| {
+        //                         actix_web::error::ErrorInternalServerError(format!(
+        //                             "Error pushing metrics to VictoriaMetrics: {}",
+        //                             e
+        //                         ))
+        //                     })?;
+        //
+        //                     buffer.clear();
+        //                 }
+        //             }
+        //         }
+        //     }
     }
 
     ctx.repo.push(&buffer).await.map_err(|e| {

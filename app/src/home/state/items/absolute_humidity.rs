@@ -1,20 +1,9 @@
-use crate::core::{
-    HomeApi,
-    timeseries::{
-        DataFrame, DataPoint,
-        interpolate::{self, Estimatable},
-    },
-};
-
 use super::*;
 use crate::home::state::{RelativeHumidity, Temperature};
-use crate::port::DataFrameAccess;
 use anyhow::Result;
-use futures::try_join;
 
-use crate::core::time::{DateTime, DateTimeRange};
 use crate::core::unit::{DegreeCelsius, Percent};
-use r#macro::{EnumVariants, Id, trace_state};
+use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
@@ -105,39 +94,6 @@ impl AbsoluteHumidity {
         // Absolute Feuchte (g/m3)
         let v = 10f64.powi(5) * MW / GK * dd / tk;
         GramPerCubicMeter(v)
-    }
-}
-
-impl Estimatable for AbsoluteHumidity {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<GramPerCubicMeter>) -> Option<GramPerCubicMeter> {
-        interpolate::algo::linear(at, df)
-    }
-}
-
-impl DataPointAccess<GramPerCubicMeter> for AbsoluteHumidity {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> Result<DataPoint<GramPerCubicMeter>> {
-        let temperature: DataPoint<DegreeCelsius> = self.temperature().current_data_point(api).await?;
-        let humidity: DataPoint<Percent> = self.relative_humidity().current_data_point(api).await?;
-
-        let dp = Self::calculate_abs_humidity(temperature.value, humidity.value);
-
-        Ok(DataPoint {
-            value: dp,
-            timestamp: std::cmp::max(temperature.timestamp, humidity.timestamp),
-        })
-    }
-}
-
-impl DataFrameAccess<GramPerCubicMeter> for AbsoluteHumidity {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> Result<DataFrame<GramPerCubicMeter>> {
-        let (t_series, h_series) = {
-            let temp = self.temperature();
-            let humidity = self.relative_humidity();
-            try_join!(temp.series(range.clone(), api), humidity.series(range.clone(), api))?
-        };
-
-        DataFrame::<GramPerCubicMeter>::combined(t_series, h_series, Self::calculate_abs_humidity)
     }
 }
 

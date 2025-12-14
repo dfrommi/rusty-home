@@ -2,7 +2,6 @@ use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, DateTimeRange, Duration};
 use crate::home::state::HomeState;
-use crate::port::{DataFrameAccess, DataPointAccess};
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema, Schema, json_schema};
 use rmcp::tool;
@@ -138,32 +137,34 @@ impl SmartHomeMcp {
         for device_id in devices {
             let ext_id: ExternalId = device_id.clone().into();
 
-            match HomeState::try_from(ext_id) {
-                Ok(state) => match state.current_data_point(&self.api).await {
-                    Ok(data_point) => {
-                        results.push(Content::json(DeviceState {
-                            device: device_id.clone(),
-                            value: data_point.value.value().to_string(),
-                            last_changed: data_point.timestamp,
-                            same_value_duration: data_point.timestamp.elapsed(),
-                        })?);
-                    }
-
-                    Err(e) => {
-                        results.push(Content::json(DeviceError {
-                            device: device_id.clone(),
-                            error: format!("Failed to get state value: {e}"),
-                        })?);
-                    }
-                },
-
-                Err(_) => {
-                    results.push(Content::json(DeviceError {
-                        device: device_id.clone(),
-                        error: format!("Unknown device: {}/{}", device_id.device_type, device_id.device_name),
-                    })?);
-                }
-            }
+            // TODO Adjust to state snapshot
+            // match HomeState::try_from(ext_id) {
+            //     Ok(state) => match state.current_data_point(&self.api).await {
+            //         Ok(data_point) => {
+            //             results.push(Content::json(DeviceState {
+            //                 device: device_id.clone(),
+            //                 value: data_point.value.value().to_string(),
+            //                 last_changed: data_point.timestamp,
+            //                 same_value_duration: data_point.timestamp.elapsed(),
+            //             })?);
+            //         }
+            //
+            //         Err(e) => {
+            //             results.push(Content::json(DeviceError {
+            //                 device: device_id.clone(),
+            //                 error: format!("Failed to get state value: {e}"),
+            //             })?);
+            //         }
+            //     },
+            //
+            //     Err(_) => {
+            //         results.push(Content::json(DeviceError {
+            //             device: device_id.clone(),
+            //             error: format!("Unknown device: {}/{}", device_id.device_type, device_id.device_name),
+            //         })?);
+            //     }
+            // }
+            todo!();
         }
 
         Ok(CallToolResult::success(results))
@@ -175,40 +176,42 @@ impl SmartHomeMcp {
         Parameters(DeviceStateHistoryRequest { device, from, to }): Parameters<DeviceStateHistoryRequest>,
     ) -> Result<CallToolResult, McpError> {
         let ext_id: ExternalId = device.clone().into();
+        todo!();
 
-        match HomeState::try_from(ext_id) {
-            Ok(state) => match state.get_data_frame(DateTimeRange::new(from, to), &self.api).await {
-                Ok(data_frame) => {
-                    let mut history = Vec::new();
-
-                    for dp in data_frame.iter() {
-                        history.push(DeviceHistoryState {
-                            value: dp.value.value().to_string(),
-                            last_changed: dp.timestamp,
-                            same_value_duration: dp.timestamp.elapsed(),
-                        });
-                    }
-
-                    return Ok(CallToolResult::success(vec![Content::json(DeviceHistoryStateResponse {
-                        device: device.clone(),
-                        values: history,
-                    })?]));
-                }
-
-                Err(e) => {
-                    return Ok(CallToolResult::error(vec![Content::json(DeviceError {
-                        device,
-                        error: format!("Failed to get state history: {e}"),
-                    })?]));
-                }
-            },
-            Err(_) => {
-                return Ok(CallToolResult::error(vec![Content::json(DeviceError {
-                    device: device.clone(),
-                    error: format!("Unknown device: {}/{}", device.device_type, device.device_name),
-                })?]));
-            }
-        }
+        // TODO Adjust to state snapshot
+        // match HomeState::try_from(ext_id) {
+        //     Ok(state) => match state.get_data_frame(DateTimeRange::new(from, to), &self.api).await {
+        //         Ok(data_frame) => {
+        //             let mut history = Vec::new();
+        //
+        //             for dp in data_frame.iter() {
+        //                 history.push(DeviceHistoryState {
+        //                     value: dp.value.value().to_string(),
+        //                     last_changed: dp.timestamp,
+        //                     same_value_duration: dp.timestamp.elapsed(),
+        //                 });
+        //             }
+        //
+        //             return Ok(CallToolResult::success(vec![Content::json(DeviceHistoryStateResponse {
+        //                 device: device.clone(),
+        //                 values: history,
+        //             })?]));
+        //         }
+        //
+        //         Err(e) => {
+        //             return Ok(CallToolResult::error(vec![Content::json(DeviceError {
+        //                 device,
+        //                 error: format!("Failed to get state history: {e}"),
+        //             })?]));
+        //         }
+        //     },
+        //     Err(_) => {
+        //         return Ok(CallToolResult::error(vec![Content::json(DeviceError {
+        //             device: device.clone(),
+        //             error: format!("Unknown device: {}/{}", device.device_type, device.device_name),
+        //         })?]));
+        //     }
+        // }
     }
 }
 

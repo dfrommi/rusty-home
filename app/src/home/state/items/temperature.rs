@@ -1,18 +1,5 @@
-use crate::core::HomeApi;
-use crate::core::timeseries::DataPoint;
-use crate::core::unit::DegreeCelsius;
 use crate::home::Thermostat;
-use crate::port::DataFrameAccess;
-use crate::{
-    core::time::{DateTime, DateTimeRange},
-    port::DataPointAccess,
-};
-use r#macro::{EnumVariants, Id, trace_state};
-
-use crate::core::timeseries::{
-    DataFrame,
-    interpolate::{Estimatable, algo},
-};
+use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 //TODO remove EnumVariants, only for state-debug
@@ -31,23 +18,4 @@ pub enum Temperature {
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,
-}
-
-impl Estimatable for Temperature {
-    fn interpolate(&self, at: DateTime, df: &DataFrame<DegreeCelsius>) -> Option<DegreeCelsius> {
-        algo::linear(at, df)
-    }
-}
-
-impl DataPointAccess<DegreeCelsius> for Temperature {
-    #[trace_state]
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
-        api.current_data_point(self).await
-    }
-}
-
-impl DataFrameAccess<DegreeCelsius> for Temperature {
-    async fn get_data_frame(&self, range: DateTimeRange, api: &HomeApi) -> anyhow::Result<DataFrame<DegreeCelsius>> {
-        api.get_data_frame(self, range).await
-    }
 }

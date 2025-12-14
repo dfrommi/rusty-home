@@ -8,6 +8,7 @@ use crate::core::{
 
 pub trait DataFrameStatsExt<T> {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
+    fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
 }
 
 impl<T> DataFrameStatsExt<T> for DataFrame<T>
@@ -15,26 +16,40 @@ where
     T: Into<f64> + Clone,
 {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64 {
-        let values = self.map_interval(|dp1, dp2| {
-            assert!(dp1.timestamp <= dp2.timestamp);
-
-            let age_factor = tau.as_secs_f64()
-                * (exp_decay_since(dp2.timestamp, tau.clone()) - exp_decay_since(dp1.timestamp, tau.clone()));
-
-            let value: T = interpolator
-                .interpolate(DateTime::midpoint(&dp1.timestamp, &dp2.timestamp), dp1, dp2)
-                //this should really never ever happen as "at" is guaranteed to be between dp1 and dp2
-                .unwrap_or(dp1.value.clone());
-
-            let value: f64 = value.into();
-            (value, age_factor)
-        });
-
-        let weights_sum: f64 = values.iter().map(|(_, w)| *w).sum();
-        let sum: f64 = values.iter().map(|(v, w)| v * w).sum();
-
-        if weights_sum != 0.0 { sum / weights_sum } else { 0.0 }
+        let (res, _count) = age_weighted_sum_and_count(self, tau, interpolator);
+        res
     }
+
+    fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64 {
+        let (res, count) = age_weighted_sum_and_count(self, tau, interpolator);
+        if count > 0 { res } else { 0.0 }
+    }
+}
+
+fn age_weighted_sum_and_count<T>(df: &DataFrame<T>, tau: Duration, interpolator: impl Interpolator<T>) -> (f64, usize)
+where
+    T: Into<f64> + Clone,
+{
+    let values = df.map_interval(|dp1, dp2| {
+        assert!(dp1.timestamp <= dp2.timestamp);
+
+        let age_factor = tau.as_secs_f64()
+            * (exp_decay_since(dp2.timestamp, tau.clone()) - exp_decay_since(dp1.timestamp, tau.clone()));
+
+        let value: T = interpolator
+            .interpolate(DateTime::midpoint(&dp1.timestamp, &dp2.timestamp), dp1, dp2)
+            //this should really never ever happen as "at" is guaranteed to be between dp1 and dp2
+            .unwrap_or(dp1.value.clone());
+
+        let value: f64 = value.into();
+        (value, age_factor)
+    });
+
+    let weights_sum: f64 = values.iter().map(|(_, w)| *w).sum();
+    let sum: f64 = values.iter().map(|(v, w)| v * w).sum();
+
+    let res = if weights_sum != 0.0 { sum / weights_sum } else { 0.0 };
+    (res, values.len())
 }
 
 fn sigmoid<T: Into<f64>>(x: T) -> Probability {

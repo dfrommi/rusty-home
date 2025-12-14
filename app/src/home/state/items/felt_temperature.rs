@@ -2,7 +2,6 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::{
-        HomeApi,
         math::{Sigmoid, Tanh},
         timeseries::DataPoint,
         unit::{DegreeCelsius, GramPerCubicMeter},
@@ -10,9 +9,7 @@ use crate::{
     home::state::{
         AbsoluteHumidity, Temperature,
         calc::{DerivedStateProvider, StateCalculationContext},
-        items::sampled_data_frame,
     },
-    port::{DataFrameAccess, DataPointAccess},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Id, EnumVariants)]
@@ -92,29 +89,6 @@ fn calculate_felt_temperature(temperature: DegreeCelsius, abs_humidity: GramPerC
     };
 
     temperature + delta_humid + delta_dry
-}
-
-impl DataPointAccess<DegreeCelsius> for FeltTemperature {
-    async fn current_data_point(&self, api: &HomeApi) -> anyhow::Result<DataPoint<DegreeCelsius>> {
-        let temp = self.temperature().current_data_point(api).await?;
-        let abs_humidity = self.abs_humidity().current_data_point(api).await?;
-        let felt_temp_value = calculate_felt_temperature(temp.value, abs_humidity.value);
-
-        Ok(DataPoint {
-            value: felt_temp_value,
-            timestamp: std::cmp::max(temp.timestamp, abs_humidity.timestamp),
-        })
-    }
-}
-
-impl DataFrameAccess<DegreeCelsius> for FeltTemperature {
-    async fn get_data_frame(
-        &self,
-        range: crate::core::time::DateTimeRange,
-        api: &crate::core::HomeApi,
-    ) -> anyhow::Result<crate::core::timeseries::DataFrame<DegreeCelsius>> {
-        sampled_data_frame(self, range, crate::t!(30 seconds), api).await
-    }
 }
 
 #[cfg(test)]

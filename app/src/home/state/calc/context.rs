@@ -18,7 +18,7 @@ use crate::{
 use super::StateSnapshot;
 
 pub async fn calculate_new_snapshot(
-    range: DateTimeRange,
+    truncate_before: Duration,
     history: &StateSnapshot,
     api: &HomeApi,
 ) -> anyhow::Result<StateSnapshot> {
@@ -29,16 +29,20 @@ pub async fn calculate_new_snapshot(
         context.load(id.clone());
     }
 
-    let snapshot = context.into_snapshot(range);
+    let snapshot = context.into_snapshot(DateTimeRange::since(t!(now) - truncate_before));
+
     Ok(snapshot)
 }
 
 //TODO optimize creation of context using less copy and loops, ideally Arc
-pub async fn create_new_calculation_context(
+async fn create_new_calculation_context(
     history: &StateSnapshot,
     api: &HomeApi,
 ) -> anyhow::Result<StateCalculationContext> {
-    let triggers = api.all_user_triggers_since(t!(48 hours ago)).await?;
+    let max_user_trigger_age = t!(48 hours ago);
+    let state_range = DateTimeRange::since(t!(8 hours ago));
+
+    let triggers = api.all_user_triggers_since(max_user_trigger_age).await?;
     let mut active_triggers = HashMap::new();
 
     for trigger in triggers {
@@ -47,7 +51,7 @@ pub async fn create_new_calculation_context(
 
     //TODO optimize loading of persistent states, ideally all in one query
     let mut persistent_states: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
-    let state_range = DateTimeRange::since(t!(8 hours ago));
+
     for item in PersistentHomeState::variants().iter() {
         let df = match api.get_data_frame(item, state_range.clone()).await {
             Err(e) => {
@@ -61,13 +65,13 @@ pub async fn create_new_calculation_context(
 
     let mut history_map: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
     for (id, value) in history.home_state_iter() {
+        //Maybe exception needed for setpoint?
         if !id.is_persistent() {
             history_map.insert(id.clone(), value.clone());
         }
     }
 
     Ok(StateCalculationContext {
-        now: t!(now),
         current: RefCell::new(HashMap::new()),
         history: history_map,
         persistent_state: persistent_states,
@@ -76,7 +80,6 @@ pub async fn create_new_calculation_context(
 }
 
 pub struct StateCalculationContext {
-    now: DateTime,
     //Has to contain persistent current values
     current: RefCell<HashMap<HomeState, DataPoint<StateValue>>>,
     history: HashMap<HomeState, DataFrame<StateValue>>,
@@ -130,13 +133,14 @@ impl StateCalculationContext {
         match current_value {
             Some(dp) => Some(dp),
             None => {
+                let now = t!(now);
                 let mut calculated_dp = HomeStateDerivedStateProvider.calculate_current(id.clone(), self)?;
-                if calculated_dp.timestamp > self.now {
-                    calculated_dp.timestamp = self.now;
+                if calculated_dp.timestamp > now {
+                    calculated_dp.timestamp = now;
                 } else if let Some(last_history_ts) = self.last_history_timestamp(&id)
                     && calculated_dp.timestamp <= last_history_ts
                 {
-                    calculated_dp.timestamp = self.now;
+                    calculated_dp.timestamp = now;
                 }
 
                 let mut current_mut = self.current.borrow_mut();
@@ -156,7 +160,7 @@ impl StateCalculationContext {
     where
         S: Into<HomeState> + ValueObject + Clone,
     {
-        let df = self.data_frame(id.clone().into(), DateTimeRange::new(self.now - duration, self.now))?;
+        let df = self.data_frame(id.clone().into(), DateTimeRange::new(t!(now) - duration, t!(now)))?;
         downcast_df(id, &df)
     }
 
@@ -164,7 +168,7 @@ impl StateCalculationContext {
     where
         S: Into<HomeState> + ValueObject + Clone,
     {
-        let df = self.data_frame(id.clone().into(), DateTimeRange::new(timestamp, self.now))?;
+        let df = self.data_frame(id.clone().into(), DateTimeRange::since(timestamp))?;
         downcast_df(id, &df)
     }
 
@@ -210,7 +214,7 @@ impl StateCalculationContext {
         }
 
         for (id, current) in self.current.borrow().iter() {
-            let df = self.history.get(id).cloned();
+            let df: Option<DataFrame<StateValue>> = self.history.get(id).cloned();
             let combined_df = match df {
                 Some(mut df) => {
                     df.insert(current.clone());

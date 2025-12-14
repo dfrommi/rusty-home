@@ -11,7 +11,6 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use crate::core::HomeApi;
 use crate::core::app_event::StateChangedEvent;
 use crate::core::app_event::UserTriggerEvent;
-use crate::core::time::DateTimeRange;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::home::state::calc::bootstrap_snapshot;
@@ -75,10 +74,8 @@ impl HomeStateRunner {
                 _ = timer.tick() => {},
             }
 
-            let range = DateTimeRange::of_last(self.duration.clone());
-
             let old_snapshot = self.snapshot.clone();
-            self.snapshot = match calculate_new_snapshot(range, &old_snapshot, &self.api).await {
+            let new_snapshot = match calculate_new_snapshot(self.duration.clone(), &old_snapshot, &self.api).await {
                 Ok(snapshot) => snapshot,
                 Err(e) => {
                     tracing::error!("Error calculating new home state snapshot: {:?}", e);
@@ -86,12 +83,12 @@ impl HomeStateRunner {
                 }
             };
 
-            if let Err(e) = self.snapshot_updated_tx.send(self.snapshot.clone()) {
+            if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
                 tracing::error!("Error sending snapshot updated event: {}", e);
             }
 
             for state in HomeState::variants() {
-                if let Some(data_point) = self.snapshot.get(state.clone()) {
+                if let Some(data_point) = new_snapshot.get(state.clone()) {
                     if let Err(e) = self.home_state_updated_tx.send(data_point.clone()) {
                         tracing::error!("Error sending home state updated event: {:?}", e);
                     }
@@ -108,6 +105,8 @@ impl HomeStateRunner {
                     }
                 }
             }
+
+            self.snapshot = new_snapshot;
         }
     }
 }

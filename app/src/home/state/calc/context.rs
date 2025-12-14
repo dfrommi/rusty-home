@@ -7,8 +7,9 @@ use crate::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{DataFrame, DataPoint},
     },
+    device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem, DeviceStateValue},
     home::{
-        state::{HomeState, HomeStateDerivedStateProvider, PersistentHomeState, SetPoint, StateValue},
+        state::{HomeState, HomeStateDerivedStateProvider, StateValue},
         trigger::UserTriggerTarget,
     },
     port::ValueObject,
@@ -21,8 +22,9 @@ pub async fn calculate_new_snapshot(
     truncate_before: Duration,
     history: &StateSnapshot,
     api: &HomeApi,
+    device_state: &DeviceStateClient,
 ) -> anyhow::Result<StateSnapshot> {
-    let context = create_new_calculation_context(history, api).await?;
+    let context = create_new_calculation_context(history, api, device_state).await?;
 
     //preload all current values
     for id in HomeState::variants().iter() {
@@ -38,9 +40,9 @@ pub async fn calculate_new_snapshot(
 async fn create_new_calculation_context(
     history: &StateSnapshot,
     api: &HomeApi,
+    device_state: &DeviceStateClient,
 ) -> anyhow::Result<StateCalculationContext> {
     let max_user_trigger_age = t!(48 hours ago);
-    let state_range = DateTimeRange::since(t!(8 hours ago));
 
     let triggers = api.all_user_triggers_since(max_user_trigger_age).await?;
     let mut active_triggers = HashMap::new();
@@ -49,41 +51,25 @@ async fn create_new_calculation_context(
         active_triggers.insert(trigger.target(), trigger);
     }
 
-    //TODO optimize loading of persistent states, ideally all in one query
-    let mut persistent_states: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
-
-    for item in PersistentHomeState::variants().iter() {
-        let df = match api.get_data_frame(item, state_range.clone()).await {
-            Err(e) => {
-                tracing::error!("Error loading persistent state {:?}: {:?}", item, e);
-                continue;
-            }
-            Ok(df) => df.map(|dp| dp.value.value().into()),
-        };
-        persistent_states.insert(HomeState::from(item.clone()), df);
-    }
-
     let mut history_map: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
     for (id, value) in history.home_state_iter() {
-        //Maybe exception needed for setpoint?
-        if !id.is_persistent() {
-            history_map.insert(id.clone(), value.clone());
-        }
+        history_map.insert(id.clone(), value.clone());
     }
+
+    let device_states = device_state.get_current_for_all().await?;
 
     Ok(StateCalculationContext {
         current: RefCell::new(HashMap::new()),
         history: history_map,
-        persistent_state: persistent_states,
+        device_state: device_states,
         active_user_triggers: active_triggers,
     })
 }
 
 pub struct StateCalculationContext {
-    //Has to contain persistent current values
     current: RefCell<HashMap<HomeState, DataPoint<StateValue>>>,
     history: HashMap<HomeState, DataFrame<StateValue>>,
-    persistent_state: HashMap<HomeState, DataFrame<StateValue>>,
+    device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
     active_user_triggers: HashMap<UserTriggerTarget, UserTriggerRequest>,
 }
 
@@ -106,25 +92,6 @@ impl StateCalculationContext {
     }
 
     fn get_home_state_value(&self, id: HomeState) -> Option<DataPoint<StateValue>> {
-        //TODO temporary workaround for migration.
-        //Setpoint is for now derived and persistent. Accept non-cached for now
-        if let HomeState::SetPoint(ref setpoint) = id {
-            if let Some(dp) = setpoint.get_derived_setpoint(self) {
-                tracing::debug!("Derived setpoint for {:?} as {:?}", setpoint, dp);
-                let calculated_dp = DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                };
-                let mut current_mut = self.current.borrow_mut();
-                current_mut.insert(id.clone(), calculated_dp.clone());
-                return Some(calculated_dp);
-            }
-        }
-
-        if id.is_persistent() {
-            return self.persistent_state.get(&id).map(|df| df.last().clone());
-        }
-
         let current_value = {
             let current = self.current.borrow();
             current.get(&id).cloned()
@@ -146,6 +113,20 @@ impl StateCalculationContext {
                 let mut current_mut = self.current.borrow_mut();
                 current_mut.insert(id.clone(), calculated_dp.clone());
                 Some(calculated_dp)
+            }
+        }
+    }
+
+    pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>
+    where
+        D: Into<DeviceStateId> + DeviceStateItem + Clone,
+    {
+        let dp = self.device_state.get(&id.clone().into())?;
+        match id.try_downcast(dp.value.clone()) {
+            Ok(v) => Some(DataPoint::new(v, dp.timestamp)),
+            Err(e) => {
+                tracing::error!("Error converting device state {:?} to exepceted type: {}", dp.value, e);
+                None
             }
         }
     }
@@ -173,14 +154,6 @@ impl StateCalculationContext {
     }
 
     fn data_frame(&self, id: HomeState, range: DateTimeRange) -> Option<DataFrame<StateValue>> {
-        //TODO temporary workaround for migration.
-        if id.is_persistent() && id != HomeState::SetPoint(SetPoint::RoomOfRequirements) {
-            return self
-                .persistent_state
-                .get(&id)
-                .and_then(|df| df.retain_range_with_context_before(&range));
-        }
-
         let prev_df = self.history.get(&id);
         let current = self.get_home_state_value(id).take_if(|dp| &dp.timestamp <= range.end());
 
@@ -207,11 +180,6 @@ impl StateCalculationContext {
 
     fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
         let mut data = HashMap::new();
-
-        //Has to be before derived so that is can be overridden
-        for (key, df) in self.persistent_state.iter() {
-            data.insert(key.clone(), df.clone());
-        }
 
         for (id, current) in self.current.borrow().iter() {
             let df: Option<DataFrame<StateValue>> = self.history.get(id).cloned();

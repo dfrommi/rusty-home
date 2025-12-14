@@ -20,7 +20,7 @@ pub struct RiskOfMouldStateProvider;
 impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
     fn calculate_current(&self, id: RiskOfMould, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
         let humidity = match id {
-            RiskOfMould::Bathroom => ctx.get(RelativeHumidity::BathroomShower)?,
+            RiskOfMould::Bathroom => ctx.get(RelativeHumidity::Bathroom)?,
         };
 
         if humidity.value < Percent(70.0) {
@@ -50,11 +50,7 @@ impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
 impl RiskOfMouldStateProvider {
     fn get_reference_dewpoint(id: RiskOfMould, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         let ref_dewpoints = match id {
-            RiskOfMould::Bathroom => vec![
-                DewPoint::LivingRoom,
-                //DewPoint::KitchenOuterWall, //TODO fix data collection
-                DewPoint::RoomOfRequirement,
-            ],
+            RiskOfMould::Bathroom => vec![DewPoint::LivingRoom, DewPoint::RoomOfRequirement],
         };
 
         let mut ref_sum: f64 = 0.0;

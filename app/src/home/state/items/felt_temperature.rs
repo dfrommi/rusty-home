@@ -14,11 +14,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Id, EnumVariants)]
 pub enum FeltTemperature {
-    BathroomShower,
     LivingRoom,
-    Kitchen,
-    KitchenOuterWall,
-    RoomOfRequirements,
 }
 
 pub struct FeltTemperatureStateProvider;
@@ -45,20 +41,12 @@ impl FeltTemperature {
     fn temperature(&self) -> Temperature {
         match self {
             FeltTemperature::LivingRoom => Temperature::LivingRoom,
-            FeltTemperature::BathroomShower => Temperature::BathroomShower,
-            FeltTemperature::Kitchen => Temperature::Kitchen,
-            FeltTemperature::KitchenOuterWall => Temperature::KitchenOuterWall,
-            FeltTemperature::RoomOfRequirements => Temperature::RoomOfRequirements,
         }
     }
 
     fn abs_humidity(&self) -> AbsoluteHumidity {
         match self {
             FeltTemperature::LivingRoom => AbsoluteHumidity::LivingRoom,
-            FeltTemperature::BathroomShower => AbsoluteHumidity::BathroomShower,
-            FeltTemperature::Kitchen => AbsoluteHumidity::Kitchen,
-            FeltTemperature::KitchenOuterWall => AbsoluteHumidity::KitchenOuterWall,
-            FeltTemperature::RoomOfRequirements => AbsoluteHumidity::RoomOfRequirements,
         }
     }
 }

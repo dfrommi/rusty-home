@@ -9,6 +9,7 @@ use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
+use crate::device_state::{DeviceStateEvent, DeviceStateId, DeviceStateValue};
 use crate::home::state::{HeatingMode, HomeState, HomeStateValue, StateValue};
 use serde::Deserialize;
 use tokio::sync::broadcast::Receiver;
@@ -24,9 +25,13 @@ impl MetricsExport {
         api::routes(repo, api)
     }
 
-    pub fn new_exporter(&self, rx: Receiver<DataPoint<HomeStateValue>>) -> HomeStateMetricsExporter {
+    pub fn new_exporter(
+        &self,
+        rx_device: Receiver<DeviceStateEvent>,
+        rx_home: Receiver<DataPoint<HomeStateValue>>,
+    ) -> HomeStateMetricsExporter {
         let repo = repository::VictoriaRepository::new(self.victoria_url.clone());
-        HomeStateMetricsExporter::new(rx, repo)
+        HomeStateMetricsExporter::new(rx_device, rx_home, repo)
     }
 }
 
@@ -64,10 +69,35 @@ impl From<DataPoint<HomeStateValue>> for Metric {
 impl From<&HomeStateValue> for MetricId {
     fn from(value: &HomeStateValue) -> Self {
         let state = HomeState::from(value);
+        let external_id = state.ext_id();
 
         MetricId {
-            name: state.ext_id().type_name().to_string(),
-            labels: tags::get_tags(value),
+            name: external_id.type_name().to_string(),
+            labels: tags::get_common_tags(&external_id),
+        }
+    }
+}
+
+impl From<DataPoint<DeviceStateValue>> for Metric {
+    fn from(dp: DataPoint<DeviceStateValue>) -> Self {
+        Metric {
+            id: MetricId::from(&dp.value),
+            value: (&dp.value).into(),
+            timestamp: dp.timestamp,
+        }
+    }
+}
+
+impl From<&DeviceStateValue> for MetricId {
+    fn from(value: &DeviceStateValue) -> Self {
+        let id = DeviceStateId::from(value.clone());
+        let ext_id = id.ext_id();
+        let mut tags = tags::get_common_tags(&ext_id);
+        tags.extend(tags::get_tags_for_device(value));
+
+        MetricId {
+            name: format!("device_{}", ext_id.type_name()),
+            labels: tags,
         }
     }
 }

@@ -4,18 +4,19 @@ mod support;
 
 use std::sync::Arc;
 
-use crate::core::HomeApi;
+use crate::{core::HomeApi, device_state::DeviceStateClient};
 use actix_web::{
     HttpResponse, ResponseError,
     web::{self},
 };
 use derive_more::derive::{Display, Error};
 
-pub fn new_routes(api: HomeApi) -> actix_web::Scope {
+pub fn new_routes(api: HomeApi, device_state_client: DeviceStateClient) -> actix_web::Scope {
     let api = Arc::new(api);
+    let device_state_client = Arc::new(device_state_client);
 
     web::scope("/grafana")
-        .service(dashboard::smart_home::routes(api.clone()))
+        .service(dashboard::smart_home::routes(api.clone(), device_state_client))
         .service(dashboard::meta::routes())
 }
 

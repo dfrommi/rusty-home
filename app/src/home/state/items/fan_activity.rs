@@ -1,7 +1,9 @@
-use std::fmt::Display;
-
 use r#macro::{EnumVariants, Id};
-use serde::{Deserialize, Serialize};
+
+use crate::{
+    core::{timeseries::DataPoint, unit::FanAirflow},
+    home::state::calc::{DerivedStateProvider, StateCalculationContext},
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum FanActivity {
@@ -9,82 +11,15 @@ pub enum FanActivity {
     BedroomCeilingFan,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum FanAirflow {
-    Off,
-    Forward(FanSpeed),
-    Reverse(FanSpeed),
-}
+pub struct FanActivityStateProvider;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum FanSpeed {
-    Silent,
-    Low,
-    Medium,
-    High,
-    Turbo,
-}
+impl DerivedStateProvider<FanActivity, FanAirflow> for FanActivityStateProvider {
+    fn calculate_current(&self, id: FanActivity, ctx: &StateCalculationContext) -> Option<DataPoint<FanAirflow>> {
+        use crate::device_state::FanActivity as DeviceFanActivity;
 
-impl Display for FanAirflow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FanAirflow::Off => write!(f, "off"),
-            FanAirflow::Forward(FanSpeed::Silent) => write!(f, "silent (fwd)"),
-            FanAirflow::Forward(FanSpeed::Low) => write!(f, "low (fwd)"),
-            FanAirflow::Forward(FanSpeed::Medium) => write!(f, "medium (fwd)"),
-            FanAirflow::Forward(FanSpeed::High) => write!(f, "high (fwd)"),
-            FanAirflow::Forward(FanSpeed::Turbo) => write!(f, "turbo (fwd)"),
-            FanAirflow::Reverse(FanSpeed::Silent) => write!(f, "silent (rev)"),
-            FanAirflow::Reverse(FanSpeed::Low) => write!(f, "low (rev)"),
-            FanAirflow::Reverse(FanSpeed::Medium) => write!(f, "medium (rev)"),
-            FanAirflow::Reverse(FanSpeed::High) => write!(f, "high (rev)"),
-            FanAirflow::Reverse(FanSpeed::Turbo) => write!(f, "turbo (rev)"),
-        }
-    }
-}
-
-impl From<&FanAirflow> for f64 {
-    fn from(value: &FanAirflow) -> Self {
-        match value {
-            FanAirflow::Off => 0.0,
-            FanAirflow::Forward(FanSpeed::Silent) => 1.0,
-            FanAirflow::Forward(FanSpeed::Low) => 2.0,
-            FanAirflow::Forward(FanSpeed::Medium) => 3.0,
-            FanAirflow::Forward(FanSpeed::High) => 4.0,
-            FanAirflow::Forward(FanSpeed::Turbo) => 5.0,
-            FanAirflow::Reverse(FanSpeed::Silent) => -1.0,
-            FanAirflow::Reverse(FanSpeed::Low) => -2.0,
-            FanAirflow::Reverse(FanSpeed::Medium) => -3.0,
-            FanAirflow::Reverse(FanSpeed::High) => -4.0,
-            FanAirflow::Reverse(FanSpeed::Turbo) => -5.0,
-        }
-    }
-}
-
-impl From<f64> for FanAirflow {
-    fn from(value: f64) -> Self {
-        if value < -4.0 {
-            FanAirflow::Reverse(FanSpeed::Turbo)
-        } else if value < -3.0 {
-            FanAirflow::Reverse(FanSpeed::High)
-        } else if value < -2.0 {
-            FanAirflow::Reverse(FanSpeed::Medium)
-        } else if value < -1.0 {
-            FanAirflow::Reverse(FanSpeed::Low)
-        } else if value < 0.0 {
-            FanAirflow::Reverse(FanSpeed::Silent)
-        } else if value > 4.0 {
-            FanAirflow::Forward(FanSpeed::Turbo)
-        } else if value > 3.0 {
-            FanAirflow::Forward(FanSpeed::High)
-        } else if value > 2.0 {
-            FanAirflow::Forward(FanSpeed::Medium)
-        } else if value > 1.0 {
-            FanAirflow::Forward(FanSpeed::Low)
-        } else if value > 0.0 {
-            FanAirflow::Forward(FanSpeed::Silent)
-        } else {
-            FanAirflow::Off
-        }
+        ctx.device_state(match id {
+            FanActivity::LivingRoomCeilingFan => DeviceFanActivity::LivingRoomCeilingFan,
+            FanActivity::BedroomCeilingFan => DeviceFanActivity::BedroomCeilingFan,
+        })
     }
 }

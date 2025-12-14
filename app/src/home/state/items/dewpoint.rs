@@ -9,8 +9,6 @@ use r#macro::{EnumVariants, Id};
 pub enum DewPoint {
     BathroomShower,
     LivingRoom,
-    Kitchen,
-    KitchenOuterWall,
     RoomOfRequirement,
     Outside,
 }
@@ -35,9 +33,7 @@ impl DewPoint {
     fn temperature(&self) -> Temperature {
         match self {
             DewPoint::LivingRoom => Temperature::LivingRoom,
-            DewPoint::BathroomShower => Temperature::BathroomShower,
-            DewPoint::Kitchen => Temperature::Kitchen,
-            DewPoint::KitchenOuterWall => Temperature::KitchenOuterWall,
+            DewPoint::BathroomShower => Temperature::Bathroom,
             DewPoint::RoomOfRequirement => Temperature::RoomOfRequirements,
             DewPoint::Outside => Temperature::Outside,
         }
@@ -46,9 +42,7 @@ impl DewPoint {
     fn relative_humidity(&self) -> RelativeHumidity {
         match self {
             DewPoint::LivingRoom => RelativeHumidity::LivingRoom,
-            DewPoint::BathroomShower => RelativeHumidity::BathroomShower,
-            DewPoint::Kitchen => RelativeHumidity::Kitchen,
-            DewPoint::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
+            DewPoint::BathroomShower => RelativeHumidity::Bathroom,
             DewPoint::RoomOfRequirement => RelativeHumidity::RoomOfRequirements,
             DewPoint::Outside => RelativeHumidity::Outside,
         }

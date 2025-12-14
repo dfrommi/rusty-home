@@ -85,31 +85,6 @@ impl HomeApiCache {
         }
     }
 
-    pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
-        tracing::debug!("Start preloading cache");
-
-        let tag_ids = self.db.get_all_tag_ids().await?;
-        let cache_range = self.caching_range();
-
-        // Process all tag IDs in parallel
-        let futures: Vec<_> = tag_ids
-            .into_iter()
-            .map(|tag_id| {
-                let cache_range = cache_range.clone();
-                async move {
-                    self.get_dataframe_from_cache(tag_id, &cache_range).await;
-                    tag_id
-                }
-            })
-            .collect();
-
-        // Wait for all parallel operations to complete
-        let results = futures::future::join_all(futures).await;
-
-        tracing::debug!("Preloading cache done for {} tags", results.len());
-        Ok(())
-    }
-
     pub async fn preload_user_trigger_cache(&self) -> anyhow::Result<()> {
         tracing::debug!("Start preloading user trigger cache");
 
@@ -146,34 +121,6 @@ impl HomeApiCache {
     pub async fn invalidate_user_trigger_cache(&self, target: &UserTriggerTarget) {
         tracing::debug!("Invalidating user trigger cache for target {:?}", target);
         self.user_trigger_cache.invalidate(target).await;
-    }
-
-    //try to return reference or at least avoid copy of entire dataframe
-    pub async fn get_dataframe_from_cache(
-        &self,
-        tag_id: i64,
-        range: &DateTimeRange,
-    ) -> Option<CacheSlice<DataFrame<f64>>> {
-        let df = self
-            .ts_cache
-            .try_get_with(tag_id, async {
-                let cache_range = self.caching_range();
-                self.db.get_dataframe_for_tag(tag_id, &cache_range).await.map(|df| {
-                    // Adjust cached range to actual data range, expanded by the cache range
-                    let effective_range = Self::extend_range(&cache_range, &df.range());
-                    CacheSlice::new(effective_range, df)
-                })
-            })
-            .await;
-
-        match df {
-            Ok(cached) if cached.covers(range) => Some(cached),
-            Err(e) => {
-                tracing::error!("Error fetching dataframe for tag {} from cache or init cache: {:?}", tag_id, e);
-                None
-            }
-            _ => None,
-        }
     }
 
     pub async fn get_commands_from_cache(

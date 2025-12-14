@@ -30,15 +30,7 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
                 }
             }
 
-            Resident::AnyoneOnCouch => {
-                let (left, center, right) = (
-                    ctx.get(Presence::CouchLeft)?,
-                    ctx.get(Presence::CouchCenter)?,
-                    ctx.get(Presence::CouchRight)?,
-                );
-
-                Some(anyone_on_couch(left, center, right))
-            }
+            Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch),
         }
     }
 }
@@ -98,32 +90,4 @@ fn sleeping(in_bed_full_range: DateTimeRange, in_bed_since_range_start: DataFram
             bail!("Internal error: sleeping stopped, but not started: {:?}", stopped_dp);
         }
     }
-}
-
-//TODO cover flaky on/off behaviour on movement
-fn anyone_on_couch(left: DataPoint<bool>, center: DataPoint<bool>, right: DataPoint<bool>) -> DataPoint<bool> {
-    let dps = [&left, &center, &right];
-
-    //not fully correct. Iterate over timeseries backwards, then stop when first time all false
-
-    let occupied_dps = dps.iter().filter(|dp| dp.value).collect::<Vec<_>>();
-
-    if occupied_dps.is_empty() {
-        return DataPoint::new(
-            false,
-            dps.iter()
-                .map(|dp| dp.timestamp)
-                .max()
-                .expect("Internal error: no maximum of non-empty vec"),
-        );
-    }
-
-    DataPoint::new(
-        true,
-        occupied_dps
-            .iter()
-            .map(|dp| dp.timestamp)
-            .min()
-            .expect("Internal error: no minimum of non-empty vec"),
-    )
 }

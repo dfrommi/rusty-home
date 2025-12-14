@@ -1,5 +1,12 @@
-use crate::home::Thermostat;
 use r#macro::{EnumVariants, Id};
+
+use crate::{
+    core::unit::DegreeCelsius,
+    home::{
+        Thermostat,
+        state::calc::{DerivedStateProvider, StateCalculationContext},
+    },
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 //TODO remove EnumVariants, only for state-debug
@@ -8,14 +15,29 @@ pub enum Temperature {
     LivingRoom,
     RoomOfRequirements,
     Bedroom,
-    BedroomOuterWall,
     Kitchen,
-    KitchenOuterWall,
-    BathroomShower,
-    Dehumidifier,
-    ThermostatOnDevice(Thermostat),
+    Bathroom,
     ThermostatExternal(Thermostat),
-    LivingRoomTado,
-    RoomOfRequirementsTado,
-    BedroomTado,
+}
+
+pub struct TemperatureStateProvider;
+
+impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvider {
+    fn calculate_current(
+        &self,
+        id: Temperature,
+        ctx: &StateCalculationContext,
+    ) -> Option<crate::core::timeseries::DataPoint<DegreeCelsius>> {
+        use crate::device_state::Temperature as DeviceTemperature;
+
+        ctx.device_state(match id {
+            Temperature::Outside => DeviceTemperature::Outside,
+            Temperature::LivingRoom => DeviceTemperature::LivingRoomTado,
+            Temperature::RoomOfRequirements => DeviceTemperature::RoomOfRequirementsTado,
+            Temperature::Bedroom => DeviceTemperature::BedroomTado,
+            Temperature::Kitchen => DeviceTemperature::Kitchen,
+            Temperature::Bathroom => DeviceTemperature::BathroomShower,
+            Temperature::ThermostatExternal(thermostat) => DeviceTemperature::ThermostatExternal(thermostat),
+        })
+    }
 }

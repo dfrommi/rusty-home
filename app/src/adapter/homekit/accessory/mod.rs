@@ -111,8 +111,8 @@ fn config() -> Vec<HomekitAccessory> {
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Bad",
-            Temperature::BathroomShower,
-            RelativeHumidity::BathroomShower,
+            Temperature::Bathroom,
+            RelativeHumidity::Bathroom,
         )),
         HomekitAccessory::WindowSensor(WindowSensor::new(
             "Fenstersensor Wohnzimmer",

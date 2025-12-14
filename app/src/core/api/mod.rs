@@ -1,12 +1,10 @@
 mod cache;
 
-use super::persistence::{Database, OfflineItem, UserTriggerRequest};
+use super::persistence::{Database, UserTriggerRequest};
 use super::time::{DateTime, DateTimeRange};
 use super::timeseries::{DataFrame, DataPoint};
 use crate::core::id::ExternalId;
-use crate::home::availability::ItemAvailability;
 use crate::home::command::{Command, CommandExecution, CommandTarget};
-use crate::home::state::{PersistentHomeState, PersistentHomeStateTypeInfo, PersistentHomeStateValue};
 use crate::home::trigger::{UserTrigger, UserTriggerId, UserTriggerTarget};
 use crate::t;
 use anyhow::Result;
@@ -63,11 +61,6 @@ impl HomeApi {
 // CACHING
 //
 impl HomeApi {
-    pub async fn preload_ts_cache(&self) -> anyhow::Result<()> {
-        self.cache.preload_ts_cache().await?;
-        self.cache.preload_user_trigger_cache().await
-    }
-
     pub async fn invalidate_ts_cache(&self, tag_id: i64) {
         self.cache.invalidate_ts_cache(tag_id).await;
     }
@@ -94,49 +87,6 @@ impl HomeApi {
         exclude_ids: &[UserTriggerId],
     ) -> anyhow::Result<u64> {
         self.db.cancel_triggers_before_excluding(before, exclude_ids).await
-    }
-}
-
-//
-//STATE
-//
-impl HomeApi {
-    pub async fn create_missing_tags(&self) -> Result<()> {
-        for id in PersistentHomeState::variants() {
-            self.db.get_tag_id(id.clone(), true).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn get_dataframe(&self, tag_id: i64, range: &DateTimeRange) -> Result<DataFrame<f64>> {
-        let df = match self.cache.get_dataframe_from_cache(tag_id, range).await {
-            Some(df) => df.data().retain_range_with_context(range)?,
-            None => {
-                tracing::warn!("No cached data found for tag {}, fetching from database", tag_id);
-                self.db.get_dataframe_for_tag(tag_id, range).await?
-            }
-        };
-        self.apply_timeshift_filter_to_dataframe(df)
-    }
-
-    pub async fn get_data_frame<T>(&self, item: &T, range: DateTimeRange) -> Result<DataFrame<T::ValueType>>
-    where
-        T: Into<PersistentHomeState> + PersistentHomeStateTypeInfo + Clone,
-    {
-        let channel: PersistentHomeState = item.clone().into();
-        let tag_id = self.db.get_tag_id(channel.clone(), false).await?;
-
-        let df = self
-            .get_dataframe(tag_id, &range)
-            .await?
-            .map(|dp| <T as PersistentHomeStateTypeInfo>::from_f64(item, dp.value));
-
-        Ok(df)
-    }
-
-    pub async fn add_state(&self, value: &PersistentHomeStateValue, timestamp: &DateTime) -> Result<()> {
-        self.db.add_state(value, timestamp).await
     }
 }
 
@@ -217,36 +167,15 @@ impl HomeApi {
 }
 
 //
-// AVAILABILITY
-//
-impl HomeApi {
-    pub async fn add_item_availability(&self, item: ItemAvailability) -> anyhow::Result<()> {
-        self.db.add_item_availability(item).await
-    }
-}
-
-//
 // GRAFANA ONLY
 //
 impl HomeApi {
-    pub async fn get_all_data_points_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<PersistentHomeStateValue>>> {
-        let data_points = self.db.get_all_data_points_in_range(range).await?;
-        Ok(self.apply_timeshift_filter(data_points, |dp| dp.timestamp))
-    }
-
     pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> Result<Vec<CommandExecution>> {
         let commands = self
             .db
             .query_all_commands(None, &DateTimeRange::new(from, until))
             .await?;
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
-    }
-
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
-        self.db.get_offline_items().await
     }
 }
 

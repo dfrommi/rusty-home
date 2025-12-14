@@ -10,6 +10,7 @@ use crate::home::state::HomeStateRunner;
 
 mod adapter;
 mod core;
+mod device_state;
 mod home;
 pub mod port;
 mod settings;
@@ -31,11 +32,14 @@ pub async fn main() {
 
     let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
 
+    let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.database.pool.clone());
+
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
         infrastructure.event_listener.new_state_changed_listener(),
         infrastructure.event_listener.new_user_trigger_event_listener(),
         infrastructure.api.clone(),
+        device_state_runner.client(),
     );
 
     let planning_runner =
@@ -46,16 +50,18 @@ pub async fn main() {
             .homeassistant
             .new_incoming_data_source(&mut infrastructure)
             .await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
     };
     let ha_cmd_executor = {
-        let executor = settings.homeassistant.new_command_executor(&infrastructure);
+        let executor = settings
+            .homeassistant
+            .new_command_executor(&infrastructure, device_state_runner.incoming_data_sender());
         CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
     };
 
     let z2m_incoming_data_processing = {
         let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
     };
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
@@ -64,7 +70,7 @@ pub async fn main() {
 
     let tasmota_incoming_data_processing = {
         let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
     };
     let tasmota_cmd_executor = {
         let executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -73,7 +79,7 @@ pub async fn main() {
 
     let energy_meter_processing = {
         let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
-        IncomingDataSourceRunner::new(ds, infrastructure.api.clone())
+        IncomingDataSourceRunner::new(ds, infrastructure.api.clone(), device_state_runner.incoming_data_sender())
     };
 
     let homekit_runner = settings
@@ -83,10 +89,11 @@ pub async fn main() {
 
     let mut metrics_exporter = settings
         .metrics
-        .new_exporter(home_state_runner.subscribe_state_updated());
+        .new_exporter(device_state_runner.subscribe(), home_state_runner.subscribe_state_updated());
 
     let http_server_exec = {
         let http_api = infrastructure.api.clone();
+        let http_device_state_client = device_state_runner.client();
         let http_database = infrastructure.database.clone();
         let metrics = settings.metrics.clone();
 
@@ -96,7 +103,7 @@ pub async fn main() {
                 .run_server(move || {
                     vec![
                         adapter::energy_meter::EnergyMeter::new_web_service(http_database.clone()),
-                        adapter::grafana::new_routes(http_api.clone()),
+                        adapter::grafana::new_routes(http_api.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(http_api.clone()),
                         metrics.new_routes(http_api.clone()),
                     ]
@@ -105,22 +112,6 @@ pub async fn main() {
                 .expect("HTTP server execution failed");
         }
     };
-
-    //try to avoid double-loading of data (other in event-dispatcher to handle the case of events
-    //in between preloading and actual use)
-    tracing::info!("Preloading time-series cache");
-    infrastructure
-        .api
-        .create_missing_tags()
-        .await
-        .expect("Error creating missing tags");
-
-    infrastructure
-        .api
-        .preload_ts_cache()
-        .await
-        .expect("Error preloading cache");
-    tracing::info!("Time-series cache preloading completed");
 
     tracing::info!("Starting state bootstrapping");
     home_state_runner
@@ -135,6 +126,7 @@ pub async fn main() {
     tracing::info!("Starting main loop");
 
     tokio::select!(
+        _ = device_state_runner.run() => {},
         _ = process_infrastucture => {},
         _ = home_state_runner.run() => {},
         _ = planning_runner.run() => {},

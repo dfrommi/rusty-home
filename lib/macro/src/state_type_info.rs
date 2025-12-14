@@ -17,23 +17,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
     );
     let annotated_generation = generate_annotated_enum(enum_name, &home_state_name, &variants);
 
-    let persistent_enum_name = format_ident!("Persistent{}", enum_name);
-    let persistent_home_state_name = format_ident!("Persistent{}", home_state_name);
-    let persistent_variants: Vec<syn::Variant> = variants
-        .clone()
-        .into_iter()
-        .filter(|variant| variant.attrs.iter().any(|attr| attr.path().is_ident("persistent")))
-        .collect();
-    let persistent_generation = generate_persistent_enum(
-        &persistent_enum_name,
-        &persistent_home_state_name,
-        &home_state_name,
-        &persistent_variants,
-    );
-
     TokenStream::from(quote! {
         #annotated_generation
-        #persistent_generation
     })
 }
 
@@ -44,7 +29,6 @@ fn generate_annotated_enum(
 ) -> TokenStream2 {
     let mut item_value_object_impls = Vec::new();
     let mut state_value_matches = Vec::new();
-    let mut home_state_persistence_matches = Vec::new();
     let mut home_state_project_matches = Vec::new();
 
     for variant in variants {
@@ -94,17 +78,6 @@ fn generate_annotated_enum(
                 }
             });
 
-            let is_persistent = variant.attrs.iter().any(|attr| attr.path().is_ident("persistent"));
-            if is_persistent {
-                home_state_persistence_matches.push(quote! {
-                    #home_state_name::#variant_name(_) => true
-                });
-            } else {
-                home_state_persistence_matches.push(quote! {
-                    #home_state_name::#variant_name(_) => false
-                });
-            }
-
             home_state_project_matches.push(quote! {
                 (#home_state_name::#variant_name(item), crate::home::state::StateValue::#state_value_variant(value)) => {
                     Some(#enum_name::#variant_name(item.clone(), value))
@@ -136,15 +109,6 @@ fn generate_annotated_enum(
                 }
             }
         }
-
-        impl #home_state_name {
-            pub fn is_persistent(&self) -> bool {
-                match self {
-                    #(#home_state_persistence_matches),*
-                }
-            }
-
-        }
     };
 
     let no_value_enum = generate_enum_without_value(enum_name, variants);
@@ -153,172 +117,6 @@ fn generate_annotated_enum(
         #no_value_enum
         #(#item_value_object_impls)*
         #home_state_impls
-    }
-}
-
-fn generate_persistent_enum(
-    persistent_enum_name: &syn::Ident,
-    persistent_home_state_name: &syn::Ident,
-    home_state_name: &syn::Ident,
-    variants: &[syn::Variant],
-) -> TokenStream2 {
-    let mut item_persistent_impls = Vec::new();
-    let mut persistent_variants = Vec::new();
-    let mut persistent_state_to_f64_matches = Vec::new();
-    let mut persistent_state_from_f64_matches = Vec::new();
-    let mut persistent_state_value_matches = Vec::new();
-    let mut persistent_to_home_state_matches = Vec::new();
-    let mut persistent_ref_to_home_state_matches = Vec::new();
-
-    for variant in variants {
-        if let syn::Fields::Unnamed(fields) = &variant.fields {
-            if fields.unnamed.len() < 2 {
-                continue;
-            }
-
-            let variant_name = &variant.ident;
-            let item_type = &fields.unnamed[0].ty;
-            let value_type = &fields.unnamed[1].ty;
-
-            if is_bool_type(value_type) {
-                persistent_state_value_matches.push(quote! {
-                    #persistent_enum_name::#variant_name(_, value) => {
-                        crate::home::state::PersistentStateValue::Boolean(*value)
-                    }
-                });
-
-                item_persistent_impls.push(quote! {
-                    impl crate::home::state::PersistentHomeStateTypeInfo for #item_type {
-                        type ValueType = #value_type;
-
-                        fn to_f64(&self, value: &#value_type) -> f64 {
-                            if *value { 1.0 } else { 0.0 }
-                        }
-
-                        fn from_f64(&self, value: f64) -> #value_type {
-                            value > 0.0
-                        }
-                    }
-                });
-            } else {
-                let state_value_variant = value_type_of_variant(value_type);
-                persistent_state_value_matches.push(quote! {
-                    #persistent_enum_name::#variant_name(_, value) => {
-                        crate::home::state::PersistentStateValue::#state_value_variant(value.clone())
-                    }
-                });
-
-                item_persistent_impls.push(quote! {
-                    impl crate::home::state::PersistentHomeStateTypeInfo for #item_type {
-                        type ValueType = #value_type;
-
-                        fn to_f64(&self, value: &#value_type) -> f64 {
-                            value.into()
-                        }
-
-                        fn from_f64(&self, value: f64) -> #value_type {
-                            value.into()
-                        }
-                    }
-                });
-            }
-
-            persistent_variants.push(quote! {
-                #variant_name(#item_type, #value_type)
-            });
-
-            persistent_state_to_f64_matches.push(quote! {
-                #persistent_enum_name::#variant_name(item, value) => {
-                    <#item_type as crate::home::state::PersistentHomeStateTypeInfo>::to_f64(&item, &value)
-                }
-            });
-
-            persistent_state_from_f64_matches.push(quote! {
-                #persistent_home_state_name::#variant_name(item) => {
-                    #persistent_enum_name::#variant_name(
-                        item.clone(),
-                        <#item_type as crate::home::state::PersistentHomeStateTypeInfo>::from_f64(&item, value)
-                    )
-                }
-            });
-
-            persistent_to_home_state_matches.push(quote! {
-                #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item)
-            });
-
-            persistent_ref_to_home_state_matches.push(quote! {
-                #persistent_home_state_name::#variant_name(item) => #home_state_name::#variant_name(item.clone())
-            });
-        }
-    }
-
-    let persistent_enum_impls = quote! {
-        #[derive(Debug, Clone)]
-        pub enum #persistent_enum_name {
-            #(#persistent_variants),*
-        }
-
-        impl #persistent_enum_name {
-            pub fn value(&self) -> crate::home::state::PersistentStateValue {
-                match self {
-                    #(#persistent_state_value_matches),*
-                }
-            }
-
-            pub fn value_to_f64(&self) -> f64 {
-                match self {
-                    #(#persistent_state_to_f64_matches),*
-                }
-            }
-        }
-
-        impl #persistent_home_state_name {
-            pub fn with_value_f64(&self, value: f64) -> #persistent_enum_name {
-                match self {
-                    #(#persistent_state_from_f64_matches),*
-                }
-            }
-        }
-
-        impl crate::home::state::PersistentHomeStateTypeInfo for #persistent_home_state_name {
-            type ValueType = #persistent_enum_name;
-
-            fn to_f64(&self, value: &Self::ValueType) -> f64 {
-                match value {
-                    #(#persistent_state_to_f64_matches),*
-                }
-            }
-
-            fn from_f64(&self, value: f64) -> Self::ValueType {
-                match self {
-                    #(#persistent_state_from_f64_matches),*
-                }
-            }
-        }
-
-        impl From<#persistent_home_state_name> for #home_state_name {
-            fn from(val: #persistent_home_state_name) -> Self {
-                match val {
-                    #(#persistent_to_home_state_matches),*
-                }
-            }
-        }
-
-        impl From<&#persistent_home_state_name> for #home_state_name {
-            fn from(val: &#persistent_home_state_name) -> Self {
-                match val {
-                    #(#persistent_ref_to_home_state_matches),*
-                }
-            }
-        }
-    };
-
-    let no_value_enum = generate_enum_without_value(persistent_enum_name, variants);
-
-    quote! {
-        #no_value_enum
-        #(#item_persistent_impls)*
-        #persistent_enum_impls
     }
 }
 

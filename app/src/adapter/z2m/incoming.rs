@@ -2,9 +2,9 @@ use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
+use crate::device_state::{DeviceStateValue, RawVendorValue, Temperature};
 use crate::home::Thermostat;
 use crate::home::availability::ItemAvailability;
-use crate::home::state::{PersistentHomeStateValue, RawVendorValue, Temperature};
 use crate::home::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
@@ -62,12 +62,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        PersistentHomeStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
+                        DeviceStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
+                        DeviceStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
                         payload.last_seen,
                     )
                     .into(),
@@ -83,7 +83,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        PersistentHomeStateValue::HeatingDemand(
+                        DeviceStateValue::HeatingDemand(
                             demand.clone(),
                             Percent(if payload.system_mode == "heat" {
                                 payload.valve_opening_degree
@@ -95,7 +95,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::Temperature(
+                        DeviceStateValue::Temperature(
                             Temperature::ThermostatOnDevice(thermostat.clone()),
                             DegreeCelsius(payload.local_temperature),
                         ),
@@ -105,7 +105,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                     //Resetting unsupported values
                     DataPoint::new(
-                        PersistentHomeStateValue::Temperature(
+                        DeviceStateValue::Temperature(
                             Temperature::ThermostatExternal(thermostat.clone()),
                             DegreeCelsius(0.0),
                         ),
@@ -113,11 +113,11 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::SetPoint(set_point.clone(), DegreeCelsius(0.0)),
+                        DeviceStateValue::SetPoint(set_point.clone(), DegreeCelsius(0.0)),
                         payload.last_seen,
                     )
                     .into(),
-                    DataPoint::new(PersistentHomeStateValue::Opened(opened.clone(), false), payload.last_seen).into(),
+                    DataPoint::new(DeviceStateValue::Opened(opened.clone(), false), payload.last_seen).into(),
                 ]
             }
 
@@ -126,15 +126,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        PersistentHomeStateValue::SetPoint(
-                            set_point.clone(),
-                            DegreeCelsius(payload.occupied_heating_setpoint),
-                        ),
+                        DeviceStateValue::SetPoint(set_point.clone(), DegreeCelsius(payload.occupied_heating_setpoint)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::HeatingDemand(
+                        DeviceStateValue::HeatingDemand(
                             demand.clone(),
                             Percent(if payload.pi_heating_demand > 1.0 {
                                 payload.pi_heating_demand
@@ -147,12 +144,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::Opened(opened.clone(), payload.window_open_external),
+                        DeviceStateValue::Opened(opened.clone(), payload.window_open_external),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::Temperature(
+                        DeviceStateValue::Temperature(
                             Temperature::ThermostatOnDevice(thermostat.clone()),
                             DegreeCelsius(payload.local_temperature),
                         ),
@@ -160,7 +157,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::Temperature(
+                        DeviceStateValue::Temperature(
                             Temperature::ThermostatExternal(thermostat.clone()),
                             DegreeCelsius(payload.external_measured_room_sensor / 100.0),
                         ),
@@ -168,7 +165,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::RawVendorValue(
+                        DeviceStateValue::RawVendorValue(
                             RawVendorValue::AllyLoadEstimate(thermostat.clone()),
                             RawValue::from(payload.load_estimate as f64),
                         ),
@@ -176,7 +173,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::RawVendorValue(
+                        DeviceStateValue::RawVendorValue(
                             RawVendorValue::AllyLoadMean(thermostat.clone()),
                             RawValue::from(payload.load_room_mean as f64),
                         ),
@@ -190,11 +187,8 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             Z2mChannel::ContactSensor(opened) => {
                 let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
-                    DataPoint::new(
-                        PersistentHomeStateValue::Opened(opened.clone(), !payload.contact),
-                        payload.last_seen,
-                    )
-                    .into(),
+                    DataPoint::new(DeviceStateValue::Opened(opened.clone(), !payload.contact), payload.last_seen)
+                        .into(),
                     availability(device_id, payload.last_seen),
                 ]
             }
@@ -203,12 +197,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        PersistentHomeStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
+                        DeviceStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
-                        PersistentHomeStateValue::TotalEnergyConsumption(
+                        DeviceStateValue::TotalEnergyConsumption(
                             energy.clone(),
                             KiloWattHours(payload.total_energy_kwh) + *energy_offset,
                         ),

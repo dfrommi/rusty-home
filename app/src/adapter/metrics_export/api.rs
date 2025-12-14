@@ -114,10 +114,6 @@ async fn backfill_handler(
 
     for range in full_range.chunked(t!(30 days)) {
         tracing::info!("Processing range {}", range);
-        let api = ctx
-            .api
-            .for_processing_of_range(DateTimeRange::new(*range.start() - t!(1 days), *range.end()));
-        let _ = api.preload_ts_cache().await;
 
         //TODO fix for StateSnapshot
         //     for state in &variants {

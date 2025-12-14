@@ -1,6 +1,6 @@
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
-use crate::home::state::{PersistentHomeStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
+use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use tokio::sync::broadcast::Receiver;
 
 use crate::{core::app_event::EnergyReadingAddedEvent, core::persistence::Database};
@@ -70,10 +70,10 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
     }
 }
 
-impl From<&EnergyReading> for PersistentHomeStateValue {
+impl From<&EnergyReading> for DeviceStateValue {
     fn from(val: &EnergyReading) -> Self {
         match val {
-            EnergyReading::Heating(item, value) => PersistentHomeStateValue::TotalRadiatorConsumption(
+            EnergyReading::Heating(item, value) => DeviceStateValue::TotalRadiatorConsumption(
                 match item {
                     Radiator::LivingRoomBig => TotalRadiatorConsumption::LivingRoomBig,
                     Radiator::LivingRoomSmall => TotalRadiatorConsumption::LivingRoomSmall,
@@ -84,14 +84,14 @@ impl From<&EnergyReading> for PersistentHomeStateValue {
                 },
                 HeatingUnit(*value),
             ),
-            EnergyReading::ColdWater(item, value) => PersistentHomeStateValue::TotalWaterConsumption(
+            EnergyReading::ColdWater(item, value) => DeviceStateValue::TotalWaterConsumption(
                 match item {
                     Faucet::Kitchen => TotalWaterConsumption::KitchenCold,
                     Faucet::Bathroom => TotalWaterConsumption::BathroomCold,
                 },
                 KiloCubicMeter(*value),
             ),
-            EnergyReading::HotWater(item, value) => PersistentHomeStateValue::TotalWaterConsumption(
+            EnergyReading::HotWater(item, value) => DeviceStateValue::TotalWaterConsumption(
                 match item {
                     Faucet::Kitchen => TotalWaterConsumption::KitchenWarm,
                     Faucet::Bathroom => TotalWaterConsumption::BathroomWarm,

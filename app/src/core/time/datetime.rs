@@ -122,6 +122,10 @@ impl DateTime {
         Self::now().elapsed_since(*self)
     }
 
+    pub fn is_passed(&self) -> bool {
+        *self < Self::now()
+    }
+
     pub fn into_db(&self) -> chrono::DateTime<chrono::Local> {
         self.delegate
     }

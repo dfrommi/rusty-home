@@ -14,9 +14,11 @@ use self::{
 };
 use crate::{
     Infrastructure,
-    core::timeseries::DataPoint,
-    core::unit::DegreeCelsius,
-    home::state::{FanAirflow, HomeStateValue},
+    core::{
+        timeseries::DataPoint,
+        unit::{DegreeCelsius, FanAirflow},
+    },
+    home::state::HomeStateValue,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

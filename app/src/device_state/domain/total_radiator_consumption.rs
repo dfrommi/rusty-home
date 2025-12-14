@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::home::Thermostat;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum TotalRadiatorConsumption {
     LivingRoomBig,
     LivingRoomSmall,

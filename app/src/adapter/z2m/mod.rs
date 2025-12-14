@@ -4,10 +4,10 @@ mod outgoing;
 
 use crate::adapter::command::CommandExecutor;
 use crate::core::unit::KiloWattHours;
-use crate::home::Thermostat;
-use crate::home::state::{
-    CurrentPowerUsage, HeatingDemand, Opened, Presence, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
+use crate::device_state::{
+    CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
+use crate::home::Thermostat;
 use crate::home::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;

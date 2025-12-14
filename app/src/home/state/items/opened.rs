@@ -11,53 +11,56 @@ pub enum OpenedArea {
     BedroomWindow,
     KitchenWindow,
     RoomOfRequirementsWindow,
-}
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
-pub enum Opened {
-    KitchenWindow,
+    //TODO remove
     KitchenRadiatorThermostat,
-    BedroomWindow,
     BedroomRadiatorThermostat,
-    LivingRoomWindowLeft,
-    LivingRoomWindowRight,
-    LivingRoomWindowSide,
-    LivingRoomBalconyDoor,
     LivingRoomRadiatorThermostatSmall,
     LivingRoomRadiatorThermostatBig,
-    RoomOfRequirementsWindowLeft,
-    RoomOfRequirementsWindowRight,
-    RoomOfRequirementsWindowSide,
     RoomOfRequirementsThermostat,
     BathroomThermostat,
-}
-
-impl OpenedArea {
-    fn api_items(&self) -> Vec<Opened> {
-        match self {
-            OpenedArea::LivingRoomWindowOrDoor => vec![
-                Opened::LivingRoomWindowLeft,
-                Opened::LivingRoomWindowRight,
-                Opened::LivingRoomWindowSide,
-                Opened::LivingRoomBalconyDoor,
-            ],
-            OpenedArea::BedroomWindow => vec![Opened::BedroomWindow],
-            OpenedArea::KitchenWindow => vec![Opened::KitchenWindow],
-            OpenedArea::RoomOfRequirementsWindow => vec![
-                Opened::RoomOfRequirementsWindowLeft,
-                Opened::RoomOfRequirementsWindowRight,
-                Opened::RoomOfRequirementsWindowSide,
-            ],
-        }
-    }
 }
 
 pub struct OpenedAreaStateProvider;
 
 impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
     fn calculate_current(&self, id: OpenedArea, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
-        let opened_items = id.api_items();
-        let opened_dps: Vec<_> = opened_items.iter().filter_map(|o| ctx.get(o.clone())).collect();
+        use crate::device_state::Opened as DeviceOpened;
+
+        let opened_items = match id {
+            OpenedArea::LivingRoomWindowOrDoor => vec![
+                DeviceOpened::LivingRoomWindowLeft,
+                DeviceOpened::LivingRoomWindowRight,
+                DeviceOpened::LivingRoomWindowSide,
+                DeviceOpened::LivingRoomBalconyDoor,
+            ],
+            OpenedArea::BedroomWindow => vec![DeviceOpened::BedroomWindow],
+            OpenedArea::KitchenWindow => vec![DeviceOpened::KitchenWindow],
+            OpenedArea::RoomOfRequirementsWindow => vec![
+                DeviceOpened::RoomOfRequirementsWindowLeft,
+                DeviceOpened::RoomOfRequirementsWindowRight,
+                DeviceOpened::RoomOfRequirementsWindowSide,
+            ],
+            OpenedArea::KitchenRadiatorThermostat => vec![DeviceOpened::KitchenRadiatorThermostat],
+            OpenedArea::BedroomRadiatorThermostat => vec![DeviceOpened::BedroomRadiatorThermostat],
+            OpenedArea::LivingRoomRadiatorThermostatSmall => {
+                vec![DeviceOpened::LivingRoomRadiatorThermostatSmall]
+            }
+            OpenedArea::LivingRoomRadiatorThermostatBig => {
+                vec![DeviceOpened::LivingRoomRadiatorThermostatBig]
+            }
+            OpenedArea::RoomOfRequirementsThermostat => {
+                vec![DeviceOpened::RoomOfRequirementsThermostat]
+            }
+            OpenedArea::BathroomThermostat => {
+                vec![DeviceOpened::BathroomThermostat]
+            }
+        };
+
+        let opened_dps: Vec<_> = opened_items
+            .iter()
+            .filter_map(|o| ctx.device_state(o.clone()))
+            .collect();
 
         if opened_dps.is_empty() {
             return None;

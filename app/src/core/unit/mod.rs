@@ -1,5 +1,6 @@
 mod degree_celsius;
 mod density;
+mod fan;
 mod heating;
 mod kwh;
 mod light;
@@ -11,6 +12,7 @@ mod watt;
 
 pub use degree_celsius::DegreeCelsius;
 pub use density::GramPerCubicMeter;
+pub use fan::*;
 pub use heating::HeatingUnit;
 pub use kwh::KiloWattHours;
 pub use light::Lux;

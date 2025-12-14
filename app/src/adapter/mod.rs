@@ -11,14 +11,17 @@ pub use command::CommandExecutorRunner;
 pub use incoming::IncomingDataSourceRunner;
 
 mod incoming {
+    use tokio::sync::mpsc;
+
     use crate::{
         core::{HomeApi, timeseries::DataPoint},
-        home::{availability::ItemAvailability, state::PersistentHomeStateValue, trigger::UserTrigger},
+        device_state::{DeviceAvailability, DeviceStateIncomingEvent, DeviceStateValue},
+        home::{availability::ItemAvailability, trigger::UserTrigger},
     };
 
     #[derive(Debug, Clone, derive_more::From)]
     pub enum IncomingData {
-        StateValue(DataPoint<PersistentHomeStateValue>),
+        StateValue(DataPoint<DeviceStateValue>),
         UserTrigger(UserTrigger),
         ItemAvailability(ItemAvailability),
     }
@@ -51,6 +54,7 @@ mod incoming {
     {
         source: S,
         api: HomeApi,
+        device_tx: mpsc::Sender<DeviceStateIncomingEvent>,
         _marker: std::marker::PhantomData<(M, C)>,
     }
 
@@ -60,10 +64,11 @@ mod incoming {
         C: std::fmt::Debug,
         S: IncomingDataSource<M, C>,
     {
-        pub fn new(source: S, api: HomeApi) -> Self {
+        pub fn new(source: S, api: HomeApi, device_tx: mpsc::Sender<DeviceStateIncomingEvent>) -> Self {
             Self {
                 source,
                 api,
+                device_tx,
                 _marker: std::marker::PhantomData,
             }
         }
@@ -115,7 +120,11 @@ mod incoming {
             for event in incoming_data.iter() {
                 match event {
                     IncomingData::StateValue(dp) => {
-                        if let Err(e) = self.api.add_state(&dp.value, &dp.timestamp).await {
+                        if let Err(e) = self
+                            .device_tx
+                            .send(DeviceStateIncomingEvent::DeviceStateUpdated(dp.clone()))
+                            .await
+                        {
                             tracing::error!("Error processing state {:?}: {:?}", dp, e);
                         }
                     }
@@ -127,8 +136,19 @@ mod incoming {
                     }
 
                     IncomingData::ItemAvailability(item) => {
-                        if let Err(e) = self.api.add_item_availability(item.clone()).await {
-                            tracing::error!("Error processing item availability {:?}: {:?}", item, e);
+                        let device_item = DeviceAvailability {
+                            device_id: item.item.clone(),
+                            source: item.source.clone(),
+                            last_seen: item.last_seen,
+                            marked_offline: item.marked_offline,
+                        };
+
+                        if let Err(e) = self
+                            .device_tx
+                            .send(DeviceStateIncomingEvent::DeviceAvailabilityUpdated(device_item))
+                            .await
+                        {
+                            tracing::error!("Error processing device availability for {}: {:?}", item.item, e);
                         }
                     }
                 }

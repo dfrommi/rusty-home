@@ -13,6 +13,20 @@ impl<V> DataPoint<V> {
 }
 
 impl<T> DataPoint<T> {
+    pub fn at(self, timestamp: DateTime) -> DataPoint<T> {
+        DataPoint {
+            value: self.value,
+            timestamp,
+        }
+    }
+
+    pub fn with<U>(&self, value: U) -> DataPoint<U> {
+        DataPoint {
+            value,
+            timestamp: self.timestamp,
+        }
+    }
+
     pub fn map_value<U>(&self, f: impl FnOnce(&T) -> U) -> DataPoint<U> {
         let value = f(&self.value);
         DataPoint {

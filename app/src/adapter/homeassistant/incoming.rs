@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
-use crate::core::unit::{DegreeCelsius, Lux, Percent};
+use crate::core::unit::{DegreeCelsius, FanAirflow, Lux, Percent};
+use crate::core::{time::DateTime, timeseries::DataPoint};
+use crate::device_state::DeviceStateValue;
 use crate::home::availability::ItemAvailability;
-use crate::{
-    core::{time::DateTime, timeseries::DataPoint},
-    home::state::{FanAirflow, PersistentHomeStateValue},
-};
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::DeviceConfig;
@@ -102,32 +100,32 @@ fn to_persistent_data_point(
     let dp: Option<IncomingData> = match channel {
         HaChannel::Temperature(channel) => Some(
             DataPoint::new(
-                PersistentHomeStateValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
+                DeviceStateValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
                 timestamp,
             )
             .into(),
         ),
         HaChannel::RelativeHumidity(channel) => Some(
             DataPoint::new(
-                PersistentHomeStateValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
+                DeviceStateValue::RelativeHumidity(channel, Percent(ha_value.parse()?)),
                 timestamp,
             )
             .into(),
         ),
         HaChannel::Powered(channel) => {
-            Some(DataPoint::new(PersistentHomeStateValue::PowerAvailable(channel, ha_value == "on"), timestamp).into())
+            Some(DataPoint::new(DeviceStateValue::PowerAvailable(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::PresenceFromEsp(channel) => {
-            Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())
+            Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::PresenceFromDeviceTracker(channel) => {
-            Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "home"), timestamp).into())
+            Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "home"), timestamp).into())
         }
-        HaChannel::LightLevel(channel) => Some(
-            DataPoint::new(PersistentHomeStateValue::LightLevel(channel, Lux(ha_value.parse()?)), timestamp).into(),
-        ),
+        HaChannel::LightLevel(channel) => {
+            Some(DataPoint::new(DeviceStateValue::LightLevel(channel, Lux(ha_value.parse()?)), timestamp).into())
+        }
         HaChannel::PresenceFromFP2(channel) => {
-            Some(DataPoint::new(PersistentHomeStateValue::Presence(channel, ha_value == "on"), timestamp).into())
+            Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::WindcalmFanSpeed(channel) => {
             //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
@@ -155,7 +153,7 @@ fn to_persistent_data_point(
             */
 
             if ha_value == "off" {
-                Some(DataPoint::new(PersistentHomeStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
+                Some(DataPoint::new(DeviceStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
             } else {
                 None
             }

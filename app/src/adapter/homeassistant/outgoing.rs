@@ -1,8 +1,12 @@
 use crate::adapter::command::CommandExecutor;
+use crate::core::timeseries::DataPoint;
+use crate::core::unit::{FanAirflow, FanSpeed};
+use crate::device_state::{DeviceStateIncomingEvent, DeviceStateValue};
 use crate::home::command::{Command, CommandTarget, Fan};
-use crate::home::state::{EnergySaving, FanActivity, FanAirflow, FanSpeed, PersistentHomeStateValue};
+use crate::home::state::{EnergySaving, FanActivity};
 use crate::t;
 use serde_json::json;
+use tokio::sync::mpsc;
 
 use super::{HaHttpClient, HaServiceTarget};
 use crate::core::HomeApi;
@@ -10,11 +14,17 @@ use crate::core::HomeApi;
 pub struct HaCommandExecutor {
     client: HaHttpClient,
     api: HomeApi,
+    device_sender: mpsc::Sender<DeviceStateIncomingEvent>,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HaCommandExecutor {
-    pub fn new(client: HaHttpClient, api: HomeApi, config: &[(CommandTarget, HaServiceTarget)]) -> Self {
+    pub fn new(
+        client: HaHttpClient,
+        api: HomeApi,
+        device_sender: mpsc::Sender<DeviceStateIncomingEvent>,
+        config: &[(CommandTarget, HaServiceTarget)],
+    ) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
         for (cmd, ha) in config {
@@ -24,6 +34,7 @@ impl HaCommandExecutor {
         Self {
             client,
             api,
+            device_sender,
             config: data,
         }
     }
@@ -146,14 +157,18 @@ impl HaCommandExecutor {
             }
         };
 
-        let channel = match fan {
-            Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
-            Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
-        };
-
         //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
-        self.api
-            .add_state(&PersistentHomeStateValue::FanActivity(channel, airflow.clone()), &t!(now))
+        self.device_sender
+            .send(DeviceStateIncomingEvent::DeviceStateUpdated(DataPoint::new(
+                DeviceStateValue::FanActivity(
+                    match fan {
+                        Fan::LivingRoomCeilingFan => crate::device_state::FanActivity::LivingRoomCeilingFan,
+                        Fan::BedroomCeilingFan => crate::device_state::FanActivity::BedroomCeilingFan,
+                    },
+                    airflow.clone(),
+                ),
+                t!(now),
+            )))
             .await?;
 
         Ok(())
@@ -240,11 +255,11 @@ impl HaCommandExecutor {
 
         //store state directly as homeassistant as there is no back-channel. still unreliable but
         //for now the best we can do
-        self.api
-            .add_state(
-                &PersistentHomeStateValue::EnergySaving(EnergySaving::LivingRoomTv, energy_saving),
-                &t!(now),
-            )
+        self.device_sender
+            .send(DeviceStateIncomingEvent::DeviceStateUpdated(DataPoint::new(
+                DeviceStateValue::EnergySaving(crate::device_state::EnergySaving::LivingRoomTv, energy_saving),
+                t!(now),
+            )))
             .await?;
 
         Ok(())

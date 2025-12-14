@@ -2,7 +2,8 @@ use crate::{
     adapter::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    home::state::{FanActivity, FanAirflow, FanSpeed, HomeStateValue},
+    core::unit::{FanAirflow, FanSpeed},
+    home::state::{FanActivity, HomeStateValue},
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]

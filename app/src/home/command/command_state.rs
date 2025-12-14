@@ -1,10 +1,10 @@
-use crate::core::unit::{DegreeCelsius, Percent, RawValue};
+use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
 use crate::home::LoadBalancedThermostat;
 use crate::home::command::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
     NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
-use crate::home::state::{FanActivity, FanAirflow, Opened, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
+use crate::home::state::{FanActivity, OpenedArea, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
 use crate::t;
 use anyhow::Result;
 
@@ -61,12 +61,12 @@ fn is_set_heating_reflected_in_state(
         crate::home::command::HeatingTargetState::Heat { temperature, .. } => Ok(&set_point == temperature), //priority not reflected in state
         crate::home::command::HeatingTargetState::WindowOpen => {
             let open_item = match device {
-                Thermostat::LivingRoomBig => Opened::LivingRoomRadiatorThermostatBig,
-                Thermostat::LivingRoomSmall => Opened::LivingRoomRadiatorThermostatSmall,
-                Thermostat::Bedroom => Opened::BedroomRadiatorThermostat,
-                Thermostat::Kitchen => Opened::KitchenRadiatorThermostat,
-                Thermostat::RoomOfRequirements => Opened::RoomOfRequirementsThermostat,
-                Thermostat::Bathroom => Opened::BathroomThermostat,
+                Thermostat::LivingRoomBig => OpenedArea::LivingRoomRadiatorThermostatBig,
+                Thermostat::LivingRoomSmall => OpenedArea::LivingRoomRadiatorThermostatSmall,
+                Thermostat::Bedroom => OpenedArea::BedroomRadiatorThermostat,
+                Thermostat::Kitchen => OpenedArea::KitchenRadiatorThermostat,
+                Thermostat::RoomOfRequirements => OpenedArea::RoomOfRequirementsThermostat,
+                Thermostat::Bathroom => OpenedArea::BathroomThermostat,
             };
             Ok(snapshot.try_get(open_item)?.value)
         }

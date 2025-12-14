@@ -1,14 +1,12 @@
 mod command_state;
 
-use crate::core::unit::{DegreeCelsius, Percent, RawValue};
+use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::home::trigger::UserTriggerId;
 use crate::home::{LoadBalancedThermostat, Thermostat};
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
-
-use crate::home::state::FanAirflow;
 
 #[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

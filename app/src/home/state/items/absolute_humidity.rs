@@ -7,15 +7,8 @@ use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
-    BathroomShower,
-    BathroomDehumidifier,
+    Bathroom,
     LivingRoom,
-    Kitchen,
-    KitchenOuterWall,
-    RoomOfRequirements,
-    LivingRoomTado,
-    RoomOfRequirementsTado,
-    BedroomTado,
     Outside,
 }
 
@@ -43,14 +36,7 @@ impl AbsoluteHumidity {
     fn temperature(&self) -> Temperature {
         match self {
             AbsoluteHumidity::LivingRoom => Temperature::LivingRoom,
-            AbsoluteHumidity::BathroomShower => Temperature::BathroomShower,
-            AbsoluteHumidity::BathroomDehumidifier => Temperature::Dehumidifier,
-            AbsoluteHumidity::Kitchen => Temperature::Kitchen,
-            AbsoluteHumidity::KitchenOuterWall => Temperature::KitchenOuterWall,
-            AbsoluteHumidity::RoomOfRequirements => Temperature::RoomOfRequirements,
-            AbsoluteHumidity::LivingRoomTado => Temperature::LivingRoomTado,
-            AbsoluteHumidity::RoomOfRequirementsTado => Temperature::RoomOfRequirementsTado,
-            AbsoluteHumidity::BedroomTado => Temperature::BedroomTado,
+            AbsoluteHumidity::Bathroom => Temperature::Bathroom,
             AbsoluteHumidity::Outside => Temperature::Outside,
         }
     }
@@ -58,14 +44,7 @@ impl AbsoluteHumidity {
     fn relative_humidity(&self) -> RelativeHumidity {
         match self {
             AbsoluteHumidity::LivingRoom => RelativeHumidity::LivingRoom,
-            AbsoluteHumidity::BathroomShower => RelativeHumidity::BathroomShower,
-            AbsoluteHumidity::BathroomDehumidifier => RelativeHumidity::Dehumidifier,
-            AbsoluteHumidity::Kitchen => RelativeHumidity::Kitchen,
-            AbsoluteHumidity::KitchenOuterWall => RelativeHumidity::KitchenOuterWall,
-            AbsoluteHumidity::RoomOfRequirements => RelativeHumidity::RoomOfRequirements,
-            AbsoluteHumidity::LivingRoomTado => RelativeHumidity::LivingRoomTado,
-            AbsoluteHumidity::RoomOfRequirementsTado => RelativeHumidity::RoomOfRequirementsTado,
-            AbsoluteHumidity::BedroomTado => RelativeHumidity::BedroomTado,
+            AbsoluteHumidity::Bathroom => RelativeHumidity::Bathroom,
             AbsoluteHumidity::Outside => RelativeHumidity::Outside,
         }
     }

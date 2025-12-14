@@ -1,22 +1,26 @@
 use crate::{
     adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::timeseries::DataPoint,
-    home::state::{HomeState, HomeStateValue},
+    device_state::{DeviceStateEvent, DeviceStateId},
+    home::state::HomeStateValue,
     t,
 };
 
 pub struct HomeStateMetricsExporter {
-    state_updated_rx: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
+    device_state_updated_rx: tokio::sync::broadcast::Receiver<DeviceStateEvent>,
+    home_state_updated_rx: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
     repo: VictoriaRepository,
 }
 
 impl HomeStateMetricsExporter {
     pub(super) fn new(
-        rx: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
+        rx_device: tokio::sync::broadcast::Receiver<DeviceStateEvent>,
+        rx_home: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
         repo: VictoriaRepository,
     ) -> Self {
         Self {
-            state_updated_rx: rx,
+            device_state_updated_rx: rx_device,
+            home_state_updated_rx: rx_home,
             repo,
         }
     }
@@ -28,50 +32,50 @@ impl HomeStateMetricsExporter {
         let mut last_flush = t!(now);
 
         loop {
-            match self.state_updated_rx.recv().await {
-                Ok(data_point) => {
-                    let home_state = HomeState::from(&data_point.value);
-
+            tokio::select! {
+                Ok(DeviceStateEvent::Updated(data_point)) = self.device_state_updated_rx.recv() => {
                     //Use now instead of first timestamp to fill gaps
-                    let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
-
+                    let metric: Metric = DataPoint::new(data_point.value.clone(), t!(now)).into();
                     //Derived metrics
-                    let derived = self.derived_metrics(&metric, home_state);
+                    let derived = self.derived_metrics(&metric, data_point.value.into());
                     for dm in derived {
                         buffer.push(dm);
                     }
 
                     buffer.push(metric);
-
-                    if buffer.len() >= MAX_BATCH || last_flush.elapsed() >= t!(15 seconds) {
-                        if let Err(e) = self.repo.push(&buffer).await {
-                            tracing::error!("Error pushing metrics to VictoriaMetrics: {:?}", e);
-                            continue; //keep trying
-                        }
-                        tracing::info!("Flushed {} metrics to VictoriaMetrics", buffer.len());
-                        buffer.clear();
-                        last_flush = t!(now);
-                    }
                 }
 
-                Err(e) => {
-                    tracing::error!("Error receiving home state updated event: {:?}", e);
+                Ok(data_point) = self.home_state_updated_rx.recv() => {
+                    //Use now instead of first timestamp to fill gaps
+                    let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
+
+                    buffer.push(metric);
                 }
+            };
+
+            if buffer.len() >= MAX_BATCH || last_flush.elapsed() >= t!(15 seconds) {
+                if let Err(e) = self.repo.push(&buffer).await {
+                    tracing::error!("Error pushing metrics to VictoriaMetrics: {:?}", e);
+                    continue; //keep trying
+                }
+                tracing::info!("Flushed {} metrics to VictoriaMetrics", buffer.len());
+                buffer.clear();
+                last_flush = t!(now);
             }
         }
     }
 
-    fn derived_metrics(&self, metric: &Metric, state: HomeState) -> Vec<Metric> {
+    fn derived_metrics(&self, metric: &Metric, state: DeviceStateId) -> Vec<Metric> {
         let mut metrics = Vec::new();
 
         match state {
-            HomeState::HeatingDemand(demand) => {
+            DeviceStateId::HeatingDemand(demand) => {
                 let mut scaled_metric = metric.clone();
                 scaled_metric.id.name = format!("{}_scaled", metric.id.name);
                 scaled_metric.value = metric.value * demand.scaling_factor();
                 metrics.push(scaled_metric);
             }
-            HomeState::TotalRadiatorConsumption(consumption) => {
+            DeviceStateId::TotalRadiatorConsumption(consumption) => {
                 let mut scaled_metric = metric.clone();
                 scaled_metric.id.name = format!("{}_scaled", metric.id.name);
                 scaled_metric.value = metric.value * consumption.scaling_factor();

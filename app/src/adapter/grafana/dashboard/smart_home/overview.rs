@@ -3,20 +3,21 @@ use std::sync::Arc;
 use actix_web::web;
 use infrastructure::TraceContext;
 
+use crate::device_state::{DeviceStateClient, DeviceStateId};
 use crate::home::command::Command;
-use crate::home::state::PersistentHomeState;
 
 use crate::{
     adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
     core::HomeApi,
 };
 
-pub fn routes(api: Arc<HomeApi>) -> actix_web::Scope {
+pub fn routes(api: Arc<HomeApi>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/overview")
         .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
         .route("/offline", web::get().to(get_offline_items))
         .app_data(web::Data::from(api))
+        .app_data(web::Data::from(device_state_client))
 }
 
 async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
@@ -104,7 +105,10 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
     }
 }
 
-async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_states(
+    device_client: web::Data<DeviceStateClient>,
+    time_range: web::Query<TimeRangeQuery>,
+) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         timestamp: String,
@@ -115,7 +119,7 @@ async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQue
     }
 
     let range = time_range.range();
-    let mut states = api
+    let mut states = device_client
         .get_all_data_points_in_range(range.clone())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
@@ -123,22 +127,23 @@ async fn get_states(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQue
     states.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     let rows = states.into_iter().map(|dp| {
-        let target = PersistentHomeState::from(&dp.value);
-
+        let target = DeviceStateId::from(&dp.value);
         let id = target.ext_id();
+        let fvalue = f64::from(&dp.value);
 
         Row {
             timestamp: dp.timestamp.to_human_readable(),
             type_: id.type_name().to_string(),
             item: id.variant_name().to_string(),
-            value: dp.value.value().to_string(),
+            //TODO implement proper formatting again
+            value: format!("{fvalue}"),
         }
     });
 
     csv_response(rows)
 }
 
-async fn get_offline_items(api: web::Data<HomeApi>) -> GrafanaResponse {
+async fn get_offline_items(client: web::Data<DeviceStateClient>) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         source: String,
@@ -146,7 +151,7 @@ async fn get_offline_items(api: web::Data<HomeApi>) -> GrafanaResponse {
         days: f64,
     }
 
-    let offline_items = api
+    let offline_items = client
         .get_offline_items()
         .await
         .map_err(GrafanaApiError::DataAccessError)?;

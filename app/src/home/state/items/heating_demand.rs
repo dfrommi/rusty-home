@@ -1,4 +1,7 @@
-use crate::home::Thermostat;
+use crate::{
+    core::{timeseries::DataPoint, unit::Percent},
+    home::state::calc::{DerivedStateProvider, StateCalculationContext},
+};
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -11,15 +14,19 @@ pub enum HeatingDemand {
     Bathroom,
 }
 
-impl HeatingDemand {
-    pub fn scaling_factor(&self) -> f64 {
-        match self {
-            HeatingDemand::LivingRoomBig => Thermostat::LivingRoomBig.heating_factor(),
-            HeatingDemand::LivingRoomSmall => Thermostat::LivingRoomSmall.heating_factor(),
-            HeatingDemand::Bedroom => Thermostat::Bedroom.heating_factor(),
-            HeatingDemand::Kitchen => Thermostat::Kitchen.heating_factor(),
-            HeatingDemand::RoomOfRequirements => Thermostat::RoomOfRequirements.heating_factor(),
-            HeatingDemand::Bathroom => Thermostat::Bathroom.heating_factor(),
-        }
+pub struct HeatingDemandStateProvider;
+
+impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider {
+    fn calculate_current(&self, id: HeatingDemand, ctx: &StateCalculationContext) -> Option<DataPoint<Percent>> {
+        use crate::device_state::HeatingDemand as DeviceHeatingDemand;
+
+        ctx.device_state(match id {
+            HeatingDemand::LivingRoomBig => DeviceHeatingDemand::LivingRoomBig,
+            HeatingDemand::LivingRoomSmall => DeviceHeatingDemand::LivingRoomSmall,
+            HeatingDemand::Bedroom => DeviceHeatingDemand::Bedroom,
+            HeatingDemand::Kitchen => DeviceHeatingDemand::Kitchen,
+            HeatingDemand::RoomOfRequirements => DeviceHeatingDemand::RoomOfRequirements,
+            HeatingDemand::Bathroom => DeviceHeatingDemand::Bathroom,
+        })
     }
 }

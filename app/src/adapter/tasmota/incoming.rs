@@ -1,9 +1,10 @@
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::time::DateTime;
+use crate::core::timeseries::DataPoint;
 use crate::core::unit::{KiloWattHours, Watt};
+use crate::device_state::DeviceStateValue;
 use crate::home::availability::ItemAvailability;
 use crate::t;
-use crate::{core::timeseries::DataPoint, home::state::PersistentHomeStateValue};
 use anyhow::bail;
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
@@ -85,12 +86,12 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
                         DataPoint::new(
-                            PersistentHomeStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
+                            DeviceStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
                             tele_message.time,
                         )
                         .into(),
                         DataPoint::new(
-                            PersistentHomeStateValue::TotalEnergyConsumption(
+                            DeviceStateValue::TotalEnergyConsumption(
                                 energy.clone(),
                                 KiloWattHours(energy_report.total),
                             ),
@@ -118,11 +119,10 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(PersistentHomeStateValue::PowerAvailable(powered.clone(), true), t!(now)).into(),
+                        DataPoint::new(DeviceStateValue::PowerAvailable(powered.clone(), true), t!(now)).into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(PersistentHomeStateValue::PowerAvailable(powered.clone(), false), t!(now))
-                            .into(),
+                        DataPoint::new(DeviceStateValue::PowerAvailable(powered.clone(), false), t!(now)).into(),
                     ]),
                     _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, msg.payload),
                 }

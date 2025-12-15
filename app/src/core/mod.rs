@@ -1,6 +1,5 @@
 pub mod id;
 pub mod math;
-pub mod persistence;
 pub mod planner;
 pub mod time;
 pub mod timeseries;

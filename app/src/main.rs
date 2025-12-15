@@ -1,4 +1,3 @@
-use core::persistence::Database;
 use infrastructure::Mqtt;
 use settings::Settings;
 use tokio::sync::broadcast;
@@ -19,7 +18,7 @@ mod settings;
 mod trigger;
 
 struct Infrastructure {
-    database: Database,
+    db_pool: sqlx::PgPool,
     mqtt_client: Mqtt,
     energy_reading_events: broadcast::Sender<adapter::energy_meter::EnergyReadingAddedEvent>,
 }
@@ -32,9 +31,9 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.database.pool.clone());
-    let trigger_runner = trigger::TriggerRunner::new(infrastructure.database.pool.clone());
-    let command_runner = CommandRunner::new(infrastructure.database.pool.clone());
+    let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.db_pool.clone());
+    let trigger_runner = trigger::TriggerRunner::new(infrastructure.db_pool.clone());
+    let command_runner = CommandRunner::new(infrastructure.db_pool.clone());
 
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
@@ -102,7 +101,8 @@ pub async fn main() {
 
     let http_server_exec = {
         let http_device_state_client = device_state_runner.client();
-        let http_database = infrastructure.database.clone();
+        let http_db_pool = infrastructure.db_pool.clone();
+
         let energy_reading_events = infrastructure.energy_reading_events.clone();
         let metrics = settings.metrics.clone();
         let http_command_client = command_runner.client();
@@ -113,7 +113,7 @@ pub async fn main() {
                 .run_server(move || {
                     vec![
                         adapter::energy_meter::EnergyMeter::new_web_service(
-                            http_database.clone(),
+                            http_db_pool.clone(),
                             energy_reading_events.clone(),
                         ),
                         adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
@@ -161,13 +161,12 @@ impl Infrastructure {
         settings.monitoring.init().expect("Error initializing monitoring");
 
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
-        let database = Database::new(db_pool);
 
         let mqtt_client = settings.mqtt.new_client();
         let (energy_reading_events, _) = broadcast::channel(16);
 
         Ok(Self {
-            database,
+            db_pool,
             mqtt_client,
             energy_reading_events,
         })

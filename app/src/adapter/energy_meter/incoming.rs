@@ -1,22 +1,22 @@
+use crate::adapter::energy_meter::persistence::EnergyReadingRepository;
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
 use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use tokio::sync::broadcast::Receiver;
 
-use crate::core::persistence::Database;
-
 use super::{EnergyReading, EnergyReadingAddedEvent, Faucet, Radiator};
 
 pub struct EnergyMeterIncomingDataSource {
-    db: Database,
+    repo: EnergyReadingRepository,
     rx: Receiver<EnergyReadingAddedEvent>,
     initial_load: Option<Vec<EnergyReadingAddedEvent>>,
 }
 
 impl EnergyMeterIncomingDataSource {
-    pub fn new(db: Database, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
+    pub fn new(pool: sqlx::PgPool, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
+        let repo = EnergyReadingRepository::new(pool);
         Self {
-            db,
+            repo,
             rx,
             initial_load: None,
         }
@@ -30,7 +30,7 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
 
     async fn recv(&mut self) -> Option<EnergyReadingAddedEvent> {
         if self.initial_load.is_none() {
-            self.initial_load = match self.db.get_latest_total_readings_ids().await {
+            self.initial_load = match self.repo.get_latest_total_readings_ids().await {
                 Ok(v) => Some(v.iter().map(|id| EnergyReadingAddedEvent { id: *id }).collect()),
                 Err(e) => {
                     tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
@@ -65,7 +65,7 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
         _: &(),
         msg: &EnergyReadingAddedEvent,
     ) -> anyhow::Result<Vec<IncomingData>> {
-        let dp = self.db.get_total_reading_by_id(msg.id).await?;
+        let dp = self.repo.get_total_reading_by_id(msg.id).await?;
         Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into()))])
     }
 }

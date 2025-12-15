@@ -1,15 +1,20 @@
 use crate::core::time::DateTime;
 
-use crate::{Database, core::timeseries::DataPoint};
+use crate::core::timeseries::DataPoint;
 
 use super::{EnergyReading, Faucet, Radiator};
 
-impl Database {
-    pub async fn add_yearly_energy_reading(
-        &self,
-        reading: EnergyReading,
-        timestamp: DateTime,
-    ) -> anyhow::Result<i64> {
+#[derive(Clone)]
+pub struct EnergyReadingRepository {
+    pool: sqlx::PgPool,
+}
+
+impl EnergyReadingRepository {
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn add_yearly_energy_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<i64> {
         //TODO derive automatically from enum
         let (type_, item, value): (&str, &str, f64) = match reading {
             EnergyReading::Heating(item, value) => ("heating", item.into(), value),

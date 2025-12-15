@@ -56,18 +56,18 @@ pub async fn main() {
             .homeassistant
             .new_incoming_data_source(&mut infrastructure)
             .await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
     };
     let ha_cmd_executor = {
         let executor = settings
             .homeassistant
-            .new_command_executor(&infrastructure, device_state_runner.incoming_data_sender());
+            .new_command_executor(&infrastructure, device_state_runner.client());
         CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
     };
 
     let z2m_incoming_data_processing = {
         let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
     };
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
@@ -76,7 +76,7 @@ pub async fn main() {
 
     let tasmota_incoming_data_processing = {
         let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
     };
     let tasmota_cmd_executor = {
         let executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -85,7 +85,7 @@ pub async fn main() {
 
     let energy_meter_processing = {
         let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.incoming_data_sender())
+        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
     };
 
     let homekit_runner = settings
@@ -136,7 +136,6 @@ pub async fn main() {
     tracing::info!("Starting main loop");
 
     tokio::select!(
-        _ = device_state_runner.run() => {},
         _ = process_infrastucture => {},
         _ = home_state_runner.run() => {},
         _ = planning_runner.run() => {},

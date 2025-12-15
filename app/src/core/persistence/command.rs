@@ -1,8 +1,8 @@
 use crate::core::id::ExternalId;
 use crate::core::time::DateTimeRange;
 use crate::home::command::{Command, CommandExecution, CommandState, CommandTarget};
-use crate::trigger::UserTriggerId;
 use crate::t;
+use crate::trigger::UserTriggerId;
 use anyhow::Result;
 use schema::*;
 

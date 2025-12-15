@@ -1,5 +1,5 @@
-use crate::home_state::{IsRunning, StateSnapshot};
 use crate::home::{HeatingZone, Room};
+use crate::home_state::{IsRunning, StateSnapshot};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
 pub enum HomeGoal {

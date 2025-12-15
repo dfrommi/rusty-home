@@ -7,10 +7,9 @@ use client::HaHttpClient;
 use client::HaMqttClient;
 use incoming::HaIncomingDataSource;
 use outgoing::HaCommandExecutor;
-use tokio::sync::mpsc;
 
 use crate::adapter::command::CommandExecutor;
-use crate::device_state::DeviceStateIncomingEvent;
+use crate::device_state::DeviceStateClient;
 use crate::device_state::{FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature};
 use std::collections::HashMap;
 
@@ -33,14 +32,14 @@ impl HomeAssitant {
     pub fn new_command_executor(
         &self,
         infrastructure: &Infrastructure,
-        device_sender: mpsc::Sender<DeviceStateIncomingEvent>,
+        device_client: DeviceStateClient,
     ) -> impl CommandExecutor + use<> {
         let http_client =
             HaHttpClient::new(&self.url, &self.token).expect("Error initializing Home Assistant REST client");
         HaCommandExecutor::new(
             http_client,
             infrastructure.api.clone(),
-            device_sender,
+            device_client,
             &config::default_ha_command_config(),
         )
     }

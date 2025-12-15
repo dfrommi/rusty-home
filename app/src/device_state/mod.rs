@@ -7,7 +7,7 @@ pub use domain::*;
 use std::{collections::HashMap, sync::Arc};
 
 use sqlx::PgPool;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 
 use crate::{
     core::{
@@ -29,13 +29,6 @@ pub struct DeviceStateClient {
     service: Arc<DeviceStateService>,
 }
 
-//temporary - to be moved to internal adapter
-#[derive(Debug, Clone)]
-pub enum DeviceStateIncomingEvent {
-    DeviceStateUpdated(DataPoint<DeviceStateValue>),
-    DeviceAvailabilityUpdated(DeviceAvailability),
-}
-
 #[derive(Debug, Clone)]
 pub struct DeviceAvailability {
     pub source: String,
@@ -53,23 +46,18 @@ pub struct OfflineItem {
 
 pub struct DeviceStateRunner {
     service: Arc<DeviceStateService>,
-    incoming_data_sender: mpsc::Sender<DeviceStateIncomingEvent>,
-    incoming_data_receiver: mpsc::Receiver<DeviceStateIncomingEvent>,
 }
 
 impl DeviceStateRunner {
     pub fn new(pool: PgPool) -> Self {
         let repo = DeviceStateRepository::new(pool);
 
-        let (incoming_data_sender, incoming_data_receiver) = mpsc::channel(512);
         let (event_tx, _event_rx) = broadcast::channel(100);
 
         let service = DeviceStateService::new(repo.clone(), event_tx.clone());
 
         DeviceStateRunner {
             service: Arc::new(service),
-            incoming_data_sender,
-            incoming_data_receiver,
         }
     }
 
@@ -79,32 +67,22 @@ impl DeviceStateRunner {
         }
     }
 
-    //temporary - to be moved to internal adapter
-    pub fn incoming_data_sender(&self) -> mpsc::Sender<DeviceStateIncomingEvent> {
-        self.incoming_data_sender.clone()
-    }
-
     pub fn subscribe(&self) -> broadcast::Receiver<DeviceStateEvent> {
         self.service.subscribe()
-    }
-
-    pub async fn run(mut self) {
-        loop {
-            if let Some(event) = self.incoming_data_receiver.recv().await {
-                match event {
-                    DeviceStateIncomingEvent::DeviceStateUpdated(dp) => {
-                        self.service.handle_state_update(dp).await;
-                    }
-                    DeviceStateIncomingEvent::DeviceAvailabilityUpdated(avail) => {
-                        self.service.handle_availability_update(avail.clone()).await;
-                    }
-                }
-            }
-        }
     }
 }
 
 impl DeviceStateClient {
+    pub async fn update_state(&self, data_point: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
+        self.service.handle_state_update(data_point).await;
+        Ok(())
+    }
+
+    pub async fn update_availability(&self, availability: DeviceAvailability) -> anyhow::Result<()> {
+        self.service.handle_availability_update(availability).await;
+        Ok(())
+    }
+
     pub async fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
         self.service.get_current_for_all().await
     }

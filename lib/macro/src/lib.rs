@@ -1,7 +1,7 @@
 mod enum_variants;
 mod id_item;
-mod state_trace;
 mod state_enum;
+mod state_trace;
 mod state_type_info;
 
 use proc_macro::TokenStream;

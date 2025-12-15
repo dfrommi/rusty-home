@@ -11,11 +11,9 @@ pub use command::CommandExecutorRunner;
 pub use incoming::IncomingDataSourceRunner;
 
 mod incoming {
-    use tokio::sync::mpsc;
-
     use crate::{
         core::timeseries::DataPoint,
-        device_state::{DeviceAvailability, DeviceStateIncomingEvent, DeviceStateValue},
+        device_state::{DeviceAvailability, DeviceStateClient, DeviceStateValue},
         home::availability::ItemAvailability,
         trigger::{TriggerClient, UserTrigger},
     };
@@ -55,7 +53,7 @@ mod incoming {
     {
         source: S,
         trigger_client: TriggerClient,
-        device_tx: mpsc::Sender<DeviceStateIncomingEvent>,
+        device_client: DeviceStateClient,
         _marker: std::marker::PhantomData<(M, C)>,
     }
 
@@ -65,15 +63,11 @@ mod incoming {
         C: std::fmt::Debug,
         S: IncomingDataSource<M, C>,
     {
-        pub fn new(
-            source: S,
-            trigger_client: TriggerClient,
-            device_tx: mpsc::Sender<DeviceStateIncomingEvent>,
-        ) -> Self {
+        pub fn new(source: S, trigger_client: TriggerClient, device_client: DeviceStateClient) -> Self {
             Self {
                 source,
                 trigger_client,
-                device_tx,
+                device_client,
                 _marker: std::marker::PhantomData,
             }
         }
@@ -125,11 +119,7 @@ mod incoming {
             for event in incoming_data.iter() {
                 match event {
                     IncomingData::StateValue(dp) => {
-                        if let Err(e) = self
-                            .device_tx
-                            .send(DeviceStateIncomingEvent::DeviceStateUpdated(dp.clone()))
-                            .await
-                        {
+                        if let Err(e) = self.device_client.update_state(dp.clone()).await {
                             tracing::error!("Error processing state {:?}: {:?}", dp, e);
                         }
                     }
@@ -148,11 +138,7 @@ mod incoming {
                             marked_offline: item.marked_offline,
                         };
 
-                        if let Err(e) = self
-                            .device_tx
-                            .send(DeviceStateIncomingEvent::DeviceAvailabilityUpdated(device_item))
-                            .await
-                        {
+                        if let Err(e) = self.device_client.update_availability(device_item).await {
                             tracing::error!("Error processing device availability for {}: {:?}", item.item, e);
                         }
                     }

@@ -1,12 +1,11 @@
 use crate::adapter::command::CommandExecutor;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{FanAirflow, FanSpeed};
-use crate::device_state::{DeviceStateIncomingEvent, DeviceStateValue};
+use crate::device_state::{DeviceStateClient, DeviceStateValue};
 use crate::home::command::{Command, CommandTarget, Fan};
 use crate::home_state::{EnergySaving, FanActivity};
 use crate::t;
 use serde_json::json;
-use tokio::sync::mpsc;
 
 use super::{HaHttpClient, HaServiceTarget};
 use crate::core::HomeApi;
@@ -14,7 +13,7 @@ use crate::core::HomeApi;
 pub struct HaCommandExecutor {
     client: HaHttpClient,
     api: HomeApi,
-    device_sender: mpsc::Sender<DeviceStateIncomingEvent>,
+    device_client: DeviceStateClient,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
@@ -22,7 +21,7 @@ impl HaCommandExecutor {
     pub fn new(
         client: HaHttpClient,
         api: HomeApi,
-        device_sender: mpsc::Sender<DeviceStateIncomingEvent>,
+        device_client: DeviceStateClient,
         config: &[(CommandTarget, HaServiceTarget)],
     ) -> Self {
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
@@ -34,7 +33,7 @@ impl HaCommandExecutor {
         Self {
             client,
             api,
-            device_sender,
+            device_client,
             config: data,
         }
     }
@@ -158,8 +157,8 @@ impl HaCommandExecutor {
         };
 
         //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
-        self.device_sender
-            .send(DeviceStateIncomingEvent::DeviceStateUpdated(DataPoint::new(
+        self.device_client
+            .update_state(DataPoint::new(
                 DeviceStateValue::FanActivity(
                     match fan {
                         Fan::LivingRoomCeilingFan => crate::device_state::FanActivity::LivingRoomCeilingFan,
@@ -168,7 +167,7 @@ impl HaCommandExecutor {
                     airflow.clone(),
                 ),
                 t!(now),
-            )))
+            ))
             .await?;
 
         Ok(())
@@ -255,11 +254,11 @@ impl HaCommandExecutor {
 
         //store state directly as homeassistant as there is no back-channel. still unreliable but
         //for now the best we can do
-        self.device_sender
-            .send(DeviceStateIncomingEvent::DeviceStateUpdated(DataPoint::new(
+        self.device_client
+            .update_state(DataPoint::new(
                 DeviceStateValue::EnergySaving(crate::device_state::EnergySaving::LivingRoomTv, energy_saving),
                 t!(now),
-            )))
+            ))
             .await?;
 
         Ok(())

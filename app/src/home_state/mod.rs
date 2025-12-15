@@ -69,19 +69,10 @@ impl HomeStateRunner {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
 
         loop {
+            //TODO debounce
             tokio::select! {
-                state_evt = self.state_changed_rx.recv() => {
-                    match state_evt {
-                        Ok(DeviceStateEvent::Changed(_)) | Ok(DeviceStateEvent::Updated(_)) => {},
-                        Err(_) => {}, // channel closed or lagged; fall back to timer ticks
-                    }
-                },
-                trigger_evt = self.user_trigger_rx.recv() => {
-                    match trigger_evt {
-                        Ok(TriggerEvent::TriggerAdded) => {},
-                        Err(_) => {},
-                    }
-                },
+                Ok(DeviceStateEvent::Updated(_)) = self.state_changed_rx.recv() => {},
+                Ok(TriggerEvent::TriggerAdded) = self.user_trigger_rx.recv() => {},
                 _ = timer.tick() => {},
             }
 

@@ -1,5 +1,6 @@
 pub mod db;
 pub mod tasmota;
+pub mod z2m;
 
 use crate::{
     core::timeseries::DataPoint,

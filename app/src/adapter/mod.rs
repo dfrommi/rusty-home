@@ -4,7 +4,6 @@ pub mod homeassistant;
 pub mod homekit;
 pub mod mcp;
 pub mod metrics_export;
-pub mod z2m;
 
 pub use command::CommandExecutorRunner;
 pub use incoming::IncomingDataSourceRunner;

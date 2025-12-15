@@ -11,7 +11,7 @@ pub struct Settings {
     pub monitoring: MonitoringConfig,
     pub homebridge: crate::adapter::homekit::Homekit,
     pub homeassistant: crate::adapter::homeassistant::HomeAssitant,
-    pub z2m: crate::adapter::z2m::Zigbee2Mqtt,
+    pub z2m: Zigbee2MqttSettings,
     pub tasmota: TasmotaSettings,
     pub metrics: crate::adapter::metrics_export::MetricsExport,
 }
@@ -29,6 +29,12 @@ impl Settings {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct TasmotaSettings {
+    pub event_topic: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct Zigbee2MqttSettings {
     pub event_topic: String,
 }
 

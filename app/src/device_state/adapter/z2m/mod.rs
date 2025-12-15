@@ -1,16 +1,26 @@
-use crate::adapter::incoming::{IncomingData, IncomingDataSource};
+mod config;
+
 use crate::automation::Thermostat;
-use crate::automation::availability::ItemAvailability;
+use crate::core::DeviceConfig;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
-use crate::device_state::{DeviceStateValue, RawVendorValue, Temperature};
-use infrastructure::MqttInMessage;
+use crate::device_state::adapter::{IncomingData, IncomingDataSource};
+use crate::device_state::{DeviceAvailability, DeviceStateValue, RawVendorValue, Temperature};
+use infrastructure::{Mqtt, MqttInMessage};
 use tokio::sync::mpsc;
 
-use crate::core::DeviceConfig;
+use crate::device_state::{
+    CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, TotalEnergyConsumption,
+};
 
-use super::Z2mChannel;
+#[derive(Debug, Clone)]
+pub enum Z2mChannel {
+    ClimateSensor(Temperature, RelativeHumidity),
+    ContactSensor(Opened),
+    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
+    Thermostat(Thermostat, SetPoint, HeatingDemand, Opened),
+}
 
 pub struct Z2mIncomingDataSource {
     base_topic: String,
@@ -19,11 +29,17 @@ pub struct Z2mIncomingDataSource {
 }
 
 impl Z2mIncomingDataSource {
-    pub fn new(base_topic: String, config: DeviceConfig<Z2mChannel>, mqtt_rx: mpsc::Receiver<MqttInMessage>) -> Self {
+    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
+        let config = DeviceConfig::new(&config::default_z2m_state_config());
+        let rx = mqtt_client
+            .subscribe(format!("{}/#", event_topic))
+            .await
+            .expect("Error subscribing to MQTT topic");
+
         Self {
-            base_topic: base_topic.trim_matches('/').to_owned(),
+            base_topic: event_topic.trim_matches('/').to_owned(),
             device_config: config,
-            mqtt_receiver: mqtt_rx,
+            mqtt_receiver: rx,
         }
     }
 }
@@ -61,7 +77,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        DeviceStateValue::Temperature(t.clone(), DegreeCelsius(payload.temperature)),
+                        DeviceStateValue::Temperature(*t, DegreeCelsius(payload.temperature)),
                         payload.last_seen,
                     )
                     .into(),
@@ -218,9 +234,9 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 }
 
 fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {
-    ItemAvailability {
+    DeviceAvailability {
         source: "Z2M".to_string(),
-        item: friendly_name.to_string(),
+        device_id: friendly_name.to_string(),
         last_seen,
         marked_offline: false,
     }

@@ -1,6 +1,5 @@
 mod api;
 pub mod app_event;
-pub mod command;
 pub mod id;
 pub mod math;
 pub mod persistence;

@@ -5,11 +5,11 @@ use infrastructure::TraceContext;
 use tokio::{sync::oneshot, task::yield_now};
 use tracing::Instrument;
 
+use crate::command::{Command, CommandClient, CommandTarget};
 use crate::core::id::ExternalId;
+use crate::core::planner::action::ActionEvaluationResult;
 use crate::core::time::DateTime;
-use crate::core::{HomeApi, planner::action::ActionEvaluationResult};
 use crate::home::RuleEvaluationContext;
-use crate::home::command::{Command, CommandTarget};
 use crate::home_state::StateSnapshot;
 use crate::t;
 use crate::trigger::{TriggerClient, UserTriggerId};
@@ -20,7 +20,7 @@ pub async fn plan_and_execute<G, A>(
     active_goals: &[G],
     config: &[(G, Vec<A>)],
     snapshot: StateSnapshot,
-    api: &HomeApi,
+    command_client: &CommandClient,
     trigger_client: &TriggerClient,
 ) -> Result<PlanningTrace>
 where
@@ -45,10 +45,10 @@ where
             let context = Context::new(goal, action.clone(), is_goal_active, prev_rx, tx);
             prev_rx = rx;
 
-            let api = api.clone();
+            let command_client = command_client.clone();
             let rule_ctx = rule_ctx.clone();
             handles.push(tokio::spawn(
-                async move { process_action(context, rule_ctx, api).await }.instrument(goal_span.clone()),
+                async move { process_action(context, rule_ctx, command_client).await }.instrument(goal_span.clone()),
             ));
         }
     }
@@ -93,7 +93,7 @@ async fn cancel_unused_triggers(
 async fn process_action<A: Action>(
     mut context: Context<A>,
     ctx: RuleEvaluationContext,
-    api: HomeApi,
+    command_client: CommandClient,
 ) -> Result<Context<A>> {
     context.trace.correlation_id = TraceContext::current_correlation_id();
 
@@ -113,12 +113,20 @@ async fn process_action<A: Action>(
     match evaluation_result {
         ActionEvaluationResult::Execute(commands, source) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), None, &api, &ctx).await;
+                execute_action(&mut context, command, source.clone(), None, &command_client, &ctx).await;
             }
         }
         ActionEvaluationResult::ExecuteTrigger(commands, source, user_trigger_id) => {
             for command in commands {
-                execute_action(&mut context, command, source.clone(), Some(user_trigger_id.clone()), &api, &ctx).await;
+                execute_action(
+                    &mut context,
+                    command,
+                    source.clone(),
+                    Some(user_trigger_id.clone()),
+                    &command_client,
+                    &ctx,
+                )
+                .await;
             }
         }
         ActionEvaluationResult::Skip => {}
@@ -195,15 +203,15 @@ fn check_locked<A>(
     evaluation_result
 }
 
-#[tracing::instrument(skip(api, ctx))]
+#[tracing::instrument(skip(command_client, ctx))]
 async fn should_execute(
     command: &Command,
     source: &ExternalId,
-    api: &HomeApi,
+    command_client: &CommandClient,
     ctx: &RuleEvaluationContext,
 ) -> anyhow::Result<bool> {
     let target: CommandTarget = command.clone().into();
-    let last_execution = api
+    let last_execution = command_client
         .get_latest_command(target.clone(), t!(48 hours ago))
         .await?
         .filter(|e| e.source == *source && e.command == *command)
@@ -216,7 +224,7 @@ async fn should_execute(
         return Ok(false);
     }
 
-    let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), api).await?;
+    let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), command_client).await?;
     if is_reflected_in_state {
         tracing::trace!("Command for {target} is already reflected in state, skipping");
         return Ok(false);
@@ -226,21 +234,21 @@ async fn should_execute(
     Ok(true)
 }
 
-#[tracing::instrument(skip(context, api, ctx))]
+#[tracing::instrument(skip(context, command_client, ctx))]
 async fn execute_action<A: Action>(
     context: &mut Context<A>,
     command: Command,
     source: ExternalId,
     user_trigger_id: Option<UserTriggerId>,
-    api: &HomeApi,
+    command_client: &CommandClient,
     ctx: &RuleEvaluationContext,
 ) {
     let target: CommandTarget = command.clone().into();
 
     context.user_trigger_id = user_trigger_id.clone();
 
-    match should_execute(&command, &source, api, ctx).await {
-        Ok(true) => match api.save_command(command, &source, user_trigger_id).await {
+    match should_execute(&command, &source, command_client, ctx).await {
+        Ok(true) => match command_client.enqueue(command, source, user_trigger_id).await {
             Ok(_) => {
                 tracing::info!("Started command {} via action {}", target, context.action);
                 context.trace.triggered = Some(true);

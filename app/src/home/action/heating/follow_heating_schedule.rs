@@ -7,9 +7,9 @@ use crate::{
         },
         unit::{DegreeCelsius, Percent},
     },
+    command::{Command, HeatingTargetState},
     home::{
         action::{Rule, RuleEvaluationContext, RuleResult},
-        command::{Command, HeatingTargetState},
         common::HeatingZone,
     },
     home_state::{HeatingMode, TargetHeatingMode, Temperature},

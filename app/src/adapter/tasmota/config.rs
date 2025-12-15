@@ -1,5 +1,5 @@
+use crate::command::{CommandTarget, PowerToggle};
 use crate::device_state::{CurrentPowerUsage, PowerAvailable, TotalEnergyConsumption};
-use crate::home::command::{CommandTarget, PowerToggle};
 
 use super::TasmotaChannel;
 

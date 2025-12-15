@@ -1,6 +1,6 @@
 use crate::{
     adapter::command::CommandExecutor,
-    home::command::{Command, CommandTarget},
+    command::{Command, CommandTarget},
 };
 use infrastructure::MqttOutMessage;
 

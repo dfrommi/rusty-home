@@ -4,11 +4,12 @@ use infrastructure::Mqtt;
 use settings::Settings;
 
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
-use crate::core::command::CommandDispatcher;
+use crate::command::CommandRunner;
 use crate::core::planner::PlanningRunner;
 use crate::home_state::HomeStateRunner;
 
 mod adapter;
+mod command;
 mod core;
 mod device_state;
 mod home;
@@ -32,10 +33,9 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let mut command_dispatcher = CommandDispatcher::new(&infrastructure);
-
     let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.database.pool.clone());
     let trigger_runner = trigger::TriggerRunner::new(infrastructure.database.pool.clone());
+    let command_runner = CommandRunner::new(infrastructure.database.pool.clone());
 
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
@@ -47,7 +47,7 @@ pub async fn main() {
 
     let planning_runner = PlanningRunner::new(
         home_state_runner.subscribe_snapshot_updated(),
-        infrastructure.api.clone(),
+        command_runner.client(),
         trigger_runner.client(),
     );
 
@@ -61,8 +61,8 @@ pub async fn main() {
     let ha_cmd_executor = {
         let executor = settings
             .homeassistant
-            .new_command_executor(&infrastructure, device_state_runner.client());
-        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+            .new_command_executor(device_state_runner.client());
+        CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
     };
 
     let z2m_incoming_data_processing = {
@@ -71,7 +71,7 @@ pub async fn main() {
     };
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
-        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+        CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
     };
 
     let tasmota_incoming_data_processing = {
@@ -80,7 +80,7 @@ pub async fn main() {
     };
     let tasmota_cmd_executor = {
         let executor = settings.tasmota.new_command_executor(&infrastructure);
-        CommandExecutorRunner::new(executor, command_dispatcher.subscribe(), infrastructure.api.clone())
+        CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
     };
 
     let energy_meter_processing = {
@@ -106,6 +106,7 @@ pub async fn main() {
         let http_device_state_client = device_state_runner.client();
         let http_database = infrastructure.database.clone();
         let metrics = settings.metrics.clone();
+        let http_command_client = command_runner.client();
 
         async move {
             settings
@@ -113,7 +114,7 @@ pub async fn main() {
                 .run_server(move || {
                     vec![
                         adapter::energy_meter::EnergyMeter::new_web_service(http_database.clone()),
-                        adapter::grafana::new_routes(http_api.clone(), http_device_state_client.clone()),
+                        adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(http_api.clone()),
                         metrics.new_routes(http_api.clone()),
                     ]
@@ -139,7 +140,7 @@ pub async fn main() {
         _ = process_infrastucture => {},
         _ = home_state_runner.run() => {},
         _ = planning_runner.run() => {},
-        _ = command_dispatcher.dispatch() => {},
+        _ = command_runner.run_dispatcher() => {},
         _ = energy_meter_processing.run() => {},
         _ = ha_incoming_data_processing.run() => {},
         _ = ha_cmd_executor.run() => {},

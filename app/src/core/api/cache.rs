@@ -1,45 +1,12 @@
-use std::sync::Arc;
-
-use moka::future::Cache;
-
-use crate::{
-    core::{
-        persistence::Database,
-        time::{DateTime, DateTimeRange, Duration},
-        timeseries::DataFrame,
-    },
-    home::command::{CommandExecution, CommandTarget},
+use crate::core::{
+    persistence::Database,
+    time::{DateTimeRange, Duration},
 };
 
 #[derive(Clone)]
 pub struct HomeApiCache {
-    db: Database,
-    caching_range: CachingRange,
-    ts_cache: Cache<i64, CacheSlice<DataFrame<f64>>>,
-    cmd_cache: Cache<CommandTarget, CacheSlice<Vec<CommandExecution>>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CacheSlice<T> {
-    range: DateTimeRange,
-    data: Arc<T>,
-}
-
-impl<T> CacheSlice<T> {
-    fn new(range: DateTimeRange, data: T) -> Self {
-        Self {
-            range,
-            data: Arc::new(data),
-        }
-    }
-
-    fn covers(&self, range: &DateTimeRange) -> bool {
-        self.range.covers(range)
-    }
-
-    pub fn data(&self) -> &T {
-        self.data.as_ref()
-    }
+    _db: Database,
+    _caching_range: CachingRange,
 }
 
 #[derive(Debug, Clone)]
@@ -51,97 +18,13 @@ pub enum CachingRange {
 impl HomeApiCache {
     pub fn new(caching_range: CachingRange, db: Database) -> Self {
         Self {
-            db,
-            caching_range,
-            ts_cache: Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
-                .build(),
-            cmd_cache: Cache::builder()
-                .time_to_live(std::time::Duration::from_secs(3 * 60 * 60))
-                .build(),
-        }
-    }
-
-    pub fn is_covering(&self, range: &DateTimeRange) -> bool {
-        self.caching_range().covers(range)
-    }
-
-    // Cache Management Methods
-    fn caching_range(&self) -> DateTimeRange {
-        //Caching always uses real time, never timeshifted. This allows stable caching while
-        //shifting around
-        match &self.caching_range {
-            CachingRange::OfLast(duration) => {
-                DateTimeRange::new(DateTime::real_now() - duration.clone(), DateTime::max_value())
-            }
-            CachingRange::Fixed(range) => range.clone(),
+            _db: db,
+            _caching_range: caching_range,
         }
     }
 
     pub async fn invalidate_ts_cache(&self, tag_id: i64) {
         tracing::debug!("Invalidating timeseries cache for tag {}", tag_id);
-        self.ts_cache.invalidate(&tag_id).await;
-    }
-
-    pub async fn invalidate_command_cache(&self, target: &CommandTarget) {
-        tracing::debug!("Invalidating command cache for target {:?}", target);
-        self.cmd_cache.invalidate(target).await;
-    }
-
-    pub async fn get_commands_from_cache(
-        &self,
-        target: &CommandTarget,
-        range: &DateTimeRange,
-    ) -> Option<CacheSlice<Vec<CommandExecution>>> {
-        let commands = self
-            .cmd_cache
-            .try_get_with(target.clone(), async {
-                let cache_range = self.caching_range();
-                self.db
-                    .query_all_commands(Some(target.clone()), &cache_range)
-                    .await
-                    .map(|cmds| {
-                        // Adjust cached range to actual data range, expanded by the cache range
-                        let effective_range = Self::merge_ranges(&cache_range, cmds.iter().map(|cmd| cmd.created));
-                        CacheSlice::new(effective_range, cmds)
-                    })
-            })
-            .await;
-
-        match commands {
-            Ok(cached) if cached.covers(range) => Some(cached),
-            Err(e) => {
-                tracing::error!(
-                    "Error fetching commands for target {:?} from cache or init cache: {:?}",
-                    target,
-                    e
-                );
-                None
-            }
-            _ => None,
-        }
-    }
-
-    fn merge_ranges<I>(cache_range: &DateTimeRange, timestamps: I) -> DateTimeRange
-    where
-        I: Iterator<Item = DateTime>,
-    {
-        let mut min_ts = *cache_range.start();
-        let mut max_ts = *cache_range.end();
-
-        for ts in timestamps {
-            if ts < min_ts {
-                min_ts = ts;
-            }
-            if ts > max_ts {
-                max_ts = ts;
-            }
-        }
-
-        DateTimeRange::new(min_ts, max_ts)
-    }
-
-    fn extend_range(a: &DateTimeRange, b: &DateTimeRange) -> DateTimeRange {
-        DateTimeRange::new(std::cmp::min(*a.start(), *b.start()), std::cmp::max(*a.end(), *b.end()))
+        let _ = tag_id;
     }
 }

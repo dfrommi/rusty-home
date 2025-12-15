@@ -1,5 +1,5 @@
+use crate::command::{Command, PowerToggle};
 use crate::home::action::{RuleEvaluationContext, SimpleRule};
-use crate::home::command::{Command, PowerToggle};
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 

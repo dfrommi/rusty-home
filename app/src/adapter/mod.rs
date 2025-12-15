@@ -151,10 +151,7 @@ mod incoming {
 mod command {
     use infrastructure::TraceContext;
 
-    use crate::{
-        core::HomeApi,
-        home::command::{Command, CommandExecution},
-    };
+    use crate::command::{Command, CommandClient, CommandExecution};
 
     pub trait CommandExecutor {
         //Returns true if command was executed
@@ -164,19 +161,19 @@ mod command {
     pub struct CommandExecutorRunner<E: CommandExecutor> {
         executor: E,
         pending_command_rx: tokio::sync::broadcast::Receiver<CommandExecution>,
-        api: HomeApi,
+        command_client: CommandClient,
     }
 
     impl<E: CommandExecutor> CommandExecutorRunner<E> {
         pub fn new(
             executor: E,
             pending_command_rx: tokio::sync::broadcast::Receiver<CommandExecution>,
-            api: HomeApi,
+            command_client: CommandClient,
         ) -> Self {
             Self {
                 executor,
                 pending_command_rx,
-                api,
+                command_client,
             }
         }
 
@@ -190,27 +187,27 @@ mod command {
                     }
                 };
 
-                process_command(msg, &self.api, &self.executor).await;
+                process_command(msg, &self.command_client, &self.executor).await;
             }
         }
     }
 
     #[tracing::instrument(skip_all, fields(command = ?cmd.command))]
-    async fn process_command(cmd: CommandExecution, api: &HomeApi, executor: &impl CommandExecutor) {
+    async fn process_command(cmd: CommandExecution, command_client: &CommandClient, executor: &impl CommandExecutor) {
         TraceContext::continue_from(&cmd.correlation_id);
 
         let res = executor.execute_command(&cmd.command).await;
 
-        handle_execution_result(cmd.id, res, api).await;
+        handle_execution_result(cmd.id, res, command_client).await;
     }
 
-    async fn handle_execution_result(command_id: i64, res: anyhow::Result<bool>, api: &HomeApi) {
+    async fn handle_execution_result(command_id: i64, res: anyhow::Result<bool>, command_client: &CommandClient) {
         let set_state_res = match res {
-            Ok(true) => api.set_command_state_success(command_id).await,
+            Ok(true) => command_client.set_command_state_success(command_id).await,
             Ok(false) => Ok(()),
             Err(e) => {
                 tracing::error!("Command {} failed: {:?}", command_id, e);
-                api.set_command_state_error(command_id, &e.to_string()).await
+                command_client.set_command_state_error(command_id, &e.to_string()).await
             }
         };
 

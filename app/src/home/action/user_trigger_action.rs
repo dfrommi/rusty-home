@@ -1,9 +1,9 @@
 use r#macro::Id;
 
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
+use crate::command::{Command, HeatingTargetState};
 use crate::core::time::Duration;
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
-use crate::home::command::{Command, HeatingTargetState};
 use crate::home::common::HeatingZone;
 use crate::home_state::PowerAvailable;
 use crate::t;
@@ -81,7 +81,7 @@ impl UserTriggerAction {
 }
 
 fn into_command(trigger: &UserTrigger) -> Vec<Command> {
-    use crate::home::command::*;
+    use crate::command::*;
 
     match trigger.clone() {
         UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => vec![Command::SetPower {

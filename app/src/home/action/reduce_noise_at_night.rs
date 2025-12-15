@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
+use crate::command::{Command, PowerToggle};
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
-use crate::home::command::{Command, PowerToggle};
 use crate::t;
 
 #[derive(Debug, Clone, Id, EnumVariants)]

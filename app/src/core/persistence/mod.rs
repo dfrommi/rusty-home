@@ -1,4 +1,3 @@
-mod command;
 pub mod listener;
 
 #[derive(Clone)]

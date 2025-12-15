@@ -76,7 +76,7 @@ async fn backfill_handler(
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error parsing min datetime: {}", e)))?;
 
     const BATCH_SIZE: usize = 20000;
-    let mut buffer: Vec<Metric> = Vec::with_capacity(BATCH_SIZE);
+    let buffer: Vec<Metric> = Vec::with_capacity(BATCH_SIZE);
 
     let min_dt = query.start.unwrap_or(absolute_min_dt).max(absolute_min_dt);
     let max_dt = query.end.unwrap_or(t!(now)).min(t!(now));

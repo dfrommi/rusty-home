@@ -3,7 +3,7 @@ use crate::{
     adapter::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    home::command::PowerToggle,
+    command::PowerToggle,
 };
 
 pub struct PowerSwitch {

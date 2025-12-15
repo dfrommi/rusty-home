@@ -1,5 +1,5 @@
 use crate::adapter::homekit::HomekitCommandTarget;
-use crate::home::command::{CommandTarget, Fan, NotificationRecipient, PowerToggle};
+use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::home::common::HeatingZone;
 use crate::home::{LoadBalancedThermostat, Room, Thermostat};
 use crate::trigger::RemoteTarget;
@@ -77,7 +77,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomTvEnergySaving.into()).into(),
             FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
-                device: crate::home::command::EnergySavingDevice::LivingRoomTv,
+                device: EnergySavingDevice::LivingRoomTv,
             }).into(),
         ]
     ),
@@ -131,11 +131,11 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,
-                notification: crate::home::command::Notification::WindowOpened,
+                notification: Notification::WindowOpened,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Sabine,
-                notification: crate::home::command::Notification::WindowOpened,
+                notification: Notification::WindowOpened,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::ControlFan {
                 device: Fan::LivingRoomCeilingFan,

@@ -7,7 +7,8 @@ use crate::{
             window_sensor::WindowSensor,
         },
     },
-    home::{HeatingZone, command::PowerToggle},
+    command::PowerToggle,
+    home::HeatingZone,
 };
 
 mod climate_sensor;

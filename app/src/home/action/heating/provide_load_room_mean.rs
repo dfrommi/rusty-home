@@ -2,11 +2,8 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::unit::RawValue,
-    home::{
-        LoadBalancedThermostat, Thermostat,
-        action::{Rule, RuleEvaluationContext, RuleResult},
-        command::Command,
-    },
+    command::Command,
+    home::{LoadBalancedThermostat, Thermostat, action::{Rule, RuleEvaluationContext, RuleResult}},
     home_state::RawVendorValue,
 };
 

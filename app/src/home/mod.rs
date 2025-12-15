@@ -4,7 +4,6 @@ use action::HomeAction;
 use goal::HomeGoal;
 
 mod action;
-pub mod command;
 mod config;
 mod goal;
 

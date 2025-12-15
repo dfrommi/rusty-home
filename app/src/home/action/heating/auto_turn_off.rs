@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
+use crate::command::{Command, PowerToggle};
 use crate::core::time::Duration;
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
-use crate::home::command::{Command, PowerToggle};
 use crate::home_state::PowerAvailable;
 use crate::t;
 

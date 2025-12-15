@@ -1,6 +1,6 @@
 use crate::core::HomeApi;
 use crate::core::id::ExternalId;
-use crate::core::time::{DateTime, DateTimeRange, Duration};
+use crate::core::time::{DateTime, Duration};
 use crate::home_state::HomeState;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema, Schema, json_schema};
@@ -132,10 +132,10 @@ impl SmartHomeMcp {
         &self,
         Parameters(DeviceIds { devices }): Parameters<DeviceIds>,
     ) -> Result<CallToolResult, McpError> {
-        let mut results = Vec::new();
+        let results = Vec::new();
 
         for device_id in devices {
-            let ext_id: ExternalId = device_id.clone().into();
+            let _ext_id: ExternalId = device_id.clone().into();
 
             // TODO Adjust to state snapshot
             // match HomeState::try_from(ext_id) {
@@ -175,7 +175,9 @@ impl SmartHomeMcp {
         &self,
         Parameters(DeviceStateHistoryRequest { device, from, to }): Parameters<DeviceStateHistoryRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let ext_id: ExternalId = device.clone().into();
+        let _ext_id: ExternalId = device.clone().into();
+        let _from = from;
+        let _to = to;
         todo!();
 
         // TODO Adjust to state snapshot

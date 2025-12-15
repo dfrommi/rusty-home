@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
+use crate::command::Command;
 use crate::core::id::ExternalId;
-use crate::home::command::Command;
 
 use crate::home::RuleEvaluationContext;
 use crate::trigger::UserTriggerId;

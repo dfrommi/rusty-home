@@ -12,9 +12,6 @@ pub struct StateChangedEvent;
 pub struct UserTriggerEvent;
 
 #[derive(Debug, Clone)]
-pub struct CommandAddedEvent;
-
-#[derive(Debug, Clone)]
 pub struct EnergyReadingAddedEvent {
     pub id: i64,
 }
@@ -25,7 +22,6 @@ pub struct AppEventListener {
 
     state_changed_tx: tokio::sync::broadcast::Sender<StateChangedEvent>,
     user_trigger_tx: tokio::sync::broadcast::Sender<UserTriggerEvent>,
-    command_added_tx: tokio::sync::broadcast::Sender<CommandAddedEvent>,
     energy_reading_added_tx: tokio::sync::broadcast::Sender<EnergyReadingAddedEvent>,
 }
 
@@ -36,7 +32,6 @@ impl AppEventListener {
             api,
             state_changed_tx: broadcast::channel(128).0,
             user_trigger_tx: broadcast::channel(16).0,
-            command_added_tx: broadcast::channel(16).0,
             energy_reading_added_tx: broadcast::channel(16).0,
         }
     }
@@ -47,10 +42,6 @@ impl AppEventListener {
 
     pub fn new_user_trigger_event_listener(&self) -> broadcast::Receiver<UserTriggerEvent> {
         self.user_trigger_tx.subscribe()
-    }
-
-    pub fn new_command_added_listener(&self) -> broadcast::Receiver<CommandAddedEvent> {
-        self.command_added_tx.subscribe()
     }
 
     pub fn new_energy_reading_added_listener(&self) -> broadcast::Receiver<EnergyReadingAddedEvent> {
@@ -73,7 +64,6 @@ impl AppEventListener {
             //only emit once if event is not bound to a specific item/row
             let mut state_changed_sent = false;
             let mut user_trigger_sent = false;
-            let mut command_added_sent = false;
 
             for event in events {
                 match event {
@@ -84,18 +74,11 @@ impl AppEventListener {
                         }
                         state_changed_sent = true;
                     }
-                    DbEvent::UserTriggerInsert { id } if !user_trigger_sent => {
+                    DbEvent::UserTriggerInsert { id: _ } if !user_trigger_sent => {
                         if let Err(e) = self.user_trigger_tx.send(UserTriggerEvent) {
                             tracing::error!("Error sending user trigger event: {:?}", e);
                         }
                         user_trigger_sent = true;
-                    }
-
-                    DbEvent::CommandAdded { .. } if !command_added_sent => {
-                        if let Err(e) = self.command_added_tx.send(CommandAddedEvent) {
-                            tracing::error!("Error sending command added event: {:?}", e);
-                        }
-                        command_added_sent = true;
                     }
 
                     DbEvent::EnergyReadingInsert { id } => {

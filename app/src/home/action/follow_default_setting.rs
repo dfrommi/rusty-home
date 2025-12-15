@@ -1,8 +1,8 @@
 use r#macro::Id;
 
+use crate::command::{Command, CommandTarget, HeatingTargetState, NotificationAction};
 use crate::core::unit::{FanAirflow, Percent, RawValue};
 use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
-use crate::home::command::{Command, CommandTarget, HeatingTargetState};
 use crate::home::common::HeatingZone;
 
 #[derive(Debug, Clone, Id)]
@@ -36,7 +36,7 @@ impl Rule for FollowDefaultSetting {
                 recipient,
                 notification,
             } => Command::PushNotify {
-                action: crate::home::command::NotificationAction::Dismiss,
+                action: NotificationAction::Dismiss,
                 notification,
                 recipient,
             },

@@ -1,4 +1,4 @@
-use crate::home::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
 use crate::device_state::{FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature};
 

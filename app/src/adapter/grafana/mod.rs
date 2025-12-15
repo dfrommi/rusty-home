@@ -2,21 +2,16 @@ mod dashboard;
 mod display;
 mod support;
 
-use std::sync::Arc;
-
-use crate::{core::HomeApi, device_state::DeviceStateClient};
+use crate::{command::CommandClient, device_state::DeviceStateClient};
 use actix_web::{
     HttpResponse, ResponseError,
     web::{self},
 };
 use derive_more::derive::{Display, Error};
 
-pub fn new_routes(api: HomeApi, device_state_client: DeviceStateClient) -> actix_web::Scope {
-    let api = Arc::new(api);
-    let device_state_client = Arc::new(device_state_client);
-
+pub fn new_routes(command_client: CommandClient, device_state_client: DeviceStateClient) -> actix_web::Scope {
     web::scope("/grafana")
-        .service(dashboard::smart_home::routes(api.clone(), device_state_client))
+        .service(dashboard::smart_home::routes(command_client, device_state_client))
         .service(dashboard::meta::routes())
 }
 

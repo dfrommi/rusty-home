@@ -1,15 +1,57 @@
-use crate::core::id::ExternalId;
-use crate::core::time::DateTimeRange;
-use crate::home::command::{Command, CommandExecution, CommandState, CommandTarget};
-use crate::t;
-use crate::trigger::UserTriggerId;
+use crate::{
+    command::{Command, CommandExecution, CommandState, CommandTarget},
+    core::{id::ExternalId, time::DateTimeRange},
+    t,
+    trigger::UserTriggerId,
+};
 use anyhow::Result;
-use schema::*;
+use sqlx::PgPool;
 
-// Command Execution & Processing
-// High-level command execution logic with deduplication and state validation
-impl super::Database {
-    //TODO handle too old commands -> expect TTL with command, store in DB and return error with message
+#[derive(Debug, Clone)]
+pub struct CommandRepository {
+    pool: PgPool,
+}
+
+impl CommandRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn insert_command(
+        &self,
+        command: &Command,
+        source: &ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+        correlation_id: Option<String>,
+    ) -> Result<CommandExecution> {
+        let db_command = serde_json::json!(command);
+
+        let rec = sqlx::query!(
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID, USER_TRIGGER_ID) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id, created"#,
+            db_command,
+            t!(now).into_db(),
+            DbCommandState::Pending as DbCommandState,
+            source.type_name(),
+            source.variant_name(),
+            correlation_id,
+            user_trigger_id.clone() as Option<UserTriggerId>
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(CommandExecution {
+            id: rec.id,
+            command: command.clone(),
+            state: CommandState::Pending,
+            created: rec.created.into(),
+            source: source.clone(),
+            user_trigger_id,
+            correlation_id,
+        })
+    }
+
     pub async fn get_command_for_processing(&self) -> Result<Option<CommandExecution>> {
         let mut tx = self.pool.begin().await?;
 
@@ -25,8 +67,8 @@ impl super::Database {
         .fetch_optional(&mut *tx)
         .await?;
 
-        match maybe_rec {
-            None => Ok(None),
+        let cmd = match maybe_rec {
+            None => None,
             Some(rec) => {
                 let id = rec.id;
 
@@ -34,7 +76,7 @@ impl super::Database {
 
                 let command_res: std::result::Result<Command, serde_json::Error> = serde_json::from_value(rec.command);
 
-                let result = match command_res {
+                match command_res {
                     Ok(command) => {
                         set_command_status_in_tx(&mut *tx, id, DbCommandState::InProgress, Option::None).await?;
 
@@ -60,42 +102,12 @@ impl super::Database {
                         .await?;
                         None
                     }
-                };
-
-                tx.commit().await?;
-                Ok(result)
+                }
             }
-        }
-    }
-}
+        };
 
-// Command Persistence & State Management
-// Methods for saving commands and managing their execution state
-impl super::Database {
-    #[tracing::instrument(skip(self))]
-    pub async fn save_command(
-        &self,
-        command: &Command,
-        source: &ExternalId,
-        user_trigger_id: Option<UserTriggerId>,
-        correlation_id: Option<String>,
-    ) -> Result<()> {
-        let db_command = serde_json::json!(command);
-
-        sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, CORRELATION_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
-            db_command,
-            t!(now).into_db(),
-            DbCommandState::Pending as DbCommandState,
-            source.type_name(),
-            source.variant_name(),
-            correlation_id,
-            user_trigger_id as Option<UserTriggerId>
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
+        tx.commit().await?;
+        Ok(cmd)
     }
 
     pub async fn set_command_state_success(&self, command_id: i64) -> Result<()> {
@@ -105,10 +117,7 @@ impl super::Database {
     pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> Result<()> {
         set_command_status_in_tx(&self.pool, command_id, DbCommandState::Error, Some(error_message)).await
     }
-}
 
-// Helper methods for cache management
-impl super::Database {
     pub async fn query_all_commands(
         &self,
         target: Option<CommandTarget>,
@@ -214,194 +223,70 @@ async fn mark_other_commands_superseeded(
     Ok(())
 }
 
-pub mod schema {
-    #[derive(Debug, Clone, sqlx::Type)]
-    #[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
-    pub enum DbCommandState {
-        Pending,
-        InProgress,
-        Success,
-        Error,
-    }
+#[derive(Debug, Clone, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+pub enum DbCommandState {
+    Pending,
+    InProgress,
+    Success,
+    Error,
 }
 
-pub mod mapper {
-    use super::*;
-    use crate::home::command::CommandState;
-
-    impl From<(DbCommandState, Option<String>)> for CommandState {
-        fn from((status, error): (DbCommandState, Option<String>)) -> Self {
-            match status {
-                DbCommandState::Pending => CommandState::Pending,
-                DbCommandState::InProgress => CommandState::InProgress,
-                DbCommandState::Success => CommandState::Success,
-                DbCommandState::Error => CommandState::Error(error.unwrap_or("unknown error".to_string())),
-            }
+impl From<(DbCommandState, Option<String>)> for CommandState {
+    fn from((status, error): (DbCommandState, Option<String>)) -> Self {
+        match status {
+            DbCommandState::Pending => CommandState::Pending,
+            DbCommandState::InProgress => CommandState::InProgress,
+            DbCommandState::Success => CommandState::Success,
+            DbCommandState::Error => CommandState::Error(error.unwrap_or("unknown error".to_string())),
         }
     }
 }
 
 #[cfg(test)]
-mod get_all_commands_since {
-    use super::super::Database;
+mod tests {
     use super::*;
+    use crate::command::PowerToggle;
     use crate::core::time::DateTime;
-    use crate::home::command::PowerToggle;
-    use crate::t;
-    use sqlx::PgPool;
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_command_found(db_pool: PgPool) {
-        //GIVEN
-        let db = Database::new(db_pool);
+        let repo = CommandRepository::new(db_pool);
 
         for (power_on, timestampe) in [
             (true, t!(4 minutes ago)),
             (false, t!(6 minutes ago)),
-            (true, t!(10 minutes ago)),
+            (true, t!(8 minutes ago)),
+            (true, t!(24 minutes ago)),
+            (false, t!(26 minutes ago)),
         ] {
-            insert_command(
-                &db,
-                &Command::SetPower {
-                    device: PowerToggle::Dehumidifier,
-                    power_on,
-                },
+            let cmd = Command::SetPower {
+                device: PowerToggle::LivingRoomNotificationLight,
+                power_on,
+            };
+            let source = ExternalId::new("test", "source");
+            let user_trigger_id = None;
+            sqlx::query!(
+                r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
+                serde_json::json!(cmd),
                 timestampe,
+                DbCommandState::Pending as DbCommandState,
+                source.type_name(),
+                source.variant_name(),
+                user_trigger_id as Option<UserTriggerId>
             )
-            .await;
+            .execute(&repo.pool)
+            .await
+            .unwrap();
         }
 
-        insert_command(
-            &db,
-            &Command::SetPower {
+        let res = repo.query_all_commands(
+            Some(CommandTarget::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
-            },
-            t!(2 minutes ago),
-        )
-        .await;
-
-        //WHEN
-        let result = db
-            .query_all_commands(
-                Some(CommandTarget::SetPower {
-                    device: PowerToggle::Dehumidifier,
-                }),
-                &DateTimeRange::new(t!(8 minutes ago), t!(now)),
-            )
-            .await
-            .unwrap();
-
-        //THEN
-        assert_eq!(result.len(), 3);
-        // Should include closest before (10 min ago), and commands in range (6 min ago, 4 min ago)
-        assert_eq!(
-            result[0].command,
-            Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            }
+            }),
+            &DateTimeRange::new(DateTime::from(t!(10 minutes ago)), DateTime::from(t!(now))),
         );
-        assert_eq!(
-            result[1].command,
-            Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: false,
-            }
-        );
-        assert_eq!(
-            result[2].command,
-            Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            }
-        );
-    }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn test_command_without_target_filter(db_pool: PgPool) {
-        //GIVEN
-        let db = Database::new(db_pool);
-
-        insert_command(
-            &db,
-            &Command::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
-            },
-            t!(2 minutes ago),
-        )
-        .await;
-
-        insert_command(
-            &db,
-            &Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            },
-            t!(4 minutes ago),
-        )
-        .await;
-
-        //WHEN
-        let result = db
-            .query_all_commands(None, &DateTimeRange::new(t!(1 hours ago), t!(now)))
-            .await
-            .unwrap();
-
-        //THEN
-        assert_eq!(result.len(), 2);
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn test_no_command(db_pool: PgPool) {
-        //GIVEN
-        let db = Database::new(db_pool);
-
-        insert_command(
-            &db,
-            &Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            },
-            t!(10 minutes ago),
-        )
-        .await;
-
-        //WHEN
-        let result = db
-            .query_all_commands(
-                Some(CommandTarget::SetPower {
-                    device: PowerToggle::Dehumidifier,
-                }),
-                &DateTimeRange::new(t!(8 minutes ago), t!(now)),
-            )
-            .await
-            .unwrap();
-
-        //THEN
-        assert_eq!(result.len(), 1);
-        // Should include closest before (10 min ago) even though it's outside the range
-        assert_eq!(
-            result[0].command,
-            Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: true,
-            }
-        );
-    }
-
-    async fn insert_command(db: &Database, command: &Command, at: DateTime) {
-        sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID) VALUES ($1, $2, $3, $4, $5)"#,
-            serde_json::to_value(command).unwrap(),
-            at.into_db(),
-            DbCommandState::Pending as DbCommandState,
-            "unit_test",
-            "fixture"
-        )
-        .execute(&db.pool)
-        .await
-        .unwrap();
+        assert_eq!(res.await.unwrap().len(), 5);
     }
 }

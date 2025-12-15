@@ -29,19 +29,10 @@ pub struct HomeAssitant {
 }
 
 impl HomeAssitant {
-    pub fn new_command_executor(
-        &self,
-        infrastructure: &Infrastructure,
-        device_client: DeviceStateClient,
-    ) -> impl CommandExecutor + use<> {
+    pub fn new_command_executor(&self, device_client: DeviceStateClient) -> impl CommandExecutor + use<> {
         let http_client =
             HaHttpClient::new(&self.url, &self.token).expect("Error initializing Home Assistant REST client");
-        HaCommandExecutor::new(
-            http_client,
-            infrastructure.api.clone(),
-            device_client,
-            &config::default_ha_command_config(),
-        )
+        HaCommandExecutor::new(http_client, device_client, &config::default_ha_command_config())
     }
 
     pub async fn new_incoming_data_source(&self, infrastructure: &mut Infrastructure) -> HaIncomingDataSource {

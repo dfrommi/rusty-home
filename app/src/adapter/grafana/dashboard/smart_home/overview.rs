@@ -1,26 +1,24 @@
-use std::sync::Arc;
-
 use actix_web::web;
 use infrastructure::TraceContext;
 
+use crate::command::{Command, CommandClient, HeatingTargetState};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
-use crate::home::command::Command;
 
-use crate::{
-    adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response},
-    core::HomeApi,
-};
+use crate::adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response};
 
-pub fn routes(api: Arc<HomeApi>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
+pub fn routes(command_client: CommandClient, device_state_client: DeviceStateClient) -> actix_web::Scope {
     web::scope("/overview")
         .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
         .route("/offline", web::get().to(get_offline_items))
-        .app_data(web::Data::from(api))
-        .app_data(web::Data::from(device_state_client))
+        .app_data(web::Data::new(command_client))
+        .app_data(web::Data::new(device_state_client))
 }
 
-async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQuery>) -> GrafanaResponse {
+async fn get_commands(
+    command_client: web::Data<CommandClient>,
+    time_range: web::Query<TimeRangeQuery>,
+) -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
         icon: String,
@@ -33,7 +31,7 @@ async fn get_commands(api: web::Data<HomeApi>, time_range: web::Query<TimeRangeQ
     }
 
     let range = time_range.range();
-    let mut commands = api
+    let mut commands = command_client
         .get_all_commands(*range.start(), *range.end())
         .await
         .map_err(GrafanaApiError::DataAccessError)?;
@@ -72,9 +70,9 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             "SetHeating",
             device.to_string(),
             match target_state {
-                crate::home::command::HeatingTargetState::Off => "off".to_string(),
-                crate::home::command::HeatingTargetState::WindowOpen => "window_open".to_string(),
-                crate::home::command::HeatingTargetState::Heat {
+                HeatingTargetState::Off => "off".to_string(),
+                HeatingTargetState::WindowOpen => "window_open".to_string(),
+                HeatingTargetState::Heat {
                     temperature,
                     low_priority,
                 } => {

@@ -8,9 +8,9 @@ mod user_trigger_action;
 use std::fmt::Debug;
 use std::fmt::Display;
 
+use crate::command::Command;
 use crate::core::id::ExternalId;
 use crate::core::timeseries::DataPoint;
-use crate::home::command::Command;
 use crate::trigger::UserTriggerExecution;
 use crate::trigger::UserTriggerId;
 use crate::trigger::UserTriggerTarget;

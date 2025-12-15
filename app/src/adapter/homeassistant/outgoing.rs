@@ -1,18 +1,15 @@
 use crate::adapter::command::CommandExecutor;
+use crate::command::{Command, CommandTarget, Fan};
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{FanAirflow, FanSpeed};
 use crate::device_state::{DeviceStateClient, DeviceStateValue};
-use crate::home::command::{Command, CommandTarget, Fan};
-use crate::home_state::{EnergySaving, FanActivity};
 use crate::t;
 use serde_json::json;
 
 use super::{HaHttpClient, HaServiceTarget};
-use crate::core::HomeApi;
 
 pub struct HaCommandExecutor {
     client: HaHttpClient,
-    api: HomeApi,
     device_client: DeviceStateClient,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
@@ -20,7 +17,6 @@ pub struct HaCommandExecutor {
 impl HaCommandExecutor {
     pub fn new(
         client: HaHttpClient,
-        api: HomeApi,
         device_client: DeviceStateClient,
         config: &[(CommandTarget, HaServiceTarget)],
     ) -> Self {
@@ -32,7 +28,6 @@ impl HaCommandExecutor {
 
         Self {
             client,
-            api,
             device_client,
             config: data,
         }
@@ -62,7 +57,7 @@ impl CommandExecutor for HaCommandExecutor {
 
 impl HaCommandExecutor {
     async fn dispatch_service_call(&self, command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<()> {
-        use crate::home::command::*;
+        use crate::command::*;
         use HaServiceTarget::*;
 
         match (ha_target, command) {

@@ -3,8 +3,7 @@ use super::Z2mCommandTarget;
 use crate::command::CommandTarget;
 use crate::core::unit::KiloWattHours;
 use crate::device_state::*;
-use crate::home::LoadBalancedThermostat;
-use crate::home::Thermostat;
+use crate::automation::{LoadBalancedThermostat, Thermostat};
 use crate::trigger::RemoteTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {

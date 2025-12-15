@@ -1,4 +1,4 @@
-use crate::home::{HeatingZone, Room};
+use crate::automation::{HeatingZone, Room};
 use crate::home_state::{IsRunning, StateSnapshot};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]

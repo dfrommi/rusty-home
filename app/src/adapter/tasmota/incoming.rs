@@ -3,7 +3,7 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{KiloWattHours, Watt};
 use crate::device_state::DeviceStateValue;
-use crate::home::availability::ItemAvailability;
+use crate::automation::availability::ItemAvailability;
 use crate::t;
 use anyhow::bail;
 use infrastructure::MqttInMessage;

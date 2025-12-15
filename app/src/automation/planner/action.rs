@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::command::Command;
 use crate::core::id::ExternalId;
 
-use crate::home::RuleEvaluationContext;
+use crate::automation::RuleEvaluationContext;
 use crate::trigger::UserTriggerId;
 
 #[derive(Debug, Clone)]

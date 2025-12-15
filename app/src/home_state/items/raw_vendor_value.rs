@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::unit::RawValue,
-    home::Thermostat,
+    automation::Thermostat,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 

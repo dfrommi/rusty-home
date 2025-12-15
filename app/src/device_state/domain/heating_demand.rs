@@ -1,4 +1,4 @@
-use crate::home::Thermostat;
+use crate::automation::Thermostat;
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]

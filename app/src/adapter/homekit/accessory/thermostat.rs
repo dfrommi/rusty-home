@@ -5,7 +5,7 @@ use crate::{
         HomekitTargetConfig,
     },
     core::unit::DegreeCelsius,
-    home::HeatingZone,
+    automation::HeatingZone,
 };
 
 #[derive(Default, Clone, Copy)]

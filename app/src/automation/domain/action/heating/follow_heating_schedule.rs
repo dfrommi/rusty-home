@@ -1,4 +1,6 @@
 use crate::{
+    automation::HeatingZone,
+    command::{Command, HeatingTargetState},
     core::{
         time::{DateTime, Duration},
         timeseries::{
@@ -7,15 +9,12 @@ use crate::{
         },
         unit::{DegreeCelsius, Percent},
     },
-    command::{Command, HeatingTargetState},
-    home::{
-        action::{Rule, RuleEvaluationContext, RuleResult},
-        common::HeatingZone,
-    },
     home_state::{HeatingMode, TargetHeatingMode, Temperature},
     t,
 };
 use r#macro::Id;
+
+use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, Id)]
 pub struct FollowHeatingSchedule {

@@ -7,7 +7,7 @@ use crate::core::unit::KiloWattHours;
 use crate::device_state::{
     CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
-use crate::home::Thermostat;
+use crate::automation::Thermostat;
 use crate::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;

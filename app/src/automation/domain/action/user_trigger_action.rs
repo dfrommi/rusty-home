@@ -3,11 +3,11 @@ use r#macro::Id;
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::command::{Command, HeatingTargetState};
 use crate::core::time::Duration;
-use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
-use crate::home::common::HeatingZone;
+use crate::automation::HeatingZone;
 use crate::home_state::PowerAvailable;
 use crate::t;
 use crate::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
+use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, Id)]
 pub struct UserTriggerAction {

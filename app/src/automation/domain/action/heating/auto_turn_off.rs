@@ -2,9 +2,9 @@ use r#macro::{EnumVariants, Id};
 
 use crate::command::{Command, PowerToggle};
 use crate::core::time::Duration;
-use crate::home::action::{Rule, RuleEvaluationContext, RuleResult};
 use crate::home_state::PowerAvailable;
 use crate::t;
+use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum AutoTurnOff {

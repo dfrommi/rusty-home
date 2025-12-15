@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
-use crate::{core::unit::DegreeCelsius, home::Thermostat};
+use crate::{automation::Thermostat, core::unit::DegreeCelsius};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 //TODO remove EnumVariants, only for state-debug

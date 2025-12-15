@@ -1,10 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::home::{
-    HeatingZone, Thermostat,
-    action::{Rule, RuleEvaluationContext, RuleResult},
-};
 use crate::command::Command;
+use crate::automation::{HeatingZone, Thermostat};
+use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Id, EnumVariants)]
 pub enum ProvideAmbientTemperature {

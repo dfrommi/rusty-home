@@ -2,7 +2,7 @@ use actix_web::web;
 
 use crate::{
     adapter::grafana::{GrafanaResponse, display::DashboardDisplay, support::csv_response},
-    home::HeatingZone,
+    automation::HeatingZone,
 };
 
 pub fn routes() -> actix_web::Scope {

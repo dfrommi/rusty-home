@@ -4,7 +4,7 @@ use crate::adapter::incoming::{IncomingData, IncomingDataSource};
 use crate::core::unit::{DegreeCelsius, FanAirflow, Lux, Percent};
 use crate::core::{time::DateTime, timeseries::DataPoint};
 use crate::device_state::DeviceStateValue;
-use crate::home::availability::ItemAvailability;
+use crate::automation::availability::ItemAvailability;
 
 use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
 use crate::core::DeviceConfig;

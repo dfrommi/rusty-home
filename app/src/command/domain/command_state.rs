@@ -1,6 +1,6 @@
 use crate::command::CommandClient;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
-use crate::home::LoadBalancedThermostat;
+use crate::automation::LoadBalancedThermostat;
 use crate::home_state::{FanActivity, OpenedArea, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
 use crate::t;
 use anyhow::Result;

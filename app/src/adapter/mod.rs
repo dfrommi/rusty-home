@@ -14,7 +14,7 @@ mod incoming {
     use crate::{
         core::timeseries::DataPoint,
         device_state::{DeviceAvailability, DeviceStateClient, DeviceStateValue},
-        home::availability::ItemAvailability,
+        automation::availability::ItemAvailability,
         trigger::{TriggerClient, UserTrigger},
     };
 

@@ -3,15 +3,15 @@ use settings::Settings;
 use tokio::sync::broadcast;
 
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
+use crate::automation::AutomationRunner;
 use crate::command::CommandRunner;
-use crate::core::planner::PlanningRunner;
 use crate::home_state::HomeStateRunner;
 
 mod adapter;
+mod automation;
 mod command;
 mod core;
 mod device_state;
-mod home;
 mod home_state;
 pub mod port;
 mod settings;
@@ -43,7 +43,7 @@ pub async fn main() {
         device_state_runner.client(),
     );
 
-    let planning_runner = PlanningRunner::new(
+    let automation_runner = AutomationRunner::new(
         home_state_runner.subscribe_snapshot_updated(),
         command_runner.client(),
         trigger_runner.client(),
@@ -141,7 +141,7 @@ pub async fn main() {
     tokio::select!(
         _ = process_infrastucture => {},
         _ = home_state_runner.run() => {},
-        _ = planning_runner.run() => {},
+        _ = automation_runner.run() => {},
         _ = command_runner.run_dispatcher() => {},
         _ = energy_meter_processing.run() => {},
         _ = ha_incoming_data_processing.run() => {},

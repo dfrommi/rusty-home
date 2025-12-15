@@ -3,7 +3,7 @@ use crate::home_state::RawVendorValue;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::{
     core::{timeseries::DataPoint, unit::Percent},
-    home::Thermostat,
+    automation::Thermostat,
 };
 use r#macro::{EnumVariants, Id};
 

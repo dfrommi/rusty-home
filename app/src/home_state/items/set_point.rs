@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
-    home::HeatingZone,
+    automation::HeatingZone,
 };
 
 use crate::home_state::{

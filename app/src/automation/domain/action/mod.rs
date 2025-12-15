@@ -23,8 +23,7 @@ pub use inform_window_open::InformWindowOpen;
 pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use user_trigger_action::UserTriggerAction;
 
-use crate::core::planner::Action;
-use crate::core::planner::ActionEvaluationResult;
+use crate::automation::planner::{Action, ActionEvaluationResult};
 use crate::home_state::*;
 use crate::port::*;
 

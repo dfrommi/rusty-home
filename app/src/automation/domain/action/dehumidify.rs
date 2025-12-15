@@ -1,7 +1,7 @@
-use crate::command::{Command, PowerToggle};
-use crate::home::action::{RuleEvaluationContext, SimpleRule};
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
+use crate::command::{Command, PowerToggle};
+use super::{RuleEvaluationContext, SimpleRule};
 
 use crate::home_state::RiskOfMould;
 

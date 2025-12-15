@@ -5,7 +5,6 @@ use sqlx::postgres::{PgListener, PgNotification};
 
 const THING_VALUE_ADDED_EVENT: &str = "thing_values_insert";
 const THING_COMMAND_ADDED_EVENT: &str = "thing_command_insert";
-const ENERGY_READING_INSERT_EVENT: &str = "energy_reading_insert";
 const USER_TRIGGER_INSERT_EVENT: &str = "user_trigger_insert";
 
 #[derive(Debug)]
@@ -18,7 +17,6 @@ pub struct DbEventListener {
 pub enum DbEvent {
     StateValueAdded { id: i64, tag_id: i64 },
     CommandAdded { id: i64 },
-    EnergyReadingInsert { id: i64 },
     UserTriggerInsert { id: UserTriggerId },
 }
 
@@ -30,11 +28,6 @@ struct StateValueAddedPayload {
 
 #[derive(Debug, Clone, Deserialize)]
 struct CommandAddedPayload {
-    pub id: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct EnergyReadingInsertPayload {
     pub id: i64,
 }
 
@@ -54,11 +47,10 @@ impl DbEventListener {
     pub async fn start_listening(&mut self) -> anyhow::Result<()> {
         tracing::debug!("Start listening for DB-events");
 
-        self.db_listener
+            self.db_listener
             .listen_all(vec![
                 THING_VALUE_ADDED_EVENT,
                 THING_COMMAND_ADDED_EVENT,
-                ENERGY_READING_INSERT_EVENT,
                 USER_TRIGGER_INSERT_EVENT,
             ])
             .await?;
@@ -108,10 +100,6 @@ impl TryInto<DbEvent> for PgNotification {
             THING_COMMAND_ADDED_EVENT => {
                 let payload: CommandAddedPayload = serde_json::from_str(self.payload())?;
                 Ok(DbEvent::CommandAdded { id: payload.id })
-            }
-            ENERGY_READING_INSERT_EVENT => {
-                let payload: EnergyReadingInsertPayload = serde_json::from_str(self.payload())?;
-                Ok(DbEvent::EnergyReadingInsert { id: payload.id })
             }
             USER_TRIGGER_INSERT_EVENT => {
                 let payload: UserTriggerInsertPayload = serde_json::from_str(self.payload())?;

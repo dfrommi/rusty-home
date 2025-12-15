@@ -5,7 +5,11 @@ use crate::{Database, core::timeseries::DataPoint};
 use super::{EnergyReading, Faucet, Radiator};
 
 impl Database {
-    pub async fn add_yearly_energy_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<()> {
+    pub async fn add_yearly_energy_reading(
+        &self,
+        reading: EnergyReading,
+        timestamp: DateTime,
+    ) -> anyhow::Result<i64> {
         //TODO derive automatically from enum
         let (type_, item, value): (&str, &str, f64) = match reading {
             EnergyReading::Heating(item, value) => ("heating", item.into(), value),
@@ -13,18 +17,19 @@ impl Database {
             EnergyReading::HotWater(item, value) => ("hot_water", item.into(), value),
         };
 
-        sqlx::query!(
+        let rec = sqlx::query!(
             r#"INSERT INTO ENERGY_READING (TYPE, NAME, VALUE, TIMESTAMP)
-                VALUES ($1, $2, $3, $4)"#,
+                VALUES ($1, $2, $3, $4)
+                RETURNING id"#,
             type_,
             item,
             value,
             timestamp.into_db(),
         )
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(rec.id)
     }
 
     pub async fn get_latest_total_readings(&self) -> anyhow::Result<Vec<DataPoint<EnergyReading>>> {

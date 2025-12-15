@@ -2,6 +2,7 @@ use core::persistence::{Database, listener::DbEventListener};
 use core::{HomeApi, app_event::AppEventListener};
 use infrastructure::Mqtt;
 use settings::Settings;
+use tokio::sync::broadcast;
 
 use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
 use crate::command::CommandRunner;
@@ -23,6 +24,7 @@ struct Infrastructure {
     database: Database,
     event_listener: AppEventListener,
     mqtt_client: Mqtt,
+    energy_reading_events: broadcast::Sender<adapter::energy_meter::EnergyReadingAddedEvent>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -105,6 +107,7 @@ pub async fn main() {
         let http_api = infrastructure.api.clone();
         let http_device_state_client = device_state_runner.client();
         let http_database = infrastructure.database.clone();
+        let energy_reading_events = infrastructure.energy_reading_events.clone();
         let metrics = settings.metrics.clone();
         let http_command_client = command_runner.client();
 
@@ -113,7 +116,10 @@ pub async fn main() {
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::EnergyMeter::new_web_service(http_database.clone()),
+                        adapter::energy_meter::EnergyMeter::new_web_service(
+                            http_database.clone(),
+                            energy_reading_events.clone(),
+                        ),
                         adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(http_api.clone()),
                         metrics.new_routes(http_api.clone()),
@@ -170,13 +176,19 @@ impl Infrastructure {
         let event_listener = AppEventListener::new(DbEventListener::new(db_listener), api.clone());
 
         let mqtt_client = settings.mqtt.new_client();
+        let (energy_reading_events, _) = broadcast::channel(16);
 
         Ok(Self {
             api,
             database,
             event_listener,
             mqtt_client,
+            energy_reading_events,
         })
+    }
+
+    fn subscribe_energy_reading_events(&self) -> broadcast::Receiver<adapter::energy_meter::EnergyReadingAddedEvent> {
+        self.energy_reading_events.subscribe()
     }
 
     async fn process(self) {

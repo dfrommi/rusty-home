@@ -5,24 +5,30 @@ mod persistence;
 use crate::{
     Infrastructure,
     adapter::incoming::IncomingDataSource,
-    core::{app_event::EnergyReadingAddedEvent, persistence::Database},
+    core::persistence::Database,
 };
 use incoming::EnergyMeterIncomingDataSource;
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
 pub struct EnergyMeter;
+
+#[derive(Debug, Clone)]
+pub struct EnergyReadingAddedEvent {
+    pub id: i64,
+}
 
 impl EnergyMeter {
     pub async fn new_incoming_data_source(
         infrastructure: &Infrastructure,
     ) -> impl IncomingDataSource<EnergyReadingAddedEvent, ()> + use<> {
         let db = infrastructure.database.clone();
-        let rx = infrastructure.event_listener.new_energy_reading_added_listener();
+        let rx = infrastructure.subscribe_energy_reading_events();
         EnergyMeterIncomingDataSource::new(db.clone(), rx)
     }
 
-    pub fn new_web_service(db: Database) -> actix_web::Scope {
-        http_server::new_actix_web_scope(db)
+    pub fn new_web_service(db: Database, tx: broadcast::Sender<EnergyReadingAddedEvent>) -> actix_web::Scope {
+        http_server::new_actix_web_scope(db, tx)
     }
 }
 

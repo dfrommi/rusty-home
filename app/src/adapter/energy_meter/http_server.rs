@@ -2,16 +2,24 @@ use crate::t;
 use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
+use tokio::sync::broadcast;
 
 use crate::Database;
 
-use super::{EnergyReading, Faucet, Radiator};
+use super::{EnergyReading, EnergyReadingAddedEvent, Faucet, Radiator};
 
-pub fn new_actix_web_scope(api: Database) -> actix_web::Scope {
+#[derive(Clone)]
+struct EnergyMeterApiState {
+    db: Database,
+    events: broadcast::Sender<EnergyReadingAddedEvent>,
+}
+
+pub fn new_actix_web_scope(db: Database, events: broadcast::Sender<EnergyReadingAddedEvent>) -> actix_web::Scope {
+    let state = EnergyMeterApiState { db, events };
     web::scope("/api/energy/readings")
         .route("/heating", web::put().to(handle_heating_reading))
         .route("/water", web::put().to(handle_water_reading))
-        .app_data(web::Data::new(api))
+        .app_data(web::Data::new(state))
 }
 
 #[derive(Debug, Deserialize)]
@@ -27,7 +35,7 @@ struct WaterReadingDTO {
     is_hot: bool,
 }
 
-async fn handle_heating_reading(api: web::Data<Database>, Json(dto): Json<HeatingReadingDTO>) -> impl Responder {
+async fn handle_heating_reading(state: web::Data<EnergyMeterApiState>, Json(dto): Json<HeatingReadingDTO>) -> impl Responder {
     let radiator = match dto.label.as_str() {
         "Wohnzimmer (groß)" => Radiator::LivingRoomBig,
         "Wohnzimmer (klein)" => Radiator::LivingRoomSmall,
@@ -47,15 +55,22 @@ async fn handle_heating_reading(api: web::Data<Database>, Json(dto): Json<Heatin
 
     tracing::info!("Adding reading {:?}", reading);
 
-    if let Err(e) = api.add_yearly_energy_reading(reading, t!(now)).await {
+    let id = match state.db.add_yearly_energy_reading(reading, t!(now)).await {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
+            return HttpResponse::UnprocessableEntity();
+        }
+    };
+
+    if let Err(e) = state.events.send(EnergyReadingAddedEvent { id }) {
         tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-        return HttpResponse::UnprocessableEntity();
     }
 
     HttpResponse::NoContent()
 }
 
-async fn handle_water_reading(api: web::Data<Database>, Json(dto): Json<WaterReadingDTO>) -> impl Responder {
+async fn handle_water_reading(state: web::Data<EnergyMeterApiState>, Json(dto): Json<WaterReadingDTO>) -> impl Responder {
     let faucet = match dto.label.as_str() {
         "Küche" => Faucet::Kitchen,
         "Bad" => Faucet::Bathroom,
@@ -75,9 +90,16 @@ async fn handle_water_reading(api: web::Data<Database>, Json(dto): Json<WaterRea
 
     tracing::info!("Adding reading {:?}", reading);
 
-    if let Err(e) = api.add_yearly_energy_reading(reading, t!(now)).await {
+    let id = match state.db.add_yearly_energy_reading(reading, t!(now)).await {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
+            return HttpResponse::UnprocessableEntity();
+        }
+    };
+
+    if let Err(e) = state.events.send(EnergyReadingAddedEvent { id }) {
         tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-        return HttpResponse::UnprocessableEntity();
     }
 
     HttpResponse::NoContent()

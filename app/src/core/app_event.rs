@@ -11,18 +11,12 @@ pub struct StateChangedEvent;
 #[derive(Debug, Clone)]
 pub struct UserTriggerEvent;
 
-#[derive(Debug, Clone)]
-pub struct EnergyReadingAddedEvent {
-    pub id: i64,
-}
-
 pub struct AppEventListener {
     api: HomeApi,
     db_listener: DbEventListener,
 
     state_changed_tx: tokio::sync::broadcast::Sender<StateChangedEvent>,
     user_trigger_tx: tokio::sync::broadcast::Sender<UserTriggerEvent>,
-    energy_reading_added_tx: tokio::sync::broadcast::Sender<EnergyReadingAddedEvent>,
 }
 
 impl AppEventListener {
@@ -32,7 +26,6 @@ impl AppEventListener {
             api,
             state_changed_tx: broadcast::channel(128).0,
             user_trigger_tx: broadcast::channel(16).0,
-            energy_reading_added_tx: broadcast::channel(16).0,
         }
     }
 
@@ -42,10 +35,6 @@ impl AppEventListener {
 
     pub fn new_user_trigger_event_listener(&self) -> broadcast::Receiver<UserTriggerEvent> {
         self.user_trigger_tx.subscribe()
-    }
-
-    pub fn new_energy_reading_added_listener(&self) -> broadcast::Receiver<EnergyReadingAddedEvent> {
-        self.energy_reading_added_tx.subscribe()
     }
 
     //consume as much as possible before triggering app event to debounce planning etc
@@ -79,12 +68,6 @@ impl AppEventListener {
                             tracing::error!("Error sending user trigger event: {:?}", e);
                         }
                         user_trigger_sent = true;
-                    }
-
-                    DbEvent::EnergyReadingInsert { id } => {
-                        if let Err(e) = self.energy_reading_added_tx.send(EnergyReadingAddedEvent { id }) {
-                            tracing::error!("Error sending energy reading added event: {:?}", e);
-                        }
                     }
 
                     //TODO invalidate command cache, but target is not easily available

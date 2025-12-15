@@ -3,9 +3,9 @@ use crate::core::unit::{HeatingUnit, KiloCubicMeter};
 use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use tokio::sync::broadcast::Receiver;
 
-use crate::{core::app_event::EnergyReadingAddedEvent, core::persistence::Database};
+use crate::core::persistence::Database;
 
-use super::{EnergyReading, Faucet, Radiator};
+use super::{EnergyReading, EnergyReadingAddedEvent, Faucet, Radiator};
 
 pub struct EnergyMeterIncomingDataSource {
     db: Database,

@@ -1,17 +1,24 @@
-use crate::adapter::incoming::{IncomingData, IncomingDataSource};
+mod config;
+
+use crate::device_state::adapter::{IncomingData, IncomingDataSource};
+use crate::device_state::{CurrentPowerUsage, DeviceAvailability, PowerAvailable, TotalEnergyConsumption};
+
+use crate::core::DeviceConfig;
+
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{KiloWattHours, Watt};
 use crate::device_state::DeviceStateValue;
-use crate::automation::availability::ItemAvailability;
 use crate::t;
 use anyhow::bail;
-use infrastructure::MqttInMessage;
+use infrastructure::{Mqtt, MqttInMessage};
 use tokio::sync::mpsc;
 
-use crate::core::DeviceConfig;
-
-use super::TasmotaChannel;
+#[derive(Debug, Clone)]
+pub enum TasmotaChannel {
+    EnergyMeter(CurrentPowerUsage, TotalEnergyConsumption),
+    PowerToggle(PowerAvailable),
+}
 
 pub struct TasmotaIncomingDataSource {
     tele_base_topic: String,
@@ -21,12 +28,21 @@ pub struct TasmotaIncomingDataSource {
 }
 
 impl TasmotaIncomingDataSource {
-    pub fn new(
-        tele_base_topic: String,
-        stat_base_topic: String,
-        config: DeviceConfig<TasmotaChannel>,
-        mqtt_rx: mpsc::Receiver<MqttInMessage>,
-    ) -> Self {
+    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
+        let config = DeviceConfig::new(&config::default_tasmota_state_config());
+        let tele_base_topic = format!("{}/tele", event_topic);
+        let stat_base_topic = format!("{}/stat", event_topic);
+        let rx = mqtt_client
+            .subscribe_all(
+                vec![
+                    format!("{}/+/SENSOR", tele_base_topic),
+                    format!("{}/+/POWER", stat_base_topic),
+                ]
+                .as_slice(),
+            )
+            .await
+            .expect("Error subscribing to MQTT topic");
+
         let tele_base_topic = tele_base_topic.trim_matches('/').to_string();
         let stat_base_topic = stat_base_topic.trim_matches('/').to_string();
 
@@ -34,7 +50,7 @@ impl TasmotaIncomingDataSource {
             tele_base_topic,
             stat_base_topic,
             device_config: config,
-            mqtt_receiver: mqtt_rx,
+            mqtt_receiver: rx,
         }
     }
 }
@@ -86,21 +102,18 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
                 match &tele_message.payload {
                     TeleMessagePayload::EnergyReport(energy_report) => Ok(vec![
                         DataPoint::new(
-                            DeviceStateValue::CurrentPowerUsage(power.clone(), Watt(energy_report.power)),
+                            DeviceStateValue::CurrentPowerUsage(*power, Watt(energy_report.power)),
                             tele_message.time,
                         )
                         .into(),
                         DataPoint::new(
-                            DeviceStateValue::TotalEnergyConsumption(
-                                energy.clone(),
-                                KiloWattHours(energy_report.total),
-                            ),
+                            DeviceStateValue::TotalEnergyConsumption(*energy, KiloWattHours(energy_report.total)),
                             tele_message.time,
                         )
                         .into(),
-                        ItemAvailability {
+                        DeviceAvailability {
                             source: "Tasmota".to_string(),
-                            item: device_id.to_string(),
+                            device_id: device_id.to_string(),
                             last_seen: tele_message.time,
                             marked_offline: false,
                         }
@@ -119,10 +132,10 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
 
                 match msg.payload.as_str() {
                     "ON" => Ok(vec![
-                        DataPoint::new(DeviceStateValue::PowerAvailable(powered.clone(), true), t!(now)).into(),
+                        DataPoint::new(DeviceStateValue::PowerAvailable(*powered, true), t!(now)).into(),
                     ]),
                     "OFF" => Ok(vec![
-                        DataPoint::new(DeviceStateValue::PowerAvailable(powered.clone(), false), t!(now)).into(),
+                        DataPoint::new(DeviceStateValue::PowerAvailable(*powered, false), t!(now)).into(),
                     ]),
                     _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, msg.payload),
                 }

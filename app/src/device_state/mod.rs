@@ -3,6 +3,7 @@ mod domain;
 mod service;
 
 pub use domain::*;
+use infrastructure::Mqtt;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -14,7 +15,10 @@ use crate::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::DataPoint,
     },
-    device_state::{adapter::db::DeviceStateRepository, service::DeviceStateService},
+    device_state::{
+        adapter::{IncomingDataSource as _, db::DeviceStateRepository, tasmota::TasmotaIncomingDataSource},
+        service::DeviceStateService,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -46,11 +50,13 @@ pub struct OfflineItem {
 
 pub struct DeviceStateRunner {
     service: Arc<DeviceStateService>,
+    tasmota_ds: TasmotaIncomingDataSource,
 }
 
 impl DeviceStateRunner {
-    pub fn new(pool: PgPool) -> Self {
+    pub async fn new(pool: PgPool, mqtt_client: &mut Mqtt, tasmota_event_topic: &str) -> Self {
         let repo = DeviceStateRepository::new(pool);
+        let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
 
         let (event_tx, _event_rx) = broadcast::channel(100);
 
@@ -58,6 +64,7 @@ impl DeviceStateRunner {
 
         DeviceStateRunner {
             service: Arc::new(service),
+            tasmota_ds,
         }
     }
 
@@ -69,6 +76,27 @@ impl DeviceStateRunner {
 
     pub fn subscribe(&self) -> broadcast::Receiver<DeviceStateEvent> {
         self.service.subscribe()
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            tokio::select! {
+                Some(updates) = self.tasmota_ds.recv_multi() => {
+                    self.process_incoming_data(updates).await;
+                }
+            }
+        }
+    }
+
+    async fn process_incoming_data(&self, updates: Vec<adapter::IncomingData>) {
+        for update in updates {
+            match update {
+                adapter::IncomingData::StateValue(data_point) => self.service.handle_state_update(data_point).await,
+                adapter::IncomingData::ItemAvailability(device_availability) => {
+                    self.service.handle_availability_update(device_availability).await
+                }
+            }
+        }
     }
 }
 

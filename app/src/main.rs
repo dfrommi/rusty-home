@@ -31,7 +31,13 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let device_state_runner = device_state::DeviceStateRunner::new(infrastructure.db_pool.clone());
+    let device_state_runner = device_state::DeviceStateRunner::new(
+        infrastructure.db_pool.clone(),
+        &mut infrastructure.mqtt_client,
+        &settings.tasmota.event_topic,
+    )
+    .await;
+
     let trigger_runner = trigger::TriggerRunner::new(infrastructure.db_pool.clone());
     let command_runner = CommandRunner::new(
         infrastructure.db_pool.clone(),
@@ -74,11 +80,6 @@ pub async fn main() {
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
         CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
-    };
-
-    let tasmota_incoming_data_processing = {
-        let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, device_state_runner.client())
     };
 
     let energy_meter_processing = {
@@ -140,6 +141,7 @@ pub async fn main() {
 
     tokio::select!(
         _ = process_infrastucture => {},
+        _ = device_state_runner.run() => {},
         _ = home_state_runner.run() => {},
         _ = automation_runner.run() => {},
         _ = command_runner.run_dispatcher() => {},
@@ -148,7 +150,6 @@ pub async fn main() {
         _ = ha_cmd_executor.run() => {},
         _ = z2m_incoming_data_processing.run() => {},
         _ = z2m_cmd_executor.run() => {},
-        _ = tasmota_incoming_data_processing.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},

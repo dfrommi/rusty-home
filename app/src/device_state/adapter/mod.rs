@@ -1,15 +1,15 @@
 pub mod db;
+pub mod tasmota;
 
 use crate::{
-    automation::availability::ItemAvailability,
     core::timeseries::DataPoint,
-    device_state::{DeviceAvailability, DeviceStateClient, DeviceStateValue},
+    device_state::{DeviceAvailability, DeviceStateValue},
 };
 
 #[derive(Debug, Clone, derive_more::From)]
 pub enum IncomingData {
     StateValue(DataPoint<DeviceStateValue>),
-    ItemAvailability(ItemAvailability),
+    ItemAvailability(DeviceAvailability),
 }
 
 pub trait IncomingDataSource<Message, Channel>
@@ -30,56 +30,16 @@ where
         channel: &Channel,
         msg: &Message,
     ) -> anyhow::Result<Vec<IncomingData>>;
-}
 
-pub struct IncomingDataSourceRunner<M, C, S>
-where
-    M: std::fmt::Debug,
-    C: std::fmt::Debug,
-    S: IncomingDataSource<M, C>,
-{
-    source: S,
-    device_client: DeviceStateClient,
-    _marker: std::marker::PhantomData<(M, C)>,
-}
+    async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
+        let msg = self.recv().await?;
+        let name = self.ds_name();
 
-impl<M, C, S> IncomingDataSourceRunner<M, C, S>
-where
-    M: std::fmt::Debug,
-    C: std::fmt::Debug,
-    S: IncomingDataSource<M, C>,
-{
-    pub fn new(source: S, device_client: DeviceStateClient) -> Self {
-        Self {
-            source,
-            device_client,
-            _marker: std::marker::PhantomData,
-        }
-    }
+        let device_id = self.device_id(&msg)?;
 
-    pub async fn run(mut self) {
-        loop {
-            let msg = match self.source.recv().await {
-                Some(msg) => msg,
-                None => continue,
-            };
-
-            self.handle_incoming_data(&msg).await;
-        }
-    }
-
-    async fn handle_incoming_data(&self, msg: &M) {
-        let source = &self.source;
-        let name = source.ds_name();
-
-        let device_id = match source.device_id(msg) {
-            Some(device_id) => device_id,
-            None => return,
-        };
-
-        let channels = source.get_channels(&device_id);
+        let channels = self.get_channels(&device_id);
         if channels.is_empty() {
-            return;
+            return None;
         }
 
         tracing::debug!("Received {} event for devices {}: {:?}", name, device_id, channels);
@@ -87,7 +47,7 @@ where
         let mut incoming_data = vec![];
 
         for channel in channels.iter() {
-            match source.to_incoming_data(&device_id, channel, msg).await {
+            match self.to_incoming_data(&device_id, channel, &msg).await {
                 Ok(events) => incoming_data.extend(events),
                 Err(e) => {
                     tracing::error!(
@@ -101,27 +61,6 @@ where
             }
         }
 
-        for event in incoming_data.iter() {
-            match event {
-                IncomingData::StateValue(dp) => {
-                    if let Err(e) = self.device_client.update_state(dp.clone()).await {
-                        tracing::error!("Error processing state {:?}: {:?}", dp, e);
-                    }
-                }
-
-                IncomingData::ItemAvailability(item) => {
-                    let device_item = DeviceAvailability {
-                        device_id: item.item.clone(),
-                        source: item.source.clone(),
-                        last_seen: item.last_seen,
-                        marked_offline: item.marked_offline,
-                    };
-
-                    if let Err(e) = self.device_client.update_availability(device_item).await {
-                        tracing::error!("Error processing device availability for {}: {:?}", item.item, e);
-                    }
-                }
-            }
-        }
+        Some(incoming_data)
     }
 }

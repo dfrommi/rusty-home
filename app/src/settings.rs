@@ -12,7 +12,7 @@ pub struct Settings {
     pub homebridge: crate::adapter::homekit::Homekit,
     pub homeassistant: crate::adapter::homeassistant::HomeAssitant,
     pub z2m: crate::adapter::z2m::Zigbee2Mqtt,
-    pub tasmota: crate::adapter::tasmota::Tasmota,
+    pub tasmota: TasmotaSettings,
     pub metrics: crate::adapter::metrics_export::MetricsExport,
 }
 
@@ -25,6 +25,11 @@ impl Settings {
         let s = builder.build()?;
         s.try_deserialize()
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TasmotaSettings {
+    pub event_topic: String,
 }
 
 #[cfg(test)]

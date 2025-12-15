@@ -4,25 +4,24 @@ mod items;
 pub use calc::StateSnapshot;
 pub use items::*;
 
-use calc::StateCalculationContext;
 use tokio::sync::broadcast::{Receiver, Sender};
 
-use crate::core::app_event::StateChangedEvent;
-use crate::core::app_event::UserTriggerEvent;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
+use crate::device_state::DeviceStateEvent;
 use crate::home_state::calc::bootstrap_snapshot;
 use crate::home_state::calc::calculate_new_snapshot;
 use crate::trigger::TriggerClient;
+use crate::trigger::TriggerEvent;
 
 pub struct HomeStateRunner {
     duration: Duration,
     device_state: DeviceStateClient,
     snapshot: StateSnapshot,
     trigger_client: TriggerClient,
-    state_changed_rx: Receiver<StateChangedEvent>,
-    user_trigger_rx: Receiver<UserTriggerEvent>,
+    state_changed_rx: Receiver<DeviceStateEvent>,
+    user_trigger_rx: Receiver<TriggerEvent>,
     home_state_updated_tx: Sender<DataPoint<HomeStateValue>>,
     home_state_changed_tx: Sender<DataPoint<HomeStateValue>>,
     snapshot_updated_tx: Sender<StateSnapshot>,
@@ -31,8 +30,8 @@ pub struct HomeStateRunner {
 impl HomeStateRunner {
     pub fn new(
         duration: Duration,
-        rx_state: Receiver<StateChangedEvent>,
-        rx_trigger: Receiver<UserTriggerEvent>,
+        rx_state: Receiver<DeviceStateEvent>,
+        rx_trigger: Receiver<TriggerEvent>,
         trigger_client: TriggerClient,
         device_state: DeviceStateClient,
     ) -> Self {
@@ -71,8 +70,18 @@ impl HomeStateRunner {
 
         loop {
             tokio::select! {
-                _ = self.state_changed_rx.recv() => {},
-                _ = self.user_trigger_rx.recv() => {},
+                state_evt = self.state_changed_rx.recv() => {
+                    match state_evt {
+                        Ok(DeviceStateEvent::Changed(_)) => {},
+                        Err(_) => {}, // channel closed or lagged; fall back to timer ticks
+                    }
+                },
+                trigger_evt = self.user_trigger_rx.recv() => {
+                    match trigger_evt {
+                        Ok(TriggerEvent::TriggerAdded) => {},
+                        Err(_) => {},
+                    }
+                },
                 _ = timer.tick() => {},
             }
 

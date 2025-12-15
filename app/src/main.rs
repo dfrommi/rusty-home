@@ -1,5 +1,5 @@
-use core::persistence::{Database, listener::DbEventListener};
-use core::{HomeApi, app_event::AppEventListener};
+use core::persistence::Database;
+use core::HomeApi;
 use infrastructure::Mqtt;
 use settings::Settings;
 use tokio::sync::broadcast;
@@ -22,7 +22,6 @@ mod trigger;
 struct Infrastructure {
     api: HomeApi,
     database: Database,
-    event_listener: AppEventListener,
     mqtt_client: Mqtt,
     energy_reading_events: broadcast::Sender<adapter::energy_meter::EnergyReadingAddedEvent>,
 }
@@ -41,8 +40,8 @@ pub async fn main() {
 
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),
-        infrastructure.event_listener.new_state_changed_listener(),
-        infrastructure.event_listener.new_user_trigger_event_listener(),
+        device_state_runner.subscribe(),
+        trigger_runner.subscribe(),
         trigger_runner.client(),
         device_state_runner.client(),
     );
@@ -168,20 +167,12 @@ impl Infrastructure {
         let database = Database::new(db_pool);
         let api = HomeApi::new(database.clone());
 
-        let db_listener = settings
-            .database
-            .new_listener()
-            .await
-            .expect("Error initializing database listener");
-        let event_listener = AppEventListener::new(DbEventListener::new(db_listener), api.clone());
-
         let mqtt_client = settings.mqtt.new_client();
         let (energy_reading_events, _) = broadcast::channel(16);
 
         Ok(Self {
             api,
             database,
-            event_listener,
             mqtt_client,
             energy_reading_events,
         })
@@ -194,7 +185,6 @@ impl Infrastructure {
     async fn process(self) {
         tokio::select!(
             _ = self.mqtt_client.process() => {},
-            _ = self.event_listener.dispatch_events() => {},
         )
     }
 }

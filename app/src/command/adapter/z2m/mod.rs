@@ -1,29 +1,31 @@
+mod config;
+
 use crate::{
-    adapter::command::CommandExecutor,
-    command::{Command, CommandTarget, HeatingTargetState},
+    command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
     core::unit::{DegreeCelsius, Percent, RawValue},
 };
 use infrastructure::MqttOutMessage;
 use serde_json::json;
+use tokio::sync::mpsc;
 
-use super::Z2mCommandTarget;
+#[derive(Debug, Clone)]
+pub enum Z2mCommandTarget {
+    Thermostat(&'static str),
+}
 
 pub struct Z2mCommandExecutor {
     base_topic: String,
     config: Vec<(CommandTarget, Z2mCommandTarget)>,
-    sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
+    sender: mpsc::Sender<MqttOutMessage>,
 }
 
 impl Z2mCommandExecutor {
-    pub fn new(
-        base_topic: String,
-        config: Vec<(CommandTarget, Z2mCommandTarget)>,
-        sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
-    ) -> Self {
+    pub fn new(mqtt_sender: mpsc::Sender<MqttOutMessage>, event_topic: &str) -> Self {
+        let config = config::default_z2m_command_config();
         Self {
-            base_topic,
+            base_topic: event_topic.to_string(),
             config,
-            sender,
+            sender: mqtt_sender,
         }
     }
 

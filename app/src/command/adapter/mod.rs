@@ -1,11 +1,13 @@
 pub mod db;
 mod tasmota;
+mod z2m;
 
 use infrastructure::TraceContext;
 
 use crate::command::{Command, CommandClient, CommandExecution};
 
 pub use tasmota::TasmotaCommandExecutor;
+pub use z2m::Z2mCommandExecutor;
 
 pub trait CommandExecutor {
     //Returns true if command was executed

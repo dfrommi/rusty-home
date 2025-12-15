@@ -36,13 +36,19 @@ pub struct CommandClient {
 }
 
 impl CommandRunner {
-    pub fn new(pool: PgPool, mqtt_sender: mpsc::Sender<MqttOutMessage>, tasmota_event_topic: &str) -> Self {
+    pub fn new(
+        pool: PgPool,
+        mqtt_sender: mpsc::Sender<MqttOutMessage>,
+        tasmota_event_topic: &str,
+        z2m_event_topic: &str,
+    ) -> Self {
         let repo = CommandRepository::new(pool);
         let (event_tx, _event_rx) = broadcast::channel(64);
 
-        let tasmota_executor = adapter::TasmotaCommandExecutor::new(tasmota_event_topic, mqtt_sender);
+        let tasmota_executor = adapter::TasmotaCommandExecutor::new(tasmota_event_topic, mqtt_sender.clone());
+        let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_sender, z2m_event_topic);
 
-        let service = Arc::new(CommandService::new(repo, tasmota_executor, event_tx));
+        let service = Arc::new(CommandService::new(repo, tasmota_executor, z2m_executor, event_tx));
 
         let event_rx = service.subscribe();
         let pending_tx = broadcast::channel(32).0;

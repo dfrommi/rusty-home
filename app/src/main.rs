@@ -43,6 +43,7 @@ pub async fn main() {
         infrastructure.db_pool.clone(),
         infrastructure.mqtt_client.new_publisher(),
         &settings.tasmota.event_topic,
+        &settings.z2m.event_topic,
     );
 
     let mut home_state_runner = HomeStateRunner::new(
@@ -76,10 +77,6 @@ pub async fn main() {
     let z2m_incoming_data_processing = {
         let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
         IncomingDataSourceRunner::new(ds, device_state_runner.client())
-    };
-    let z2m_cmd_executor = {
-        let executor = settings.z2m.new_command_executor(&infrastructure);
-        CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
     };
 
     let energy_meter_processing = {
@@ -149,7 +146,6 @@ pub async fn main() {
         _ = ha_incoming_data_processing.run() => {},
         _ = ha_cmd_executor.run() => {},
         _ = z2m_incoming_data_processing.run() => {},
-        _ = z2m_cmd_executor.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},

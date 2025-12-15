@@ -3,7 +3,7 @@ use tokio::sync::broadcast;
 use crate::{
     command::{
         Command, CommandEvent, CommandExecution, CommandState, CommandTarget,
-        adapter::{CommandExecutor, TasmotaCommandExecutor},
+        adapter::{CommandExecutor, TasmotaCommandExecutor, Z2mCommandExecutor},
     },
     core::{
         id::ExternalId,
@@ -18,6 +18,7 @@ use super::adapter::db::CommandRepository;
 pub struct CommandService {
     repo: CommandRepository,
     tasmota_executor: TasmotaCommandExecutor,
+    z2m_executor: Z2mCommandExecutor,
     event_tx: broadcast::Sender<CommandEvent>,
 }
 
@@ -25,11 +26,13 @@ impl CommandService {
     pub fn new(
         repo: CommandRepository,
         tasmota_executor: TasmotaCommandExecutor,
+        z2m_executor: Z2mCommandExecutor,
         event_tx: broadcast::Sender<CommandEvent>,
     ) -> Self {
         Self {
             repo,
             tasmota_executor,
+            z2m_executor,
             event_tx,
         }
     }
@@ -50,8 +53,10 @@ impl CommandService {
             .insert_command_for_processing(&command, &source, user_trigger_id, correlation_id)
             .await?;
 
-        //use or_else to chain executors
-        let res = self.execute_via(&self.tasmota_executor, &command).await;
+        let res = match self.execute_via(&self.tasmota_executor, &command).await {
+            Some(r) => Some(r),
+            None => self.execute_via(&self.z2m_executor, &command).await,
+        };
 
         match res {
             Some(Ok(())) => {

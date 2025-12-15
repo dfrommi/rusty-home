@@ -4,13 +4,11 @@ use rmcp::transport::streamable_http_server::session::local::LocalSessionManager
 use rmcp_actix_web::transport::StreamableHttpService;
 use server::SmartHomeMcp;
 
-use crate::core::HomeApi;
-
 mod server;
 
-pub fn new_routes(api: HomeApi) -> actix_web::Scope {
+pub fn new_routes() -> actix_web::Scope {
     let service = StreamableHttpService::builder()
-        .service_factory(Arc::new(move || Ok(SmartHomeMcp::new(api.clone()))))
+        .service_factory(Arc::new(move || Ok(SmartHomeMcp::new())))
         .session_manager(Arc::new(LocalSessionManager::default()))
         .build();
 

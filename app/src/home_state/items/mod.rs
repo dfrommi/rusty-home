@@ -44,7 +44,7 @@ pub use set_point::SetPoint;
 pub use target_heating_mode::*;
 pub use temperature::Temperature;
 
-use super::StateCalculationContext;
+use crate::home_state::calc::StateCalculationContext;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;

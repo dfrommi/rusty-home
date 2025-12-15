@@ -72,7 +72,7 @@ impl HomeStateRunner {
             tokio::select! {
                 state_evt = self.state_changed_rx.recv() => {
                     match state_evt {
-                        Ok(DeviceStateEvent::Changed(_)) => {},
+                        Ok(DeviceStateEvent::Changed(_)) | Ok(DeviceStateEvent::Updated(_)) => {},
                         Err(_) => {}, // channel closed or lagged; fall back to timer ticks
                     }
                 },

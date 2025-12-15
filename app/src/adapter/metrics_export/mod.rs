@@ -5,7 +5,6 @@ mod tags;
 
 pub use exporter::HomeStateMetricsExporter;
 
-use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
@@ -20,9 +19,9 @@ pub struct MetricsExport {
 }
 
 impl MetricsExport {
-    pub fn new_routes(&self, api: HomeApi) -> actix_web::Scope {
+    pub fn new_routes(&self) -> actix_web::Scope {
         let repo = repository::VictoriaRepository::new(self.victoria_url.clone());
-        api::routes(repo, api)
+        api::routes(repo)
     }
 
     pub fn new_exporter(

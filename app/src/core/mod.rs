@@ -1,5 +1,3 @@
-mod api;
-pub mod app_event;
 pub mod id;
 pub mod math;
 pub mod persistence;
@@ -9,8 +7,6 @@ pub mod timeseries;
 pub mod unit;
 
 use std::collections::HashMap;
-
-pub use api::HomeApi;
 
 pub struct DeviceConfig<V> {
     config: HashMap<String, Vec<V>>,

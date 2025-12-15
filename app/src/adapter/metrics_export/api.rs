@@ -8,16 +8,12 @@ use serde::Deserialize;
 
 use crate::{
     adapter::metrics_export::{Metric, MetricId, repository::VictoriaRepository},
-    core::{
-        HomeApi,
-        time::{DateTime, DateTimeRange},
-    },
+    core::time::{DateTime, DateTimeRange},
     home_state::HomeState,
     t,
 };
 
 struct MetricApiContext {
-    api: HomeApi,
     repo: VictoriaRepository,
 }
 
@@ -34,8 +30,8 @@ struct BackfillQuery {
     end: Option<DateTime>,
 }
 
-pub fn routes(repo: VictoriaRepository, api: HomeApi) -> actix_web::Scope {
-    let web_data = Arc::new(MetricApiContext { api, repo });
+pub fn routes(repo: VictoriaRepository) -> actix_web::Scope {
+    let web_data = Arc::new(MetricApiContext { repo });
     web::scope("/metrics")
         .route("/backfill", web::get().to(backfill_handler))
         .route("/names", web::get().to(items_handler))

@@ -1,4 +1,3 @@
-use crate::core::HomeApi;
 use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, Duration};
 use crate::home_state::HomeState;
@@ -12,7 +11,6 @@ use rmcp::{
 
 #[derive(Clone)]
 pub struct SmartHomeMcp {
-    api: HomeApi,
     tool_router: ToolRouter<Self>,
 }
 
@@ -98,9 +96,8 @@ impl JsonSchema for Duration {
 
 #[tool_router]
 impl SmartHomeMcp {
-    pub fn new(api: HomeApi) -> Self {
+    pub fn new() -> Self {
         Self {
-            api,
             tool_router: Self::tool_router(),
         }
     }

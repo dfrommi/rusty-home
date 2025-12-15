@@ -1,5 +1,4 @@
 use core::persistence::Database;
-use core::HomeApi;
 use infrastructure::Mqtt;
 use settings::Settings;
 use tokio::sync::broadcast;
@@ -20,7 +19,6 @@ mod settings;
 mod trigger;
 
 struct Infrastructure {
-    api: HomeApi,
     database: Database,
     mqtt_client: Mqtt,
     energy_reading_events: broadcast::Sender<adapter::energy_meter::EnergyReadingAddedEvent>,
@@ -103,7 +101,6 @@ pub async fn main() {
         .new_exporter(device_state_runner.subscribe(), home_state_runner.subscribe_state_updated());
 
     let http_server_exec = {
-        let http_api = infrastructure.api.clone();
         let http_device_state_client = device_state_runner.client();
         let http_database = infrastructure.database.clone();
         let energy_reading_events = infrastructure.energy_reading_events.clone();
@@ -120,8 +117,8 @@ pub async fn main() {
                             energy_reading_events.clone(),
                         ),
                         adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
-                        adapter::mcp::new_routes(http_api.clone()),
-                        metrics.new_routes(http_api.clone()),
+                        adapter::mcp::new_routes(),
+                        metrics.new_routes(),
                     ]
                 })
                 .await
@@ -165,13 +162,11 @@ impl Infrastructure {
 
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
         let database = Database::new(db_pool);
-        let api = HomeApi::new(database.clone());
 
         let mqtt_client = settings.mqtt.new_client();
         let (energy_reading_events, _) = broadcast::channel(16);
 
         Ok(Self {
-            api,
             database,
             mqtt_client,
             energy_reading_events,

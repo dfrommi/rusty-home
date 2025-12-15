@@ -1,7 +1,10 @@
 use tokio::sync::broadcast;
 
 use crate::{
-    command::{Command, CommandEvent, CommandExecution, CommandState, CommandTarget},
+    command::{
+        Command, CommandEvent, CommandExecution, CommandState, CommandTarget,
+        adapter::{CommandExecutor, TasmotaCommandExecutor},
+    },
     core::{
         id::ExternalId,
         time::{DateTime, DateTimeRange},
@@ -14,16 +17,64 @@ use super::adapter::db::CommandRepository;
 
 pub struct CommandService {
     repo: CommandRepository,
+    tasmota_executor: TasmotaCommandExecutor,
     event_tx: broadcast::Sender<CommandEvent>,
 }
 
 impl CommandService {
-    pub fn new(repo: CommandRepository, event_tx: broadcast::Sender<CommandEvent>) -> Self {
-        Self { repo, event_tx }
+    pub fn new(
+        repo: CommandRepository,
+        tasmota_executor: TasmotaCommandExecutor,
+        event_tx: broadcast::Sender<CommandEvent>,
+    ) -> Self {
+        Self {
+            repo,
+            tasmota_executor,
+            event_tx,
+        }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<CommandEvent> {
         self.event_tx.subscribe()
+    }
+
+    pub async fn execute_command(
+        &self,
+        command: Command,
+        source: ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+        correlation_id: Option<String>,
+    ) -> anyhow::Result<()> {
+        let command_exec = self
+            .repo
+            .insert_command_for_processing(&command, &source, user_trigger_id, correlation_id)
+            .await?;
+
+        //use or_else to chain executors
+        let res = self.execute_via(&self.tasmota_executor, &command).await;
+
+        match res {
+            Some(Ok(())) => {
+                self.set_command_state_success(command_exec.id).await;
+                Ok(())
+            }
+            Some(Err(e)) => {
+                self.set_command_state_error(command_exec.id, &e.to_string()).await;
+                Err(e)
+            }
+            None => {
+                self.set_command_state_error(command_exec.id, "No executor").await?;
+                anyhow::bail!("No executor could handle the command")
+            }
+        }
+    }
+
+    async fn execute_via(&self, executor: &impl CommandExecutor, command: &Command) -> Option<anyhow::Result<()>> {
+        match executor.execute_command(command).await {
+            Ok(true) => Some(Ok(())),
+            Ok(false) => None,
+            Err(e) => Some(Err(e)),
+        }
     }
 
     pub async fn save_command(
@@ -35,7 +86,7 @@ impl CommandService {
     ) -> anyhow::Result<()> {
         let execution = self
             .repo
-            .insert_command(&command, &source, user_trigger_id, correlation_id)
+            .enqueue_command(&command, &source, user_trigger_id, correlation_id)
             .await?;
 
         let _ = self.event_tx.send(CommandEvent::Added(execution));
@@ -96,6 +147,7 @@ impl CommandService {
         Ok(self.apply_timeshift_filter(commands, |cmd| cmd.created))
     }
 
+    //TODO why not on DB?
     fn apply_timeshift_filter<T>(&self, items: Vec<T>, get_timestamp: impl Fn(&T) -> DateTime) -> Vec<T> {
         if DateTime::is_shifted() {
             let now = t!(now);

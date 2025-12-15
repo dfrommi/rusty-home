@@ -1,14 +1,9 @@
 mod config;
 mod incoming;
-mod outgoing;
 
-use crate::{
-    adapter::command::CommandExecutor,
-    device_state::{CurrentPowerUsage, PowerAvailable, TotalEnergyConsumption},
-};
+use crate::device_state::{CurrentPowerUsage, PowerAvailable, TotalEnergyConsumption};
 
 use incoming::TasmotaIncomingDataSource;
-use outgoing::TasmotaCommandExecutor;
 use serde::Deserialize;
 
 use crate::{Infrastructure, core::DeviceConfig};
@@ -31,12 +26,6 @@ enum TasmotaCommandTarget {
 }
 
 impl Tasmota {
-    pub fn new_command_executor(&self, infrastructure: &Infrastructure) -> impl CommandExecutor + use<> {
-        let tx = infrastructure.mqtt_client.new_publisher();
-        let config = config::default_tasmota_command_config();
-        TasmotaCommandExecutor::new(self.event_topic.clone(), config, tx)
-    }
-
     pub async fn new_incoming_data_source(&self, infrastructure: &mut Infrastructure) -> TasmotaIncomingDataSource {
         let mqtt_client = &mut infrastructure.mqtt_client;
         let config = DeviceConfig::new(&config::default_tasmota_state_config());

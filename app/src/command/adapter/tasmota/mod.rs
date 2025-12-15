@@ -1,10 +1,16 @@
-use crate::{
-    adapter::command::CommandExecutor,
-    command::{Command, CommandTarget},
-};
+mod config;
+
+use super::CommandExecutor;
+
+use crate::command::{Command, CommandTarget};
 use infrastructure::MqttOutMessage;
 
-use super::TasmotaCommandTarget;
+use tokio::sync::mpsc;
+
+#[derive(Debug, Clone)]
+enum TasmotaCommandTarget {
+    PowerSwitch(&'static str),
+}
 
 pub struct TasmotaCommandExecutor {
     base_topic: String,
@@ -13,15 +19,13 @@ pub struct TasmotaCommandExecutor {
 }
 
 impl TasmotaCommandExecutor {
-    pub fn new(
-        base_topic: String,
-        config: Vec<(CommandTarget, TasmotaCommandTarget)>,
-        sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
-    ) -> Self {
+    pub fn new(event_topic: &str, mqtt_sender: mpsc::Sender<MqttOutMessage>) -> TasmotaCommandExecutor {
+        let config = config::default_tasmota_command_config();
+
         Self {
-            base_topic,
+            base_topic: event_topic.to_string(),
             config,
-            sender,
+            sender: mqtt_sender,
         }
     }
 }

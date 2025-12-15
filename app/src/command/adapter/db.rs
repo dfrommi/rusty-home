@@ -17,12 +17,36 @@ impl CommandRepository {
         Self { pool }
     }
 
-    pub async fn insert_command(
+    pub async fn insert_command_for_processing(
         &self,
         command: &Command,
         source: &ExternalId,
         user_trigger_id: Option<UserTriggerId>,
         correlation_id: Option<String>,
+    ) -> Result<CommandExecution> {
+        //mark others as superseeded is no longer needed when no command are created as pending
+        self.insert_command(command, source, user_trigger_id, correlation_id, DbCommandState::InProgress)
+            .await
+    }
+
+    pub async fn enqueue_command(
+        &self,
+        command: &Command,
+        source: &ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+        correlation_id: Option<String>,
+    ) -> Result<CommandExecution> {
+        self.insert_command(command, source, user_trigger_id, correlation_id, DbCommandState::Pending)
+            .await
+    }
+
+    async fn insert_command(
+        &self,
+        command: &Command,
+        source: &ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+        correlation_id: Option<String>,
+        state: DbCommandState,
     ) -> Result<CommandExecution> {
         let db_command = serde_json::json!(command);
 
@@ -32,7 +56,7 @@ impl CommandRepository {
                 RETURNING id, created"#,
             db_command,
             t!(now).into_db(),
-            DbCommandState::Pending as DbCommandState,
+            state as DbCommandState,
             source.type_name(),
             source.variant_name(),
             correlation_id,

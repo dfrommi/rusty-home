@@ -7,10 +7,10 @@ pub use domain::*;
 use std::sync::Arc;
 
 use adapter::db::CommandRepository;
-use infrastructure::TraceContext;
+use infrastructure::{MqttOutMessage, TraceContext};
 use service::CommandService;
 use sqlx::PgPool;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     core::{id::ExternalId, time::DateTime},
@@ -36,10 +36,13 @@ pub struct CommandClient {
 }
 
 impl CommandRunner {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, mqtt_sender: mpsc::Sender<MqttOutMessage>, tasmota_event_topic: &str) -> Self {
         let repo = CommandRepository::new(pool);
         let (event_tx, _event_rx) = broadcast::channel(64);
-        let service = Arc::new(CommandService::new(repo, event_tx));
+
+        let tasmota_executor = adapter::TasmotaCommandExecutor::new(tasmota_event_topic, mqtt_sender);
+
+        let service = Arc::new(CommandService::new(repo, tasmota_executor, event_tx));
 
         let event_rx = service.subscribe();
         let pending_tx = broadcast::channel(32).0;
@@ -95,6 +98,17 @@ impl CommandRunner {
 impl CommandClient {
     pub fn subscribe_events(&self) -> broadcast::Receiver<CommandEvent> {
         self.service.subscribe()
+    }
+
+    pub async fn execute(
+        &self,
+        command: Command,
+        source: ExternalId,
+        user_trigger_id: Option<UserTriggerId>,
+    ) -> anyhow::Result<()> {
+        self.service
+            .execute_command(command, source, user_trigger_id, TraceContext::current_correlation_id())
+            .await
     }
 
     pub async fn enqueue(

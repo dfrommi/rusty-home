@@ -1,26 +1,6 @@
-use crate::command::{CommandTarget, PowerToggle};
 use crate::device_state::{CurrentPowerUsage, PowerAvailable, TotalEnergyConsumption};
 
 use super::TasmotaChannel;
-
-use super::TasmotaCommandTarget;
-
-pub fn default_tasmota_command_config() -> Vec<(CommandTarget, TasmotaCommandTarget)> {
-    vec![
-        (
-            CommandTarget::SetPower {
-                device: PowerToggle::Dehumidifier,
-            },
-            TasmotaCommandTarget::PowerSwitch("dehumidifier"),
-        ),
-        (
-            CommandTarget::SetPower {
-                device: PowerToggle::InfraredHeater,
-            },
-            TasmotaCommandTarget::PowerSwitch("irheater"),
-        ),
-    ]
-}
 
 pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
     vec![

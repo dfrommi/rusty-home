@@ -1,10 +1,9 @@
 use super::Z2mChannel;
 use super::Z2mCommandTarget;
+use crate::automation::{LoadBalancedThermostat, Thermostat};
 use crate::command::CommandTarget;
 use crate::core::unit::KiloWattHours;
 use crate::device_state::*;
-use crate::automation::{LoadBalancedThermostat, Thermostat};
-use crate::trigger::RemoteTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![
@@ -263,9 +262,5 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 KiloWattHours(0.0),
             ),
         ),
-        //
-        // BUTTON PRESS
-        //
-        ("bedroom/remote", Z2mChannel::RemoteClick(RemoteTarget::BedroomDoor)),
     ]
 }

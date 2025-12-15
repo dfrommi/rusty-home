@@ -1,13 +1,13 @@
 use r#macro::Id;
 
+use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
+use crate::automation::HeatingZone;
 use crate::command::{Command, HeatingTargetState};
 use crate::core::time::Duration;
-use crate::automation::HeatingZone;
 use crate::home_state::PowerAvailable;
 use crate::t;
-use crate::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger, UserTriggerTarget};
-use super::{Rule, RuleEvaluationContext, RuleResult};
+use crate::trigger::{UserTrigger, UserTriggerTarget};
 
 #[derive(Debug, Clone, Id)]
 pub struct UserTriggerAction {
@@ -56,8 +56,7 @@ impl Rule for UserTriggerAction {
 impl UserTriggerAction {
     fn default_duration(&self, ctx: &RuleEvaluationContext) -> Option<Duration> {
         match self.target {
-            UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower) => Some(t!(15 minutes)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving) => {
                 match ctx.current_dp(PowerAvailable::LivingRoomTv) {
@@ -84,14 +83,6 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
     use crate::command::*;
 
     match trigger.clone() {
-        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)) => vec![Command::SetPower {
-            device: PowerToggle::InfraredHeater,
-            power_on: true,
-        }],
-        UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::BottomSingle)) => vec![Command::SetPower {
-            device: PowerToggle::InfraredHeater,
-            power_on: false,
-        }],
         UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(on)) => vec![Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: on,

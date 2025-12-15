@@ -1,11 +1,10 @@
 use crate::adapter::incoming::{IncomingData, IncomingDataSource};
+use crate::automation::Thermostat;
+use crate::automation::availability::ItemAvailability;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
 use crate::device_state::{DeviceStateValue, RawVendorValue, Temperature};
-use crate::automation::Thermostat;
-use crate::automation::availability::ItemAvailability;
-use crate::trigger::{ButtonPress, Remote, RemoteTarget, UserTrigger};
 use infrastructure::MqttInMessage;
 use tokio::sync::mpsc;
 
@@ -212,28 +211,6 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ]
             }
-
-            Z2mChannel::RemoteClick(target) => {
-                let payload: RemoteControl = serde_json::from_str(&msg.payload)?;
-                let mut events = vec![availability(device_id, payload.last_seen)];
-
-                let button_press = match payload.action.as_deref() {
-                    Some("on") => Some(ButtonPress::TopSingle),
-                    Some("off") => Some(ButtonPress::BottomSingle),
-                    _ => None,
-                };
-
-                if let Some(button_press) = button_press {
-                    events.push(
-                        UserTrigger::Remote(match target {
-                            RemoteTarget::BedroomDoor => Remote::BedroomDoor(button_press),
-                        })
-                        .into(),
-                    );
-                }
-
-                events
-            }
         };
 
         Ok(result)
@@ -289,11 +266,5 @@ struct PowerPlug {
     current_power_w: f64,
     #[serde(rename = "energy")]
     total_energy_kwh: f64,
-    last_seen: DateTime,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct RemoteControl {
-    action: Option<String>,
     last_seen: DateTime,
 }

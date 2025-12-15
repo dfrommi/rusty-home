@@ -54,7 +54,7 @@ pub async fn main() {
             .homeassistant
             .new_incoming_data_source(&mut infrastructure)
             .await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
+        IncomingDataSourceRunner::new(ds, device_state_runner.client())
     };
     let ha_cmd_executor = {
         let executor = settings
@@ -65,7 +65,7 @@ pub async fn main() {
 
     let z2m_incoming_data_processing = {
         let ds = settings.z2m.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
+        IncomingDataSourceRunner::new(ds, device_state_runner.client())
     };
     let z2m_cmd_executor = {
         let executor = settings.z2m.new_command_executor(&infrastructure);
@@ -74,7 +74,7 @@ pub async fn main() {
 
     let tasmota_incoming_data_processing = {
         let ds = settings.tasmota.new_incoming_data_source(&mut infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
+        IncomingDataSourceRunner::new(ds, device_state_runner.client())
     };
     let tasmota_cmd_executor = {
         let executor = settings.tasmota.new_command_executor(&infrastructure);
@@ -83,7 +83,7 @@ pub async fn main() {
 
     let energy_meter_processing = {
         let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
-        IncomingDataSourceRunner::new(ds, trigger_runner.client(), device_state_runner.client())
+        IncomingDataSourceRunner::new(ds, device_state_runner.client())
     };
 
     let homekit_runner = settings

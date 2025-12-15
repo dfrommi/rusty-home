@@ -1,14 +1,13 @@
 use crate::adapter::homekit::HomekitCommandTarget;
-use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::automation::{HeatingZone, LoadBalancedThermostat, Room, Thermostat};
-use crate::trigger::RemoteTarget;
+use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 
-use super::action::{Dehumidify, HomeAction};
-use super::goal::HomeGoal;
 use super::action::{
     AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
     ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
+use super::action::{Dehumidify, HomeAction};
+use super::goal::HomeGoal;
 
 #[rustfmt::skip]
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
@@ -22,7 +21,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         {
             let mut a = vec![
                 UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
-                UserTriggerAction::new(RemoteTarget::BedroomDoor.into()).into(),
                 AutoTurnOff::IrHeater.into(),
             ]; 
             a.extend(smarter_heating_actions(HeatingZone::Bedroom));

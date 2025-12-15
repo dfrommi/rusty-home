@@ -3,12 +3,11 @@ mod incoming;
 mod outgoing;
 
 use crate::adapter::command::CommandExecutor;
+use crate::automation::Thermostat;
 use crate::core::unit::KiloWattHours;
 use crate::device_state::{
     CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, Temperature, TotalEnergyConsumption,
 };
-use crate::automation::Thermostat;
-use crate::trigger::RemoteTarget;
 use incoming::Z2mIncomingDataSource;
 use outgoing::Z2mCommandExecutor;
 use serde::Deserialize;
@@ -26,7 +25,6 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
-    RemoteClick(RemoteTarget),
     Thermostat(Thermostat, SetPoint, HeatingDemand, Opened),
 }
 

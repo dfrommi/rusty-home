@@ -12,16 +12,14 @@ pub use incoming::IncomingDataSourceRunner;
 
 mod incoming {
     use crate::{
+        automation::availability::ItemAvailability,
         core::timeseries::DataPoint,
         device_state::{DeviceAvailability, DeviceStateClient, DeviceStateValue},
-        automation::availability::ItemAvailability,
-        trigger::{TriggerClient, UserTrigger},
     };
 
     #[derive(Debug, Clone, derive_more::From)]
     pub enum IncomingData {
         StateValue(DataPoint<DeviceStateValue>),
-        UserTrigger(UserTrigger),
         ItemAvailability(ItemAvailability),
     }
 
@@ -52,7 +50,6 @@ mod incoming {
         S: IncomingDataSource<M, C>,
     {
         source: S,
-        trigger_client: TriggerClient,
         device_client: DeviceStateClient,
         _marker: std::marker::PhantomData<(M, C)>,
     }
@@ -63,10 +60,9 @@ mod incoming {
         C: std::fmt::Debug,
         S: IncomingDataSource<M, C>,
     {
-        pub fn new(source: S, trigger_client: TriggerClient, device_client: DeviceStateClient) -> Self {
+        pub fn new(source: S, device_client: DeviceStateClient) -> Self {
             Self {
                 source,
-                trigger_client,
                 device_client,
                 _marker: std::marker::PhantomData,
             }
@@ -121,12 +117,6 @@ mod incoming {
                     IncomingData::StateValue(dp) => {
                         if let Err(e) = self.device_client.update_state(dp.clone()).await {
                             tracing::error!("Error processing state {:?}: {:?}", dp, e);
-                        }
-                    }
-
-                    IncomingData::UserTrigger(trigger) => {
-                        if let Err(e) = self.trigger_client.add_trigger(trigger.clone()).await {
-                            tracing::error!("Error processing user trigger {:?}: {:?}", trigger, e);
                         }
                     }
 

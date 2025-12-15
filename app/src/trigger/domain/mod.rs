@@ -12,7 +12,6 @@ pub struct UserTriggerId(i64);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTrigger {
-    Remote(Remote),
     Homekit(HomekitCommand),
 }
 
@@ -21,36 +20,12 @@ pub enum UserTrigger {
 )]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
-    Remote(RemoteTarget),
     Homekit(HomekitCommandTarget),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "remote", content = "button", rename_all = "snake_case")]
-pub enum Remote {
-    BedroomDoor(ButtonPress),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
-#[serde(tag = "remote", rename_all = "snake_case")]
-#[display("Remote[{}]", _variant)]
-pub enum RemoteTarget {
-    BedroomDoor,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ButtonPress {
-    TopSingle,
-    BottomSingle,
 }
 
 impl UserTrigger {
     pub fn target(&self) -> UserTriggerTarget {
         match self {
-            UserTrigger::Remote(remote) => match remote {
-                Remote::BedroomDoor(_) => UserTriggerTarget::Remote(RemoteTarget::BedroomDoor),
-            },
             UserTrigger::Homekit(command) => match command {
                 HomekitCommand::InfraredHeaterPower(_) => {
                     UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower)
@@ -95,43 +70,10 @@ mod serialization {
     use serde_json::json;
 
     #[test]
-    fn test_display_remote() {
-        assert_eq!(
-            UserTriggerTarget::Remote(RemoteTarget::BedroomDoor).to_string(),
-            "Remote[BedroomDoor]"
-        );
-    }
-
-    #[test]
     fn test_display_homekit() {
         assert_eq!(
             UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower).to_string(),
             "Homekit[InfraredHeaterPower]"
-        );
-    }
-
-    #[test]
-    fn test_serialize_remote() {
-        assert_json_eq!(
-            UserTrigger::Remote(Remote::BedroomDoor(ButtonPress::TopSingle)),
-            json!({
-                "type": "remote",
-                "remote": "bedroom_door",
-                "button": "top_single"
-            })
-        );
-
-        println!(
-            "{}",
-            serde_json::to_string(&UserTriggerTarget::Remote(RemoteTarget::BedroomDoor)).unwrap()
-        );
-
-        assert_json_eq!(
-            UserTriggerTarget::Remote(RemoteTarget::BedroomDoor),
-            json!({
-                "type": "remote",
-                "remote": "bedroom_door"
-            })
         );
     }
 

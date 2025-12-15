@@ -247,13 +247,12 @@ impl From<(DbCommandState, Option<String>)> for CommandState {
 mod tests {
     use super::*;
     use crate::command::PowerToggle;
-    use crate::core::time::DateTime;
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_command_found(db_pool: PgPool) {
         let repo = CommandRepository::new(db_pool);
 
-        for (power_on, timestampe) in [
+        for (power_on, timestamp) in [
             (true, t!(4 minutes ago)),
             (false, t!(6 minutes ago)),
             (true, t!(8 minutes ago)),
@@ -269,7 +268,7 @@ mod tests {
             sqlx::query!(
                 r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
                 serde_json::json!(cmd),
-                timestampe,
+                timestamp.into_db(),
                 DbCommandState::Pending as DbCommandState,
                 source.type_name(),
                 source.variant_name(),
@@ -280,11 +279,12 @@ mod tests {
             .unwrap();
         }
 
+        let range = DateTimeRange::new(t!(10 minutes ago), t!(now));
         let res = repo.query_all_commands(
             Some(CommandTarget::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
             }),
-            &DateTimeRange::new(DateTime::from(t!(10 minutes ago)), DateTime::from(t!(now))),
+            &range,
         );
 
         assert_eq!(res.await.unwrap().len(), 5);

@@ -38,6 +38,8 @@ async fn create_new_calculation_context(
     device_state: &DeviceStateClient,
     trigger_client: &TriggerClient,
 ) -> anyhow::Result<StateCalculationContext> {
+    let start_time = t!(now);
+
     let triggers = trigger_client.get_all_active_triggers().await?;
     let mut active_triggers = HashMap::new();
 
@@ -53,6 +55,7 @@ async fn create_new_calculation_context(
     let device_states = device_state.get_current_for_all().await?;
 
     Ok(StateCalculationContext {
+        start_time,
         current: RefCell::new(HashMap::new()),
         history: history_map,
         device_state: device_states,
@@ -61,6 +64,7 @@ async fn create_new_calculation_context(
 }
 
 pub struct StateCalculationContext {
+    start_time: DateTime,
     current: RefCell<HashMap<HomeState, DataPoint<StateValue>>>,
     history: HashMap<HomeState, DataFrame<StateValue>>,
     device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
@@ -177,7 +181,7 @@ impl StateCalculationContext {
             data.insert(id.clone(), combined_df);
         }
 
-        StateSnapshot::new(data, self.active_user_triggers)
+        StateSnapshot::new(self.start_time, data, self.active_user_triggers)
     }
 }
 

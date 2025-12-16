@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::core::time::DateTime;
 use crate::t;
 use crate::trigger::{UserTrigger, UserTriggerExecution, UserTriggerId};
@@ -59,18 +61,27 @@ impl TriggerRepository {
                     WHERE timestamp >= $1
                     AND timestamp <= $2
                     AND (active_until IS NULL OR active_until >= $2)
-               ORDER BY 2 ASC"#,
+               ORDER BY timestamp DESC"#,
             since.into_db(),
             now.into_db(),
         )
         .fetch_all(&self.pool)
         .await?;
 
+        //Only take latest per target
+        let mut seen_targets = HashSet::new();
         let mut result = Vec::with_capacity(records.len());
 
         for row in records {
             let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
             let timestamp = row.timestamp.into();
+
+            let target = trigger.target();
+            if seen_targets.contains(&target) {
+                continue;
+            }
+            seen_targets.insert(target);
+
             result.push(UserTriggerExecution {
                 id: row.id.into(),
                 trigger,

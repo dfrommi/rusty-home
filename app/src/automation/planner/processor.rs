@@ -27,7 +27,7 @@ where
     G: Eq + Display,
     A: Action + Clone + Send + Sync + 'static,
 {
-    let planning_start = t!(now);
+    let planning_data_timestamp = snapshot.timestamp();
     let rule_ctx = RuleEvaluationContext::new(snapshot);
 
     let (first_tx, mut prev_rx) = oneshot::channel();
@@ -69,19 +69,19 @@ where
         .iter()
         .filter_map(|c| c.user_trigger_id.clone())
         .collect::<Vec<UserTriggerId>>();
-    cancel_unused_triggers(planning_start, used_triggers, trigger_client).await?;
+    cancel_unused_triggers(planning_data_timestamp, used_triggers, trigger_client).await?;
 
     let steps = results.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
 }
 
 async fn cancel_unused_triggers(
-    planning_start: DateTime,
+    planning_data_timestamp: DateTime,
     used_triggers: Vec<UserTriggerId>,
     trigger_client: &TriggerClient,
 ) -> anyhow::Result<()> {
     trigger_client
-        .disable_triggers_before_except(planning_start, &used_triggers)
+        .disable_triggers_before_except(planning_data_timestamp, &used_triggers)
         .await
         .map(|_| ())
 }

@@ -33,31 +33,35 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
         let w_presence: f64 = 3.733237448369802;
 
         match Occupancy::calculate(prior, w_presence, main_df) {
-            Ok(probability) => Some(DataPoint::new(probability, t!(now))),
-            Err(_) => None,
+            Some(probability) => Some(DataPoint::new(probability, t!(now))),
+            None => None,
         }
     }
 }
 
 impl Occupancy {
-    pub fn calculate_presence(mut presence: DataFrame<bool>) -> anyhow::Result<f64> {
+    pub fn calculate_presence(mut presence: DataFrame<bool>) -> Option<f64> {
         presence.retain_range(
             &DateTimeRange::since(t!(1 hours ago)),
             LastSeenInterpolator,
             LastSeenInterpolator,
-        )?;
+        );
+
+        if presence.is_empty() {
+            return None;
+        }
 
         let s1 = presence.weighted_aged_sum(t!(30 minutes), LastSeenInterpolator);
-        Ok(s1)
+        Some(s1)
     }
 
-    pub fn calculate(prior: f64, w_presence: f64, presence: DataFrame<bool>) -> anyhow::Result<Probability> {
+    pub fn calculate(prior: f64, w_presence: f64, presence: DataFrame<bool>) -> Option<Probability> {
         let sigmoid = Sigmoid::default();
         let s1 = Self::calculate_presence(presence)?;
 
         //let prior = logit(p(0.03));
 
-        Ok(sigmoid.eval(prior + w_presence * s1))
+        Some(sigmoid.eval(prior + w_presence * s1))
     }
 }
 
@@ -77,27 +81,24 @@ mod tests {
     fn training() {
         let sigmoid = Sigmoid::default();
 
-        let df0 = DataFrame::new(vec![DataPoint::new(true, t!(1 hours ago))]).unwrap();
-        let df1 = DataFrame::new(vec![DataPoint::new(false, t!(1 hours ago))]).unwrap();
+        let df0 = DataFrame::new(vec![DataPoint::new(true, t!(1 hours ago))]);
+        let df1 = DataFrame::new(vec![DataPoint::new(false, t!(1 hours ago))]);
         let df2 = DataFrame::new(vec![
             DataPoint::new(false, t!(1 hours ago)),
             DataPoint::new(true, t!(15 minutes ago)),
             DataPoint::new(false, t!(2 minutes ago)),
             DataPoint::new(true, t!(1 minutes ago)),
-        ])
-        .unwrap();
+        ]);
 
         let df3 = DataFrame::new(vec![
             DataPoint::new(true, t!(1 hours ago)),
             DataPoint::new(false, t!(20 minutes ago)),
             DataPoint::new(true, t!(1 minutes ago)),
-        ])
-        .unwrap();
+        ]);
         let df4 = DataFrame::new(vec![
             DataPoint::new(false, t!(1 hours ago)),
             DataPoint::new(true, t!(10 minutes ago)),
-        ])
-        .unwrap();
+        ]);
         let df5 = DataFrame::new(vec![
             DataPoint::new(true, t!(1 hours ago)),
             DataPoint::new(false, t!(5 minutes ago)),
@@ -105,8 +106,7 @@ mod tests {
             DataPoint::new(false, t!(3 minutes ago)),
             DataPoint::new(true, t!(2 minutes ago)),
             DataPoint::new(false, t!(1 minutes ago)),
-        ])
-        .unwrap();
+        ]);
 
         let features = array![
             [Occupancy::calculate_presence(df0.clone()).unwrap()],

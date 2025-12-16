@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use super::DataFrame;
 
-pub trait Interpolator<T>: Copy {
+pub trait Interpolator<T: Clone>: Copy {
     fn interpolate(&self, at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T>;
     fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Result<Option<T>>;
 }

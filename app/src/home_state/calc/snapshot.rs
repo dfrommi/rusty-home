@@ -37,7 +37,7 @@ impl StateSnapshot {
     where
         S: Into<HomeState> + ValueObject + Clone,
     {
-        let state_value = self.data.get(&id.clone().into())?.last();
+        let state_value = self.data.get(&id.clone().into())?.last()?;
         let value = id.project_state_value(state_value.value.clone())?;
 
         Some(DataPoint {

@@ -54,7 +54,9 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             _ => None,
         };
 
-        let occupancy_1h = occupancy_item.and_then(|item| ctx.all_since(item, t!(1 hours ago)));
+        let occupancy_1h = occupancy_item
+            .and_then(|item| ctx.all_since(item, t!(1 hours ago)))
+            .unwrap_or(DataFrame::empty());
 
         Some(calculate_heating_mode(
             !ctx.get(Presence::AtHomeDennis)? & !ctx.get(Presence::AtHomeSabine)?,
@@ -131,7 +133,7 @@ fn calculate_heating_mode(
     window_open: DataPoint<bool>,
     temp_increase: DataPoint<bool>,
     sleeping: DataPoint<bool>,
-    occupancy_1h: Option<DataFrame<Probability>>,
+    occupancy_1h: DataFrame<Probability>,
     user_override: Option<UserHeatingOverride>,
 ) -> DataPoint<HeatingMode> {
     //away and no later override
@@ -183,17 +185,16 @@ fn calculate_heating_mode(
         }
     }
 
-    if let Some(occupancy_ts) = occupancy_1h {
+    if let Some(current_occupancy) = occupancy_1h.last() {
         let threshold_high = p(0.7);
         let threshold_low = p(0.5);
-        let current_occupancy = occupancy_ts.last();
 
         //On with hysteresis
         if current_occupancy.value >= threshold_high {
             tracing::trace!("Heating in comfort-mode as room is highly occupied");
             return current_occupancy.map_value(|_| HeatingMode::Comfort);
         } else if current_occupancy.value >= threshold_low {
-            let last_outlier = occupancy_ts.latest_where(|dp| dp.value >= threshold_high || dp.value <= threshold_low);
+            let last_outlier = occupancy_1h.latest_where(|dp| dp.value >= threshold_high || dp.value <= threshold_low);
 
             if let Some(last_outlier) = last_outlier
                 && last_outlier.value >= threshold_high

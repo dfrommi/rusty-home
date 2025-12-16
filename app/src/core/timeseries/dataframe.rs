@@ -7,25 +7,26 @@ use crate::{
     },
     t,
 };
-use anyhow::ensure;
 
 use super::DataPoint;
 
 #[derive(Debug, Clone)]
-pub struct DataFrame<T> {
+pub struct DataFrame<T: Clone> {
     data: BTreeMap<DateTime, DataPoint<T>>,
 }
 
-impl<T> DataFrame<T> {
-    pub fn new(values: impl IntoIterator<Item = DataPoint<T>>) -> anyhow::Result<Self> {
+impl<T: Clone> DataFrame<T> {
+    pub fn empty() -> Self {
+        Self { data: BTreeMap::new() }
+    }
+
+    pub fn new(values: impl IntoIterator<Item = DataPoint<T>>) -> Self {
         let mut data: BTreeMap<DateTime, DataPoint<T>> = BTreeMap::new();
         for dp in values {
             data.insert(dp.timestamp, dp);
         }
 
-        ensure!(!data.is_empty(), "data frames must not be empty");
-
-        Ok(Self { data })
+        Self { data }
     }
 
     pub fn retain_range(
@@ -33,62 +34,26 @@ impl<T> DataFrame<T> {
         range: &DateTimeRange,
         start_interpolator: impl Interpolator<T>,
         end_interpolator: impl Interpolator<T>,
-    ) -> anyhow::Result<()>
-    where
-        T: Clone,
-    {
+    ) {
         let start = *range.start();
         let end = *range.end();
 
         if !self.data.contains_key(&start)
-            && let Some(dp_at_start) = start_interpolator.interpolate_df(start, self)?
+            && let Ok(Some(dp_at_start)) = start_interpolator.interpolate_df(start, self)
         {
             self.data.insert(start, DataPoint::new(dp_at_start, start));
         }
 
         if !self.data.contains_key(&end)
-            && let Some(dp_at_end) = end_interpolator.interpolate_df(end, self)?
+            && let Ok(Some(dp_at_end)) = end_interpolator.interpolate_df(end, self)
         {
             self.data.insert(end, DataPoint::new(dp_at_end, end));
         }
 
         self.data.retain(|k, _| *k >= start && *k <= end);
-
-        ensure!(!self.data.is_empty(), "data frame is empty after truncation");
-
-        Ok(())
     }
 
-    pub fn retain_range_with_context(&self, range: &DateTimeRange) -> anyhow::Result<Self>
-    where
-        T: Clone,
-    {
-        let mut points = Vec::new();
-
-        // Add the previous value before the range (if it exists)
-        if let Some(prev_dp) = self.prev(*range.start()) {
-            points.push(prev_dp.clone());
-        }
-
-        // Add all values within the range
-        for (timestamp, dp) in &self.data {
-            if *timestamp >= *range.start() && *timestamp <= *range.end() {
-                points.push(dp.clone());
-            }
-        }
-
-        // Add the next value after the range (if it exists)
-        if let Some(next_dp) = self.next(*range.end()) {
-            points.push(next_dp.clone());
-        }
-
-        Self::new(points)
-    }
-
-    pub fn retain_range_with_context_before(&self, range: &DateTimeRange) -> Option<Self>
-    where
-        T: Clone,
-    {
+    pub fn retain_range_with_context_before(&self, range: &DateTimeRange) -> Self {
         let in_range = self.data.range(*range.start()..=*range.end());
         let before = self.prev(*range.start());
 
@@ -102,20 +67,16 @@ impl<T> DataFrame<T> {
             points.push(dp.clone());
         }
 
-        if points.is_empty() {
-            return None;
-        }
-
-        DataFrame::new(points).ok()
+        DataFrame::new(points)
     }
 
-    pub fn map<U>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
+    pub fn map<U: Clone>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
         let values = self.data.values().map(|dp| {
             let ts = dp.timestamp;
             DataPoint::new(f(dp), ts)
         });
 
-        DataFrame::new(values).expect("Internal error: Error creating data frame of non-empty datapoints")
+        DataFrame::new(values)
     }
 
     pub fn map_interval<U, F>(&self, f: F) -> Vec<U>
@@ -144,20 +105,20 @@ impl<T> DataFrame<T> {
         };
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    pub fn non_empty(self) -> Option<Self> {
+        if self.is_empty() { None } else { Some(self) }
+    }
+
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    pub fn range(&self) -> DateTimeRange {
-        DateTimeRange::new(self.first().timestamp, self.last().timestamp)
-    }
-
-    pub fn first(&self) -> &DataPoint<T> {
-        self.data.first_key_value().unwrap().1
-    }
-
-    pub fn last(&self) -> &DataPoint<T> {
-        self.data.last_key_value().unwrap().1
+    pub fn last(&self) -> Option<&DataPoint<T>> {
+        self.data.values().next_back()
     }
 
     pub fn prev_or_at(&self, at: DateTime) -> Option<&DataPoint<T>> {
@@ -172,21 +133,7 @@ impl<T> DataFrame<T> {
         self.data.range(at..).next().map(|(_, v)| v)
     }
 
-    pub fn min(&self) -> &DataPoint<T>
-    where
-        T: PartialOrd,
-    {
-        self.data
-            .iter()
-            .min_by(|(_, a), (_, b)| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal))
-            .expect("Internal error: map should not be empty")
-            .1
-    }
-
-    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T, Duration)>>
-    where
-        T: Clone,
-    {
+    pub fn with_duration_until_next_dp(&self) -> Vec<DataPoint<(T, Duration)>> {
         self.current_and_next()
             .into_iter()
             .map(|(current, next)| {
@@ -211,39 +158,14 @@ impl<T> DataFrame<T> {
 
         result
     }
-
-    pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
-        self.data.values()
-    }
 }
 
 impl<T, U> From<&DataFrame<T>> for DataFrame<U>
 where
     T: Clone + Into<U>,
+    U: Clone,
 {
     fn from(val: &DataFrame<T>) -> Self {
         val.map(|dp| dp.value.clone().into())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::core::timeseries::interpolate::LastSeenInterpolator;
-
-    use super::*;
-
-    #[test]
-    fn test_retain_range() {
-        let mut df1 = DataFrame::new(vec![DataPoint::new(true, t!(2 hours ago))]).unwrap();
-
-        let result = df1.retain_range(
-            &DateTimeRange::since(t!(1 hours ago)),
-            LastSeenInterpolator,
-            LastSeenInterpolator,
-        );
-
-        println!("Resulting DF: {:?}", df1);
-
-        assert!(result.is_ok());
     }
 }

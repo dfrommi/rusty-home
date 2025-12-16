@@ -126,7 +126,7 @@ impl StateCalculationContext {
     }
 
     fn last_history_timestamp(&self, id: &HomeState) -> Option<DateTime> {
-        self.history.get(id).map(|df| df.last().timestamp)
+        self.history.get(id).and_then(|df| df.last()).map(|dp| dp.timestamp)
     }
 
     //combine previous snapshot and current value into full frame
@@ -154,12 +154,12 @@ impl StateCalculationContext {
         match (current, prev_df) {
             //TODO optimize to avoid double retain
             (Some(current), Some(df)) => {
-                let mut df = df.retain_range_with_context_before(&range)?;
+                let mut df = df.retain_range_with_context_before(&range);
                 df.insert(current.clone());
-                df.retain_range_with_context_before(&range)
+                Some(df.retain_range_with_context_before(&range))
             }
-            (Some(current), None) if current.timestamp <= *range.end() => DataFrame::new(vec![current.clone()]).ok(),
-            (None, Some(df)) => df.retain_range_with_context_before(&range),
+            (Some(current), None) if current.timestamp <= *range.end() => Some(DataFrame::new(vec![current.clone()])),
+            (None, Some(df)) => Some(df.retain_range_with_context_before(&range)),
             _ => None,
         }
     }
@@ -181,10 +181,8 @@ impl StateCalculationContext {
                 Some(mut df) => {
                     df.insert(current.clone());
                     df.retain_range_with_context_before(&range)
-                        .expect("Internal error: Error retaining range in data frame of non-empty datapoints")
                 }
-                None => DataFrame::new(vec![current.clone()])
-                    .expect("Internal error: Error creating data frame of non-empty datapoints"),
+                None => DataFrame::new(vec![current.clone()]),
             };
             data.insert(id.clone(), combined_df);
         }

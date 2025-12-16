@@ -6,7 +6,7 @@ use crate::core::{
     unit::{Probability, p},
 };
 
-pub trait DataFrameStatsExt<T> {
+pub trait DataFrameStatsExt<T: Clone> {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
     fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
 }

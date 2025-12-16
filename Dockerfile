@@ -19,6 +19,7 @@ RUN mkdir -p app/src kraken/src lib/macro/src lib/infrastructure/src \
 RUN cargo fetch
 RUN --mount=type=cache,id=cargo-reg,target=/usr/local/cargo/registry \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=cargo-target,target=/usr/src/myapp/target \
     cargo build --release --locked
 RUN rm -rf app/src lib/macro/src lib/infrastructure/src
 ## end of dependency caching
@@ -30,7 +31,9 @@ RUN touch -a -m app/src/main.rs lib/macro/src/lib.rs lib/infrastructure/src/lib.
 
 RUN --mount=type=cache,id=cargo-reg,target=/usr/local/cargo/registry \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git \
-    cargo build --release --locked
+    --mount=type=cache,id=cargo-target,target=/usr/src/myapp/target \
+    cargo build --release --locked \
+    && cp target/release/app /usr/local/bin/app
 
 FROM debian:stable-slim
 
@@ -44,7 +47,7 @@ RUN apt-get update -y \
 
 EXPOSE 8080
 
-COPY --from=builder /usr/src/myapp/*/release/app /usr/local/bin/
+COPY --from=builder /usr/local/bin/app /usr/local/bin/
 ENV TZ=Europe/Berlin
 
 CMD ["app"]

@@ -3,7 +3,7 @@ pub mod planner;
 
 pub use domain::*;
 
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::broadcast::{Receiver, error::RecvError};
 
 use crate::{command::CommandClient, home_state::StateSnapshot, trigger::TriggerClient};
 
@@ -36,8 +36,16 @@ impl AutomationRunner {
             tokio::select! {
                 _ = timer.tick() => {},
 
-                Ok(new_snapshot) = self.snapshot_updated_rx.recv() => {
-                    last_snapshot = Some(new_snapshot);
+                event = self.snapshot_updated_rx.recv() => match event {
+                    Ok(new_snapshot) => {
+                        last_snapshot = Some(new_snapshot);
+                    },
+                    Err(RecvError::Closed) => {
+                        tracing::error!("State snapshot receiver channel closed");
+                    },
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("State snapshot receiver lagged by {} messages", count);
+                    }
                 },
             };
 

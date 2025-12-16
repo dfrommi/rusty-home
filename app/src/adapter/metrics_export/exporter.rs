@@ -1,3 +1,5 @@
+use tokio::sync::broadcast::error::RecvError;
+
 use crate::{
     adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::timeseries::DataPoint,
@@ -33,23 +35,40 @@ impl HomeStateMetricsExporter {
 
         loop {
             tokio::select! {
-                Ok(DeviceStateEvent::Updated(data_point)) = self.device_state_updated_rx.recv() => {
-                    //Use now instead of first timestamp to fill gaps
-                    let metric: Metric = DataPoint::new(data_point.value.clone(), t!(now)).into();
-                    //Derived metrics
-                    let derived = self.derived_metrics(&metric, data_point.value.into());
-                    for dm in derived {
-                        buffer.push(dm);
+                event = self.device_state_updated_rx.recv() => match event {
+                    Ok(DeviceStateEvent::Updated(data_point)) => {
+                        //Use now instead of first timestamp to fill gaps
+                        let metric: Metric = DataPoint::new(data_point.value.clone(), t!(now)).into();
+                        //Derived metrics
+                        let derived = self.derived_metrics(&metric, data_point.value.into());
+                        for dm in derived {
+                            buffer.push(dm);
+                        }
+
+                        buffer.push(metric);
+                    },
+                    Ok(_) => { /* ignore other events */ },
+                    Err(RecvError::Closed) => {
+                        tracing::error!("Device state receiver channel closed");
+                    },
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("Device state receiver lagged by {} messages", count);
                     }
+                },
 
-                    buffer.push(metric);
-                }
+                event = self.home_state_updated_rx.recv() => match event {
+                    Ok(data_point) => {
+                        //Use now instead of first timestamp to fill gaps
+                        let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
 
-                Ok(data_point) = self.home_state_updated_rx.recv() => {
-                    //Use now instead of first timestamp to fill gaps
-                    let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
-
-                    buffer.push(metric);
+                        buffer.push(metric);
+                    },
+                    Err(RecvError::Closed) => {
+                        tracing::error!("Home state receiver channel closed");
+                    },
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("Home state receiver lagged by {} messages", count);
+                    }
                 }
             };
 

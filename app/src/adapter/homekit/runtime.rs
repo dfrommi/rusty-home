@@ -52,21 +52,24 @@ impl HomekitRunner {
 
         loop {
             tokio::select! {
-                Some(mqtt_msg) = self.mqtt_receiver.recv() => {
-                    self.handle_mqtt_message(mqtt_msg).await;
-                }
+                event = self.mqtt_receiver.recv() => match event {
+                    Some(mqtt_msg) => {
+                        self.handle_mqtt_message(mqtt_msg).await;
+                    },
+                    None => {
+                        tracing::error!("Homekit MQTT receiver channel closed");
+                    }
+                },
 
-                state_change = self.state_change_rx.recv() => {
-                    match state_change {
-                        Ok(state) => {
-                            self.handle_state_change(state).await;
-                        }
-                        Err(RecvError::Closed) => {
-                            tracing::error!("State change receiver channel closed");
-                        }
-                        Err(RecvError::Lagged(count)) => {
-                            tracing::warn!("State change receiver lagged by {} messages", count);
-                        }
+                state_change = self.state_change_rx.recv() => match state_change {
+                    Ok(state) => {
+                        self.handle_state_change(state).await;
+                    }
+                    Err(RecvError::Closed) => {
+                        tracing::error!("State change receiver channel closed");
+                    }
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("State change receiver lagged by {} messages", count);
                     }
                 }
             }

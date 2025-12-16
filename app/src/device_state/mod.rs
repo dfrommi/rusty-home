@@ -108,22 +108,17 @@ impl DeviceStateRunner {
 
     pub async fn run(mut self) {
         loop {
-            tokio::select! {
-                Some(updates) = self.tasmota_ds.recv_multi() => {
-                    self.process_incoming_data(updates).await;
-                }
-                Some(updates) = self.z2m_ds.recv_multi() => {
-                    self.process_incoming_data(updates).await;
-                }
-                Some(updates) = self.ha_ds.recv_multi() => {
-                    self.process_incoming_data(updates).await;
-                }
-                Some(updates) = self.energy_meter_ds.recv_multi() => {
-                    self.process_incoming_data(updates).await;
-                }
-                Some(updates) = self.internal_ds.recv_multi() => {
-                    self.process_incoming_data(updates).await;
-                }
+            //TODO expose error like "closed" when data-source gets refactored
+            let updates = tokio::select! {
+                updates = self.tasmota_ds.recv_multi() => updates,
+                updates = self.z2m_ds.recv_multi() => updates,
+                updates = self.ha_ds.recv_multi() => updates,
+                updates = self.energy_meter_ds.recv_multi() => updates,
+                updates = self.internal_ds.recv_multi() => updates,
+            };
+
+            if let Some(updates) = updates {
+                self.process_incoming_data(updates).await;
             }
         }
     }

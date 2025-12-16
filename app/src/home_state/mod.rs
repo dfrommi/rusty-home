@@ -4,6 +4,7 @@ mod items;
 pub use calc::StateSnapshot;
 pub use items::*;
 
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::core::time::Duration;
@@ -76,16 +77,33 @@ impl HomeStateRunner {
         loop {
             tokio::select! {
                 //Collect state changes as many might come in short intervals
-                Ok(DeviceStateEvent::Updated(_)) = self.state_changed_rx.recv() => {
-                    // Put debounce timer into the near future, expiration triggers calculation
-                    debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
+                event = self.state_changed_rx.recv() => match event {
+                    Ok(DeviceStateEvent::Updated(_)) => {
+                        // Put debounce timer into the near future, expiration triggers calculation
+                        debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
+                    },
+                    Ok(_) => { /* Ignore other events */ },
+                    Err(RecvError::Closed) => {
+                        tracing::error!("State change receiver channel closed");
+                    }
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("State change receiver lagged by {} messages", count);
+                    }
                 },
 
-                Ok(TriggerEvent::TriggerAdded) = self.user_trigger_rx.recv() => {
-                    self.update_snapshot().await;
+                event = self.user_trigger_rx.recv() => match event {
+                    Ok(TriggerEvent::TriggerAdded) => {
+                        self.update_snapshot().await;
 
-                    //Schedule next regular update
-                    debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
+                        //Schedule next regular update
+                        debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
+                    },
+                    Err(RecvError::Closed) => {
+                        tracing::error!("User trigger receiver channel closed");
+                    }
+                    Err(RecvError::Lagged(count)) => {
+                        tracing::warn!("User trigger receiver lagged by {} messages", count);
+                    }
                 },
 
                 // Debounce elapsed

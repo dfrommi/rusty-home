@@ -5,10 +5,7 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use crate::command::adapter::CommandExecutor;
 use crate::command::{Command, CommandTarget, Fan};
-use crate::core::timeseries::DataPoint;
 use crate::core::unit::{FanAirflow, FanSpeed};
-use crate::device_state::{DeviceStateClient, DeviceStateValue};
-use crate::t;
 use serde_json::json;
 
 #[derive(Debug, Clone)]
@@ -21,12 +18,11 @@ enum HaServiceTarget {
 
 pub struct HomeAssistantCommandExecutor {
     client: HaHttpClient,
-    device_client: DeviceStateClient,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HomeAssistantCommandExecutor {
-    pub fn new(url: &str, token: &str, device_client: DeviceStateClient) -> Self {
+    pub fn new(url: &str, token: &str) -> Self {
         let http_client = HaHttpClient::new(url, token).expect("Error initializing Home Assistant REST client");
 
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
@@ -37,7 +33,6 @@ impl HomeAssistantCommandExecutor {
 
         Self {
             client: http_client,
-            device_client,
             config: data,
         }
     }
@@ -160,20 +155,6 @@ impl HomeAssistantCommandExecutor {
             }
         };
 
-        //store state directly as homeassistant integration is highly unreliable in terms of fan speed updates
-        self.device_client
-            .update_state(DataPoint::new(
-                DeviceStateValue::FanActivity(
-                    match fan {
-                        Fan::LivingRoomCeilingFan => crate::device_state::FanActivity::LivingRoomCeilingFan,
-                        Fan::BedroomCeilingFan => crate::device_state::FanActivity::BedroomCeilingFan,
-                    },
-                    airflow.clone(),
-                ),
-                t!(now),
-            ))
-            .await?;
-
         Ok(())
     }
 
@@ -255,15 +236,6 @@ impl HomeAssistantCommandExecutor {
                     .await?;
             }
         }
-
-        //store state directly as homeassistant as there is no back-channel. still unreliable but
-        //for now the best we can do
-        self.device_client
-            .update_state(DataPoint::new(
-                DeviceStateValue::EnergySaving(crate::device_state::EnergySaving::LivingRoomTv, energy_saving),
-                t!(now),
-            ))
-            .await?;
 
         Ok(())
     }

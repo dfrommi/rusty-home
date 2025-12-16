@@ -31,6 +31,15 @@ pub async fn main() {
 
     let (energy_meter_tx, energy_meter_rx) = mpsc::channel(16);
 
+    let command_runner = CommandRunner::new(
+        infrastructure.db_pool.clone(),
+        infrastructure.mqtt_client.new_publisher(),
+        &settings.tasmota.event_topic,
+        &settings.z2m.event_topic,
+        &settings.homeassistant.url,
+        &settings.homeassistant.token,
+    );
+
     let device_state_runner = device_state::DeviceStateRunner::new(
         infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
@@ -40,19 +49,11 @@ pub async fn main() {
         &settings.homeassistant.url,
         &settings.homeassistant.token,
         energy_meter_rx,
+        command_runner.subscribe(),
     )
     .await;
 
     let trigger_runner = trigger::TriggerRunner::new(infrastructure.db_pool.clone());
-    let command_runner = CommandRunner::new(
-        infrastructure.db_pool.clone(),
-        infrastructure.mqtt_client.new_publisher(),
-        &settings.tasmota.event_topic,
-        &settings.z2m.event_topic,
-        &settings.homeassistant.url,
-        &settings.homeassistant.token,
-        device_state_runner.client(),
-    );
 
     let mut home_state_runner = HomeStateRunner::new(
         t!(3 hours),

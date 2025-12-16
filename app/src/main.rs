@@ -29,8 +29,6 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let (energy_meter_tx, energy_meter_rx) = mpsc::channel(16);
-
     let command_runner = CommandRunner::new(
         infrastructure.db_pool.clone(),
         infrastructure.mqtt_client.new_publisher(),
@@ -39,6 +37,8 @@ pub async fn main() {
         &settings.homeassistant.url,
         &settings.homeassistant.token,
     );
+
+    let (energy_meter_tx, energy_meter_rx) = mpsc::channel(16);
 
     let device_state_runner = device_state::DeviceStateRunner::new(
         infrastructure.db_pool.clone(),
@@ -110,20 +110,36 @@ pub async fn main() {
         .expect("Error bootstrapping state");
     tracing::info!("State bootstrapping completed");
 
-    tracing::info!("Starting infrastructure processing");
-    let process_infrastucture = infrastructure.process();
-
     tracing::info!("Starting main loop");
 
-    tokio::select!(
-        _ = process_infrastucture => {},
-        _ = device_state_runner.run() => {},
-        _ = home_state_runner.run() => {},
-        _ = automation_runner.run() => {},
-        _ = http_server_exec => {},
-        _ = homekit_runner.run() => {},
-        _ = metrics_exporter.run() => {},
-    );
+    tokio::spawn(async move {
+        device_state_runner.run().await;
+    });
+
+    tokio::spawn(async move {
+        automation_runner.run().await;
+    });
+
+    tokio::spawn(async move {
+        home_state_runner.run().await;
+    });
+
+    tokio::spawn(async move {
+        metrics_exporter.run().await;
+    });
+
+    tokio::spawn(async move {
+        http_server_exec.await;
+    });
+
+    tokio::spawn(async move {
+        tracing::info!("Starting HomeKit runner");
+        homekit_runner.run().await;
+    });
+
+    infrastructure.mqtt_client.process().await;
+
+    tracing::info!("Shutting down");
 }
 
 impl Infrastructure {
@@ -135,11 +151,5 @@ impl Infrastructure {
         let mqtt_client = settings.mqtt.new_client();
 
         Ok(Self { db_pool, mqtt_client })
-    }
-
-    async fn process(self) {
-        tokio::select!(
-            _ = self.mqtt_client.process() => {},
-        )
     }
 }

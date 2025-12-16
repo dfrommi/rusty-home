@@ -67,9 +67,10 @@ impl PlanningTraceStep {
 
 pub async fn display_planning_trace(trace: &PlanningTrace) {
     if planning_trace_has_changed(trace) {
-        tracing::info!("Planning result:\n{:?}", trace);
+        //TODO less noisy logging
+        tracing::info!("Planning result changed");
     } else {
-        tracing::info!("Planning result is unchanged");
+        tracing::debug!("Planning result is unchanged");
     }
 }
 

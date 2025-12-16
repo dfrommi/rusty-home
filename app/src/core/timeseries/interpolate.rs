@@ -47,8 +47,26 @@ where
     T: From<f64> + Clone,
     for<'a> &'a T: Into<f64>,
 {
-    if prev.timestamp > at || next.timestamp < at || prev.timestamp > next.timestamp {
-        anyhow::bail!("Cannot interpolate: timestamps out of order");
+    if prev.timestamp > at {
+        anyhow::bail!(
+            "Cannot interpolate: prev timestamp {} is after requested timestamp {}",
+            prev.timestamp,
+            at
+        );
+    }
+    if next.timestamp < at {
+        anyhow::bail!(
+            "Cannot interpolate: next timestamp {} is before requested timestamp {}",
+            next.timestamp,
+            at
+        );
+    }
+    if prev.timestamp > next.timestamp {
+        anyhow::bail!(
+            "Cannot interpolate: prev timestamp {} is after next timestamp {}",
+            prev.timestamp,
+            next.timestamp
+        );
     }
 
     if prev.timestamp == at {

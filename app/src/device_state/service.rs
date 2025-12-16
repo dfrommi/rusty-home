@@ -43,7 +43,7 @@ impl DeviceStateService {
             }
         };
 
-        tracing::info!("Device state update received: {:?}", &dp.value);
+        tracing::info!("Device state update received (changed = {}): {:?}", changed, &dp.value);
 
         self.current_cache.insert(id, dp.clone()).await;
 

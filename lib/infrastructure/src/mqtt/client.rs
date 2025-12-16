@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    str::{Utf8Error, from_utf8},
-    time::{Duration, Instant},
-};
+use std::str::{Utf8Error, from_utf8};
 
 use rumqttc::v5::{
     AsyncClient, EventLoop, MqttOptions,
@@ -58,9 +54,14 @@ pub struct MqttInMessage {
 pub struct Mqtt {
     client: AsyncClient,
     event_loop: EventLoop,
-    subsciptions: Vec<Sender<MqttInMessage>>,
+    subsciptions: Vec<MqttSubscription>,
     publisher_tx: Sender<MqttOutMessage>,
     publisher_rx: Receiver<MqttOutMessage>,
+}
+
+struct MqttSubscription {
+    topic: String,
+    tx: Sender<MqttInMessage>,
 }
 
 impl Mqtt {
@@ -102,7 +103,12 @@ impl Mqtt {
         for topic in topic {
             tracing::info!("Subscribing to topic: {:?}", &topic);
 
-            self.subsciptions.push(tx.clone());
+            let subscription = MqttSubscription {
+                topic: topic.clone(),
+                tx: tx.clone(),
+            };
+
+            self.subsciptions.push(subscription);
 
             self.client
                 .subscribe_with_properties(
@@ -131,8 +137,6 @@ impl Mqtt {
 
         //Receive and forward MQTT messages
         tasks.spawn(async move {
-            let mut last_seen: HashMap<String, (Instant, String)> = HashMap::new();
-
             loop {
                 match event_loop.poll().await {
                     Ok(Incoming(rumqttc::v5::mqttbytes::v5::Packet::Publish(msg))) => {
@@ -144,6 +148,8 @@ impl Mqtt {
                             }
                         };
 
+                        tracing::trace!("Received MQTT message on topic {}", mqtt_in_message.topic,);
+
                         let subscription_ids = match msg.properties {
                             Some(p) => p.subscription_identifiers,
                             None => {
@@ -152,21 +158,25 @@ impl Mqtt {
                             }
                         };
 
-                        //deduplicate as some senders publish multiple times (homekit)
-                        if let Some((t, p)) = last_seen.get(&mqtt_in_message.topic) {
-                            if t.elapsed() < Duration::from_millis(250) && p == &mqtt_in_message.payload {
-                                continue;
-                            }
-                        }
-
-                        last_seen
-                            .insert(mqtt_in_message.topic.clone(), (Instant::now(), mqtt_in_message.payload.clone()));
-
                         for id in subscription_ids {
                             match self.subsciptions.get(id - 1) {
-                                Some(tx) => {
-                                    if let Err(e) = tx.send(mqtt_in_message.clone()).await {
-                                        tracing::error!("Failed to forward MQTT message to subscriber: {}", e);
+                                Some(sub) => {
+                                    tracing::trace!(
+                                        "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
+                                        sub.topic,
+                                        sub.tx.is_closed(),
+                                        mqtt_in_message
+                                    );
+                                    if let Err(e) = sub
+                                        .tx
+                                        .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
+                                        .await
+                                    {
+                                        tracing::error!(
+                                            "Failed to forward MQTT message to subscriber {}: {}",
+                                            sub.topic,
+                                            e
+                                        );
                                     }
                                 }
                                 None => {

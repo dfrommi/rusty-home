@@ -17,8 +17,8 @@ use crate::{
     },
     device_state::{
         adapter::{
-            IncomingDataSource as _, db::DeviceStateRepository, tasmota::TasmotaIncomingDataSource,
-            z2m::Z2mIncomingDataSource,
+            IncomingDataSource as _, db::DeviceStateRepository, homeassistant::HomeAssistantIncomingDataSource,
+            tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
         },
         service::DeviceStateService,
     },
@@ -55,13 +55,23 @@ pub struct DeviceStateRunner {
     service: Arc<DeviceStateService>,
     tasmota_ds: TasmotaIncomingDataSource,
     z2m_ds: Z2mIncomingDataSource,
+    ha_ds: HomeAssistantIncomingDataSource,
 }
 
 impl DeviceStateRunner {
-    pub async fn new(pool: PgPool, mqtt_client: &mut Mqtt, tasmota_event_topic: &str, z2m_event_topic: &str) -> Self {
+    pub async fn new(
+        pool: PgPool,
+        mqtt_client: &mut Mqtt,
+        tasmota_event_topic: &str,
+        z2m_event_topic: &str,
+        ha_event_topic: &str,
+        ha_url: &str,
+        ha_token: &str,
+    ) -> Self {
         let repo = DeviceStateRepository::new(pool);
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await;
+        let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await;
 
         let (event_tx, _event_rx) = broadcast::channel(100);
 
@@ -71,6 +81,7 @@ impl DeviceStateRunner {
             service: Arc::new(service),
             tasmota_ds,
             z2m_ds,
+            ha_ds,
         }
     }
 
@@ -91,6 +102,9 @@ impl DeviceStateRunner {
                     self.process_incoming_data(updates).await;
                 }
                 Some(updates) = self.z2m_ds.recv_multi() => {
+                    self.process_incoming_data(updates).await;
+                }
+                Some(updates) = self.ha_ds.recv_multi() => {
                     self.process_incoming_data(updates).await;
                 }
             }

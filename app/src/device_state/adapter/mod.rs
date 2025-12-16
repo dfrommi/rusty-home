@@ -1,4 +1,5 @@
 pub mod db;
+pub mod homeassistant;
 pub mod tasmota;
 pub mod z2m;
 

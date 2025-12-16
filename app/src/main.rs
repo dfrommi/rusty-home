@@ -36,6 +36,9 @@ pub async fn main() {
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
+        &settings.homeassistant.topic_event,
+        &settings.homeassistant.url,
+        &settings.homeassistant.token,
     )
     .await;
 
@@ -63,14 +66,6 @@ pub async fn main() {
         command_runner.client(),
         trigger_runner.client(),
     );
-
-    let ha_incoming_data_processing = {
-        let ds = settings
-            .homeassistant
-            .new_incoming_data_source(&mut infrastructure)
-            .await;
-        IncomingDataSourceRunner::new(ds, device_state_runner.client())
-    };
 
     let energy_meter_processing = {
         let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
@@ -136,7 +131,6 @@ pub async fn main() {
         _ = automation_runner.run() => {},
         _ = command_runner.run_dispatcher() => {},
         _ = energy_meter_processing.run() => {},
-        _ = ha_incoming_data_processing.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},

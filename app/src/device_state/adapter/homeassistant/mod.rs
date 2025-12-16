@@ -1,33 +1,97 @@
+mod config;
+
+use infrastructure::{Mqtt, MqttInMessage};
+use serde::Deserialize;
+
+use anyhow::Context;
+use infrastructure::HttpClientConfig;
+use reqwest_middleware::ClientWithMiddleware;
+
+use crate::device_state::adapter::{IncomingData, IncomingDataSource};
+use crate::device_state::{
+    DeviceAvailability, FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature,
+};
 use std::collections::HashMap;
 
-use crate::adapter::incoming::{IncomingData, IncomingDataSource};
-use crate::core::unit::{DegreeCelsius, FanAirflow, Lux, Percent};
-use crate::core::{time::DateTime, timeseries::DataPoint};
-use crate::device_state::DeviceStateValue;
-use crate::automation::availability::ItemAvailability;
+use crate::core::time::DateTime;
+use serde::Deserializer;
+use serde_json::Value;
 
-use super::{HaChannel, HaHttpClient, HaMqttClient, StateChangedEvent, StateValue};
+use crate::core::timeseries::DataPoint;
+use crate::core::unit::{DegreeCelsius, FanAirflow, Lux, Percent};
+use crate::device_state::DeviceStateValue;
+
 use crate::core::DeviceConfig;
 
-pub struct HaIncomingDataSource {
+#[derive(Debug, Clone)]
+pub enum HaChannel {
+    Temperature(Temperature),
+    RelativeHumidity(RelativeHumidity),
+    Powered(PowerAvailable),
+    PresenceFromEsp(Presence),
+    PresenceFromDeviceTracker(Presence),
+    PresenceFromFP2(Presence),
+    WindcalmFanSpeed(FanActivity),
+    LightLevel(LightLevel),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct StateChangedEvent {
+    pub entity_id: String,
+    pub state: StateValue,
+    pub last_changed: DateTime,
+    pub last_updated: DateTime,
+    pub attributes: HashMap<String, Value>,
+}
+
+#[derive(Debug)]
+pub enum StateValue {
+    Available(String),
+    Unavailable,
+}
+
+//TODO can deserialization of event be in the adapter?
+impl<'de> Deserialize<'de> for StateValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        match value.as_str() {
+            "unavailable" => Ok(StateValue::Unavailable),
+            _ => Ok(StateValue::Available(value)),
+        }
+    }
+}
+
+pub struct HomeAssistantIncomingDataSource {
     client: HaHttpClient,
     listener: HaMqttClient,
     config: DeviceConfig<HaChannel>,
     initial_load: Option<Vec<StateChangedEvent>>,
 }
 
-impl HaIncomingDataSource {
-    pub fn new(client: HaHttpClient, listener: HaMqttClient, config: DeviceConfig<HaChannel>) -> Self {
+impl HomeAssistantIncomingDataSource {
+    pub async fn new(mqtt: &mut Mqtt, event_topic: &str, url: &str, token: &str) -> Self {
+        let config = DeviceConfig::new(&config::default_ha_state_config());
+        let rx = mqtt
+            .subscribe(event_topic.clone())
+            .await
+            .expect("Error subscribing to MQTT topic");
+
+        let mqtt_client = HaMqttClient::new(rx);
+        let http_client = HaHttpClient::new(url, token).expect("Error creating HA HTTP client");
+
         Self {
-            client,
-            listener,
+            client: http_client,
+            listener: mqtt_client,
             config,
             initial_load: None,
         }
     }
 }
 
-impl IncomingDataSource<StateChangedEvent, HaChannel> for HaIncomingDataSource {
+impl IncomingDataSource<StateChangedEvent, HaChannel> for HomeAssistantIncomingDataSource {
     fn ds_name(&self) -> &str {
         "HomeAssistant"
     }
@@ -166,11 +230,90 @@ fn to_persistent_data_point(
 fn to_item_availability(new_state: &StateChangedEvent) -> IncomingData {
     let entity_id: &str = &new_state.entity_id;
 
-    ItemAvailability {
+    DeviceAvailability {
         source: "HA".to_string(),
-        item: entity_id.to_string(),
+        device_id: entity_id.to_string(),
         last_seen: new_state.last_updated,
         marked_offline: matches!(new_state.state, StateValue::Unavailable),
     }
     .into()
+}
+
+#[derive(Debug, Clone)]
+pub struct HaHttpClient {
+    client: ClientWithMiddleware,
+    base_url: String,
+}
+
+impl HaHttpClient {
+    pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
+        let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
+
+        Ok(Self {
+            client,
+            base_url: url.to_owned(),
+        })
+    }
+}
+
+impl HaHttpClient {
+    pub async fn get_current_state(&self) -> anyhow::Result<Vec<StateChangedEvent>> {
+        let response = self.client.get(format!("{}/api/states", self.base_url)).send().await?;
+
+        response
+            .json::<Vec<StateChangedEvent>>()
+            .await
+            .context("Error getting all states")
+    }
+}
+
+pub struct HaMqttClient {
+    state_rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
+}
+
+impl HaMqttClient {
+    pub fn new(rx: tokio::sync::mpsc::Receiver<MqttInMessage>) -> Self {
+        Self { state_rx: rx }
+    }
+}
+
+impl HaMqttClient {
+    pub async fn recv(&mut self) -> Option<StateChangedEvent> {
+        match self.state_rx.recv().await {
+            Some(msg) => {
+                match serde_json::from_str::<HaEvent>(&msg.payload) {
+                    Ok(HaEvent::StateChanged { new_state: event, .. }) => Some(event),
+                    Ok(HaEvent::Unknown(_)) => {
+                        tracing::trace!("Received unsupported event: {:?}", msg.payload);
+                        None
+                    }
+
+                    //json parsing error
+                    Err(e) => {
+                        tracing::error!("Error parsing MQTT message: {}", e);
+                        None
+                    }
+                }
+            }
+
+            None => {
+                tracing::error!("Error parsing MQTT message: channel closed");
+                None
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "event_type", content = "event_data")]
+#[allow(dead_code)]
+pub enum HaEvent {
+    #[serde(rename = "state_changed")]
+    StateChanged {
+        entity_id: String,
+        new_state: StateChangedEvent,
+    },
+
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
 }

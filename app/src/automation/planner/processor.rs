@@ -14,7 +14,7 @@ use crate::trigger::{TriggerClient, UserTriggerId};
 
 use crate::automation::RuleEvaluationContext;
 
-use super::{action::Action, context::Context, resource_lock::ResourceLock, ActionEvaluationResult, PlanningTrace};
+use super::{ActionEvaluationResult, PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
 
 pub async fn plan_and_execute<G, A>(
     active_goals: &[G],
@@ -248,12 +248,12 @@ async fn execute_action<A: Action>(
     context.user_trigger_id = user_trigger_id.clone();
 
     match should_execute(&command, &source, command_client, ctx).await {
-        Ok(true) => match command_client.enqueue(command, source, user_trigger_id).await {
+        Ok(true) => match command_client.execute(command, source, user_trigger_id).await {
             Ok(_) => {
-                tracing::info!("Started command {} via action {}", target, context.action);
+                tracing::info!("Command {} executed via action {}", target, context.action);
                 context.trace.triggered = Some(true);
             }
-            Err(e) => tracing::error!("Error saving command for {}: {:?}", target, e),
+            Err(e) => tracing::error!("Error executing command for {}: {:?}", target, e),
         },
         Ok(false) => {
             tracing::trace!("Skipped execution command {} via action {}", target, context.action);

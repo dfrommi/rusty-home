@@ -129,7 +129,6 @@ pub async fn main() {
         _ = device_state_runner.run() => {},
         _ = home_state_runner.run() => {},
         _ = automation_runner.run() => {},
-        _ = command_runner.run_dispatcher() => {},
         _ = energy_meter_processing.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},

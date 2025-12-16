@@ -28,7 +28,6 @@ pub enum CommandEvent {
 pub struct CommandRunner {
     service: Arc<CommandService>,
     event_rx: broadcast::Receiver<CommandEvent>,
-    pending_tx: broadcast::Sender<CommandExecution>,
 }
 
 #[derive(Clone)]
@@ -57,13 +56,8 @@ impl CommandRunner {
         let service = Arc::new(CommandService::new(repo, tasmota_executor, z2m_executor, ha_executor, event_tx));
 
         let event_rx = service.subscribe();
-        let pending_tx = broadcast::channel(32).0;
 
-        Self {
-            service,
-            event_rx,
-            pending_tx,
-        }
+        Self { service, event_rx }
     }
 
     pub fn client(&self) -> CommandClient {
@@ -74,36 +68,6 @@ impl CommandRunner {
 
     pub fn subscribe_events(&self) -> broadcast::Receiver<CommandEvent> {
         self.service.subscribe()
-    }
-
-    pub fn subscribe_pending_commands(&self) -> broadcast::Receiver<CommandExecution> {
-        self.pending_tx.subscribe()
-    }
-
-    pub async fn run_dispatcher(mut self) {
-        let mut timer = tokio::time::interval(std::time::Duration::from_secs(15));
-        let mut got_cmd = false;
-
-        loop {
-            if !got_cmd {
-                tokio::select! {
-                    _ = self.event_rx.recv() => {},
-                    _ = timer.tick() => {},
-                };
-            }
-
-            match self.service.get_command_for_processing().await {
-                Ok(Some(cmd)) => {
-                    got_cmd = true;
-                    self.pending_tx.send(cmd).ok();
-                }
-                Ok(None) => got_cmd = false,
-                Err(e) => {
-                    tracing::error!("Error getting pending commands: {:?}", e);
-                    got_cmd = false;
-                }
-            }
-        }
     }
 }
 
@@ -121,29 +85,6 @@ impl CommandClient {
         self.service
             .execute_command(command, source, user_trigger_id, TraceContext::current_correlation_id())
             .await
-    }
-
-    pub async fn enqueue(
-        &self,
-        command: Command,
-        source: ExternalId,
-        user_trigger_id: Option<UserTriggerId>,
-    ) -> anyhow::Result<()> {
-        self.service
-            .save_command(command, source, user_trigger_id, TraceContext::current_correlation_id())
-            .await
-    }
-
-    pub async fn get_command_for_processing(&self) -> anyhow::Result<Option<CommandExecution>> {
-        self.service.get_command_for_processing().await
-    }
-
-    pub async fn set_command_state_success(&self, command_id: i64) -> anyhow::Result<()> {
-        self.service.set_command_state_success(command_id).await
-    }
-
-    pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> anyhow::Result<()> {
-        self.service.set_command_state_error(command_id, error_message).await
     }
 
     pub async fn get_latest_command(

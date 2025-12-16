@@ -2,6 +2,11 @@
 members = ["app"]
 resolver = "2"
 
+[workspace.lints.clippy]
+disallowed_methods = "deny"
+unwrap_used = "warn"
+expect_used = "warn"
+
 [workspace.dependencies]
 #Core dependencies
 anyhow = "1"

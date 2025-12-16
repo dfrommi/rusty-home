@@ -1,0 +1,3 @@
+disallowed-methods = [
+  { path = "tokio::sync::mpsc::bounded::Sender::send", reason = "Locks until there is capacity, leading to application lock when receiver got closed accidentally", replacement = "send_timeout" },
+]

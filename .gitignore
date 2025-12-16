@@ -9,6 +9,7 @@ Cargo.lock
 
 /*.toml
 !Cargo.toml
+!clippy.toml
 
 *.stderr
 

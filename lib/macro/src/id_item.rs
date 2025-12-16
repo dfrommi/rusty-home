@@ -63,12 +63,13 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
                 if fields.unnamed.len() == 1 {
                     let field_type = &fields.unnamed[0].ty;
 
-                    if let Type::Path(type_path) = field_type {
-                        if let Some(segment) = type_path.path.segments.last() {
-                            if segment.arguments.is_empty() {
-                                let nested_type_ext = segment.ident.to_string().to_snake_case();
+                    if let Type::Path(type_path) = field_type
+                        && let Some(segment) = type_path.path.segments.last()
+                        && segment.arguments.is_empty()
+                    {
+                        let nested_type_ext = segment.ident.to_string().to_snake_case();
 
-                                from_ext_item_name_matches.push(quote! {
+                        from_ext_item_name_matches.push(quote! {
                                     variant_name if variant_name.starts_with(concat!(#variant_name_ext, "::")) => {
                                         let nested_variant = match variant_name.split_once("::") {
                                             Some((_, nested)) if !nested.is_empty() => nested,
@@ -79,8 +80,6 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
                                         #enum_name::#variant_name(nested_item)
                                     }
                                 });
-                            }
-                        }
                     }
                 }
             }

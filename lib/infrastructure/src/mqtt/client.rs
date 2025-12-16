@@ -191,7 +191,9 @@ impl Mqtt {
         });
 
         while let Some(task) = tasks.join_next().await {
-            let () = task.unwrap();
+            if let Err(e) = task {
+                tracing::error!("MQTT task error: {}", e);
+            }
         }
     }
 }

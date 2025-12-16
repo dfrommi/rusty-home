@@ -17,9 +17,18 @@ impl HttpClientConfig {
         let mut headers = HeaderMap::new();
 
         if let Some(token) = &self.bearer_token {
-            let mut auth_value = header::HeaderValue::from_str(format!("Bearer {token}").as_str()).unwrap();
-            auth_value.set_sensitive(true);
-            headers.insert(header::AUTHORIZATION, auth_value);
+            match header::HeaderValue::from_str(format!("Bearer {token}").as_str()) {
+                Ok(mut auth_value) => {
+                    auth_value.set_sensitive(true);
+                    headers.insert(header::AUTHORIZATION, auth_value);
+                }
+                Err(e) => {
+                    anyhow::bail!(
+                        "Bearer token contains invalid characters, not able to set as http-header: {}",
+                        e
+                    );
+                }
+            }
         }
 
         let client = reqwest::Client::builder().default_headers(headers).build()?;

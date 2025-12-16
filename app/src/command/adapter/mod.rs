@@ -1,4 +1,5 @@
 pub mod db;
+mod homeassistant;
 mod tasmota;
 mod z2m;
 
@@ -6,6 +7,7 @@ use infrastructure::TraceContext;
 
 use crate::command::{Command, CommandClient, CommandExecution};
 
+pub use homeassistant::HomeAssistantCommandExecutor;
 pub use tasmota::TasmotaCommandExecutor;
 pub use z2m::Z2mCommandExecutor;
 

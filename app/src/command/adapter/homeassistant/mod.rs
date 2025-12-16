@@ -1,4 +1,9 @@
-use crate::adapter::command::CommandExecutor;
+mod config;
+
+use infrastructure::HttpClientConfig;
+use reqwest_middleware::ClientWithMiddleware;
+
+use crate::command::adapter::CommandExecutor;
 use crate::command::{Command, CommandTarget, Fan};
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{FanAirflow, FanSpeed};
@@ -6,35 +11,39 @@ use crate::device_state::{DeviceStateClient, DeviceStateValue};
 use crate::t;
 use serde_json::json;
 
-use super::{HaHttpClient, HaServiceTarget};
+#[derive(Debug, Clone)]
+enum HaServiceTarget {
+    LightTurnOnOff(&'static str),
+    PushNotification(&'static str),
+    LgWebosSmartTv(&'static str),
+    WindcalmFanSpeed(&'static str),
+}
 
-pub struct HaCommandExecutor {
+pub struct HomeAssistantCommandExecutor {
     client: HaHttpClient,
     device_client: DeviceStateClient,
     config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
-impl HaCommandExecutor {
-    pub fn new(
-        client: HaHttpClient,
-        device_client: DeviceStateClient,
-        config: &[(CommandTarget, HaServiceTarget)],
-    ) -> Self {
+impl HomeAssistantCommandExecutor {
+    pub fn new(url: &str, token: &str, device_client: DeviceStateClient) -> Self {
+        let http_client = HaHttpClient::new(url, token).expect("Error initializing Home Assistant REST client");
+
         let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
 
-        for (cmd, ha) in config {
+        for (cmd, ha) in config::default_ha_command_config() {
             data.push((cmd.clone(), ha.clone()));
         }
 
         Self {
-            client,
+            client: http_client,
             device_client,
             config: data,
         }
     }
 }
 
-impl CommandExecutor for HaCommandExecutor {
+impl CommandExecutor for HomeAssistantCommandExecutor {
     #[tracing::instrument(name = "execute_command HA", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let command_target: CommandTarget = command.clone().into();
@@ -55,7 +64,7 @@ impl CommandExecutor for HaCommandExecutor {
     }
 }
 
-impl HaCommandExecutor {
+impl HomeAssistantCommandExecutor {
     async fn dispatch_service_call(&self, command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<()> {
         use crate::command::*;
         use HaServiceTarget::*;
@@ -277,4 +286,38 @@ fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> 
             "onfail": {"uri": luna_url, "params": payload},
         }
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct HaHttpClient {
+    client: ClientWithMiddleware,
+    base_url: String,
+}
+
+impl HaHttpClient {
+    pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
+        let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
+
+        Ok(Self {
+            client,
+            base_url: url.to_owned(),
+        })
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn call_service(
+        &self,
+        domain: &str,
+        service: &str,
+        service_data: serde_json::Value,
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/api/services/{}/{}", self.base_url, domain, service);
+
+        tracing::info!("Calling HA service {}: {:?}", url, serde_json::to_string(&service_data)?);
+
+        let response = self.client.post(url).json(&service_data).send().await?;
+        tracing::info!("Response: {} - {}", response.status(), response.text().await?);
+
+        Ok(())
+    }
 }

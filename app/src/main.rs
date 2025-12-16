@@ -2,7 +2,7 @@ use infrastructure::Mqtt;
 use settings::Settings;
 use tokio::sync::broadcast;
 
-use crate::adapter::{CommandExecutorRunner, IncomingDataSourceRunner};
+use crate::adapter::IncomingDataSourceRunner;
 use crate::automation::AutomationRunner;
 use crate::command::CommandRunner;
 use crate::home_state::HomeStateRunner;
@@ -45,6 +45,9 @@ pub async fn main() {
         infrastructure.mqtt_client.new_publisher(),
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
+        &settings.homeassistant.url,
+        &settings.homeassistant.token,
+        device_state_runner.client(),
     );
 
     let mut home_state_runner = HomeStateRunner::new(
@@ -67,12 +70,6 @@ pub async fn main() {
             .new_incoming_data_source(&mut infrastructure)
             .await;
         IncomingDataSourceRunner::new(ds, device_state_runner.client())
-    };
-    let ha_cmd_executor = {
-        let executor = settings
-            .homeassistant
-            .new_command_executor(device_state_runner.client());
-        CommandExecutorRunner::new(executor, command_runner.subscribe_pending_commands(), command_runner.client())
     };
 
     let energy_meter_processing = {
@@ -140,7 +137,6 @@ pub async fn main() {
         _ = command_runner.run_dispatcher() => {},
         _ = energy_meter_processing.run() => {},
         _ = ha_incoming_data_processing.run() => {},
-        _ = ha_cmd_executor.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},

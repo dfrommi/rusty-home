@@ -14,6 +14,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     core::{id::ExternalId, time::DateTime},
+    device_state::DeviceStateClient,
     trigger::UserTriggerId,
 };
 
@@ -41,14 +42,19 @@ impl CommandRunner {
         mqtt_sender: mpsc::Sender<MqttOutMessage>,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,
+        ha_url: &str,
+        ha_token: &str,
+        //TODO handle via command-events
+        device_client: DeviceStateClient,
     ) -> Self {
         let repo = CommandRepository::new(pool);
         let (event_tx, _event_rx) = broadcast::channel(64);
 
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(tasmota_event_topic, mqtt_sender.clone());
         let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_sender, z2m_event_topic);
+        let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token, device_client);
 
-        let service = Arc::new(CommandService::new(repo, tasmota_executor, z2m_executor, event_tx));
+        let service = Arc::new(CommandService::new(repo, tasmota_executor, z2m_executor, ha_executor, event_tx));
 
         let event_rx = service.subscribe();
         let pending_tx = broadcast::channel(32).0;

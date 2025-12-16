@@ -3,7 +3,7 @@ use tokio::sync::broadcast;
 use crate::{
     command::{
         Command, CommandEvent, CommandExecution, CommandState, CommandTarget,
-        adapter::{CommandExecutor, TasmotaCommandExecutor, Z2mCommandExecutor},
+        adapter::{CommandExecutor, HomeAssistantCommandExecutor, TasmotaCommandExecutor, Z2mCommandExecutor},
     },
     core::{
         id::ExternalId,
@@ -19,6 +19,7 @@ pub struct CommandService {
     repo: CommandRepository,
     tasmota_executor: TasmotaCommandExecutor,
     z2m_executor: Z2mCommandExecutor,
+    ha_executor: HomeAssistantCommandExecutor,
     event_tx: broadcast::Sender<CommandEvent>,
 }
 
@@ -27,12 +28,14 @@ impl CommandService {
         repo: CommandRepository,
         tasmota_executor: TasmotaCommandExecutor,
         z2m_executor: Z2mCommandExecutor,
+        ha_executor: HomeAssistantCommandExecutor,
         event_tx: broadcast::Sender<CommandEvent>,
     ) -> Self {
         Self {
             repo,
             tasmota_executor,
             z2m_executor,
+            ha_executor,
             event_tx,
         }
     }
@@ -55,7 +58,10 @@ impl CommandService {
 
         let res = match self.execute_via(&self.tasmota_executor, &command).await {
             Some(r) => Some(r),
-            None => self.execute_via(&self.z2m_executor, &command).await,
+            None => match { self.execute_via(&self.z2m_executor, &command).await } {
+                Some(r) => Some(r),
+                None => self.execute_via(&self.ha_executor, &command).await,
+            },
         };
 
         match res {

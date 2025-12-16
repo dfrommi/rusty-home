@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::unit::RawValue,
     automation::Thermostat,
+    core::unit::RawValue,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 

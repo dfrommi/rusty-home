@@ -4,8 +4,8 @@ use crate::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitHeatingState, HomekitService, HomekitTarget,
         HomekitTargetConfig,
     },
-    core::unit::DegreeCelsius,
     automation::HeatingZone,
+    core::unit::DegreeCelsius,
 };
 
 #[derive(Default, Clone, Copy)]

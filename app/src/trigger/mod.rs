@@ -42,10 +42,6 @@ pub struct TriggerClient {
 }
 
 impl TriggerClient {
-    pub fn subscribe(&self) -> broadcast::Receiver<TriggerEvent> {
-        self.service.subscribe()
-    }
-
     pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         self.service.add_trigger(trigger).await
     }

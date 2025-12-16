@@ -50,34 +50,44 @@ impl CommandService {
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
         correlation_id: Option<String>,
-    ) -> anyhow::Result<()> {
-        let command_exec = self
+    ) -> anyhow::Result<CommandExecution> {
+        let mut command_exec = self
             .repo
             .insert_command_for_processing(&command, &source, user_trigger_id, correlation_id)
             .await?;
 
+        let command_id = command_exec.id;
+
         let res = match self.execute_via(&self.tasmota_executor, &command).await {
             Some(r) => Some(r),
-            None => match { self.execute_via(&self.z2m_executor, &command).await } {
+            None => match self.execute_via(&self.z2m_executor, &command).await {
                 Some(r) => Some(r),
                 None => self.execute_via(&self.ha_executor, &command).await,
             },
         };
 
-        match res {
-            Some(Ok(())) => {
-                self.set_command_state_success(command_exec.id).await;
-                Ok(())
-            }
-            Some(Err(e)) => {
-                self.set_command_state_error(command_exec.id, &e.to_string()).await;
-                Err(e)
-            }
-            None => {
-                self.set_command_state_error(command_exec.id, "No executor").await?;
-                anyhow::bail!("No executor could handle the command")
-            }
+        let final_state = match res {
+            Some(Ok(())) => CommandState::Success,
+            Some(Err(e)) => CommandState::Error(e.to_string()),
+            None => CommandState::Error("No executor".to_string()),
+        };
+
+        command_exec.state = final_state.clone();
+
+        if let Err(e) = self.repo.set_command_state(command_id, final_state.clone()).await {
+            tracing::warn!(
+                "Failed to update command state of {} to {:?} in DB: {}",
+                command_id,
+                final_state,
+                e
+            );
         }
+
+        if let Err(e) = self.event_tx.send(CommandEvent::CommandExecuted(command_exec.clone())) {
+            tracing::warn!("Failed to send command executed event of {}: {}", command_id, e);
+        }
+
+        Ok(command_exec)
     }
 
     async fn execute_via(&self, executor: &impl CommandExecutor, command: &Command) -> Option<anyhow::Result<()>> {
@@ -86,55 +96,6 @@ impl CommandService {
             Ok(false) => None,
             Err(e) => Some(Err(e)),
         }
-    }
-
-    pub async fn save_command(
-        &self,
-        command: Command,
-        source: ExternalId,
-        user_trigger_id: Option<UserTriggerId>,
-        correlation_id: Option<String>,
-    ) -> anyhow::Result<()> {
-        let execution = self
-            .repo
-            .enqueue_command(&command, &source, user_trigger_id, correlation_id)
-            .await?;
-
-        let _ = self.event_tx.send(CommandEvent::Added(execution));
-
-        Ok(())
-    }
-
-    pub async fn get_command_for_processing(&self) -> anyhow::Result<Option<CommandExecution>> {
-        let result = self.repo.get_command_for_processing().await?;
-
-        if let Some(cmd) = result.as_ref() {
-            let _ = self.event_tx.send(CommandEvent::Started(cmd.clone()));
-        }
-
-        Ok(result)
-    }
-
-    pub async fn set_command_state_success(&self, command_id: i64) -> anyhow::Result<()> {
-        self.repo.set_command_state_success(command_id).await?;
-
-        let _ = self.event_tx.send(CommandEvent::Finished {
-            id: command_id,
-            state: CommandState::Success,
-        });
-
-        Ok(())
-    }
-
-    pub async fn set_command_state_error(&self, command_id: i64, error_message: &str) -> anyhow::Result<()> {
-        self.repo.set_command_state_error(command_id, error_message).await?;
-
-        let _ = self.event_tx.send(CommandEvent::Finished {
-            id: command_id,
-            state: CommandState::Error(error_message.to_string()),
-        });
-
-        Ok(())
     }
 
     pub async fn get_latest_command(

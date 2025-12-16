@@ -37,29 +37,6 @@ impl EnergyReadingRepository {
         Ok(rec.id)
     }
 
-    pub async fn get_latest_total_readings(&self) -> anyhow::Result<Vec<DataPoint<EnergyReading>>> {
-        let rows = sqlx::query!(
-            r#"SELECT DISTINCT ON (type, name) 
-                type as "reading_type!", 
-                name as "name!",
-                value as "value!",
-                timestamp as "timestamp!"
-                FROM energy_reading_total
-                ORDER BY type, name, timestamp DESC"#
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let mut readings: Vec<DataPoint<EnergyReading>> = vec![];
-
-        for row in rows {
-            let reading = try_into_reading(&row.reading_type, &row.name, row.value)?;
-            readings.push(DataPoint::new(reading, row.timestamp.into()));
-        }
-
-        Ok(readings)
-    }
-
     pub async fn get_latest_total_readings_ids(&self) -> anyhow::Result<Vec<i64>> {
         let rows = sqlx::query!(
             r#"SELECT DISTINCT ON (type, name) 

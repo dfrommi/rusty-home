@@ -1,9 +1,9 @@
 use r#macro::Id;
 
+use super::{Rule, RuleEvaluationContext, RuleResult};
+use crate::automation::HeatingZone;
 use crate::command::{Command, CommandTarget, HeatingTargetState, NotificationAction};
 use crate::core::unit::{FanAirflow, Percent, RawValue};
-use crate::automation::HeatingZone;
-use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, Id)]
 pub struct FollowDefaultSetting(CommandTarget);

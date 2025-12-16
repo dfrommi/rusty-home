@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
+use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::{Command, PowerToggle};
 use crate::t;
-use super::{Rule, RuleEvaluationContext, RuleResult};
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum ReduceNoiseAtNight {

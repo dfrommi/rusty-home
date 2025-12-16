@@ -1,8 +1,8 @@
 mod command_state;
 
+use crate::automation::{LoadBalancedThermostat, Thermostat};
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
 use crate::core::{id::ExternalId, time::DateTime};
-use crate::automation::{LoadBalancedThermostat, Thermostat};
 use crate::trigger::UserTriggerId;
 use derive_more::derive::{Display, From};
 use r#macro::{EnumVariants, Id};

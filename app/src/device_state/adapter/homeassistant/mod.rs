@@ -75,7 +75,7 @@ impl HomeAssistantIncomingDataSource {
     pub async fn new(mqtt: &mut Mqtt, event_topic: &str, url: &str, token: &str) -> Self {
         let config = DeviceConfig::new(&config::default_ha_state_config());
         let rx = mqtt
-            .subscribe(event_topic.clone())
+            .subscribe(event_topic)
             .await
             .expect("Error subscribing to MQTT topic");
 

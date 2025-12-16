@@ -20,9 +20,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub enum CommandEvent {
-    Added(CommandExecution),
-    Started(CommandExecution),
-    Finished { id: i64, state: CommandState },
+    CommandExecuted(CommandExecution),
 }
 
 pub struct CommandRunner {
@@ -72,16 +70,12 @@ impl CommandRunner {
 }
 
 impl CommandClient {
-    pub fn subscribe_events(&self) -> broadcast::Receiver<CommandEvent> {
-        self.service.subscribe()
-    }
-
     pub async fn execute(
         &self,
         command: Command,
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<CommandExecution> {
         self.service
             .execute_command(command, source, user_trigger_id, TraceContext::current_correlation_id())
             .await

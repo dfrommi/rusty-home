@@ -129,16 +129,6 @@ impl StateCalculationContext {
         self.history.get(id).and_then(|df| df.last()).map(|dp| dp.timestamp)
     }
 
-    //combine previous snapshot and current value into full frame
-    //TODO dataframe slices and use reference
-    pub fn all_of_last<S>(&self, id: S, duration: Duration) -> Option<DataFrame<S::ValueType>>
-    where
-        S: Into<HomeState> + ValueObject + Clone,
-    {
-        let df = self.data_frame(id.clone().into(), DateTimeRange::new(t!(now) - duration, t!(now)))?;
-        downcast_df(id, &df)
-    }
-
     pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::ValueType>>
     where
         S: Into<HomeState> + ValueObject + Clone,

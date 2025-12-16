@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
     automation::HeatingZone,
+    core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
 };
 
 use crate::home_state::{

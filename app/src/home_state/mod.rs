@@ -66,56 +66,78 @@ impl HomeStateRunner {
     }
 
     pub async fn run(mut self) {
-        let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        use tokio::time::{self, Duration, Instant};
+
+        let scheduled_duration = Duration::from_secs(30);
+        let debounce_duration = Duration::from_millis(50);
+        let debounce_sleeper = time::sleep(scheduled_duration);
+        tokio::pin!(debounce_sleeper);
 
         loop {
-            //TODO debounce
             tokio::select! {
-                Ok(DeviceStateEvent::Updated(_)) = self.state_changed_rx.recv() => {},
-                Ok(TriggerEvent::TriggerAdded) = self.user_trigger_rx.recv() => {},
-                _ = timer.tick() => {},
-            }
+                //Collect state changes as many might come in short intervals
+                Ok(DeviceStateEvent::Updated(_)) = self.state_changed_rx.recv() => {
+                    // Put debounce timer into the near future, expiration triggers calculation
+                    debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
+                },
 
-            let old_snapshot = self.snapshot.clone();
-            let new_snapshot = match calculate_new_snapshot(
-                self.duration.clone(),
-                &old_snapshot,
-                &self.device_state,
-                &self.trigger_client,
-            )
-            .await
-            {
-                Ok(snapshot) => snapshot,
-                Err(e) => {
-                    tracing::error!("Error calculating new home state snapshot: {:?}", e);
-                    continue;
-                }
-            };
+                Ok(TriggerEvent::TriggerAdded) = self.user_trigger_rx.recv() => {
+                    self.update_snapshot().await;
 
-            if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
-                tracing::error!("Error sending snapshot updated event: {}", e);
-            }
+                    //Schedule next regular update
+                    debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
+                },
 
-            for state in HomeState::variants() {
-                if let Some(data_point) = new_snapshot.get(state.clone()) {
-                    if let Err(e) = self.home_state_updated_tx.send(data_point.clone()) {
-                        tracing::error!("Error sending home state updated event: {:?}", e);
-                    }
-
-                    let is_different = match old_snapshot.get(state.clone()) {
-                        Some(previous) => previous.value != data_point.value,
-                        None => true,
-                    };
-
-                    if is_different {
-                        if let Err(e) = self.home_state_changed_tx.send(data_point) {
-                            tracing::error!("Error sending home state changed event: {:?}", e);
-                        }
-                    }
+                // Debounce elapsed
+                () = &mut debounce_sleeper => {
+                    self.update_snapshot().await;
+                    //Schedule next regular update
+                    debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
                 }
             }
-
-            self.snapshot = new_snapshot;
         }
+    }
+
+    async fn update_snapshot(&mut self) {
+        let old_snapshot = self.snapshot.clone();
+        let new_snapshot = match calculate_new_snapshot(
+            self.duration.clone(),
+            &old_snapshot,
+            &self.device_state,
+            &self.trigger_client,
+        )
+        .await
+        {
+            Ok(snapshot) => snapshot,
+            Err(e) => {
+                tracing::error!("Error calculating new home state snapshot: {:?}", e);
+                return;
+            }
+        };
+
+        if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
+            tracing::error!("Error sending snapshot updated event: {}", e);
+        }
+
+        for state in HomeState::variants() {
+            if let Some(data_point) = new_snapshot.get(state.clone()) {
+                if let Err(e) = self.home_state_updated_tx.send(data_point.clone()) {
+                    tracing::error!("Error sending home state updated event: {:?}", e);
+                }
+
+                let is_different = match old_snapshot.get(state.clone()) {
+                    Some(previous) => previous.value != data_point.value,
+                    None => true,
+                };
+
+                if is_different {
+                    if let Err(e) = self.home_state_changed_tx.send(data_point) {
+                        tracing::error!("Error sending home state changed event: {:?}", e);
+                    }
+                }
+            }
+        }
+
+        self.snapshot = new_snapshot;
     }
 }

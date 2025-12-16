@@ -1,19 +1,27 @@
-use crate::adapter::energy_meter::persistence::EnergyReadingRepository;
-use crate::adapter::incoming::{IncomingData, IncomingDataSource};
-use crate::core::unit::{HeatingUnit, KiloCubicMeter};
-use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
-use tokio::sync::broadcast::Receiver;
+mod persistence;
 
-use super::{EnergyReading, EnergyReadingAddedEvent, Faucet, Radiator};
+use crate::core::unit::{HeatingUnit, KiloCubicMeter};
+use crate::device_state::adapter::energy_meter::persistence::EnergyReadingRepository;
+use crate::device_state::adapter::{IncomingData, IncomingDataSource};
+use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
+use crate::t;
+use tokio::sync::mpsc;
+
+use crate::adapter::energy_meter::{EnergyReading, Faucet, Radiator};
+
+#[derive(Debug, Clone)]
+pub struct EnergyReadingAddedEvent {
+    pub id: i64,
+}
 
 pub struct EnergyMeterIncomingDataSource {
     repo: EnergyReadingRepository,
-    rx: Receiver<EnergyReadingAddedEvent>,
+    rx: mpsc::Receiver<EnergyReading>,
     initial_load: Option<Vec<EnergyReadingAddedEvent>>,
 }
 
 impl EnergyMeterIncomingDataSource {
-    pub fn new(pool: sqlx::PgPool, rx: Receiver<EnergyReadingAddedEvent>) -> Self {
+    pub fn new(pool: sqlx::PgPool, rx: mpsc::Receiver<EnergyReading>) -> Self {
         let repo = EnergyReadingRepository::new(pool);
         Self {
             repo,
@@ -42,11 +50,14 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
         match &mut self.initial_load {
             Some(data) if !data.is_empty() => data.pop(),
             _ => match self.rx.recv().await {
-                Ok(msg) => Some(msg),
-                Err(e) => {
-                    tracing::error!("Error receiving energy reading: {}", e);
-                    None
-                }
+                Some(msg) => match self.repo.add_yearly_energy_reading(msg, t!(now)).await {
+                    Ok(id) => Some(EnergyReadingAddedEvent { id }),
+                    Err(e) => {
+                        tracing::error!("Error saving Energy Reading: {:?}", e);
+                        return None;
+                    }
+                },
+                None => None,
             },
         }
     }

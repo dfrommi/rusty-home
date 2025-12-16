@@ -1,27 +1,17 @@
-use crate::adapter::energy_meter::persistence::EnergyReadingRepository;
-use crate::t;
 use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
 use serde::Deserialize;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
-use super::{EnergyReading, EnergyReadingAddedEvent, Faucet, Radiator};
+use super::{EnergyReading, Faucet, Radiator};
 
-#[derive(Clone)]
-struct EnergyMeterApiState {
-    repo: EnergyReadingRepository,
-    events: broadcast::Sender<EnergyReadingAddedEvent>,
-}
+type EnergyReadingSender = mpsc::Sender<EnergyReading>;
 
-pub fn new_actix_web_scope(
-    repo: EnergyReadingRepository,
-    events: broadcast::Sender<EnergyReadingAddedEvent>,
-) -> actix_web::Scope {
-    let state = EnergyMeterApiState { repo, events };
+pub fn new_actix_web_scope(events: EnergyReadingSender) -> actix_web::Scope {
     web::scope("/api/energy/readings")
         .route("/heating", web::put().to(handle_heating_reading))
         .route("/water", web::put().to(handle_water_reading))
-        .app_data(web::Data::new(state))
+        .app_data(web::Data::new(events))
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +28,7 @@ struct WaterReadingDTO {
 }
 
 async fn handle_heating_reading(
-    state: web::Data<EnergyMeterApiState>,
+    sender: web::Data<EnergyReadingSender>,
     Json(dto): Json<HeatingReadingDTO>,
 ) -> impl Responder {
     let radiator = match dto.label.as_str() {
@@ -58,25 +48,18 @@ async fn handle_heating_reading(
 
     let reading = EnergyReading::Heating(radiator, value);
 
-    tracing::info!("Adding reading {:?}", reading);
+    tracing::info!("Received reading {:?}", reading);
 
-    let id = match state.repo.add_yearly_energy_reading(reading, t!(now)).await {
-        Ok(id) => id,
-        Err(e) => {
-            tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-            return HttpResponse::UnprocessableEntity();
-        }
-    };
-
-    if let Err(e) = state.events.send(EnergyReadingAddedEvent { id }) {
-        tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
+    if let Err(e) = sender.send(reading).await {
+        tracing::error!("Error sending energy reading {:?}: {:?}", dto, e);
+        return HttpResponse::InternalServerError();
     }
 
     HttpResponse::NoContent()
 }
 
 async fn handle_water_reading(
-    state: web::Data<EnergyMeterApiState>,
+    sender: web::Data<EnergyReadingSender>,
     Json(dto): Json<WaterReadingDTO>,
 ) -> impl Responder {
     let faucet = match dto.label.as_str() {
@@ -98,16 +81,9 @@ async fn handle_water_reading(
 
     tracing::info!("Adding reading {:?}", reading);
 
-    let id = match state.repo.add_yearly_energy_reading(reading, t!(now)).await {
-        Ok(id) => id,
-        Err(e) => {
-            tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
-            return HttpResponse::UnprocessableEntity();
-        }
-    };
-
-    if let Err(e) = state.events.send(EnergyReadingAddedEvent { id }) {
-        tracing::error!("Error adding energy reading {:?}: {:?}", dto, e);
+    if let Err(e) = sender.send(reading).await {
+        tracing::error!("Error sending energy reading {:?}: {:?}", dto, e);
+        return HttpResponse::InternalServerError();
     }
 
     HttpResponse::NoContent()

@@ -1,8 +1,7 @@
 use infrastructure::Mqtt;
 use settings::Settings;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
-use crate::adapter::IncomingDataSourceRunner;
 use crate::automation::AutomationRunner;
 use crate::command::CommandRunner;
 use crate::home_state::HomeStateRunner;
@@ -20,7 +19,6 @@ mod trigger;
 struct Infrastructure {
     db_pool: sqlx::PgPool,
     mqtt_client: Mqtt,
-    energy_reading_events: broadcast::Sender<adapter::energy_meter::EnergyReadingAddedEvent>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -31,6 +29,8 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
+    let (energy_meter_tx, energy_meter_rx) = mpsc::channel(16);
+
     let device_state_runner = device_state::DeviceStateRunner::new(
         infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
@@ -39,6 +39,7 @@ pub async fn main() {
         &settings.homeassistant.topic_event,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
+        energy_meter_rx,
     )
     .await;
 
@@ -67,11 +68,6 @@ pub async fn main() {
         trigger_runner.client(),
     );
 
-    let energy_meter_processing = {
-        let ds = adapter::energy_meter::EnergyMeter::new_incoming_data_source(&infrastructure).await;
-        IncomingDataSourceRunner::new(ds, device_state_runner.client())
-    };
-
     let homekit_runner = settings
         .homebridge
         .new_runner(
@@ -87,9 +83,6 @@ pub async fn main() {
 
     let http_server_exec = {
         let http_device_state_client = device_state_runner.client();
-        let http_db_pool = infrastructure.db_pool.clone();
-
-        let energy_reading_events = infrastructure.energy_reading_events.clone();
         let metrics = settings.metrics.clone();
         let http_command_client = command_runner.client();
 
@@ -98,10 +91,7 @@ pub async fn main() {
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::EnergyMeter::new_web_service(
-                            http_db_pool.clone(),
-                            energy_reading_events.clone(),
-                        ),
+                        adapter::energy_meter::EnergyMeter::new_web_service(energy_meter_tx.clone()),
                         adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(),
                         metrics.new_routes(),
@@ -129,7 +119,6 @@ pub async fn main() {
         _ = device_state_runner.run() => {},
         _ = home_state_runner.run() => {},
         _ = automation_runner.run() => {},
-        _ = energy_meter_processing.run() => {},
         _ = http_server_exec => {},
         _ = homekit_runner.run() => {},
         _ = metrics_exporter.run() => {},
@@ -143,17 +132,8 @@ impl Infrastructure {
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
 
         let mqtt_client = settings.mqtt.new_client();
-        let (energy_reading_events, _) = broadcast::channel(16);
 
-        Ok(Self {
-            db_pool,
-            mqtt_client,
-            energy_reading_events,
-        })
-    }
-
-    fn subscribe_energy_reading_events(&self) -> broadcast::Receiver<adapter::energy_meter::EnergyReadingAddedEvent> {
-        self.energy_reading_events.subscribe()
+        Ok(Self { db_pool, mqtt_client })
     }
 
     async fn process(self) {

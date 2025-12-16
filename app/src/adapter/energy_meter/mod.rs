@@ -1,31 +1,13 @@
 mod http_server;
-mod incoming;
-mod persistence;
 
-use crate::{Infrastructure, adapter::incoming::IncomingDataSource};
-use incoming::EnergyMeterIncomingDataSource;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct EnergyMeter;
 
-#[derive(Debug, Clone)]
-pub struct EnergyReadingAddedEvent {
-    pub id: i64,
-}
-
 impl EnergyMeter {
-    pub async fn new_incoming_data_source(
-        infrastructure: &Infrastructure,
-    ) -> impl IncomingDataSource<EnergyReadingAddedEvent, ()> + use<> {
-        let db = infrastructure.db_pool.clone();
-        let rx = infrastructure.subscribe_energy_reading_events();
-        EnergyMeterIncomingDataSource::new(db.clone(), rx)
-    }
-
-    pub fn new_web_service(pool: sqlx::PgPool, tx: broadcast::Sender<EnergyReadingAddedEvent>) -> actix_web::Scope {
-        let repo = persistence::EnergyReadingRepository::new(pool);
-        http_server::new_actix_web_scope(repo, tx)
+    pub fn new_web_service(tx: mpsc::Sender<EnergyReading>) -> actix_web::Scope {
+        http_server::new_actix_web_scope(tx)
     }
 }
 

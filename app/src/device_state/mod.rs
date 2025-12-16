@@ -8,17 +8,19 @@ use infrastructure::Mqtt;
 use std::{collections::HashMap, sync::Arc};
 
 use sqlx::PgPool;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{
+    adapter::energy_meter::EnergyReading,
     core::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::DataPoint,
     },
     device_state::{
         adapter::{
-            IncomingDataSource as _, db::DeviceStateRepository, homeassistant::HomeAssistantIncomingDataSource,
-            tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
+            IncomingDataSource as _, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
+            homeassistant::HomeAssistantIncomingDataSource, tasmota::TasmotaIncomingDataSource,
+            z2m::Z2mIncomingDataSource,
         },
         service::DeviceStateService,
     },
@@ -56,6 +58,7 @@ pub struct DeviceStateRunner {
     tasmota_ds: TasmotaIncomingDataSource,
     z2m_ds: Z2mIncomingDataSource,
     ha_ds: HomeAssistantIncomingDataSource,
+    energy_meter_ds: EnergyMeterIncomingDataSource,
 }
 
 impl DeviceStateRunner {
@@ -67,11 +70,13 @@ impl DeviceStateRunner {
         ha_event_topic: &str,
         ha_url: &str,
         ha_token: &str,
+        energy_reading_rx: mpsc::Receiver<EnergyReading>,
     ) -> Self {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool.clone());
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await;
+        let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
 
         let (event_tx, _event_rx) = broadcast::channel(100);
 
@@ -82,6 +87,7 @@ impl DeviceStateRunner {
             tasmota_ds,
             z2m_ds,
             ha_ds,
+            energy_meter_ds,
         }
     }
 
@@ -107,6 +113,9 @@ impl DeviceStateRunner {
                 Some(updates) = self.ha_ds.recv_multi() => {
                     self.process_incoming_data(updates).await;
                 }
+                Some(updates) = self.energy_meter_ds.recv_multi() => {
+                    self.process_incoming_data(updates).await;
+                }
             }
         }
     }
@@ -126,11 +135,6 @@ impl DeviceStateRunner {
 impl DeviceStateClient {
     pub async fn update_state(&self, data_point: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
         self.service.handle_state_update(data_point).await;
-        Ok(())
-    }
-
-    pub async fn update_availability(&self, availability: DeviceAvailability) -> anyhow::Result<()> {
-        self.service.handle_availability_update(availability).await;
         Ok(())
     }
 

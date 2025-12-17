@@ -4,7 +4,10 @@ use infrastructure::EventEmitter;
 use moka::future::Cache;
 
 use crate::{
-    core::{time::DateTimeRange, timeseries::DataPoint},
+    core::{
+        time::{DateTime, DateTimeRange},
+        timeseries::DataPoint,
+    },
     device_state::{
         DeviceAvailability, DeviceStateEvent, DeviceStateId, DeviceStateValue, OfflineItem,
         adapter::db::DeviceStateRepository,
@@ -29,6 +32,11 @@ impl DeviceStateService {
     }
 
     pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
+        if DateTime::is_shifted() {
+            tracing::warn!("Received device state update with shifted DateTime: {:?}, ignoring", dp);
+            return;
+        }
+
         let id = DeviceStateId::from(&dp.value);
 
         let changed = match self.repo.save(dp.clone()).await {
@@ -41,11 +49,10 @@ impl DeviceStateService {
 
         tracing::info!("Device state update received (changed = {}): {:?}", changed, &dp.value);
 
-        self.current_cache.insert(id, dp.clone()).await;
-
-        //publish events
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
         if changed {
+            //Only when changed to preseve timestamps (new one not to be used unless value is new)
+            self.current_cache.insert(id, dp.clone()).await;
             self.event_tx.send(DeviceStateEvent::Changed(dp.clone()));
         }
     }
@@ -87,7 +94,12 @@ impl DeviceStateService {
         Ok(res)
     }
 
-    pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<DataPoint<DeviceStateValue>> {
+    async fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<DataPoint<DeviceStateValue>> {
+        if DateTime::is_shifted() {
+            //TODO uncached bootstapping leads to a lot of db hits, improve this
+            return self.repo.get_latest_for_device(id).await;
+        }
+
         self.current_cache
             .try_get_with(*id, async {
                 tracing::debug!("Cache miss for device state {:?}, fetching from repo", id);

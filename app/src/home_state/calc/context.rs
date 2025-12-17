@@ -6,7 +6,7 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
     },
     device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem, DeviceStateValue},
-    home_state::{HomeState, HomeStateDerivedStateProvider, StateValue},
+    home_state::{HomeState, HomeStateDerivedStateProvider, HomeStateValue, OpenedArea, StateValue},
     port::ValueObject,
     t,
     trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
@@ -98,13 +98,29 @@ impl StateCalculationContext {
         match current_value {
             Some(dp) => Some(dp),
             None => {
-                let now = t!(now);
                 let mut calculated_dp = HomeStateDerivedStateProvider.calculate_current(id.clone(), self)?;
+                let now = t!(now);
+
                 if calculated_dp.timestamp > now {
+                    tracing::warn!(
+                        "Calculated future timestamp for {:?}, adjusted from {} to now {}",
+                        id,
+                        calculated_dp.timestamp,
+                        now
+                    );
+
                     calculated_dp.timestamp = now;
                 } else if let Some(last_history_ts) = self.last_history_timestamp(&id)
-                    && calculated_dp.timestamp <= last_history_ts
+                    && calculated_dp.timestamp < last_history_ts
                 {
+                    tracing::warn!(
+                        "Calculated timestamp of {:?} is not after last history timestamp, adjusted to now {} <= {} --> {}",
+                        id,
+                        calculated_dp.timestamp,
+                        last_history_ts,
+                        now
+                    );
+
                     calculated_dp.timestamp = now;
                 }
 

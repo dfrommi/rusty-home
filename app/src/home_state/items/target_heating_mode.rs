@@ -138,14 +138,21 @@ fn calculate_heating_mode(
     }
 
     if let Some(user_override) = user_override {
-        tracing::trace!(
-            "Heating in manual mode as user override is active to {}°C",
-            user_override.target_temperature.0
-        );
-        return DataPoint::new(
-            HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id),
-            user_override.timestamp,
-        );
+        if user_override.timestamp.elapsed() > t!(1 hours) {
+            tracing::trace!(
+                "User override expired ({} minutes) - ignoring",
+                user_override.timestamp.elapsed().as_minutes()
+            );
+        } else {
+            tracing::trace!(
+                "Heating in manual mode as user override is active to {}°C",
+                user_override.target_temperature.0
+            );
+            return DataPoint::new(
+                HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id),
+                user_override.timestamp,
+            );
+        }
     }
 
     //TODO take more factors like cold air coming in after ventilation into account

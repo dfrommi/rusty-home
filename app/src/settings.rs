@@ -13,7 +13,7 @@ pub struct Settings {
     pub homeassistant: HomeAssitantSettings,
     pub z2m: Zigbee2MqttSettings,
     pub tasmota: TasmotaSettings,
-    pub metrics: crate::adapter::metrics_export::MetricsExport,
+    pub metrics: MetricsExportSettings,
 }
 
 impl Settings {
@@ -44,6 +44,12 @@ pub struct TasmotaSettings {
 #[allow(unused)]
 pub struct Zigbee2MqttSettings {
     pub event_topic: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(unused)]
+pub struct MetricsExportSettings {
+    pub victoria_url: String,
 }
 
 #[cfg(test)]

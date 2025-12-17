@@ -13,10 +13,6 @@ use crate::{
     t,
 };
 
-struct MetricApiContext {
-    repo: VictoriaRepository,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 struct BackfillQuery {
     #[serde(default)]
@@ -30,12 +26,24 @@ struct BackfillQuery {
     end: Option<DateTime>,
 }
 
-pub fn routes(repo: VictoriaRepository) -> actix_web::Scope {
-    let web_data = Arc::new(MetricApiContext { repo });
-    web::scope("/metrics")
-        .route("/backfill", web::get().to(backfill_handler))
-        .route("/names", web::get().to(items_handler))
-        .app_data(web::Data::from(web_data))
+#[derive(Clone)]
+pub struct MetricsExportApi {
+    repo: Arc<VictoriaRepository>,
+}
+
+impl MetricsExportApi {
+    pub fn new(repo: Arc<VictoriaRepository>) -> Self {
+        Self { repo }
+    }
+}
+
+impl Into<actix_web::Scope> for MetricsExportApi {
+    fn into(self) -> actix_web::Scope {
+        web::scope("/metrics")
+            .route("/backfill", web::get().to(backfill_handler))
+            .route("/names", web::get().to(items_handler))
+            .app_data(web::Data::from(self.repo))
+    }
 }
 
 impl BackfillQuery {
@@ -64,7 +72,7 @@ impl BackfillQuery {
 }
 
 async fn backfill_handler(
-    ctx: web::Data<MetricApiContext>,
+    repo: web::Data<VictoriaRepository>,
     query: Query<BackfillQuery>,
 ) -> Result<HttpResponse, Error> {
     //Date where data collection started
@@ -95,17 +103,18 @@ async fn backfill_handler(
     );
 
     //Delete existing data
-    for state in &variants {
-        let id = MetricId::from(&state.ext_id());
-        tracing::info!("Deleting existing data for metric: {}", id);
-
-        ctx.repo.delete_series(id.clone()).await.map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!(
-                "Error deleting existing metrics {} from VictoriaMetrics: {}",
-                id, e
-            ))
-        })?;
-    }
+    // TODO handle diffrent naming patterns
+    // for state in &variants {
+    //     let id = MetricId::from(&state.ext_id());
+    //     tracing::info!("Deleting existing data for metric: {}", id);
+    //
+    //     repo.delete_series(id.clone()).await.map_err(|e| {
+    //         actix_web::error::ErrorInternalServerError(format!(
+    //             "Error deleting existing metrics {} from VictoriaMetrics: {}",
+    //             id, e
+    //         ))
+    //     })?;
+    // }
 
     for range in full_range.chunked(t!(30 days)) {
         tracing::info!("Processing range {}", range);
@@ -140,7 +149,7 @@ async fn backfill_handler(
         //     }
     }
 
-    ctx.repo.push(&buffer).await.map_err(|e| {
+    repo.push(&buffer).await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Error pushing metrics to VictoriaMetrics: {}", e))
     })?;
 

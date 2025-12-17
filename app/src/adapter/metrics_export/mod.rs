@@ -1,165 +1,105 @@
+mod adapter;
 mod api;
-mod exporter;
+mod domain;
 mod repository;
 mod tags;
 
-pub use exporter::HomeStateMetricsExporter;
+pub use api::MetricsExportApi;
+
+use std::sync::Arc;
+
+use domain::*;
+
 use infrastructure::EventListener;
 
-use crate::core::id::ExternalId;
-use crate::core::time::DateTime;
-use crate::core::timeseries::DataPoint;
-use crate::device_state::{DeviceStateEvent, DeviceStateId, DeviceStateValue};
-use crate::home_state::{HeatingMode, HomeState, HomeStateEvent, HomeStateValue, StateValue};
-use serde::Deserialize;
+use crate::{
+    adapter::metrics_export::{Metric, adapter::MetricsAdapter as _, repository::VictoriaRepository},
+    device_state::{DeviceStateClient, DeviceStateEvent},
+    home_state::HomeStateEvent,
+    t,
+};
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct MetricsExport {
-    pub victoria_url: String,
+use crate::adapter::metrics_export::adapter::{device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter};
+
+pub struct MetricsExportModule {
+    repo: Arc<VictoriaRepository>,
+    device_state_events: EventListener<DeviceStateEvent>,
+    home_state_events: EventListener<HomeStateEvent>,
+    device_state_client: DeviceStateClient,
+    home_metrics_adapter: HomeMetricsAdapter,
+    device_metrics_adapter: DeviceMetricsAdapter,
 }
 
-impl MetricsExport {
-    pub fn new_routes(&self) -> actix_web::Scope {
-        let repo = repository::VictoriaRepository::new(self.victoria_url.clone());
-        api::routes(repo)
-    }
+impl MetricsExportModule {
+    pub fn new(
+        victoria_url: String,
+        device_state_events: EventListener<DeviceStateEvent>,
+        home_state_events: EventListener<HomeStateEvent>,
+        device_state_client: DeviceStateClient,
+    ) -> Self {
+        let repo = Arc::new(VictoriaRepository::new(victoria_url));
 
-    pub fn new_exporter(
-        &self,
-        rx_device: EventListener<DeviceStateEvent>,
-        rx_home: EventListener<HomeStateEvent>,
-    ) -> HomeStateMetricsExporter {
-        let repo = repository::VictoriaRepository::new(self.victoria_url.clone());
-        HomeStateMetricsExporter::new(rx_device, rx_home, repo)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Metric {
-    id: MetricId,
-    value: f64,
-    timestamp: DateTime,
-}
-
-#[derive(Debug, Clone)]
-struct MetricId {
-    name: String,
-    labels: Vec<MetricLabel>,
-}
-
-#[derive(Debug, Clone)]
-enum MetricLabel {
-    Variant(String),
-    Room(String),
-    FriendlyName(String),
-    EnumVariant(String),
-}
-
-impl From<DataPoint<HomeStateValue>> for Metric {
-    fn from(dp: DataPoint<HomeStateValue>) -> Self {
-        Metric {
-            id: MetricId::from(&dp.value),
-            value: to_metrics_value(dp.value.value()),
-            timestamp: dp.timestamp,
+        Self {
+            repo,
+            device_state_events,
+            home_state_events,
+            device_state_client,
+            home_metrics_adapter: HomeMetricsAdapter,
+            device_metrics_adapter: DeviceMetricsAdapter,
         }
     }
-}
 
-impl From<&HomeStateValue> for MetricId {
-    fn from(value: &HomeStateValue) -> Self {
-        let state = HomeState::from(value);
-        let external_id = state.ext_id();
+    pub fn router(&self) -> MetricsExportApi {
+        MetricsExportApi::new(self.repo.clone())
+    }
 
-        MetricId {
-            name: external_id.type_name().to_string(),
-            labels: tags::get_common_tags(&external_id),
+    pub async fn run(mut self) {
+        const MAX_BATCH: usize = 500;
+
+        let mut device_state_timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut buffer = Vec::with_capacity(MAX_BATCH);
+        let mut last_flush = t!(now);
+
+        loop {
+            let metrics = tokio::select! {
+                event = self.device_state_events.recv() => match event {
+                    Some(DeviceStateEvent::Updated(data_point)) => self.device_metrics_adapter.to_metrics(data_point.clone()),
+                    _ => vec![],
+                },
+
+                _ = device_state_timer.tick() => match self.device_state_client.get_current_for_all().await {
+                    Ok(states) => {
+                        states.into_iter().flat_map(|(_, dp)| {
+                            self.device_metrics_adapter.to_metrics(dp)
+                        }).collect()
+                    },
+                    Err(e) => {
+                        tracing::error!("Error fetching current device states for metrics export: {:?}", e);
+                        vec![]
+                    }
+                },
+
+                event = self.home_state_events.recv() => match event {
+                    Some(HomeStateEvent::Updated(data_point)) => self.home_metrics_adapter.to_metrics(data_point.clone()),
+                    _ => vec![],
+                }
+            };
+
+            for mut metric in metrics.into_iter() {
+                //ensure a consitent flow of datapoints
+                metric.timestamp = t!(now);
+                buffer.push(metric);
+            }
+
+            if buffer.len() >= MAX_BATCH || last_flush.elapsed() >= t!(15 seconds) {
+                if let Err(e) = self.repo.push(&buffer).await {
+                    tracing::error!("Error pushing metrics to VictoriaMetrics: {:?}", e);
+                    continue; //keep trying
+                }
+                tracing::info!("Flushed {} metrics to VictoriaMetrics", buffer.len());
+                buffer.clear();
+                last_flush = t!(now);
+            }
         }
-    }
-}
-
-impl From<DataPoint<DeviceStateValue>> for Metric {
-    fn from(dp: DataPoint<DeviceStateValue>) -> Self {
-        Metric {
-            id: MetricId::from(&dp.value),
-            value: (&dp.value).into(),
-            timestamp: dp.timestamp,
-        }
-    }
-}
-
-impl From<&DeviceStateValue> for MetricId {
-    fn from(value: &DeviceStateValue) -> Self {
-        let id = DeviceStateId::from(value.clone());
-        let ext_id = id.ext_id();
-        let mut tags = tags::get_common_tags(&ext_id);
-        tags.extend(tags::get_tags_for_device(value));
-
-        MetricId {
-            name: format!("device_{}", ext_id.type_name()),
-            labels: tags,
-        }
-    }
-}
-
-impl From<&ExternalId> for MetricId {
-    fn from(ext_id: &ExternalId) -> Self {
-        MetricId {
-            name: ext_id.type_name().to_string(),
-            labels: vec![MetricLabel::Variant(ext_id.variant_name().to_string())],
-        }
-    }
-}
-
-impl std::fmt::Display for Metric {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.id, self.value, self.timestamp.millis())
-    }
-}
-
-impl std::fmt::Display for MetricId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let labels: Vec<String> = self.labels.iter().map(|label| label.to_string()).collect();
-        if labels.is_empty() {
-            write!(f, "{}", self.name)
-        } else {
-            write!(f, "{}{{{}}}", self.name, labels.join(", "))
-        }
-    }
-}
-
-impl std::fmt::Display for MetricLabel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MetricLabel::Variant(v) => write!(f, "item=\"{}\"", v),
-            MetricLabel::Room(r) => write!(f, "room=\"{}\"", r),
-            MetricLabel::FriendlyName(n) => write!(f, "friendly_name=\"{}\"", n),
-            MetricLabel::EnumVariant(ev) => write!(f, "enum_variant=\"{}\"", ev),
-        }
-    }
-}
-
-fn to_metrics_value(value: StateValue) -> f64 {
-    match value {
-        StateValue::Boolean(b) => b.into(),
-        StateValue::DegreeCelsius(degree_celsius) => f64::from(&degree_celsius),
-        StateValue::Watt(watt) => f64::from(&watt),
-        StateValue::Percent(percent) => f64::from(&percent),
-        StateValue::GramPerCubicMeter(gram_per_cubic_meter) => f64::from(&gram_per_cubic_meter),
-        StateValue::KiloWattHours(kilo_watt_hours) => f64::from(&kilo_watt_hours),
-        StateValue::HeatingUnit(heating_unit) => f64::from(&heating_unit),
-        StateValue::KiloCubicMeter(kilo_cubic_meter) => f64::from(&kilo_cubic_meter),
-        StateValue::FanAirflow(fan_airflow) => f64::from(&fan_airflow),
-        StateValue::RawValue(raw) => f64::from(&raw),
-        StateValue::Lux(lux) => f64::from(&lux),
-        StateValue::Probability(probability) => f64::from(&probability),
-        StateValue::HeatingMode(heating_mode) => match heating_mode {
-            HeatingMode::Sleep => 10.0,
-            HeatingMode::EnergySaving => 11.0,
-            HeatingMode::Comfort => 12.0,
-            HeatingMode::Manual(_, _) => 13.0,
-            HeatingMode::Ventilation => 1.0,
-            HeatingMode::PostVentilation => 2.0,
-            HeatingMode::Away => -1.0,
-        },
     }
 }

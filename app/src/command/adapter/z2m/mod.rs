@@ -4,9 +4,8 @@ use crate::{
     command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
     core::unit::{DegreeCelsius, Percent, RawValue},
 };
-use infrastructure::MqttOutMessage;
+use infrastructure::MqttSender;
 use serde_json::json;
-use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub enum Z2mCommandTarget {
@@ -16,11 +15,11 @@ pub enum Z2mCommandTarget {
 pub struct Z2mCommandExecutor {
     base_topic: String,
     config: Vec<(CommandTarget, Z2mCommandTarget)>,
-    sender: mpsc::Sender<MqttOutMessage>,
+    sender: MqttSender,
 }
 
 impl Z2mCommandExecutor {
-    pub fn new(mqtt_sender: mpsc::Sender<MqttOutMessage>, event_topic: &str) -> Self {
+    pub fn new(mqtt_sender: MqttSender, event_topic: &str) -> Self {
         let config = config::default_z2m_command_config();
         Self {
             base_topic: event_topic.to_string(),
@@ -127,41 +126,44 @@ impl Z2mCommandExecutor {
             None
         };
 
-        let msg = MqttOutMessage::transient(
-            self.target_topic(device_id),
-            serde_json::to_string(&ThermostatCommandPayload {
-                window_open_external: window_open,
-                programming_operation_mode: operation_mode,
-                occupied_heating_setpoint: high_priority_setpoint.map(|t| t.temperature.0),
-                occupied_heating_setpoint_scheduled: low_priority_setpoint.map(|t| t.temperature.0),
-            })?,
-        );
+        self.sender
+            .send_transient(
+                self.target_topic(device_id),
+                serde_json::to_string(&ThermostatCommandPayload {
+                    window_open_external: window_open,
+                    programming_operation_mode: operation_mode,
+                    occupied_heating_setpoint: high_priority_setpoint.map(|t| t.temperature.0),
+                    occupied_heating_setpoint_scheduled: low_priority_setpoint.map(|t| t.temperature.0),
+                })?,
+            )
+            .await?;
 
-        self.sender.send(msg).await?;
         Ok(true)
     }
 
     async fn set_ambient_temperature(&self, device_id: &str, temperature: DegreeCelsius) -> anyhow::Result<bool> {
         let value = (temperature.0 * 100.0) as i32; //Z2M expects temperature in centi-degrees
 
-        let msg = MqttOutMessage::transient(
-            self.target_topic(device_id),
-            json!({ "external_measured_room_sensor": value }).to_string(),
-        );
+        self.sender
+            .send_transient(
+                self.target_topic(device_id),
+                json!({ "external_measured_room_sensor": value }).to_string(),
+            )
+            .await?;
 
-        self.sender.send(msg).await?;
         Ok(true)
     }
 
     pub async fn set_load_room_mean(&self, device_id: &str, value: RawValue) -> anyhow::Result<bool> {
         let value = value.0 as i64;
 
-        let msg = MqttOutMessage::transient(
-            self.target_topic(device_id),
-            serde_json::to_string(&ThermostatLoadPayload { load_room_mean: value })?,
-        );
+        self.sender
+            .send_transient(
+                self.target_topic(device_id),
+                serde_json::to_string(&ThermostatLoadPayload { load_room_mean: value })?,
+            )
+            .await?;
 
-        self.sender.send(msg).await?;
         Ok(true)
     }
 
@@ -170,17 +172,18 @@ impl Z2mCommandExecutor {
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
         let closed_percentage = 100 - opened_percentage;
 
-        let msg = MqttOutMessage::transient(
-            self.target_topic(device_id),
-            json!({
-                "system_mode": system_mode,
-                "valve_opening_degree": opened_percentage,
-                "valve_closing_degree": closed_percentage,
-            })
-            .to_string(),
-        );
+        self.sender
+            .send_transient(
+                self.target_topic(device_id),
+                json!({
+                    "system_mode": system_mode,
+                    "valve_opening_degree": opened_percentage,
+                    "valve_closing_degree": closed_percentage,
+                })
+                .to_string(),
+            )
+            .await?;
 
-        self.sender.send(msg).await?;
         Ok(true)
     }
 }

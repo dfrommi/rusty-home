@@ -3,9 +3,8 @@ mod config;
 use super::CommandExecutor;
 
 use crate::command::{Command, CommandTarget};
-use infrastructure::MqttOutMessage;
 
-use tokio::sync::mpsc;
+use infrastructure::MqttSender;
 
 #[derive(Debug, Clone)]
 enum TasmotaCommandTarget {
@@ -15,11 +14,11 @@ enum TasmotaCommandTarget {
 pub struct TasmotaCommandExecutor {
     base_topic: String,
     config: Vec<(CommandTarget, TasmotaCommandTarget)>,
-    sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
+    sender: MqttSender,
 }
 
 impl TasmotaCommandExecutor {
-    pub fn new(event_topic: &str, mqtt_sender: mpsc::Sender<MqttOutMessage>) -> TasmotaCommandExecutor {
+    pub fn new(event_topic: &str, mqtt_sender: MqttSender) -> TasmotaCommandExecutor {
         let config = config::default_tasmota_command_config();
 
         Self {
@@ -45,12 +44,12 @@ impl CommandExecutor for TasmotaCommandExecutor {
 
         match (command, tasmota_target.unwrap()) {
             (Command::SetPower { power_on, .. }, TasmotaCommandTarget::PowerSwitch(device_id)) => {
-                let msg = MqttOutMessage::transient(
-                    format!("{}/cmnd/{}/Power1", self.base_topic, device_id),
-                    if *power_on { "ON".to_string() } else { "OFF".to_string() },
-                );
-
-                self.sender.send(msg).await?;
+                self.sender
+                    .send_transient(
+                        format!("{}/cmnd/{}/Power1", self.base_topic, device_id),
+                        if *power_on { "ON".to_string() } else { "OFF".to_string() },
+                    )
+                    .await?;
                 Ok(true)
             }
 

@@ -5,8 +5,8 @@ mod service;
 use std::sync::Arc;
 
 pub use domain::*;
+use infrastructure::{EventBus, EventListener};
 use sqlx::PgPool;
-use tokio::sync::broadcast;
 
 use crate::{
     core::time::DateTime,
@@ -34,6 +34,7 @@ impl UserTriggerExecution {
 
 pub struct TriggerRunner {
     service: Arc<TriggerService>,
+    event_bus: EventBus<TriggerEvent>,
 }
 
 #[derive(Clone)]
@@ -62,8 +63,10 @@ impl TriggerClient {
 impl TriggerRunner {
     pub fn new(pool: PgPool) -> Self {
         let repo = TriggerRepository::new(pool);
-        let service = Arc::new(TriggerService::new(repo));
-        Self { service }
+        let event_bus = EventBus::new(64);
+        let service = Arc::new(TriggerService::new(repo, event_bus.emitter()));
+
+        Self { service, event_bus }
     }
 
     pub fn client(&self) -> TriggerClient {
@@ -72,7 +75,7 @@ impl TriggerRunner {
         }
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<TriggerEvent> {
-        self.service.subscribe()
+    pub fn subscribe(&self) -> EventListener<TriggerEvent> {
+        self.event_bus.subscribe()
     }
 }

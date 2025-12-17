@@ -2,10 +2,10 @@ mod accessory;
 mod hap;
 mod runtime;
 
+use infrastructure::EventListener;
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::broadcast::Receiver;
 
 use self::{
     accessory::HomekitRegistry,
@@ -18,7 +18,7 @@ use crate::{
         timeseries::DataPoint,
         unit::{DegreeCelsius, FanAirflow},
     },
-    home_state::HomeStateValue,
+    home_state::{HomeStateEvent, HomeStateValue},
     trigger::TriggerClient,
 };
 
@@ -114,7 +114,7 @@ impl Homekit {
         &self,
         infrastructure: &mut Infrastructure,
         trigger_client: TriggerClient,
-        state_change_rx: Receiver<DataPoint<HomeStateValue>>,
+        state_change_rx: EventListener<HomeStateEvent>,
     ) -> HomekitRunner {
         let mqtt_receiver = infrastructure
             .mqtt_client
@@ -125,7 +125,7 @@ impl Homekit {
         HomekitRunner::new(
             HomekitRegistry::default(),
             state_change_rx,
-            infrastructure.mqtt_client.new_publisher(),
+            infrastructure.mqtt_client.sender(),
             mqtt_receiver,
             self.base_topic.clone(),
             trigger_client,

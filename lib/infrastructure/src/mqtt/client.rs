@@ -1,67 +1,27 @@
-use std::str::{Utf8Error, from_utf8};
+use std::sync::Arc;
 
 use rumqttc::v5::{
     AsyncClient, EventLoop, MqttOptions,
     mqttbytes::{
         QoS,
-        v5::{ConnectProperties, Publish, SubscribeProperties},
+        v5::{ConnectProperties, SubscribeProperties},
     },
 };
 
 use rumqttc::v5::Event::Incoming;
+use tokio::sync::mpsc;
 
-use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
-    task::JoinSet,
-};
-
-use crate::monitoring::TraceContext;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MqttOutMessage {
-    topic: String,
-    payload: String,
-    retain: bool,
-    correlation_id: Option<String>,
-}
-
-impl MqttOutMessage {
-    pub fn transient(topic: String, payload: String) -> Self {
-        Self {
-            topic,
-            payload,
-            retain: false,
-            correlation_id: TraceContext::current_correlation_id(),
-        }
-    }
-
-    pub fn retained(topic: String, payload: String) -> Self {
-        Self {
-            topic,
-            payload,
-            retain: true,
-            correlation_id: TraceContext::current_correlation_id(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MqttInMessage {
-    pub topic: String,
-    pub payload: String,
-}
+use super::*;
 
 pub struct Mqtt {
-    client: AsyncClient,
+    client: Arc<AsyncClient>,
     event_loop: EventLoop,
-    subsciptions: Vec<MqttSubscription>,
-    publisher_tx: Sender<MqttOutMessage>,
-    publisher_rx: Receiver<MqttOutMessage>,
+    subsciptions: Vec<MqttSubscriptionHandle>,
 }
 
-struct MqttSubscription {
+struct MqttSubscriptionHandle {
     topic: String,
-    tx: Sender<MqttInMessage>,
+    tx: mpsc::Sender<MqttInMessage>,
 }
 
 impl Mqtt {
@@ -76,34 +36,25 @@ impl Mqtt {
         mqttoptions.set_connect_properties(connect_props);
 
         let (client, event_loop) = AsyncClient::new(mqttoptions, 10);
-        let (pub_tx, pub_rx) = mpsc::channel::<MqttOutMessage>(32);
 
         Mqtt {
-            client,
+            client: Arc::new(client),
             event_loop,
             subsciptions: vec![],
-            publisher_rx: pub_rx,
-            publisher_tx: pub_tx,
         }
     }
 
-    pub async fn subscribe(
-        &mut self,
-        topic: impl Into<String>,
-    ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
+    pub async fn subscribe(&mut self, topic: impl Into<String>) -> anyhow::Result<MqttSubscription> {
         self.subscribe_all(&[topic.into()]).await
     }
 
-    pub async fn subscribe_all(
-        &mut self,
-        topic: &[String],
-    ) -> Result<Receiver<MqttInMessage>, rumqttc::v5::ClientError> {
+    pub async fn subscribe_all(&mut self, topic: &[String]) -> anyhow::Result<MqttSubscription> {
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
 
         for topic in topic {
             tracing::info!("Subscribing to topic: {:?}", &topic);
 
-            let subscription = MqttSubscription {
+            let subscription = MqttSubscriptionHandle {
                 topic: topic.clone(),
                 tx: tx.clone(),
             };
@@ -122,113 +73,68 @@ impl Mqtt {
                 .await?;
         }
 
-        Ok(rx)
+        Ok(MqttSubscription::new(rx))
     }
 
-    pub fn new_publisher(&self) -> Sender<MqttOutMessage> {
-        self.publisher_tx.clone()
+    pub fn sender(&self) -> MqttSender {
+        MqttSender::new(self.client.clone())
     }
 
-    pub async fn process(mut self) {
-        let mut tasks = JoinSet::new();
-
-        let client = self.client;
-        let mut event_loop = self.event_loop;
-
+    pub async fn run(mut self) {
         //Receive and forward MQTT messages
-        tasks.spawn(async move {
-            loop {
-                match event_loop.poll().await {
-                    Ok(Incoming(rumqttc::v5::mqttbytes::v5::Packet::Publish(msg))) => {
-                        let mqtt_in_message: MqttInMessage = match (&msg).try_into() {
-                            Ok(m) => m,
-                            Err(e) => {
-                                tracing::error!("Error parsing MQTT message: {}", e);
-                                continue;
-                            }
-                        };
-
-                        tracing::trace!("Received MQTT message on topic {}", mqtt_in_message.topic,);
-
-                        let subscription_ids = match msg.properties {
-                            Some(p) => p.subscription_identifiers,
-                            None => {
-                                tracing::error!("No subscription identifiers in MQTT message");
-                                continue;
-                            }
-                        };
-
-                        for id in subscription_ids {
-                            match self.subsciptions.get(id - 1) {
-                                Some(sub) => {
-                                    tracing::trace!(
-                                        "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
-                                        sub.topic,
-                                        sub.tx.is_closed(),
-                                        mqtt_in_message
-                                    );
-                                    if let Err(e) = sub
-                                        .tx
-                                        .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
-                                        .await
-                                    {
-                                        tracing::error!(
-                                            "Failed to forward MQTT message to subscriber {}: {}",
-                                            sub.topic,
-                                            e
-                                        );
-                                    }
-                                }
-                                None => {
-                                    tracing::error!("No subscription for id: {}", id);
-                                }
-                            }
-                        }
-                    }
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::error!("MQTT error: {}", e);
-                    }
+        loop {
+            match self.event_loop.poll().await {
+                Ok(Incoming(rumqttc::v5::mqttbytes::v5::Packet::Publish(publish))) => {
+                    self.handle_publish(publish).await;
                 }
-            }
-        });
-
-        //Publish MQTT messages
-        tasks.spawn(async move {
-            while let Some(cmd) = self.publisher_rx.recv().await {
-                send_message(cmd, &client).await;
-            }
-        });
-
-        while let Some(task) = tasks.join_next().await {
-            if let Err(e) = task {
-                tracing::error!("MQTT task error: {}", e);
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!("MQTT error: {}", e);
+                }
             }
         }
     }
-}
 
-#[tracing::instrument(skip_all, fields(topic = %cmd.topic, otel.name = format!("MQTT publish {}", cmd.topic)))]
-async fn send_message(cmd: MqttOutMessage, client: &AsyncClient) {
-    TraceContext::continue_from(&cmd.correlation_id);
+    async fn handle_publish(&self, msg: rumqttc::v5::mqttbytes::v5::Publish) {
+        let mqtt_in_message: MqttInMessage = match (&msg).try_into() {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("Error parsing MQTT message: {}", e);
+                return;
+            }
+        };
 
-    tracing::debug!("Publishing MQTT message to {}: {:?}", cmd.topic, cmd);
+        tracing::trace!("Received MQTT message on topic {}", mqtt_in_message.topic,);
 
-    if let Err(e) = client
-        .publish(cmd.topic.clone(), QoS::ExactlyOnce, cmd.retain, cmd.payload)
-        .await
-    {
-        tracing::error!("Error publishing MQTT message to {}: {}", cmd.topic, e);
-    }
-}
+        let subscription_ids = match msg.properties {
+            Some(p) => p.subscription_identifiers,
+            None => {
+                tracing::error!("No subscription identifiers in MQTT message");
+                return;
+            }
+        };
 
-impl TryInto<MqttInMessage> for &Publish {
-    type Error = Utf8Error;
-
-    fn try_into(self) -> Result<MqttInMessage, Self::Error> {
-        Ok(MqttInMessage {
-            topic: from_utf8(&self.topic)?.to_string(),
-            payload: from_utf8(&self.payload)?.to_string(),
-        })
+        for id in subscription_ids {
+            match self.subsciptions.get(id - 1) {
+                Some(sub) => {
+                    tracing::trace!(
+                        "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
+                        sub.topic,
+                        sub.tx.is_closed(),
+                        mqtt_in_message
+                    );
+                    if let Err(e) = sub
+                        .tx
+                        .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
+                        .await
+                    {
+                        tracing::error!("Failed to forward MQTT message to subscriber {}: {}", sub.topic, e);
+                    }
+                }
+                None => {
+                    tracing::error!("No subscription for id: {}", id);
+                }
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use infrastructure::EventEmitter;
 use moka::future::Cache;
-use tokio::sync::broadcast;
 
 use crate::{
     core::{time::DateTimeRange, timeseries::DataPoint},
@@ -13,12 +13,12 @@ use crate::{
 
 pub struct DeviceStateService {
     repo: DeviceStateRepository,
-    event_tx: broadcast::Sender<DeviceStateEvent>,
+    event_tx: EventEmitter<DeviceStateEvent>,
     current_cache: Cache<DeviceStateId, DataPoint<DeviceStateValue>>,
 }
 
 impl DeviceStateService {
-    pub fn new(repo: DeviceStateRepository, event_tx: broadcast::Sender<DeviceStateEvent>) -> Self {
+    pub fn new(repo: DeviceStateRepository, event_tx: EventEmitter<DeviceStateEvent>) -> Self {
         let current_cache = Cache::builder().max_capacity(10_000).build();
 
         Self {
@@ -26,10 +26,6 @@ impl DeviceStateService {
             event_tx,
             current_cache,
         }
-    }
-
-    pub fn subscribe(&self) -> broadcast::Receiver<DeviceStateEvent> {
-        self.event_tx.subscribe()
     }
 
     pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
@@ -47,12 +43,10 @@ impl DeviceStateService {
 
         self.current_cache.insert(id, dp.clone()).await;
 
-        //publish event
-        if let Err(e) = self.event_tx.send(DeviceStateEvent::Updated(dp.clone())) {
-            tracing::error!("Error sending device state updated event for {:?}: {}", id, e);
-        }
-        if changed && let Err(e) = self.event_tx.send(DeviceStateEvent::Changed(dp.clone())) {
-            tracing::error!("Error sending device state changed event for {:?}: {}", id, e);
+        //publish events
+        self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
+        if changed {
+            self.event_tx.send(DeviceStateEvent::Changed(dp.clone()));
         }
     }
 

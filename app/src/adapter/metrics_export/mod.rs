@@ -4,14 +4,14 @@ mod repository;
 mod tags;
 
 pub use exporter::HomeStateMetricsExporter;
+use infrastructure::EventListener;
 
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::{DeviceStateEvent, DeviceStateId, DeviceStateValue};
-use crate::home_state::{HeatingMode, HomeState, HomeStateValue, StateValue};
+use crate::home_state::{HeatingMode, HomeState, HomeStateEvent, HomeStateValue, StateValue};
 use serde::Deserialize;
-use tokio::sync::broadcast::Receiver;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct MetricsExport {
@@ -26,8 +26,8 @@ impl MetricsExport {
 
     pub fn new_exporter(
         &self,
-        rx_device: Receiver<DeviceStateEvent>,
-        rx_home: Receiver<DataPoint<HomeStateValue>>,
+        rx_device: EventListener<DeviceStateEvent>,
+        rx_home: EventListener<HomeStateEvent>,
     ) -> HomeStateMetricsExporter {
         let repo = repository::VictoriaRepository::new(self.victoria_url.clone());
         HomeStateMetricsExporter::new(rx_device, rx_home, repo)

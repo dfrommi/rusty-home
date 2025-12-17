@@ -1,6 +1,6 @@
 mod config;
 
-use infrastructure::{Mqtt, MqttInMessage};
+use infrastructure::{Mqtt, MqttSubscription};
 use serde::Deserialize;
 
 use anyhow::Context;
@@ -268,11 +268,11 @@ impl HaHttpClient {
 }
 
 pub struct HaMqttClient {
-    state_rx: tokio::sync::mpsc::Receiver<MqttInMessage>,
+    state_rx: MqttSubscription,
 }
 
 impl HaMqttClient {
-    pub fn new(rx: tokio::sync::mpsc::Receiver<MqttInMessage>) -> Self {
+    pub fn new(rx: MqttSubscription) -> Self {
         Self { state_rx: rx }
     }
 }

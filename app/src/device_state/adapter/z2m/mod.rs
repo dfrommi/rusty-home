@@ -7,8 +7,7 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{DeviceAvailability, DeviceStateValue, RawVendorValue, Temperature};
-use infrastructure::{Mqtt, MqttInMessage};
-use tokio::sync::mpsc;
+use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::device_state::{
     CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, TotalEnergyConsumption,
@@ -25,7 +24,7 @@ pub enum Z2mChannel {
 pub struct Z2mIncomingDataSource {
     base_topic: String,
     device_config: DeviceConfig<Z2mChannel>,
-    mqtt_receiver: mpsc::Receiver<MqttInMessage>,
+    mqtt_receiver: MqttSubscription,
 }
 
 impl Z2mIncomingDataSource {

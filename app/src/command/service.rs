@@ -1,4 +1,4 @@
-use tokio::sync::broadcast;
+use infrastructure::EventEmitter;
 
 use crate::{
     command::{
@@ -20,7 +20,7 @@ pub struct CommandService {
     tasmota_executor: TasmotaCommandExecutor,
     z2m_executor: Z2mCommandExecutor,
     ha_executor: HomeAssistantCommandExecutor,
-    event_tx: broadcast::Sender<CommandEvent>,
+    event_tx: EventEmitter<CommandEvent>,
 }
 
 impl CommandService {
@@ -29,7 +29,7 @@ impl CommandService {
         tasmota_executor: TasmotaCommandExecutor,
         z2m_executor: Z2mCommandExecutor,
         ha_executor: HomeAssistantCommandExecutor,
-        event_tx: broadcast::Sender<CommandEvent>,
+        event_tx: EventEmitter<CommandEvent>,
     ) -> Self {
         Self {
             repo,
@@ -38,10 +38,6 @@ impl CommandService {
             ha_executor,
             event_tx,
         }
-    }
-
-    pub fn subscribe(&self) -> broadcast::Receiver<CommandEvent> {
-        self.event_tx.subscribe()
     }
 
     pub async fn execute_command(
@@ -83,9 +79,7 @@ impl CommandService {
             );
         }
 
-        if let Err(e) = self.event_tx.send(CommandEvent::CommandExecuted(command_exec.clone())) {
-            tracing::warn!("Failed to send command executed event of {}: {}", command_id, e);
-        }
+        self.event_tx.send(CommandEvent::CommandExecuted(command_exec.clone()));
 
         Ok(command_exec)
     }

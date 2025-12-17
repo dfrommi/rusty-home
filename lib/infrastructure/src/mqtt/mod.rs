@@ -1,6 +1,11 @@
 mod client;
+mod receiver;
+mod sender;
 
-pub use client::{Mqtt, MqttInMessage, MqttOutMessage};
+pub use client::Mqtt;
+pub use receiver::{MqttInMessage, MqttSubscription};
+pub use sender::MqttSender;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]

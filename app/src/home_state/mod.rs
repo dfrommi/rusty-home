@@ -2,10 +2,9 @@ mod calc;
 mod items;
 
 pub use calc::StateSnapshot;
+use infrastructure::EventEmitter;
+use infrastructure::{EventBus, EventListener};
 pub use items::*;
-
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
@@ -16,36 +15,43 @@ use crate::home_state::calc::calculate_new_snapshot;
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
 
+#[derive(Debug, Clone)]
+pub enum HomeStateEvent {
+    SnapshotUpdated(StateSnapshot),
+    Updated(DataPoint<HomeStateValue>),
+    Changed(DataPoint<HomeStateValue>),
+}
+
 pub struct HomeStateRunner {
     duration: Duration,
     device_state: DeviceStateClient,
     snapshot: StateSnapshot,
     trigger_client: TriggerClient,
-    state_changed_rx: Receiver<DeviceStateEvent>,
-    user_trigger_rx: Receiver<TriggerEvent>,
-    home_state_updated_tx: Sender<DataPoint<HomeStateValue>>,
-    home_state_changed_tx: Sender<DataPoint<HomeStateValue>>,
-    snapshot_updated_tx: Sender<StateSnapshot>,
+    device_state_rx: EventListener<DeviceStateEvent>,
+    trigger_rx: EventListener<TriggerEvent>,
+    event_bus: EventBus<HomeStateEvent>,
+    //TODO in service
+    event_emitter: EventEmitter<HomeStateEvent>,
 }
 
 impl HomeStateRunner {
     pub fn new(
         duration: Duration,
-        rx_state: Receiver<DeviceStateEvent>,
-        rx_trigger: Receiver<TriggerEvent>,
+        device_state_rx: EventListener<DeviceStateEvent>,
+        trigger_rx: EventListener<TriggerEvent>,
         trigger_client: TriggerClient,
         device_state: DeviceStateClient,
     ) -> Self {
+        let event_bus = EventBus::new(256);
         Self {
             duration,
             device_state,
             snapshot: StateSnapshot::default(),
             trigger_client,
-            state_changed_rx: rx_state,
-            user_trigger_rx: rx_trigger,
-            home_state_updated_tx: tokio::sync::broadcast::channel(256).0,
-            home_state_changed_tx: tokio::sync::broadcast::channel(256).0,
-            snapshot_updated_tx: tokio::sync::broadcast::channel(64).0,
+            device_state_rx,
+            trigger_rx,
+            event_emitter: event_bus.emitter(),
+            event_bus,
         }
     }
 
@@ -54,16 +60,8 @@ impl HomeStateRunner {
         Ok(())
     }
 
-    pub fn subscribe_state_updated(&self) -> Receiver<DataPoint<HomeStateValue>> {
-        self.home_state_updated_tx.subscribe()
-    }
-
-    pub fn subscribe_state_changed(&self) -> Receiver<DataPoint<HomeStateValue>> {
-        self.home_state_changed_tx.subscribe()
-    }
-
-    pub fn subscribe_snapshot_updated(&self) -> Receiver<StateSnapshot> {
-        self.snapshot_updated_tx.subscribe()
+    pub fn subscribe(&self) -> EventListener<HomeStateEvent> {
+        self.event_bus.subscribe()
     }
 
     pub async fn run(mut self) {
@@ -77,33 +75,16 @@ impl HomeStateRunner {
         loop {
             tokio::select! {
                 //Collect state changes as many might come in short intervals
-                event = self.state_changed_rx.recv() => match event {
-                    Ok(DeviceStateEvent::Updated(_)) => {
-                        // Put debounce timer into the near future, expiration triggers calculation
-                        debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
-                    },
-                    Ok(_) => { /* Ignore other events */ },
-                    Err(RecvError::Closed) => {
-                        tracing::error!("State change receiver channel closed");
-                    }
-                    Err(RecvError::Lagged(count)) => {
-                        tracing::warn!("State change receiver lagged by {} messages", count);
-                    }
+                event = self.device_state_rx.recv() => if let Some(DeviceStateEvent::Updated(_)) = event {
+                    // Put debounce timer into the near future, expiration triggers calculation
+                    debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
                 },
 
-                event = self.user_trigger_rx.recv() => match event {
-                    Ok(TriggerEvent::TriggerAdded) => {
-                        self.update_snapshot().await;
+                event = self.trigger_rx.recv() => if let Some(TriggerEvent::TriggerAdded) = event {
+                    self.update_snapshot().await;
 
-                        //Schedule next regular update
-                        debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
-                    },
-                    Err(RecvError::Closed) => {
-                        tracing::error!("User trigger receiver channel closed");
-                    }
-                    Err(RecvError::Lagged(count)) => {
-                        tracing::warn!("User trigger receiver lagged by {} messages", count);
-                    }
+                    //Schedule next regular update
+                    debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
                 },
 
                 // Debounce elapsed
@@ -133,15 +114,12 @@ impl HomeStateRunner {
             }
         };
 
-        if let Err(e) = self.snapshot_updated_tx.send(new_snapshot.clone()) {
-            tracing::error!("Error sending snapshot updated event: {}", e);
-        }
+        self.event_emitter
+            .send(HomeStateEvent::SnapshotUpdated(new_snapshot.clone()));
 
         for state in HomeState::variants() {
             if let Some(data_point) = new_snapshot.get(state.clone()) {
-                if let Err(e) = self.home_state_updated_tx.send(data_point.clone()) {
-                    tracing::error!("Error sending home state updated event: {:?}", e);
-                }
+                self.event_emitter.send(HomeStateEvent::Updated(data_point.clone()));
 
                 let is_different = match old_snapshot.get(state.clone()) {
                     Some(previous) => previous.value != data_point.value,
@@ -149,9 +127,7 @@ impl HomeStateRunner {
                 };
 
                 if is_different {
-                    if let Err(e) = self.home_state_changed_tx.send(data_point) {
-                        tracing::error!("Error sending home state changed event: {:?}", e);
-                    }
+                    self.event_emitter.send(HomeStateEvent::Changed(data_point));
                 }
             }
         }

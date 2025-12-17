@@ -27,6 +27,19 @@ impl Default for StateSnapshot {
     }
 }
 
+impl std::fmt::Debug for StateSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateSnapshot")
+            .field("timestamp", &self.timestamp)
+            .field("data_keys", &self.data.keys().collect::<Vec<_>>())
+            .field(
+                "active_user_triggers_keys",
+                &self.active_user_triggers.keys().collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
 impl StateSnapshot {
     pub fn new(
         start_of_calculation: DateTime,

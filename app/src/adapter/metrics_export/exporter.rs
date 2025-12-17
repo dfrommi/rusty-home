@@ -1,23 +1,23 @@
-use tokio::sync::broadcast::error::RecvError;
+use infrastructure::EventListener;
 
 use crate::{
     adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::timeseries::DataPoint,
     device_state::{DeviceStateEvent, DeviceStateId},
-    home_state::HomeStateValue,
+    home_state::HomeStateEvent,
     t,
 };
 
 pub struct HomeStateMetricsExporter {
-    device_state_updated_rx: tokio::sync::broadcast::Receiver<DeviceStateEvent>,
-    home_state_updated_rx: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
+    device_state_updated_rx: EventListener<DeviceStateEvent>,
+    home_state_updated_rx: EventListener<HomeStateEvent>,
     repo: VictoriaRepository,
 }
 
 impl HomeStateMetricsExporter {
     pub(super) fn new(
-        rx_device: tokio::sync::broadcast::Receiver<DeviceStateEvent>,
-        rx_home: tokio::sync::broadcast::Receiver<DataPoint<HomeStateValue>>,
+        rx_device: EventListener<DeviceStateEvent>,
+        rx_home: EventListener<HomeStateEvent>,
         repo: VictoriaRepository,
     ) -> Self {
         Self {
@@ -35,40 +35,23 @@ impl HomeStateMetricsExporter {
 
         loop {
             tokio::select! {
-                event = self.device_state_updated_rx.recv() => match event {
-                    Ok(DeviceStateEvent::Updated(data_point)) => {
-                        //Use now instead of first timestamp to fill gaps
-                        let metric: Metric = DataPoint::new(data_point.value.clone(), t!(now)).into();
-                        //Derived metrics
-                        let derived = self.derived_metrics(&metric, data_point.value.into());
-                        for dm in derived {
-                            buffer.push(dm);
-                        }
-
-                        buffer.push(metric);
-                    },
-                    Ok(_) => { /* ignore other events */ },
-                    Err(RecvError::Closed) => {
-                        tracing::error!("Device state receiver channel closed");
-                    },
-                    Err(RecvError::Lagged(count)) => {
-                        tracing::warn!("Device state receiver lagged by {} messages", count);
+                event = self.device_state_updated_rx.recv() => if let Some(DeviceStateEvent::Updated(data_point)) = event {
+                    //Use now instead of first timestamp to fill gaps
+                    let metric: Metric = DataPoint::new(data_point.value.clone(), t!(now)).into();
+                    //Derived metrics
+                    let derived = self.derived_metrics(&metric, data_point.value.into());
+                    for dm in derived {
+                        buffer.push(dm);
                     }
+
+                    buffer.push(metric);
                 },
 
-                event = self.home_state_updated_rx.recv() => match event {
-                    Ok(data_point) => {
-                        //Use now instead of first timestamp to fill gaps
-                        let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
+                event = self.home_state_updated_rx.recv() => if let Some(HomeStateEvent::Updated(data_point)) = event {
+                    //Use now instead of first timestamp to fill gaps
+                    let metric: Metric = DataPoint::new(data_point.value, t!(now)).into();
 
-                        buffer.push(metric);
-                    },
-                    Err(RecvError::Closed) => {
-                        tracing::error!("Home state receiver channel closed");
-                    },
-                    Err(RecvError::Lagged(count)) => {
-                        tracing::warn!("Home state receiver lagged by {} messages", count);
-                    }
+                    buffer.push(metric);
                 }
             };
 

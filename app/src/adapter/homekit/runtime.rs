@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 
-use infrastructure::{MqttInMessage, MqttOutMessage};
+use infrastructure::{EventListener, MqttInMessage, MqttSender, MqttSubscription};
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::broadcast::{Receiver, error::RecvError},
-    task::JoinHandle,
-};
+use tokio::task::JoinHandle;
 
 use super::{
     HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig, accessory::HomekitRegistry,
@@ -13,15 +10,15 @@ use super::{
 };
 use crate::{
     core::timeseries::DataPoint,
-    home_state::HomeStateValue,
+    home_state::{HomeStateEvent, HomeStateValue},
     trigger::{TriggerClient, UserTrigger},
 };
 
 pub struct HomekitRunner {
     registry: HomekitRegistry,
-    state_change_rx: Receiver<DataPoint<HomeStateValue>>,
-    mqtt_sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
-    mqtt_receiver: tokio::sync::mpsc::Receiver<MqttInMessage>,
+    state_change_rx: EventListener<HomeStateEvent>,
+    mqtt_sender: MqttSender,
+    mqtt_receiver: MqttSubscription,
     mqtt_base_topic: String,
     trigger_client: TriggerClient,
     trigger_debounce: HashMap<HomekitTarget, JoinHandle<()>>,
@@ -30,9 +27,9 @@ pub struct HomekitRunner {
 impl HomekitRunner {
     pub fn new(
         registry: HomekitRegistry,
-        state_change_rx: Receiver<DataPoint<HomeStateValue>>,
-        mqtt_sender: tokio::sync::mpsc::Sender<MqttOutMessage>,
-        mqtt_receiver: tokio::sync::mpsc::Receiver<MqttInMessage>,
+        state_change_rx: EventListener<HomeStateEvent>,
+        mqtt_sender: MqttSender,
+        mqtt_receiver: MqttSubscription,
         mqtt_base_topic: String,
         trigger_client: TriggerClient,
     ) -> Self {
@@ -61,16 +58,8 @@ impl HomekitRunner {
                     }
                 },
 
-                state_change = self.state_change_rx.recv() => match state_change {
-                    Ok(state) => {
-                        self.handle_state_change(state).await;
-                    }
-                    Err(RecvError::Closed) => {
-                        tracing::error!("State change receiver channel closed");
-                    }
-                    Err(RecvError::Lagged(count)) => {
-                        tracing::warn!("State change receiver lagged by {} messages", count);
-                    }
+                state_change = self.state_change_rx.recv() => if let Some(HomeStateEvent::Changed(state)) = state_change {
+                    self.handle_state_change(state).await;
                 }
             }
         }
@@ -109,8 +98,8 @@ impl HomekitRunner {
                     continue;
                 }
             };
-            let msg = MqttOutMessage::transient(topic.to_string(), payload);
-            if let Err(e) = self.mqtt_sender.send(msg).await {
+
+            if let Err(e) = self.mqtt_sender.send_transient(&topic, payload).await {
                 tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }
@@ -181,9 +170,8 @@ impl HomekitRunner {
             };
 
             let payload = Self::service_registration_payload(name.clone(), service.clone(), &characteristics);
-            let msg = MqttOutMessage::transient(topic.to_string(), payload.to_string());
 
-            if let Err(e) = self.mqtt_sender.send(msg).await {
+            if let Err(e) = self.mqtt_sender.send_transient(&topic, payload.to_string()).await {
                 tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }

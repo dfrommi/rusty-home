@@ -3,12 +3,11 @@ mod domain;
 mod service;
 
 pub use domain::*;
-use infrastructure::Mqtt;
+use infrastructure::{EventBus, EventListener, Mqtt};
 
 use std::{collections::HashMap, sync::Arc};
 
 use sqlx::PgPool;
-use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     adapter::energy_meter::EnergyReading,
@@ -56,6 +55,7 @@ pub struct OfflineItem {
 
 pub struct DeviceStateRunner {
     service: Arc<DeviceStateService>,
+    event_bus: EventBus<DeviceStateEvent>,
     tasmota_ds: TasmotaIncomingDataSource,
     z2m_ds: Z2mIncomingDataSource,
     ha_ds: HomeAssistantIncomingDataSource,
@@ -72,8 +72,8 @@ impl DeviceStateRunner {
         ha_event_topic: &str,
         ha_url: &str,
         ha_token: &str,
-        energy_reading_rx: mpsc::Receiver<EnergyReading>,
-        command_events: broadcast::Receiver<CommandEvent>,
+        energy_reading_rx: EventListener<EnergyReading>,
+        command_events: EventListener<CommandEvent>,
     ) -> Self {
         let repo = DeviceStateRepository::new(pool.clone());
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
@@ -82,12 +82,13 @@ impl DeviceStateRunner {
         let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
         let internal_ds = InternalDataSource::new(command_events);
 
-        let (event_tx, _event_rx) = broadcast::channel(100);
+        let event_bus = EventBus::new(128);
 
-        let service = DeviceStateService::new(repo.clone(), event_tx.clone());
+        let service = DeviceStateService::new(repo.clone(), event_bus.emitter());
 
         DeviceStateRunner {
             service: Arc::new(service),
+            event_bus,
             tasmota_ds,
             z2m_ds,
             ha_ds,
@@ -102,8 +103,8 @@ impl DeviceStateRunner {
         }
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<DeviceStateEvent> {
-        self.service.subscribe()
+    pub fn subscribe(&self) -> EventListener<DeviceStateEvent> {
+        self.event_bus.subscribe()
     }
 
     pub async fn run(mut self) {

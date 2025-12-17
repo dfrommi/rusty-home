@@ -11,8 +11,7 @@ use crate::core::unit::{KiloWattHours, Watt};
 use crate::device_state::DeviceStateValue;
 use crate::t;
 use anyhow::bail;
-use infrastructure::{Mqtt, MqttInMessage};
-use tokio::sync::mpsc;
+use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 #[derive(Debug, Clone)]
 pub enum TasmotaChannel {
@@ -24,7 +23,7 @@ pub struct TasmotaIncomingDataSource {
     tele_base_topic: String,
     stat_base_topic: String,
     device_config: DeviceConfig<TasmotaChannel>,
-    mqtt_receiver: mpsc::Receiver<MqttInMessage>,
+    mqtt_receiver: MqttSubscription,
 }
 
 impl TasmotaIncomingDataSource {

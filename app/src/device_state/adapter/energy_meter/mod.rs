@@ -5,7 +5,7 @@ use crate::device_state::adapter::energy_meter::persistence::EnergyReadingReposi
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use crate::t;
-use tokio::sync::mpsc;
+use infrastructure::EventListener;
 
 use crate::adapter::energy_meter::{EnergyReading, Faucet, Radiator};
 
@@ -16,12 +16,12 @@ pub struct EnergyReadingAddedEvent {
 
 pub struct EnergyMeterIncomingDataSource {
     repo: EnergyReadingRepository,
-    rx: mpsc::Receiver<EnergyReading>,
+    rx: EventListener<EnergyReading>,
     initial_load: Option<Vec<EnergyReadingAddedEvent>>,
 }
 
 impl EnergyMeterIncomingDataSource {
-    pub fn new(pool: sqlx::PgPool, rx: mpsc::Receiver<EnergyReading>) -> Self {
+    pub fn new(pool: sqlx::PgPool, rx: EventListener<EnergyReading>) -> Self {
         let repo = EnergyReadingRepository::new(pool);
         Self {
             repo,

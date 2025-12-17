@@ -1,13 +1,13 @@
 use actix_web::web::{self, Json};
 use actix_web::{HttpResponse, Responder};
+use infrastructure::EventEmitter;
 use serde::Deserialize;
-use tokio::sync::mpsc;
 
 use super::{EnergyReading, Faucet, Radiator};
 
-type EnergyReadingSender = mpsc::Sender<EnergyReading>;
+type EnergyReadingSender = EventEmitter<EnergyReading>;
 
-pub fn new_actix_web_scope(events: EnergyReadingSender) -> actix_web::Scope {
+pub fn new_actix_web_scope(events: EventEmitter<EnergyReading>) -> actix_web::Scope {
     web::scope("/api/energy/readings")
         .route("/heating", web::put().to(handle_heating_reading))
         .route("/water", web::put().to(handle_water_reading))
@@ -50,10 +50,7 @@ async fn handle_heating_reading(
 
     tracing::info!("Received reading {:?}", reading);
 
-    if let Err(e) = sender.send(reading).await {
-        tracing::error!("Error sending energy reading {:?}: {:?}", dto, e);
-        return HttpResponse::InternalServerError();
-    }
+    sender.send(reading);
 
     HttpResponse::NoContent()
 }
@@ -81,10 +78,7 @@ async fn handle_water_reading(
 
     tracing::info!("Adding reading {:?}", reading);
 
-    if let Err(e) = sender.send(reading).await {
-        tracing::error!("Error sending energy reading {:?}: {:?}", dto, e);
-        return HttpResponse::InternalServerError();
-    }
+    sender.send(reading);
 
     HttpResponse::NoContent()
 }

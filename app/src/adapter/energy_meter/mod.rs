@@ -1,12 +1,12 @@
-mod http_server;
+use infrastructure::EventEmitter;
 
-use tokio::sync::mpsc;
+mod http_server;
 
 #[derive(Debug, Clone)]
 pub struct EnergyMeter;
 
 impl EnergyMeter {
-    pub fn new_web_service(tx: mpsc::Sender<EnergyReading>) -> actix_web::Scope {
+    pub fn new_web_service(tx: EventEmitter<EnergyReading>) -> actix_web::Scope {
         http_server::new_actix_web_scope(tx)
     }
 }

@@ -1,4 +1,4 @@
-use tokio::sync::broadcast;
+use infrastructure::EventEmitter;
 
 use crate::{
     core::time::DateTime,
@@ -8,27 +8,18 @@ use crate::{
 
 pub struct TriggerService {
     repo: TriggerRepository,
-    event_tx: broadcast::Sender<TriggerEvent>,
+    event_tx: EventEmitter<TriggerEvent>,
 }
 
 impl TriggerService {
-    pub fn new(repo: TriggerRepository) -> Self {
-        Self {
-            repo,
-            event_tx: broadcast::channel(100).0,
-        }
-    }
-
-    pub fn subscribe(&self) -> broadcast::Receiver<TriggerEvent> {
-        self.event_tx.subscribe()
+    pub fn new(repo: TriggerRepository, event_tx: EventEmitter<TriggerEvent>) -> Self {
+        Self { repo, event_tx }
     }
 
     pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         match self.repo.add_trigger(trigger).await {
             Ok(_) => {
-                self.event_tx
-                    .send(TriggerEvent::TriggerAdded)
-                    .map_err(|e| anyhow::anyhow!("Failed to send trigger added event: {:?}", e))?;
+                self.event_tx.send(TriggerEvent::TriggerAdded);
                 Ok(())
             }
             Err(e) => Err(e),

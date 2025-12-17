@@ -1,6 +1,5 @@
-use infrastructure::Mqtt;
+use infrastructure::{EventBus, Mqtt};
 use settings::Settings;
-use tokio::sync::mpsc;
 
 use crate::automation::AutomationRunner;
 use crate::command::CommandRunner;
@@ -31,14 +30,14 @@ pub async fn main() {
 
     let command_runner = CommandRunner::new(
         infrastructure.db_pool.clone(),
-        infrastructure.mqtt_client.new_publisher(),
+        infrastructure.mqtt_client.sender(),
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
     );
 
-    let (energy_meter_tx, energy_meter_rx) = mpsc::channel(16);
+    let energy_meter_bus = EventBus::new(64);
 
     let device_state_runner = device_state::DeviceStateRunner::new(
         infrastructure.db_pool.clone(),
@@ -48,7 +47,7 @@ pub async fn main() {
         &settings.homeassistant.topic_event,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
-        energy_meter_rx,
+        energy_meter_bus.subscribe(),
         command_runner.subscribe(),
     )
     .await;
@@ -63,36 +62,30 @@ pub async fn main() {
         device_state_runner.client(),
     );
 
-    let automation_runner = AutomationRunner::new(
-        home_state_runner.subscribe_snapshot_updated(),
-        command_runner.client(),
-        trigger_runner.client(),
-    );
+    let automation_runner =
+        AutomationRunner::new(home_state_runner.subscribe(), command_runner.client(), trigger_runner.client());
 
     let homekit_runner = settings
         .homebridge
-        .new_runner(
-            &mut infrastructure,
-            trigger_runner.client(),
-            home_state_runner.subscribe_state_changed(),
-        )
+        .new_runner(&mut infrastructure, trigger_runner.client(), home_state_runner.subscribe())
         .await;
 
     let mut metrics_exporter = settings
         .metrics
-        .new_exporter(device_state_runner.subscribe(), home_state_runner.subscribe_state_updated());
+        .new_exporter(device_state_runner.subscribe(), home_state_runner.subscribe());
 
     let http_server_exec = {
         let http_device_state_client = device_state_runner.client();
         let metrics = settings.metrics.clone();
         let http_command_client = command_runner.client();
+        let energy_reading_emitter = energy_meter_bus.emitter();
 
         async move {
             settings
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::EnergyMeter::new_web_service(energy_meter_tx.clone()),
+                        adapter::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
                         adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(),
                         metrics.new_routes(),
@@ -137,7 +130,7 @@ pub async fn main() {
         homekit_runner.run().await;
     });
 
-    infrastructure.mqtt_client.process().await;
+    infrastructure.mqtt_client.run().await;
 
     tracing::info!("Shutting down");
 }

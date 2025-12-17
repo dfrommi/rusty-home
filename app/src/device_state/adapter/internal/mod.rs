@@ -1,4 +1,4 @@
-use tokio::sync::broadcast;
+use infrastructure::EventListener;
 
 use crate::{
     command::{Command, CommandEvent, CommandExecution, EnergySavingDevice, Fan},
@@ -8,11 +8,11 @@ use crate::{
 };
 
 pub struct InternalDataSource {
-    rx: broadcast::Receiver<CommandEvent>,
+    rx: EventListener<CommandEvent>,
 }
 
 impl InternalDataSource {
-    pub fn new(rx: broadcast::Receiver<CommandEvent>) -> Self {
+    pub fn new(rx: EventListener<CommandEvent>) -> Self {
         Self { rx }
     }
 }
@@ -23,7 +23,7 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
     }
 
     async fn recv(&mut self) -> Option<CommandEvent> {
-        self.rx.recv().await.ok()
+        self.rx.recv().await
     }
 
     fn device_id(&self, msg: &CommandEvent) -> Option<String> {

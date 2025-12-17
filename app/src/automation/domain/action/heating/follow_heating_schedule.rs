@@ -182,6 +182,7 @@ impl FollowHeatingSchedule {
 
             //reperated interpolation moves the value linearly towards room temp. Timestamp now is
             //therefore fine and on the line of linear interpolation
+            //FIXME: Error evaluating action follow_heating_schedule::kitchen, assuming not fulfilled: Cannot interpolate: next timestamp 2025-12-13 14:58:08.904812711 +01:00 is before requested timestamp 2025-12-13 17:28:09.288973983 +01:00
             let prev = DataPoint::new(thermostat_external_temp, t!(now));
             let next = DataPoint::new(room_temp, mode_start_time + total_duration.clone());
 

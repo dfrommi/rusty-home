@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::home_state::{
-    AutomaticTemperatureIncrease, Occupancy, OpenedArea, Presence, Resident,
+    Occupancy, OpenedArea, Presence, Resident,
     calc::{DerivedStateProvider, StateCalculationContext},
 };
 use crate::{
@@ -61,7 +61,6 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
         Some(calculate_heating_mode(
             !ctx.get(Presence::AtHomeDennis)? & !ctx.get(Presence::AtHomeSabine)?,
             ctx.get(id.window())?,
-            ctx.get(id.temp_increase())?,
             ctx.get(Resident::AnyoneSleeping)?,
             occupancy_1h,
             self.get_user_override(id, ctx),
@@ -86,7 +85,7 @@ impl TargetHeatingModeStateProvider {
             | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state))
             | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => match state {
                 HomekitHeatingState::Off => Some(DegreeCelsius(0.0)),
-                HomekitHeatingState::Heat(target_temperature) => Some(target_temperature.clone()),
+                HomekitHeatingState::Heat(target_temperature) => Some(*target_temperature),
                 HomekitHeatingState::Auto => None,
             },
             _ => None,
@@ -114,15 +113,6 @@ impl TargetHeatingMode {
         }
     }
 
-    fn temp_increase(&self) -> AutomaticTemperatureIncrease {
-        match self {
-            TargetHeatingMode::RoomOfRequirements => AutomaticTemperatureIncrease::RoomOfRequirements,
-            TargetHeatingMode::LivingRoom => AutomaticTemperatureIncrease::LivingRoom,
-            TargetHeatingMode::Bedroom | TargetHeatingMode::Bathroom => AutomaticTemperatureIncrease::Bedroom,
-            TargetHeatingMode::Kitchen => AutomaticTemperatureIncrease::Kitchen,
-        }
-    }
-
     pub fn post_ventilation_duration() -> Duration {
         t!(30 minutes)
     }
@@ -131,7 +121,6 @@ impl TargetHeatingMode {
 fn calculate_heating_mode(
     away: DataPoint<bool>,
     window_open: DataPoint<bool>,
-    temp_increase: DataPoint<bool>,
     sleeping: DataPoint<bool>,
     occupancy_1h: DataFrame<Probability>,
     user_override: Option<UserHeatingOverride>,
@@ -166,7 +155,7 @@ fn calculate_heating_mode(
     //default-temperature of thermostat
     if !window_open.value && window_open.timestamp.elapsed() < TargetHeatingMode::post_ventilation_duration() {
         tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
-        return DataPoint::new(HeatingMode::PostVentilation, temp_increase.timestamp);
+        return DataPoint::new(HeatingMode::PostVentilation, window_open.timestamp);
     }
 
     //Use negative occupancy in living room to detect sleep-mode, but only after is was
@@ -213,15 +202,10 @@ fn calculate_heating_mode(
         }
     }
 
-    let max_ts = &[
-        away.timestamp,
-        window_open.timestamp,
-        temp_increase.timestamp,
-        sleeping.timestamp,
-    ]
-    .into_iter()
-    .max()
-    .unwrap_or_else(|| t!(now));
+    let max_ts = &[away.timestamp, window_open.timestamp, sleeping.timestamp]
+        .into_iter()
+        .max()
+        .unwrap_or_else(|| t!(now));
 
     tracing::trace!("Heating in energy-saving-mode (fallback) as no higher-prio rule applied");
 

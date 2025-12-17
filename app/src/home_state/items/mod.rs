@@ -1,5 +1,4 @@
 mod absolute_humidity;
-mod automatic_temp_inc;
 mod cold_air_coming_in;
 mod dewpoint;
 mod energy_saving;
@@ -23,7 +22,6 @@ mod temperature;
 use std::fmt::Debug;
 
 pub use absolute_humidity::AbsoluteHumidity;
-pub use automatic_temp_inc::AutomaticTemperatureIncrease;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
@@ -54,7 +52,6 @@ use r#macro::StateTypeInfoDerive;
 #[derive(Debug, Clone, PartialEq, StateTypeInfoDerive)]
 pub enum HomeStateValue {
     AbsoluteHumidity(AbsoluteHumidity, GramPerCubicMeter),
-    AutomaticTemperatureIncrease(AutomaticTemperatureIncrease, bool),
     ColdAirComingIn(ColdAirComingIn, bool),
     DewPoint(DewPoint, DegreeCelsius),
     FeltTemperature(FeltTemperature, DegreeCelsius),
@@ -105,14 +102,6 @@ impl DerivedStateProvider<HomeState, StateValue> for HomeStateDerivedStateProvid
                     value: dp.value.into(),
                     timestamp: dp.timestamp,
                 }),
-            HomeState::AutomaticTemperatureIncrease(id) => {
-                automatic_temp_inc::AutomaticTemperatureIncreaseStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
             HomeState::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
                 .calculate_current(id, ctx)
                 .map(|dp| DataPoint {

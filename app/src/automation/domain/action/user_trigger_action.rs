@@ -3,7 +3,7 @@ use r#macro::Id;
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::automation::HeatingZone;
-use crate::command::{Command, HeatingTargetState};
+use crate::command::{Command, EnergySavingDevice, HeatingTargetState};
 use crate::core::time::Duration;
 use crate::home_state::PowerAvailable;
 use crate::t;
@@ -91,12 +91,10 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
             device: PowerToggle::Dehumidifier,
             power_on: on,
         }],
-        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(on)) if !on => vec![Command::SetEnergySaving {
+        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(on)) => vec![Command::SetEnergySaving {
             device: EnergySavingDevice::LivingRoomTv,
-            on: false,
+            on,
         }],
-        //Active EnergySaving is just setting back to FollowDefault action
-        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(_)) => vec![],
         UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(speed)) => vec![Command::ControlFan {
             device: Fan::LivingRoomCeilingFan,
             speed,

@@ -30,7 +30,7 @@ pub enum HeatingMode {
     Manual(DegreeCelsius, UserTriggerId),
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingMode {
     LivingRoom,
     Bedroom,

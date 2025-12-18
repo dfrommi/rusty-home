@@ -6,7 +6,7 @@ use crate::{core::timeseries::DataPoint, home_state::Presence};
 use anyhow::{Result, bail};
 use r#macro::{EnumVariants, Id};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Resident {
     AnyoneSleeping,
     AnyoneOnCouch,

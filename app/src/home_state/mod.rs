@@ -117,11 +117,11 @@ impl HomeStateRunner {
         self.event_emitter
             .send(HomeStateEvent::SnapshotUpdated(new_snapshot.clone()));
 
-        for state in HomeState::variants() {
-            if let Some(data_point) = new_snapshot.get(state.clone()) {
+        for state in HomeStateId::variants() {
+            if let Some(data_point) = new_snapshot.get(state) {
                 self.event_emitter.send(HomeStateEvent::Updated(data_point.clone()));
 
-                let is_different = match old_snapshot.get(state.clone()) {
+                let is_different = match old_snapshot.get(state) {
                     Some(previous) => previous.value != data_point.value,
                     None => true,
                 };

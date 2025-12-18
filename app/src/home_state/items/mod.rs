@@ -47,9 +47,9 @@ use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
 use crate::home_state::calc::StateCalculationContext;
 use crate::t;
-use r#macro::StateTypeInfoDerive;
+use r#macro::StateEnumDerive;
 
-#[derive(Debug, Clone, PartialEq, StateTypeInfoDerive)]
+#[derive(Debug, Clone, PartialEq, StateEnumDerive)]
 pub enum HomeStateValue {
     AbsoluteHumidity(AbsoluteHumidity, GramPerCubicMeter),
     ColdAirComingIn(ColdAirComingIn, bool),
@@ -74,178 +74,79 @@ pub enum HomeStateValue {
     Temperature(Temperature, DegreeCelsius),
 }
 
-#[derive(Debug, Clone, PartialEq, derive_more::From)]
-pub enum StateValue {
-    Boolean(bool),
-    DegreeCelsius(DegreeCelsius),
-    Watt(Watt),
-    Percent(Percent),
-    GramPerCubicMeter(GramPerCubicMeter),
-    KiloWattHours(KiloWattHours),
-    HeatingUnit(HeatingUnit),
-    KiloCubicMeter(KiloCubicMeter),
-    FanAirflow(FanAirflow),
-    HeatingMode(HeatingMode),
-    RawValue(RawValue),
-    Lux(Lux),
-    Probability(Probability),
+impl HomeStateItem for HomeStateId {
+    type Type = HomeStateValue;
+
+    fn try_downcast(&self, value: HomeStateValue) -> anyhow::Result<Self::Type> {
+        Ok(value)
+    }
 }
 
 pub struct HomeStateDerivedStateProvider;
 
-impl DerivedStateProvider<HomeState, StateValue> for HomeStateDerivedStateProvider {
-    fn calculate_current(&self, id: HomeState, ctx: &StateCalculationContext) -> Option<DataPoint<StateValue>> {
+impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedStateProvider {
+    fn calculate_current(&self, id: HomeStateId, ctx: &StateCalculationContext) -> Option<DataPoint<HomeStateValue>> {
         match id {
-            HomeState::AbsoluteHumidity(id) => absolute_humidity::AbsoluteHumidityStateProvider
+            HomeStateId::AbsoluteHumidity(id) => absolute_humidity::AbsoluteHumidityStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
+                .map(|dp| dp.with(HomeStateValue::AbsoluteHumidity(id, dp.value))),
+            HomeStateId::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::DewPoint(id) => dewpoint::DewPointStateProvider
+                .map(|dp| dp.with(HomeStateValue::ColdAirComingIn(id, dp.value))),
+            HomeStateId::DewPoint(id) => dewpoint::DewPointStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::FeltTemperature(id) => felt_temperature::FeltTemperatureStateProvider
+                .map(|dp| dp.with(HomeStateValue::DewPoint(id, dp.value))),
+            HomeStateId::FeltTemperature(id) => felt_temperature::FeltTemperatureStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::IsRunning(id) => {
-                is_running::IsRunningStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::Load(id) => load::LoadStateProvider.calculate_current(id, ctx).map(|dp| DataPoint {
-                value: dp.value.into(),
-                timestamp: dp.timestamp,
-            }),
-            HomeState::Occupancy(id) => {
-                occupancy::OccupancyStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::OpenedArea(id) => {
-                opened::OpenedAreaStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::Resident(id) => resident::ResidentStateProvider
+                .map(|dp| dp.with(HomeStateValue::FeltTemperature(id, dp.value))),
+            HomeStateId::IsRunning(id) => is_running::IsRunningStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::RiskOfMould(id) => {
-                risk_of_mould::RiskOfMouldStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::TargetHeatingMode(id) => target_heating_mode::TargetHeatingModeStateProvider
+                .map(|dp| dp.with(HomeStateValue::IsRunning(id, dp.value))),
+            HomeStateId::Load(id) => load::LoadStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::EnergySaving(id) => {
-                energy_saving::EnergySavingStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::FanActivity(id) => fan_activity::FanActivityStateProvider
+                .map(|dp| dp.with(HomeStateValue::Load(id, dp.value))),
+            HomeStateId::Occupancy(id) => occupancy::OccupancyStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::HeatingDemand(id) => heating_demand::HeatingDemandStateProvider
+                .map(|dp| dp.with(HomeStateValue::Occupancy(id, dp.value))),
+            HomeStateId::OpenedArea(id) => opened::OpenedAreaStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::PowerAvailable(id) => power_available::PowerAvailableStateProvider
+                .map(|dp| dp.with(HomeStateValue::OpenedArea(id, dp.value))),
+            HomeStateId::Resident(id) => resident::ResidentStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::Presence(id) => presence::PresenceStateProvider
+                .map(|dp| dp.with(HomeStateValue::Resident(id, dp.value))),
+            HomeStateId::RiskOfMould(id) => risk_of_mould::RiskOfMouldStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::RawVendorValue(id) => raw_vendor_value::RawVendorValueStateProvider
+                .map(|dp| dp.with(HomeStateValue::RiskOfMould(id, dp.value))),
+            HomeStateId::TargetHeatingMode(id) => target_heating_mode::TargetHeatingModeStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::RelativeHumidity(id) => relative_humidity::RelativeHumidityStateProvider
+                .map(|dp| dp.with(HomeStateValue::TargetHeatingMode(id, dp.value.clone()))),
+            HomeStateId::EnergySaving(id) => energy_saving::EnergySavingStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-            HomeState::SetPoint(id) => {
-                set_point::SetPointStateProvider
-                    .calculate_current(id, ctx)
-                    .map(|dp| DataPoint {
-                        value: dp.value.into(),
-                        timestamp: dp.timestamp,
-                    })
-            }
-            HomeState::Temperature(id) => temperature::TemperatureStateProvider
+                .map(|dp| dp.with(HomeStateValue::EnergySaving(id, dp.value))),
+            HomeStateId::FanActivity(id) => fan_activity::FanActivityStateProvider
                 .calculate_current(id, ctx)
-                .map(|dp| DataPoint {
-                    value: dp.value.into(),
-                    timestamp: dp.timestamp,
-                }),
-        }
-    }
-}
-
-impl std::fmt::Display for StateValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StateValue::Boolean(bool) => write!(f, "{}", bool),
-            StateValue::DegreeCelsius(degree_celsius) => write!(f, "{}", degree_celsius),
-            StateValue::Watt(watt) => write!(f, "{}", watt),
-            StateValue::Percent(percent) => write!(f, "{}", percent),
-            StateValue::GramPerCubicMeter(gram_per_cubic_meter) => write!(f, "{}", gram_per_cubic_meter),
-            StateValue::KiloWattHours(kilo_watt_hours) => write!(f, "{}", kilo_watt_hours),
-            StateValue::HeatingUnit(heating_unit) => write!(f, "{}", heating_unit),
-            StateValue::KiloCubicMeter(kilo_cubic_meter) => write!(f, "{}", kilo_cubic_meter),
-            StateValue::FanAirflow(fan_airflow) => write!(f, "{}", fan_airflow),
-            StateValue::HeatingMode(heating_mode) => write!(f, "{}", heating_mode),
-            StateValue::RawValue(raw_value) => write!(f, "{}", raw_value),
-            StateValue::Lux(lux) => write!(f, "{}", lux),
-            StateValue::Probability(probability) => write!(f, "{}", probability),
+                .map(|dp| dp.with(HomeStateValue::FanActivity(id, dp.value.clone()))),
+            HomeStateId::HeatingDemand(id) => heating_demand::HeatingDemandStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::HeatingDemand(id, dp.value))),
+            HomeStateId::PowerAvailable(id) => power_available::PowerAvailableStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::PowerAvailable(id, dp.value))),
+            HomeStateId::Presence(id) => presence::PresenceStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::Presence(id, dp.value))),
+            HomeStateId::RawVendorValue(id) => raw_vendor_value::RawVendorValueStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::RawVendorValue(id, dp.value))),
+            HomeStateId::RelativeHumidity(id) => relative_humidity::RelativeHumidityStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::RelativeHumidity(id, dp.value))),
+            HomeStateId::SetPoint(id) => set_point::SetPointStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::SetPoint(id, dp.value))),
+            HomeStateId::Temperature(id) => temperature::TemperatureStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::Temperature(id, dp.value))),
         }
     }
 }

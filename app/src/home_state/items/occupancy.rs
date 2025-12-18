@@ -10,7 +10,7 @@ use crate::core::math::DataFrameStatsExt as _;
 use crate::core::time::DateTimeRange;
 use r#macro::{EnumVariants, Id};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Occupancy {
     LivingRoomCouch,
     BedroomBed,

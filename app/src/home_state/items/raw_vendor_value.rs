@@ -6,7 +6,7 @@ use crate::{
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RawVendorValue {
     AllyLoadEstimate(Thermostat),
     AllyLoadMean(Thermostat),

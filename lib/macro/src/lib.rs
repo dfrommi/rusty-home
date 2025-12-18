@@ -2,18 +2,12 @@ mod enum_variants;
 mod id_item;
 mod state_enum;
 mod state_trace;
-mod state_type_info;
 
 use proc_macro::TokenStream;
 
 #[proc_macro_derive(StateEnumDerive)]
 pub fn state_enum_derive(input: TokenStream) -> TokenStream {
     state_enum::derive(input)
-}
-
-#[proc_macro_derive(StateTypeInfoDerive, attributes(persistent))]
-pub fn state_type_info_derive(input: TokenStream) -> TokenStream {
-    state_type_info::derive(input)
 }
 
 #[proc_macro_derive(Id)]

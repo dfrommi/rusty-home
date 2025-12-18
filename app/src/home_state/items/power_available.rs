@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum PowerAvailable {
     Dehumidifier,
     LivingRoomNotificationLight,

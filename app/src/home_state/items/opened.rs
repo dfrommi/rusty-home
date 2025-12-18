@@ -5,7 +5,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::DataPoint;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum OpenedArea {
     LivingRoomWindowOrDoor,
     BedroomWindow,

@@ -25,7 +25,6 @@ pub use user_trigger_action::UserTriggerAction;
 
 use crate::automation::planner::{Action, ActionEvaluationResult};
 use crate::home_state::*;
-use crate::port::*;
 
 #[derive(Debug, Clone)]
 pub enum RuleResult {
@@ -48,18 +47,18 @@ impl RuleEvaluationContext {
         &self.snapshot
     }
 
-    pub fn current_dp<S>(&self, id: S) -> Result<DataPoint<S::ValueType>>
+    pub fn current_dp<S>(&self, id: S) -> Result<DataPoint<S::Type>>
     where
-        S: Into<HomeState> + ValueObject + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         self.snapshot
             .get(id.clone())
             .ok_or_else(|| anyhow::anyhow!("Current value for state {:?} not found", id.into()))
     }
 
-    pub fn current<S>(&self, id: S) -> Result<S::ValueType>
+    pub fn current<S>(&self, id: S) -> Result<S::Type>
     where
-        S: Into<HomeState> + ValueObject + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         self.current_dp(id).map(|dp| dp.value)
     }

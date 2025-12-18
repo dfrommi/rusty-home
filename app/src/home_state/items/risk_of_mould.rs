@@ -10,7 +10,7 @@ use r#macro::{EnumVariants, Id};
 
 use super::dewpoint::DewPoint;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, EnumVariants, Id)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumVariants, Id)]
 pub enum RiskOfMould {
     Bathroom,
 }

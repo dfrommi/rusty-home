@@ -5,15 +5,14 @@ use crate::{
         time::DateTime,
         timeseries::{DataFrame, DataPoint},
     },
-    home_state::{HomeState, StateValue},
-    port::ValueObject,
+    home_state::{HomeStateId, HomeStateItem, HomeStateValue},
     trigger::{UserTriggerExecution, UserTriggerTarget},
 };
 
 #[derive(Clone)]
 pub struct StateSnapshot {
     timestamp: DateTime,
-    data: Arc<HashMap<HomeState, DataFrame<StateValue>>>,
+    data: Arc<HashMap<HomeStateId, DataFrame<HomeStateValue>>>,
     active_user_triggers: Arc<HashMap<UserTriggerTarget, UserTriggerExecution>>,
 }
 
@@ -43,7 +42,7 @@ impl std::fmt::Debug for StateSnapshot {
 impl StateSnapshot {
     pub fn new(
         start_of_calculation: DateTime,
-        data: HashMap<HomeState, DataFrame<StateValue>>,
+        data: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
         active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     ) -> Self {
         StateSnapshot {
@@ -57,12 +56,14 @@ impl StateSnapshot {
         self.timestamp
     }
 
-    pub fn get<S>(&self, id: S) -> Option<DataPoint<S::ValueType>>
+    pub fn get<S>(&self, id: S) -> Option<DataPoint<S::Type>>
     where
-        S: Into<HomeState> + ValueObject + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         let state_value = self.data.get(&id.clone().into())?.last()?;
-        let value = id.project_state_value(state_value.value.clone())?;
+        let value = id
+            .try_downcast(state_value.value.clone())
+            .expect("Internal error: HomeStateValue type mismatch");
 
         Some(DataPoint {
             value,
@@ -70,9 +71,9 @@ impl StateSnapshot {
         })
     }
 
-    pub fn try_get<S>(&self, id: S) -> anyhow::Result<DataPoint<S::ValueType>>
+    pub fn try_get<S>(&self, id: S) -> anyhow::Result<DataPoint<S::Type>>
     where
-        S: Into<HomeState> + ValueObject + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         self.get(id)
             .ok_or_else(|| anyhow::anyhow!("no data point found for state"))
@@ -87,7 +88,7 @@ impl StateSnapshot {
         self.active_user_triggers.get(&target)
     }
 
-    pub fn home_state_iter(&self) -> impl Iterator<Item = (&HomeState, &DataFrame<StateValue>)> {
+    pub fn home_state_iter(&self) -> impl Iterator<Item = (&HomeStateId, &DataFrame<HomeStateValue>)> {
         self.data.iter()
     }
 }

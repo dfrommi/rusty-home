@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
     Bathroom,
     LivingRoom,

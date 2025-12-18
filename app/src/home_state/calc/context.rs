@@ -6,8 +6,7 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
     },
     device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem, DeviceStateValue},
-    home_state::{HomeState, HomeStateDerivedStateProvider, HomeStateValue, OpenedArea, StateValue},
-    port::ValueObject,
+    home_state::{HomeStateDerivedStateProvider, HomeStateId, HomeStateItem, HomeStateValue},
     t,
     trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
 };
@@ -23,7 +22,7 @@ pub async fn calculate_new_snapshot(
     let context = create_new_calculation_context(history, device_state, trigger_client).await?;
 
     //preload all current values
-    for id in HomeState::variants().iter() {
+    for id in HomeStateId::variants().iter() {
         context.load(id.clone());
     }
 
@@ -47,7 +46,7 @@ async fn create_new_calculation_context(
         active_triggers.insert(trigger.target(), trigger);
     }
 
-    let mut history_map: HashMap<HomeState, DataFrame<StateValue>> = HashMap::new();
+    let mut history_map: HashMap<HomeStateId, DataFrame<HomeStateValue>> = HashMap::new();
     for (id, value) in history.home_state_iter() {
         history_map.insert(id.clone(), value.clone());
     }
@@ -65,8 +64,8 @@ async fn create_new_calculation_context(
 
 pub struct StateCalculationContext {
     start_time: DateTime,
-    current: RefCell<HashMap<HomeState, DataPoint<StateValue>>>,
-    history: HashMap<HomeState, DataFrame<StateValue>>,
+    current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
+    history: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
     device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
     active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
 }
@@ -76,12 +75,38 @@ pub trait DerivedStateProvider<ID, T> {
 }
 
 impl StateCalculationContext {
-    pub fn get<S>(&self, id: S) -> Option<DataPoint<S::ValueType>>
+    fn load(&self, id: HomeStateId) {
+        let _ = self.get_home_state_value(id);
+    }
+
+    fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
+        let mut data = HashMap::new();
+
+        for (id, current) in self.current.borrow().iter() {
+            let df: Option<DataFrame<HomeStateValue>> = self.history.get(id).cloned();
+            let combined_df = match df {
+                Some(mut df) => {
+                    df.insert(current.clone());
+                    df.retain_range_with_context_before(&range)
+                }
+                None => DataFrame::new(vec![current.clone()]),
+            };
+            data.insert(id.clone(), combined_df);
+        }
+
+        StateSnapshot::new(self.start_time, data, self.active_user_triggers)
+    }
+}
+
+impl StateCalculationContext {
+    pub fn get<S>(&self, id: S) -> Option<DataPoint<S::Type>>
     where
-        S: Into<HomeState> + ValueObject + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         let state_value = self.get_home_state_value(id.clone().into())?;
-        let value = id.project_state_value(state_value.value)?;
+        let value = id
+            .try_downcast(state_value.value)
+            .expect("Internal error: State value projection failed in get");
 
         Some(DataPoint {
             value,
@@ -89,7 +114,35 @@ impl StateCalculationContext {
         })
     }
 
-    fn get_home_state_value(&self, id: HomeState) -> Option<DataPoint<StateValue>> {
+    pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::Type>>
+    where
+        S: Into<HomeStateId> + HomeStateItem + Clone,
+    {
+        let df = self.data_frame(id.clone().into(), DateTimeRange::since(timestamp))?;
+        downcast_df(id, &df)
+    }
+
+    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
+        self.active_user_triggers.get(&target)
+    }
+
+    pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>
+    where
+        D: Into<DeviceStateId> + DeviceStateItem + Clone,
+    {
+        let dp = self.device_state.get(&id.clone().into())?;
+        match id.try_downcast(dp.value.clone()) {
+            Ok(v) => Some(DataPoint::new(v, dp.timestamp)),
+            Err(e) => {
+                tracing::error!("Error converting device state {:?} to exepceted type: {}", dp.value, e);
+                None
+            }
+        }
+    }
+}
+
+impl StateCalculationContext {
+    fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
         let current_value = {
             let current = self.current.borrow();
             current.get(&id).cloned()
@@ -131,33 +184,11 @@ impl StateCalculationContext {
         }
     }
 
-    pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>
-    where
-        D: Into<DeviceStateId> + DeviceStateItem + Clone,
-    {
-        let dp = self.device_state.get(&id.clone().into())?;
-        match id.try_downcast(dp.value.clone()) {
-            Ok(v) => Some(DataPoint::new(v, dp.timestamp)),
-            Err(e) => {
-                tracing::error!("Error converting device state {:?} to exepceted type: {}", dp.value, e);
-                None
-            }
-        }
-    }
-
-    fn last_history_timestamp(&self, id: &HomeState) -> Option<DateTime> {
+    fn last_history_timestamp(&self, id: &HomeStateId) -> Option<DateTime> {
         self.history.get(id).and_then(|df| df.last()).map(|dp| dp.timestamp)
     }
 
-    pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::ValueType>>
-    where
-        S: Into<HomeState> + ValueObject + Clone,
-    {
-        let df = self.data_frame(id.clone().into(), DateTimeRange::since(timestamp))?;
-        downcast_df(id, &df)
-    }
-
-    fn data_frame(&self, id: HomeState, range: DateTimeRange) -> Option<DataFrame<StateValue>> {
+    fn data_frame(&self, id: HomeStateId, range: DateTimeRange) -> Option<DataFrame<HomeStateValue>> {
         let prev_df = self.history.get(&id);
         let current = self.get_home_state_value(id).take_if(|dp| &dp.timestamp <= range.end());
 
@@ -173,38 +204,15 @@ impl StateCalculationContext {
             _ => None,
         }
     }
-
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
-        self.active_user_triggers.get(&target)
-    }
-
-    fn load(&self, id: HomeState) {
-        let _ = self.get_home_state_value(id);
-    }
-
-    fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
-        let mut data = HashMap::new();
-
-        for (id, current) in self.current.borrow().iter() {
-            let df: Option<DataFrame<StateValue>> = self.history.get(id).cloned();
-            let combined_df = match df {
-                Some(mut df) => {
-                    df.insert(current.clone());
-                    df.retain_range_with_context_before(&range)
-                }
-                None => DataFrame::new(vec![current.clone()]),
-            };
-            data.insert(id.clone(), combined_df);
-        }
-
-        StateSnapshot::new(self.start_time, data, self.active_user_triggers)
-    }
 }
 
-fn downcast_df<S: ValueObject + Into<HomeState>>(id: S, df: &DataFrame<StateValue>) -> Option<DataFrame<S::ValueType>> {
-    Some(df.map(|dp: &DataPoint<StateValue>| {
+fn downcast_df<S: HomeStateItem + Into<HomeStateId>>(
+    id: S,
+    df: &DataFrame<HomeStateValue>,
+) -> Option<DataFrame<S::Type>> {
+    Some(df.map(|dp: &DataPoint<HomeStateValue>| {
         //TODO fail gracefully
-        id.project_state_value(dp.value.clone())
+        id.try_downcast(dp.value.clone())
             .expect("Internal error: State value projection failed in downcast_df")
     }))
 }

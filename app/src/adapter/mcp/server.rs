@@ -1,6 +1,6 @@
 use crate::core::id::ExternalId;
 use crate::core::time::{DateTime, Duration};
-use crate::home_state::HomeState;
+use crate::home_state::HomeStateId;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema, Schema, json_schema};
 use rmcp::tool;
@@ -112,7 +112,7 @@ impl SmartHomeMcp {
     async fn list_devices(&self) -> Result<CallToolResult, McpError> {
         let mut devices = Vec::new();
 
-        for state in HomeState::variants() {
+        for state in HomeStateId::variants() {
             let external_id = state.ext_id();
 
             devices.push(Content::json(DeviceId {

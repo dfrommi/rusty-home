@@ -7,9 +7,9 @@ use actix_web::{
 use serde::Deserialize;
 
 use crate::{
-    adapter::metrics_export::{Metric, MetricId, repository::VictoriaRepository},
+    adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::time::{DateTime, DateTimeRange},
-    home_state::HomeState,
+    home_state::HomeStateId,
     t,
 };
 
@@ -54,12 +54,12 @@ impl BackfillQuery {
             .collect()
     }
 
-    fn contains(list: &[String], s: &HomeState) -> bool {
+    fn contains(list: &[String], s: &HomeStateId) -> bool {
         list.iter().any(|n| s.ext_id().to_string().starts_with(n))
     }
 
-    fn matching_variants(&self) -> Vec<HomeState> {
-        let variants = HomeState::variants();
+    fn matching_variants(&self) -> Vec<HomeStateId> {
+        let variants = HomeStateId::variants();
         let names = Self::split(&self.name);
         let excluded_names = Self::split(&self.exclude);
 
@@ -157,7 +157,7 @@ async fn backfill_handler(
 }
 
 async fn items_handler() -> Result<HttpResponse, Error> {
-    let variants = HomeState::variants();
+    let variants = HomeStateId::variants();
     let items: Vec<String> = variants.iter().map(|s| s.ext_id().to_string()).collect();
 
     Ok(HttpResponse::Ok().body(items.join("\n")))

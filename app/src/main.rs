@@ -11,7 +11,6 @@ mod command;
 mod core;
 mod device_state;
 mod home_state;
-pub mod port;
 mod settings;
 mod trigger;
 

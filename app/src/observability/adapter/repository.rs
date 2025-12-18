@@ -1,7 +1,6 @@
 use reqwest::Client;
 
-use crate::adapter::metrics_export::Metric;
-use crate::adapter::metrics_export::MetricId;
+use crate::observability::domain::{Metric, MetricId};
 
 pub struct VictoriaRepository {
     client: Client,
@@ -56,7 +55,7 @@ impl VictoriaRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{adapter::metrics_export::MetricLabel, core::time::DateTime};
+    use crate::{core::time::DateTime, observability::domain::MetricLabel};
     use mockito::Server;
 
     fn metric(name: &str, variant: Option<&str>, value: f64, timestamp: DateTime) -> Metric {

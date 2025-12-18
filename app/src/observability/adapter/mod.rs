@@ -1,3 +1,4 @@
+pub mod api;
 pub mod device_metrics;
 pub mod home_metrics;
 pub mod repository;

@@ -1,31 +1,26 @@
 mod adapter;
-mod api;
 mod domain;
-mod repository;
-mod tags;
-
-pub use api::MetricsExportApi;
 
 use std::sync::Arc;
-
-use domain::*;
 
 use infrastructure::EventListener;
 
 use crate::{
-    adapter::metrics_export::{Metric, adapter::MetricsAdapter as _, repository::VictoriaRepository},
+    command::CommandClient,
     device_state::{DeviceStateClient, DeviceStateEvent},
     home_state::HomeStateEvent,
+    observability::adapter::{MetricsAdapter as _, api::MetricsExportApi, repository::VictoriaRepository},
     t,
 };
 
-use crate::adapter::metrics_export::adapter::{device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter};
+use crate::observability::adapter::{device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter};
 
 pub struct MetricsExportModule {
     repo: Arc<VictoriaRepository>,
     device_state_events: EventListener<DeviceStateEvent>,
     home_state_events: EventListener<HomeStateEvent>,
     device_state_client: DeviceStateClient,
+    command_client: CommandClient,
     home_metrics_adapter: HomeMetricsAdapter,
     device_metrics_adapter: DeviceMetricsAdapter,
 }
@@ -36,6 +31,7 @@ impl MetricsExportModule {
         device_state_events: EventListener<DeviceStateEvent>,
         home_state_events: EventListener<HomeStateEvent>,
         device_state_client: DeviceStateClient,
+        command_client: CommandClient,
     ) -> Self {
         let repo = Arc::new(VictoriaRepository::new(victoria_url));
 
@@ -44,13 +40,14 @@ impl MetricsExportModule {
             device_state_events,
             home_state_events,
             device_state_client,
+            command_client,
             home_metrics_adapter: HomeMetricsAdapter,
             device_metrics_adapter: DeviceMetricsAdapter,
         }
     }
 
-    pub fn router(&self) -> MetricsExportApi {
-        MetricsExportApi::new(self.repo.clone())
+    pub fn api(&self) -> MetricsExportApi {
+        MetricsExportApi::new(self.repo.clone(), self.command_client.clone(), self.device_state_client.clone())
     }
 
     pub async fn run(mut self) {

@@ -1,7 +1,7 @@
 use crate::{
-    adapter::metrics_export::domain::{Metric, MetricId},
     core::timeseries::DataPoint,
     home_state::{HeatingMode, HomeStateId, HomeStateValue},
+    observability::domain::{Metric, MetricId},
 };
 
 pub struct HomeMetricsAdapter;

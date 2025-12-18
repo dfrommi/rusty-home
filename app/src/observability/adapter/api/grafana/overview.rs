@@ -3,8 +3,7 @@ use infrastructure::TraceContext;
 
 use crate::command::{Command, CommandClient, HeatingTargetState};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
-
-use crate::adapter::grafana::{GrafanaApiError, GrafanaResponse, dashboard::TimeRangeQuery, support::csv_response};
+use crate::observability::adapter::api::grafana::{GrafanaApiError, GrafanaResponse, TimeRangeQuery, csv_response};
 
 pub fn routes(command_client: CommandClient, device_state_client: DeviceStateClient) -> actix_web::Scope {
     web::scope("/overview")

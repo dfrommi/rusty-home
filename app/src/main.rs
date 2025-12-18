@@ -11,6 +11,7 @@ mod command;
 mod core;
 mod device_state;
 mod home_state;
+mod observability;
 mod settings;
 mod trigger;
 
@@ -69,18 +70,17 @@ pub async fn main() {
         .new_runner(&mut infrastructure, trigger_runner.client(), home_state_runner.subscribe())
         .await;
 
-    let metrics_exporter = adapter::metrics_export::MetricsExportModule::new(
+    let metrics_exporter = observability::MetricsExportModule::new(
         settings.metrics.victoria_url.clone(),
         device_state_runner.subscribe(),
         home_state_runner.subscribe(),
         device_state_runner.client(),
+        command_runner.client(),
     );
 
     let http_server_exec = {
-        let http_device_state_client = device_state_runner.client();
-        let http_command_client = command_runner.client();
         let energy_reading_emitter = energy_meter_bus.emitter();
-        let metrics_export_api = metrics_exporter.router();
+        let metrics_export_api = metrics_exporter.api();
 
         async move {
             settings
@@ -88,9 +88,8 @@ pub async fn main() {
                 .run_server(move || {
                     vec![
                         adapter::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
-                        adapter::grafana::new_routes(http_command_client.clone(), http_device_state_client.clone()),
                         adapter::mcp::new_routes(),
-                        metrics_export_api.clone().into(),
+                        metrics_export_api.routes(),
                     ]
                 })
                 .await

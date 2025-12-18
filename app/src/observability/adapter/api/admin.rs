@@ -7,9 +7,9 @@ use actix_web::{
 use serde::Deserialize;
 
 use crate::{
-    adapter::metrics_export::{Metric, repository::VictoriaRepository},
     core::time::{DateTime, DateTimeRange},
     home_state::HomeStateId,
+    observability::{adapter::repository::VictoriaRepository, domain::Metric},
     t,
 };
 
@@ -24,26 +24,6 @@ struct BackfillQuery {
 
     start: Option<DateTime>,
     end: Option<DateTime>,
-}
-
-#[derive(Clone)]
-pub struct MetricsExportApi {
-    repo: Arc<VictoriaRepository>,
-}
-
-impl MetricsExportApi {
-    pub fn new(repo: Arc<VictoriaRepository>) -> Self {
-        Self { repo }
-    }
-}
-
-impl Into<actix_web::Scope> for MetricsExportApi {
-    fn into(self) -> actix_web::Scope {
-        web::scope("/metrics")
-            .route("/backfill", web::get().to(backfill_handler))
-            .route("/names", web::get().to(items_handler))
-            .app_data(web::Data::from(self.repo))
-    }
 }
 
 impl BackfillQuery {
@@ -69,6 +49,13 @@ impl BackfillQuery {
             .filter(|s| !Self::contains(&excluded_names, s))
             .collect()
     }
+}
+
+pub fn routes(repo: Arc<VictoriaRepository>) -> actix_web::Scope {
+    web::scope("/metrics")
+        .route("/backfill", web::get().to(backfill_handler))
+        .route("/names", web::get().to(items_handler))
+        .app_data(web::Data::from(repo))
 }
 
 async fn backfill_handler(

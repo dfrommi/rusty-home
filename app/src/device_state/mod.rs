@@ -53,7 +53,7 @@ pub struct OfflineItem {
     pub duration: Duration,
 }
 
-pub struct DeviceStateRunner {
+pub struct DeviceStateModule {
     service: Arc<DeviceStateService>,
     event_bus: EventBus<DeviceStateEvent>,
     tasmota_ds: TasmotaIncomingDataSource,
@@ -63,7 +63,7 @@ pub struct DeviceStateRunner {
     internal_ds: InternalDataSource,
 }
 
-impl DeviceStateRunner {
+impl DeviceStateModule {
     pub async fn new(
         pool: PgPool,
         mqtt_client: &mut Mqtt,
@@ -86,7 +86,7 @@ impl DeviceStateRunner {
 
         let service = DeviceStateService::new(repo.clone(), event_bus.emitter());
 
-        DeviceStateRunner {
+        DeviceStateModule {
             service: Arc::new(service),
             event_bus,
             tasmota_ds,

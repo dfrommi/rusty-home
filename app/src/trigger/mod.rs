@@ -32,7 +32,7 @@ impl UserTriggerExecution {
     }
 }
 
-pub struct TriggerRunner {
+pub struct TriggerModule {
     service: Arc<TriggerService>,
     event_bus: EventBus<TriggerEvent>,
 }
@@ -60,7 +60,7 @@ impl TriggerClient {
     }
 }
 
-impl TriggerRunner {
+impl TriggerModule {
     pub fn new(pool: PgPool) -> Self {
         let repo = TriggerRepository::new(pool);
         let event_bus = EventBus::new(64);

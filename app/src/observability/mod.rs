@@ -15,7 +15,7 @@ use crate::{
 
 use crate::observability::adapter::{device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter};
 
-pub struct MetricsExportModule {
+pub struct ObservabilityModule {
     repo: Arc<VictoriaRepository>,
     device_state_events: EventListener<DeviceStateEvent>,
     home_state_events: EventListener<HomeStateEvent>,
@@ -25,7 +25,7 @@ pub struct MetricsExportModule {
     device_metrics_adapter: DeviceMetricsAdapter,
 }
 
-impl MetricsExportModule {
+impl ObservabilityModule {
     pub fn new(
         victoria_url: String,
         device_state_events: EventListener<DeviceStateEvent>,

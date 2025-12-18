@@ -1,9 +1,9 @@
 use infrastructure::{EventBus, Mqtt};
 use settings::Settings;
 
-use crate::automation::AutomationRunner;
-use crate::command::CommandRunner;
-use crate::home_state::HomeStateRunner;
+use crate::automation::AutomationModule;
+use crate::command::CommandModule;
+use crate::home_state::HomeStateModule;
 
 mod adapter;
 mod automation;
@@ -28,7 +28,7 @@ pub async fn main() {
         .await
         .expect("Error initializing infrastructure");
 
-    let command_runner = CommandRunner::new(
+    let command_module = CommandModule::new(
         infrastructure.db_pool.clone(),
         infrastructure.mqtt_client.sender(),
         &settings.tasmota.event_topic,
@@ -39,7 +39,7 @@ pub async fn main() {
 
     let energy_meter_bus = EventBus::new(64);
 
-    let device_state_runner = device_state::DeviceStateRunner::new(
+    let device_state_module = device_state::DeviceStateModule::new(
         infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
@@ -48,39 +48,39 @@ pub async fn main() {
         &settings.homeassistant.url,
         &settings.homeassistant.token,
         energy_meter_bus.subscribe(),
-        command_runner.subscribe(),
+        command_module.subscribe(),
     )
     .await;
 
-    let trigger_runner = trigger::TriggerRunner::new(infrastructure.db_pool.clone());
+    let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
 
-    let mut home_state_runner = HomeStateRunner::new(
+    let mut home_state_module = HomeStateModule::new(
         t!(3 hours),
-        device_state_runner.subscribe(),
-        trigger_runner.subscribe(),
-        trigger_runner.client(),
-        device_state_runner.client(),
+        device_state_module.subscribe(),
+        trigger_module.subscribe(),
+        trigger_module.client(),
+        device_state_module.client(),
     );
 
-    let automation_runner =
-        AutomationRunner::new(home_state_runner.subscribe(), command_runner.client(), trigger_runner.client());
+    let automation_module =
+        AutomationModule::new(home_state_module.subscribe(), command_module.client(), trigger_module.client());
 
-    let homekit_runner = settings
+    let homekit_module = settings
         .homebridge
-        .new_runner(&mut infrastructure, trigger_runner.client(), home_state_runner.subscribe())
+        .new_runner(&mut infrastructure, trigger_module.client(), home_state_module.subscribe())
         .await;
 
-    let metrics_exporter = observability::MetricsExportModule::new(
+    let observability_module = observability::ObservabilityModule::new(
         settings.metrics.victoria_url.clone(),
-        device_state_runner.subscribe(),
-        home_state_runner.subscribe(),
-        device_state_runner.client(),
-        command_runner.client(),
+        device_state_module.subscribe(),
+        home_state_module.subscribe(),
+        device_state_module.client(),
+        command_module.client(),
     );
 
     let http_server_exec = {
         let energy_reading_emitter = energy_meter_bus.emitter();
-        let metrics_export_api = metrics_exporter.api();
+        let metrics_export_api = observability_module.api();
 
         async move {
             settings
@@ -98,7 +98,7 @@ pub async fn main() {
     };
 
     tracing::info!("Starting state bootstrapping");
-    home_state_runner
+    home_state_module
         .bootstrap_snapshot()
         .await
         .expect("Error bootstrapping state");
@@ -107,19 +107,19 @@ pub async fn main() {
     tracing::info!("Starting main loop");
 
     tokio::spawn(async move {
-        device_state_runner.run().await;
+        device_state_module.run().await;
     });
 
     tokio::spawn(async move {
-        automation_runner.run().await;
+        automation_module.run().await;
     });
 
     tokio::spawn(async move {
-        home_state_runner.run().await;
+        home_state_module.run().await;
     });
 
     tokio::spawn(async move {
-        metrics_exporter.run().await;
+        observability_module.run().await;
     });
 
     tokio::spawn(async move {
@@ -128,7 +128,7 @@ pub async fn main() {
 
     tokio::spawn(async move {
         tracing::info!("Starting HomeKit runner");
-        homekit_runner.run().await;
+        homekit_module.run().await;
     });
 
     infrastructure.mqtt_client.run().await;

@@ -12,13 +12,13 @@ use crate::{
 
 use planner::plan_for_home;
 
-pub struct AutomationRunner {
+pub struct AutomationModule {
     home_state_rx: EventListener<HomeStateEvent>,
     command_client: CommandClient,
     trigger_client: TriggerClient,
 }
 
-impl AutomationRunner {
+impl AutomationModule {
     pub fn new(
         home_state_rx: EventListener<HomeStateEvent>,
         command_client: CommandClient,

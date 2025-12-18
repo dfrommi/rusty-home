@@ -21,7 +21,7 @@ pub enum CommandEvent {
     CommandExecuted(CommandExecution),
 }
 
-pub struct CommandRunner {
+pub struct CommandModule {
     service: Arc<CommandService>,
     event_bus: EventBus<CommandEvent>,
 }
@@ -31,7 +31,7 @@ pub struct CommandClient {
     service: Arc<CommandService>,
 }
 
-impl CommandRunner {
+impl CommandModule {
     pub fn new(
         pool: PgPool,
         mqtt_sender: MqttSender,

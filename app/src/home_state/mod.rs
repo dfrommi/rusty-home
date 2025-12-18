@@ -22,7 +22,7 @@ pub enum HomeStateEvent {
     Changed(DataPoint<HomeStateValue>),
 }
 
-pub struct HomeStateRunner {
+pub struct HomeStateModule {
     duration: Duration,
     device_state: DeviceStateClient,
     snapshot: StateSnapshot,
@@ -34,7 +34,7 @@ pub struct HomeStateRunner {
     event_emitter: EventEmitter<HomeStateEvent>,
 }
 
-impl HomeStateRunner {
+impl HomeStateModule {
     pub fn new(
         duration: Duration,
         device_state_rx: EventListener<DeviceStateEvent>,

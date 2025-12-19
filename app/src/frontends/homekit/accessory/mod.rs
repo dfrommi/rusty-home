@@ -1,14 +1,14 @@
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
 use crate::{
-    adapter::homekit::{
+    automation::HeatingZone,
+    command::PowerToggle,
+    frontends::homekit::{
         HomekitCommand, HomekitEvent, HomekitTargetConfig,
         accessory::{
             climate_sensor::ClimateSensor, energy_saving_switch::EnergySavingSwitch, fan::Fan,
             power_switch::PowerSwitch, thermostat::Thermostat, window_sensor::WindowSensor,
         },
     },
-    automation::HeatingZone,
-    command::PowerToggle,
 };
 
 mod climate_sensor;

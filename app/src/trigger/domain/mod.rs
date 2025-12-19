@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget};
+use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget};
 
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, sqlx::Type,

@@ -1,10 +1,10 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::automation::HeatingZone;
 use crate::command::{Command, EnergySavingDevice, HeatingTargetState};
 use crate::core::time::Duration;
+use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
 use crate::home_state::PowerAvailable;
 use crate::t;
 use crate::trigger::{UserTrigger, UserTriggerTarget};

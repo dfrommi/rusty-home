@@ -7,7 +7,7 @@ use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWater
 use crate::t;
 use infrastructure::EventListener;
 
-use crate::adapter::energy_meter::{EnergyReading, Faucet, Radiator};
+use crate::frontends::energy_meter::{EnergyReading, Faucet, Radiator};
 
 #[derive(Debug, Clone)]
 pub struct EnergyReadingAddedEvent {

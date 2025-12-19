@@ -9,7 +9,7 @@ pub struct Settings {
     pub mqtt: MqttConfig,
     pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
-    pub homebridge: crate::adapter::homekit::Homekit,
+    pub homebridge: crate::frontends::homekit::Homekit,
     pub homeassistant: HomeAssitantSettings,
     pub z2m: Zigbee2MqttSettings,
     pub tasmota: TasmotaSettings,

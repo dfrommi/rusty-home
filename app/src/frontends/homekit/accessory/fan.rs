@@ -1,8 +1,8 @@
 use crate::{
-    adapter::homekit::{
+    core::unit::{FanAirflow, FanSpeed},
+    frontends::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    core::unit::{FanAirflow, FanSpeed},
     home_state::{FanActivity, HomeStateValue},
 };
 

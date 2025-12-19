@@ -1,6 +1,6 @@
-use crate::adapter::homekit::HomekitCommandTarget;
 use crate::automation::{HeatingZone, LoadBalancedThermostat, Room, Thermostat};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::frontends::homekit::HomekitCommandTarget;
 
 use super::action::{
     AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,

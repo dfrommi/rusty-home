@@ -1,5 +1,5 @@
 use crate::{
-    adapter::homekit::{
+    frontends::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
     home_state::{HomeStateValue, OpenedArea},

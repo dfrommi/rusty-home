@@ -5,12 +5,12 @@ use crate::home_state::{
     calc::{DerivedStateProvider, StateCalculationContext},
 };
 use crate::{
-    adapter::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     core::{
         time::{DateTime, Duration},
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
+    frontends::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     t,
     trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
 };

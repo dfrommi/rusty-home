@@ -5,11 +5,11 @@ use crate::automation::AutomationModule;
 use crate::command::CommandModule;
 use crate::home_state::HomeStateModule;
 
-mod adapter;
 mod automation;
 mod command;
 mod core;
 mod device_state;
+mod frontends;
 mod home_state;
 mod observability;
 mod settings;
@@ -87,8 +87,8 @@ pub async fn main() {
                 .http_server
                 .run_server(move || {
                     vec![
-                        adapter::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
-                        adapter::mcp::new_routes(),
+                        frontends::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
+                        frontends::mcp::new_routes(),
                         metrics_export_api.routes(),
                     ]
                 })

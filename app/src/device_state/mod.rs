@@ -10,7 +10,6 @@ use std::{collections::HashMap, sync::Arc};
 use sqlx::PgPool;
 
 use crate::{
-    adapter::energy_meter::EnergyReading,
     command::CommandEvent,
     core::{
         time::{DateTime, DateTimeRange, Duration},
@@ -24,6 +23,7 @@ use crate::{
         },
         service::DeviceStateService,
     },
+    frontends::energy_meter::EnergyReading,
 };
 
 #[derive(Debug, Clone)]

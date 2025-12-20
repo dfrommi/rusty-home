@@ -64,5 +64,6 @@ fn to_metrics_value(value: HomeStateValue) -> f64 {
         HomeStateValue::RelativeHumidity(_, v) => f64::from(&v),
         HomeStateValue::SetPoint(_, v) => f64::from(&v),
         HomeStateValue::Temperature(_, v) => f64::from(&v),
+        HomeStateValue::TargetHeatingDemand(_, v) => f64::from(&v),
     }
 }

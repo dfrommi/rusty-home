@@ -3,8 +3,8 @@ use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, Notif
 use crate::frontends::homekit::HomekitCommandTarget;
 
 use super::action::{
-    AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, InformWindowOpen, ProvideAmbientTemperature,
-    ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
+    AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, FollowTargetHeatingDemand, InformWindowOpen,
+    ProvideAmbientTemperature, ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
 };
 use super::action::{Dehumidify, HomeAction};
 use super::goal::HomeGoal;
@@ -146,18 +146,13 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
 }
 
 fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
-    vec![
-        FollowHeatingSchedule::new(zone.clone()).into(),
-        // UserTriggerAction::new(
-        //     match zone {
-        //         HeatingZone::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
-        //         HeatingZone::Bedroom => HomekitCommandTarget::BedroomHeatingState,
-        //         HeatingZone::Kitchen => HomekitCommandTarget::KitchenHeatingState,
-        //         HeatingZone::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
-        //         HeatingZone::Bathroom => HomekitCommandTarget::BathroomHeatingState,
-        //     }
-        //     .into(),
-        // )
-        // .into(),
-    ]
+    let mut actions = vec![];
+
+    if zone == HeatingZone::RoomOfRequirements {
+        actions.push(FollowTargetHeatingDemand::new(zone.clone()).into());
+    }
+
+    actions.push(FollowHeatingSchedule::new(zone).into());
+
+    actions
 }

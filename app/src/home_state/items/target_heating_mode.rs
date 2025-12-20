@@ -1,8 +1,11 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::home_state::{
-    Occupancy, OpenedArea, Presence, Resident,
-    calc::{DerivedStateProvider, StateCalculationContext},
+use crate::{
+    automation::Thermostat,
+    home_state::{
+        Occupancy, OpenedArea, Presence, Resident,
+        calc::{DerivedStateProvider, StateCalculationContext},
+    },
 };
 use crate::{
     core::{
@@ -37,6 +40,19 @@ pub enum TargetHeatingMode {
     Kitchen,
     RoomOfRequirements,
     Bathroom,
+}
+
+impl TargetHeatingMode {
+    pub fn from_thermostat(thermostat: Thermostat) -> Self {
+        match thermostat {
+            Thermostat::LivingRoomSmall => TargetHeatingMode::LivingRoom,
+            Thermostat::LivingRoomBig => TargetHeatingMode::LivingRoom,
+            Thermostat::Bedroom => TargetHeatingMode::Bedroom,
+            Thermostat::Kitchen => TargetHeatingMode::Kitchen,
+            Thermostat::RoomOfRequirements => TargetHeatingMode::RoomOfRequirements,
+            Thermostat::Bathroom => TargetHeatingMode::Bathroom,
+        }
+    }
 }
 
 pub struct TargetHeatingModeStateProvider;

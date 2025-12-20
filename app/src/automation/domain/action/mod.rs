@@ -101,6 +101,7 @@ pub enum HomeAction {
     UserTriggerAction(UserTriggerAction),
     SupportVentilationWithFan(SupportVentilationWithFan),
     FollowHeatingSchedule(FollowHeatingSchedule),
+    FollowTargetHeatingDemand(FollowTargetHeatingDemand),
 }
 
 impl Display for HomeAction {
@@ -135,6 +136,9 @@ impl Action for HomeAction {
             HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
                 evaluate_rule(follow_heating_schedule, ext_id, ctx)
             }
+            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
+                evaluate_rule(follow_target_heating_demand, ext_id, ctx)
+            }
         }
     }
 
@@ -152,6 +156,7 @@ impl Action for HomeAction {
                 support_ventilation_with_fan.ext_id()
             }
             HomeAction::FollowHeatingSchedule(follow_heating_schedule) => follow_heating_schedule.ext_id(),
+            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => follow_target_heating_demand.ext_id(),
         }
     }
 }

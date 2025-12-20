@@ -16,6 +16,7 @@ mod relative_humidity;
 mod resident;
 mod risk_of_mould;
 mod set_point;
+mod target_heating_demand;
 mod target_heating_mode;
 mod temperature;
 
@@ -39,6 +40,7 @@ pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
 pub use set_point::SetPoint;
+pub use target_heating_demand::TargetHeatingDemand;
 pub use target_heating_mode::*;
 pub use temperature::Temperature;
 
@@ -62,6 +64,7 @@ pub enum HomeStateValue {
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
     TargetHeatingMode(TargetHeatingMode, HeatingMode),
+    TargetHeatingDemand(TargetHeatingDemand, Percent),
 
     EnergySaving(EnergySaving, bool),
     FanActivity(FanActivity, FanAirflow),
@@ -147,6 +150,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Temperature(id) => temperature::TemperatureStateProvider
                 .calculate_current(id, ctx)
                 .map(|dp| dp.with(HomeStateValue::Temperature(id, dp.value))),
+            HomeStateId::TargetHeatingDemand(id) => target_heating_demand::HeatingDemandStateProvider
+                .calculate_current(id, ctx)
+                .map(|dp| dp.with(HomeStateValue::TargetHeatingDemand(id, dp.value))),
         }
     }
 }

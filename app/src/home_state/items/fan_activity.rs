@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::{timeseries::DataPoint, unit::FanAirflow},
+    core::unit::FanAirflow,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
@@ -14,12 +14,13 @@ pub enum FanActivity {
 pub struct FanActivityStateProvider;
 
 impl DerivedStateProvider<FanActivity, FanAirflow> for FanActivityStateProvider {
-    fn calculate_current(&self, id: FanActivity, ctx: &StateCalculationContext) -> Option<DataPoint<FanAirflow>> {
+    fn calculate_current(&self, id: FanActivity, ctx: &StateCalculationContext) -> Option<FanAirflow> {
         use crate::device_state::FanActivity as DeviceFanActivity;
 
         ctx.device_state(match id {
             FanActivity::LivingRoomCeilingFan => DeviceFanActivity::LivingRoomCeilingFan,
             FanActivity::BedroomCeilingFan => DeviceFanActivity::BedroomCeilingFan,
         })
+        .map(|dp| dp.value)
     }
 }

@@ -19,16 +19,13 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
         &self,
         id: AbsoluteHumidity,
         ctx: &StateCalculationContext,
-    ) -> Option<DataPoint<GramPerCubicMeter>> {
+    ) -> Option<GramPerCubicMeter> {
         let temperature_dp = ctx.get(id.temperature())?;
         let humidity_dp = ctx.get(id.relative_humidity())?;
 
         let abs_humidity_value = AbsoluteHumidity::calculate_abs_humidity(temperature_dp.value, humidity_dp.value);
 
-        Some(DataPoint {
-            value: abs_humidity_value,
-            timestamp: std::cmp::max(temperature_dp.timestamp, humidity_dp.timestamp),
-        })
+        Some(abs_humidity_value)
     }
 }
 

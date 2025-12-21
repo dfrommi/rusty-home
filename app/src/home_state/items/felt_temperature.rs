@@ -3,7 +3,6 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     core::{
         math::{Sigmoid, Tanh},
-        timeseries::DataPoint,
         unit::{DegreeCelsius, GramPerCubicMeter},
     },
     home_state::{
@@ -24,16 +23,13 @@ impl DerivedStateProvider<FeltTemperature, DegreeCelsius> for FeltTemperatureSta
         &self,
         id: FeltTemperature,
         ctx: &StateCalculationContext,
-    ) -> Option<DataPoint<DegreeCelsius>> {
+    ) -> Option<DegreeCelsius> {
         let temperature_dp = ctx.get(id.temperature())?;
         let abs_humidity_dp = ctx.get(id.abs_humidity())?;
 
         let felt_temp_value = calculate_felt_temperature(temperature_dp.value, abs_humidity_dp.value);
 
-        Some(DataPoint {
-            value: felt_temp_value,
-            timestamp: std::cmp::max(temperature_dp.timestamp, abs_humidity_dp.timestamp),
-        })
+        Some(felt_temp_value)
     }
 }
 

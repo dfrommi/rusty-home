@@ -16,16 +16,13 @@ pub enum DewPoint {
 pub struct DewPointStateProvider;
 
 impl DerivedStateProvider<DewPoint, DegreeCelsius> for DewPointStateProvider {
-    fn calculate_current(&self, id: DewPoint, ctx: &StateCalculationContext) -> Option<DataPoint<DegreeCelsius>> {
+    fn calculate_current(&self, id: DewPoint, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         let temperature_dp = ctx.get(id.temperature())?;
         let humidity_dp = ctx.get(id.relative_humidity())?;
 
         let dew_point_value = DewPoint::calculate_dew_point(temperature_dp.value, humidity_dp.value);
 
-        Some(DataPoint {
-            value: dew_point_value,
-            timestamp: std::cmp::max(temperature_dp.timestamp, humidity_dp.timestamp),
-        })
+        Some(dew_point_value)
     }
 }
 

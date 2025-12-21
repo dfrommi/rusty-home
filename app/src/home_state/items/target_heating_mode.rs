@@ -62,7 +62,7 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
         &self,
         id: TargetHeatingMode,
         ctx: &StateCalculationContext,
-    ) -> Option<DataPoint<HeatingMode>> {
+    ) -> Option<HeatingMode> {
         let occupancy_item = match id {
             TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
             TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
@@ -80,7 +80,8 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             ctx.get(Resident::AnyoneSleeping)?,
             occupancy_1h,
             self.get_user_override(id, ctx),
-        ))
+        )
+        .value)
     }
 }
 

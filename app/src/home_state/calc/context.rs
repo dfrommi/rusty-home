@@ -23,7 +23,7 @@ pub async fn calculate_new_snapshot(
 
     //preload all current values
     for id in HomeStateId::variants().iter() {
-        context.load(id.clone());
+        context.load(*id);
     }
 
     let snapshot = context.into_snapshot(DateTimeRange::since(t!(now) - truncate_before));
@@ -71,7 +71,7 @@ pub struct StateCalculationContext {
 }
 
 pub trait DerivedStateProvider<ID, T> {
-    fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<DataPoint<T>>;
+    fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<T>;
 }
 
 impl StateCalculationContext {
@@ -91,7 +91,7 @@ impl StateCalculationContext {
                 }
                 None => DataFrame::new(vec![current.clone()]),
             };
-            data.insert(id.clone(), combined_df);
+            data.insert(*id, combined_df);
         }
 
         StateSnapshot::new(self.start_time, data, self.active_user_triggers)
@@ -104,14 +104,13 @@ impl StateCalculationContext {
         S: Into<HomeStateId> + HomeStateItem + Clone,
     {
         let state_value = self.get_home_state_value(id.clone().into())?;
-        let value = id
-            .try_downcast(state_value.value)
-            .expect("Internal error: State value projection failed in get");
-
-        Some(DataPoint {
-            value,
-            timestamp: state_value.timestamp,
-        })
+        match id.try_downcast(state_value.value.clone()) {
+            Ok(v) => Some(state_value.with(v)),
+            Err(e) => {
+                tracing::error!("Error converting home state {:?} to exepceted type: {}", state_value.value, e);
+                None
+            }
+        }
     }
 
     pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::Type>>
@@ -151,41 +150,24 @@ impl StateCalculationContext {
         match current_value {
             Some(dp) => Some(dp),
             None => {
-                let mut calculated_dp = HomeStateDerivedStateProvider.calculate_current(id.clone(), self)?;
-                let now = t!(now);
+                let calculated_value = HomeStateDerivedStateProvider.calculate_current(id, self)?;
+                let previous_dp = self.history.get(&id).and_then(|df| df.last());
 
-                if calculated_dp.timestamp > now {
-                    tracing::warn!(
-                        "Calculated future timestamp for {:?}, adjusted from {} to now {}",
-                        id,
-                        calculated_dp.timestamp,
-                        now
-                    );
-
-                    calculated_dp.timestamp = now;
-                } else if let Some(last_history_ts) = self.last_history_timestamp(&id)
-                    && calculated_dp.timestamp < last_history_ts
+                //check if previous value is the same, then reuse timestamp
+                let calculated_dp = if let Some(previous_dp) = previous_dp
+                    && previous_dp.value == calculated_value
                 {
-                    tracing::warn!(
-                        "Calculated timestamp of {:?} is not after last history timestamp, adjusted to now {} <= {} --> {}",
-                        id,
-                        calculated_dp.timestamp,
-                        last_history_ts,
-                        now
-                    );
-
-                    calculated_dp.timestamp = now;
-                }
+                    previous_dp.clone()
+                } else {
+                    //no or different previous value
+                    DataPoint::new(calculated_value, self.start_time)
+                };
 
                 let mut current_mut = self.current.borrow_mut();
-                current_mut.insert(id.clone(), calculated_dp.clone());
+                current_mut.insert(id, calculated_dp.clone());
                 Some(calculated_dp)
             }
         }
-    }
-
-    fn last_history_timestamp(&self, id: &HomeStateId) -> Option<DateTime> {
-        self.history.get(id).and_then(|df| df.last()).map(|dp| dp.timestamp)
     }
 
     fn data_frame(&self, id: HomeStateId, range: DateTimeRange) -> Option<DataFrame<HomeStateValue>> {

@@ -1,9 +1,7 @@
+use crate::core::timeseries::DataPoint;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
-use crate::t;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
-
-use crate::core::timeseries::DataPoint;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum OpenedArea {
@@ -24,7 +22,7 @@ pub enum OpenedArea {
 pub struct OpenedAreaStateProvider;
 
 impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
-    fn calculate_current(&self, id: OpenedArea, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+    fn calculate_current(&self, id: OpenedArea, ctx: &StateCalculationContext) -> Option<bool> {
         use crate::device_state::Opened as DeviceOpened;
 
         let opened_items = match id {
@@ -70,16 +68,14 @@ impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
     }
 }
 
-fn any_of(opened_dps: Vec<DataPoint<bool>>) -> DataPoint<bool> {
-    let timestamp = opened_dps.iter().map(|v| v.timestamp).max().unwrap_or(t!(now));
-    let value = opened_dps.iter().any(|v| v.value);
-
-    DataPoint { value, timestamp }
+fn any_of(opened_dps: Vec<DataPoint<bool>>) -> bool {
+    opened_dps.iter().any(|v| v.value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::t;
 
     #[tokio::test]
     async fn test_any_of_some_opened() {
@@ -89,7 +85,7 @@ mod tests {
             DataPoint::new(false, t!(1 minutes ago)),
         ]);
 
-        assert!(res.value);
+        assert!(res);
     }
 
     #[tokio::test]
@@ -100,6 +96,6 @@ mod tests {
             DataPoint::new(false, t!(1 minutes ago)),
         ]);
 
-        assert!(!res.value);
+        assert!(!res);
     }
 }

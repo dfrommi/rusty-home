@@ -1,6 +1,5 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::core::timeseries::DataPoint;
 use crate::core::unit::Watt;
 use crate::device_state::CurrentPowerUsage;
 use crate::home_state::PowerAvailable;
@@ -15,12 +14,12 @@ pub enum IsRunning {
 pub struct IsRunningStateProvider;
 
 impl DerivedStateProvider<IsRunning, bool> for IsRunningStateProvider {
-    fn calculate_current(&self, id: IsRunning, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+    fn calculate_current(&self, id: IsRunning, ctx: &StateCalculationContext) -> Option<bool> {
         match id {
-            IsRunning::LivingRoomTv => ctx.get(PowerAvailable::LivingRoomTv),
+            IsRunning::LivingRoomTv => ctx.get(PowerAvailable::LivingRoomTv).map(|dp| dp.value),
             IsRunning::RoomOfRequirementsMonitor => {
                 let power_usage_dp = ctx.device_state(CurrentPowerUsage::RoomOfRequirementsMonitor)?;
-                Some(DataPoint::new(power_usage_dp.value > Watt(15.0), power_usage_dp.timestamp))
+                Some(power_usage_dp.value > Watt(15.0))
             }
         }
     }

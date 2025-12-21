@@ -19,12 +19,13 @@ impl DerivedStateProvider<RawVendorValue, RawValue> for RawVendorValueStateProvi
         &self,
         id: RawVendorValue,
         ctx: &StateCalculationContext,
-    ) -> Option<crate::core::timeseries::DataPoint<RawValue>> {
+    ) -> Option<RawValue> {
         use crate::device_state::RawVendorValue as DeviceRawVendorValue;
 
         ctx.device_state(match id {
             RawVendorValue::AllyLoadEstimate(thermostat) => DeviceRawVendorValue::AllyLoadEstimate(thermostat),
             RawVendorValue::AllyLoadMean(thermostat) => DeviceRawVendorValue::AllyLoadMean(thermostat),
         })
+        .map(|dp| dp.value)
     }
 }

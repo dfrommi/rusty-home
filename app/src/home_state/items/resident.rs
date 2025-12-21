@@ -15,14 +15,14 @@ pub enum Resident {
 pub struct ResidentStateProvider;
 
 impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
-    fn calculate_current(&self, id: Resident, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+    fn calculate_current(&self, id: Resident, ctx: &StateCalculationContext) -> Option<bool> {
         match id {
             Resident::AnyoneSleeping => {
                 let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(t!(now));
                 let in_bed_df = ctx.all_since(Presence::BedroomBed, *in_bed_full_range.start())?;
 
                 match sleeping(in_bed_full_range, in_bed_df) {
-                    Ok(dp) => Some(dp),
+                    Ok(dp) => Some(dp.value),
                     Err(e) => {
                         tracing::error!("Error calculating AnyoneSleeping: {:?}", e);
                         None
@@ -30,7 +30,7 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
                 }
             }
 
-            Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch),
+            Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch).map(|dp| dp.value),
         }
     }
 }

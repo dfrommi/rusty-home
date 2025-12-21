@@ -2,7 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::HeatingZone,
-    core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
+    core::{time::DateTime, unit::DegreeCelsius},
 };
 
 use crate::home_state::{
@@ -27,21 +27,21 @@ fn from_iso(s: &str) -> DateTime {
 pub struct SetPointStateProvider;
 
 impl DerivedStateProvider<SetPoint, DegreeCelsius> for SetPointStateProvider {
-    fn calculate_current(&self, id: SetPoint, ctx: &StateCalculationContext) -> Option<DataPoint<DegreeCelsius>> {
+    fn calculate_current(&self, id: SetPoint, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         use crate::device_state::SetPoint as DeviceSetPoint;
 
         match id {
             SetPoint::RoomOfRequirements if from_iso("2025-11-22T15:08:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::RoomOfRequirements)?;
                 let value = HeatingZone::RoomOfRequirements.setpoint_for_mode(&mode.value);
-                Some(DataPoint::new(value, mode.timestamp))
+                Some(value)
             }
-            SetPoint::RoomOfRequirements => ctx.device_state(DeviceSetPoint::RoomOfRequirements),
-            SetPoint::LivingRoomBig => ctx.device_state(DeviceSetPoint::LivingRoomBig),
-            SetPoint::LivingRoomSmall => ctx.device_state(DeviceSetPoint::LivingRoomSmall),
-            SetPoint::Bedroom => ctx.device_state(DeviceSetPoint::Bedroom),
-            SetPoint::Kitchen => ctx.device_state(DeviceSetPoint::Kitchen),
-            SetPoint::Bathroom => ctx.device_state(DeviceSetPoint::Bathroom),
+            SetPoint::RoomOfRequirements => ctx.device_state(DeviceSetPoint::RoomOfRequirements).map(|dp| dp.value),
+            SetPoint::LivingRoomBig => ctx.device_state(DeviceSetPoint::LivingRoomBig).map(|dp| dp.value),
+            SetPoint::LivingRoomSmall => ctx.device_state(DeviceSetPoint::LivingRoomSmall).map(|dp| dp.value),
+            SetPoint::Bedroom => ctx.device_state(DeviceSetPoint::Bedroom).map(|dp| dp.value),
+            SetPoint::Kitchen => ctx.device_state(DeviceSetPoint::Kitchen).map(|dp| dp.value),
+            SetPoint::Bathroom => ctx.device_state(DeviceSetPoint::Bathroom).map(|dp| dp.value),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::core::{
     math::Sigmoid,
-    timeseries::{DataFrame, DataPoint, interpolate::LastSeenInterpolator},
+    timeseries::{DataFrame, interpolate::LastSeenInterpolator},
 };
 
 use super::*;
@@ -20,7 +20,7 @@ pub enum Occupancy {
 pub struct OccupancyStateProvider;
 
 impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
-    fn calculate_current(&self, id: Occupancy, ctx: &StateCalculationContext) -> Option<DataPoint<Probability>> {
+    fn calculate_current(&self, id: Occupancy, ctx: &StateCalculationContext) -> Option<Probability> {
         let range = DateTimeRange::since(t!(1 hours ago));
 
         let main_df = match id {
@@ -32,10 +32,7 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
         let prior: f64 = -1.7968470630447446;
         let w_presence: f64 = 3.733237448369802;
 
-        match Occupancy::calculate(prior, w_presence, main_df) {
-            Some(probability) => Some(DataPoint::new(probability, t!(now))),
-            None => None,
-        }
+        Occupancy::calculate(prior, w_presence, main_df)
     }
 }
 

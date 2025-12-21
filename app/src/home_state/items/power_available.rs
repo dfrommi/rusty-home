@@ -17,7 +17,7 @@ impl DerivedStateProvider<PowerAvailable, bool> for PowerAvailableStateProvider 
         &self,
         id: PowerAvailable,
         ctx: &StateCalculationContext,
-    ) -> Option<crate::core::timeseries::DataPoint<bool>> {
+    ) -> Option<bool> {
         use crate::device_state::PowerAvailable as DevicePowerAvailable;
 
         ctx.device_state(match id {
@@ -26,5 +26,6 @@ impl DerivedStateProvider<PowerAvailable, bool> for PowerAvailableStateProvider 
             PowerAvailable::InfraredHeater => DevicePowerAvailable::InfraredHeater,
             PowerAvailable::LivingRoomTv => DevicePowerAvailable::LivingRoomTv,
         })
+        .map(|dp| dp.value)
     }
 }

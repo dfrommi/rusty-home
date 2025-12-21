@@ -4,7 +4,7 @@ use crate::core::timeseries::interpolate::LinearInterpolator;
 use crate::core::unit::{DegreeCelsius, Percent};
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
-use crate::{core::timeseries::DataPoint, home_state::RelativeHumidity};
+use crate::home_state::RelativeHumidity;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
@@ -18,14 +18,14 @@ pub enum RiskOfMould {
 pub struct RiskOfMouldStateProvider;
 
 impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
-    fn calculate_current(&self, id: RiskOfMould, ctx: &StateCalculationContext) -> Option<DataPoint<bool>> {
+    fn calculate_current(&self, id: RiskOfMould, ctx: &StateCalculationContext) -> Option<bool> {
         let humidity = match id {
             RiskOfMould::Bathroom => ctx.get(RelativeHumidity::Bathroom)?,
         };
 
         if humidity.value < Percent(70.0) {
             tracing::trace!("Humidity of shower-sensor is below 70%, no risk of mould");
-            return Some(DataPoint::new(false, humidity.timestamp));
+            return Some(false);
         }
 
         let this_dp = match id {
@@ -43,7 +43,7 @@ impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
             ref_dp
         );
 
-        Some(DataPoint::new(risk, this_dp.timestamp))
+        Some(risk)
     }
 }
 

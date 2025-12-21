@@ -22,7 +22,7 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
         &self,
         id: Temperature,
         ctx: &StateCalculationContext,
-    ) -> Option<crate::core::timeseries::DataPoint<DegreeCelsius>> {
+    ) -> Option<DegreeCelsius> {
         use crate::device_state::Temperature as DeviceTemperature;
 
         ctx.device_state(match id {
@@ -34,5 +34,6 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
             Temperature::Bathroom => DeviceTemperature::BathroomShower,
             Temperature::ThermostatExternal(thermostat) => DeviceTemperature::ThermostatExternal(thermostat),
         })
+        .map(|dp| dp.value)
     }
 }

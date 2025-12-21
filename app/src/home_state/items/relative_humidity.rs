@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::{timeseries::DataPoint, unit::Percent},
+    core::unit::Percent,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
@@ -18,7 +18,7 @@ pub enum RelativeHumidity {
 pub struct RelativeHumidityStateProvider;
 
 impl DerivedStateProvider<RelativeHumidity, Percent> for RelativeHumidityStateProvider {
-    fn calculate_current(&self, id: RelativeHumidity, ctx: &StateCalculationContext) -> Option<DataPoint<Percent>> {
+    fn calculate_current(&self, id: RelativeHumidity, ctx: &StateCalculationContext) -> Option<Percent> {
         use crate::device_state::RelativeHumidity as DeviceRelativeHumidity;
 
         ctx.device_state(match id {
@@ -29,5 +29,6 @@ impl DerivedStateProvider<RelativeHumidity, Percent> for RelativeHumidityStatePr
             RelativeHumidity::Kitchen => DeviceRelativeHumidity::Kitchen,
             RelativeHumidity::Bathroom => DeviceRelativeHumidity::BathroomShower,
         })
+        .map(|dp| dp.value)
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     core::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{
-            DataFrame, DataPoint,
+            DataFrame,
             interpolate::{Interpolator, LastSeenInterpolator, LinearInterpolator},
         },
         unit::{DegreeCelsius, Percent},
@@ -24,7 +24,7 @@ pub enum TargetHeatingDemand {
 pub struct HeatingDemandStateProvider;
 
 impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStateProvider {
-    fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<DataPoint<Percent>> {
+    fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
         let (thermostat, mode) = match id {
             TargetHeatingDemand::Thermostat(t) => (t, TargetHeatingMode::from_thermostat(t)),
         };
@@ -42,7 +42,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
 
         let pid_params = get_pid_params_for_mode(thermostat, &mode.value);
         let output = match mode.value {
-            HeatingMode::Ventilation => Some(mode.with(Percent(0.0))),
+            HeatingMode::Ventilation => Some(Percent(0.0)),
 
             _ => {
                 let start_at = mode.timestamp;
@@ -54,8 +54,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
                     Some(value) => value,
                     None => return fallback_heating_demand(ctx, thermostat),
                 };
-                let output = calculate_pid(&pid_params, &setpoints, &temperatures, mode.timestamp, t!(30 seconds))
-                    .map(|value| DataPoint::new(value, t!(now)));
+                let output = calculate_pid(&pid_params, &setpoints, &temperatures, mode.timestamp, t!(30 seconds));
                 output.or_else(|| fallback_heating_demand(ctx, thermostat))
             }
         };
@@ -195,23 +194,21 @@ fn calculate_pid(
     Some(Percent(output))
 }
 
-fn fallback_heating_demand(ctx: &StateCalculationContext, thermostat: Thermostat) -> Option<DataPoint<Percent>> {
-    ctx.get(thermostat.heating_demand())
+fn fallback_heating_demand(ctx: &StateCalculationContext, thermostat: Thermostat) -> Option<Percent> {
+    ctx.get(thermostat.heating_demand()).map(|dp| dp.value)
 }
 
-fn normalize_output(params: &PidParams, output: DataPoint<Percent>) -> DataPoint<Percent> {
-    output.map_value(|value| {
-        let output_cap = params.max_output.0.min(100.0).max(0.0);
-        let clamped = value.0.clamp(0.0, output_cap);
-        let quantized = quantize_percent(clamped);
-        let min_output = params.min_output.0.max(0.0);
-        let final_output = if quantized > 0.0 && quantized < min_output {
-            0.0
-        } else {
-            quantized
-        };
-        Percent(final_output)
-    })
+fn normalize_output(params: &PidParams, output: Percent) -> Percent {
+    let output_cap = params.max_output.0.min(100.0).max(0.0);
+    let clamped = output.0.clamp(0.0, output_cap);
+    let quantized = quantize_percent(clamped);
+    let min_output = params.min_output.0.max(0.0);
+    let final_output = if quantized > 0.0 && quantized < min_output {
+        0.0
+    } else {
+        quantized
+    };
+    Percent(final_output)
 }
 
 fn quantize_percent(value: f64) -> f64 {

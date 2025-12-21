@@ -39,13 +39,13 @@ impl<T: Clone> DataFrame<T> {
         let end = *range.end();
 
         if !self.data.contains_key(&start)
-            && let Ok(Some(dp_at_start)) = start_interpolator.interpolate_df(start, self)
+            && let Some(dp_at_start) = start_interpolator.interpolate_df(start, self)
         {
             self.data.insert(start, DataPoint::new(dp_at_start, start));
         }
 
         if !self.data.contains_key(&end)
-            && let Ok(Some(dp_at_end)) = end_interpolator.interpolate_df(end, self)
+            && let Some(dp_at_end) = end_interpolator.interpolate_df(end, self)
         {
             self.data.insert(end, DataPoint::new(dp_at_end, end));
         }

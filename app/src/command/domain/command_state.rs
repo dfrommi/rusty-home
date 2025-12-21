@@ -1,15 +1,14 @@
-use crate::automation::LoadBalancedThermostat;
 use crate::command::CommandClient;
-use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
-use crate::home_state::{FanActivity, OpenedArea, PowerAvailable, RawVendorValue, SetPoint, StateSnapshot};
+use crate::core::unit::{FanAirflow, Percent};
+use crate::home_state::{FanActivity, PowerAvailable, StateSnapshot};
 use crate::t;
 use anyhow::Result;
 
 use crate::home_state::EnergySaving;
 
 use super::{
-    Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, HeatingTargetState, Notification,
-    NotificationAction, NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
+    Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, Notification, NotificationAction,
+    NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
 };
 
 impl Command {
@@ -20,15 +19,6 @@ impl Command {
     ) -> Result<bool> {
         match self {
             Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, snapshot),
-            Command::SetHeating { device, target_state } => {
-                is_set_heating_reflected_in_state(device, target_state, snapshot)
-            }
-            Command::SetThermostatAmbientTemperature { device, temperature } => {
-                is_set_thermostat_ambient_temperature_reflected_in_state(device, *temperature, command_client).await
-            }
-            Command::SetThermostatLoadMean { device, value } => {
-                is_set_thermostat_load_mean_reflected_in_state(device, *value, command_client, snapshot).await
-            }
             Command::SetThermostatValveOpeningPosition { device, value } => {
                 is_set_thermostat_valve_opening_position_reflected_in_state(device, value, snapshot)
             }
@@ -45,39 +35,6 @@ impl Command {
     }
 }
 
-fn is_set_heating_reflected_in_state(
-    device: &Thermostat,
-    target_state: &HeatingTargetState,
-    snapshot: &StateSnapshot,
-) -> Result<bool> {
-    let set_point_item = match device {
-        Thermostat::LivingRoomBig => SetPoint::LivingRoomBig,
-        Thermostat::LivingRoomSmall => SetPoint::LivingRoomSmall,
-        Thermostat::Bedroom => SetPoint::Bedroom,
-        Thermostat::RoomOfRequirements => SetPoint::RoomOfRequirements,
-        Thermostat::Kitchen => SetPoint::Kitchen,
-        Thermostat::Bathroom => SetPoint::Bathroom,
-    };
-
-    let set_point = snapshot.try_get(set_point_item)?.value;
-
-    match target_state {
-        HeatingTargetState::Off => Ok(set_point == DegreeCelsius(0.0)),
-        HeatingTargetState::Heat { temperature, .. } => Ok(&set_point == temperature), //priority not reflected in state
-        HeatingTargetState::WindowOpen => {
-            let open_item = match device {
-                Thermostat::LivingRoomBig => OpenedArea::LivingRoomRadiatorThermostatBig,
-                Thermostat::LivingRoomSmall => OpenedArea::LivingRoomRadiatorThermostatSmall,
-                Thermostat::Bedroom => OpenedArea::BedroomRadiatorThermostat,
-                Thermostat::Kitchen => OpenedArea::KitchenRadiatorThermostat,
-                Thermostat::RoomOfRequirements => OpenedArea::RoomOfRequirementsThermostat,
-                Thermostat::Bathroom => OpenedArea::BathroomThermostat,
-            };
-            Ok(snapshot.try_get(open_item)?.value)
-        }
-    }
-}
-
 fn is_set_thermostat_valve_opening_position_reflected_in_state(
     device: &Thermostat,
     value: &Percent,
@@ -85,59 +42,6 @@ fn is_set_thermostat_valve_opening_position_reflected_in_state(
 ) -> Result<bool> {
     let heating_demand = snapshot.try_get(device.heating_demand())?.value;
     Ok(heating_demand.0 as i32 == value.0 as i32)
-}
-
-async fn is_set_thermostat_ambient_temperature_reflected_in_state(
-    device: &Thermostat,
-    temperature: DegreeCelsius,
-    command_client: &CommandClient,
-) -> Result<bool> {
-    //TODO from temperature state
-
-    let latest_command = command_client
-        .get_latest_command(
-            CommandTarget::SetThermostatAmbientTemperature { device: device.clone() },
-            t!(2 hours ago),
-        )
-        .await?;
-
-    //see guidelines for device at https://www.zigbee2mqtt.io/devices/014G2461.html#external-measured-room-sensor-numeric
-    match latest_command {
-        Some(CommandExecution {
-            command: Command::SetThermostatAmbientTemperature {
-                temperature: cmd_temp, ..
-            },
-            created,
-            ..
-        }) => {
-            //Always send with changes
-            if (cmd_temp.0 - temperature.0).abs() > 0.01 {
-                return Ok(false); //not reflected
-            }
-
-            Ok(created.elapsed() < t!(25 minutes))
-        }
-        Some(cmd) => anyhow::bail!("Unexpected command type returned: {cmd:?}"),
-        None => Ok(false),
-    }
-}
-
-async fn is_set_thermostat_load_mean_reflected_in_state(
-    device: &LoadBalancedThermostat,
-    value: RawValue,
-    command_client: &CommandClient,
-    snapshot: &StateSnapshot,
-) -> Result<bool> {
-    let current_value = snapshot.try_get(RawVendorValue::AllyLoadMean(device.into()))?.value;
-    let latest_command_ts = command_client
-        .get_latest_command(CommandTarget::SetThermostatLoadMean { device: device.clone() }, t!(2 hours ago))
-        .await?
-        .map(|cmd| cmd.created)
-        .unwrap_or(t!(24 hours ago));
-
-    let is_reflected = (current_value.0 - value.0).abs() < 5.0 && latest_command_ts.elapsed() < t!(15 minutes);
-
-    Ok(is_reflected)
 }
 
 fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapshot: &StateSnapshot) -> Result<bool> {

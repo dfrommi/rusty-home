@@ -44,58 +44,28 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         // THERMOSTATS
         //
         (
-            "living_room/radiator_thermostat_big",
-            Z2mChannel::Thermostat(
-                Thermostat::LivingRoomBig,
-                SetPoint::LivingRoomBig,
-                HeatingDemand::LivingRoomBig,
-                Opened::LivingRoomRadiatorThermostatBig,
-            ),
+            "living_room/radiator_thermostat_big_sonoff",
+            Z2mChannel::Thermostat(Thermostat::LivingRoomBig, HeatingDemand::LivingRoomBig),
         ),
         (
-            "living_room/radiator_thermostat_small",
-            Z2mChannel::Thermostat(
-                Thermostat::LivingRoomSmall,
-                SetPoint::LivingRoomSmall,
-                HeatingDemand::LivingRoomSmall,
-                Opened::LivingRoomRadiatorThermostatSmall,
-            ),
+            "living_room/radiator_thermostat_small_sonoff",
+            Z2mChannel::Thermostat(Thermostat::LivingRoomSmall, HeatingDemand::LivingRoomSmall),
         ),
         (
-            "kitchen/radiator_thermostat",
-            Z2mChannel::Thermostat(
-                Thermostat::Kitchen,
-                SetPoint::Kitchen,
-                HeatingDemand::Kitchen,
-                Opened::KitchenRadiatorThermostat,
-            ),
+            "kitchen/radiator_thermostat_sonoff",
+            Z2mChannel::Thermostat(Thermostat::Kitchen, HeatingDemand::Kitchen),
         ),
         (
-            "bedroom/radiator_thermostat",
-            Z2mChannel::Thermostat(
-                Thermostat::Bedroom,
-                SetPoint::Bedroom,
-                HeatingDemand::Bedroom,
-                Opened::BedroomRadiatorThermostat,
-            ),
+            "bedroom/radiator_thermostat_sonoff",
+            Z2mChannel::Thermostat(Thermostat::Bedroom, HeatingDemand::Bedroom),
         ),
         (
             "room_of_requirements/radiator_thermostat_sonoff",
-            Z2mChannel::Thermostat(
-                Thermostat::RoomOfRequirements,
-                SetPoint::RoomOfRequirements,
-                HeatingDemand::RoomOfRequirements,
-                Opened::RoomOfRequirementsThermostat,
-            ),
+            Z2mChannel::Thermostat(Thermostat::RoomOfRequirements, HeatingDemand::RoomOfRequirements),
         ),
         (
-            "bathroom/radiator_thermostat",
-            Z2mChannel::Thermostat(
-                Thermostat::Bathroom,
-                SetPoint::Bathroom,
-                HeatingDemand::Bathroom,
-                Opened::BathroomThermostat,
-            ),
+            "bathroom/radiator_thermostat_sonoff",
+            Z2mChannel::Thermostat(Thermostat::Bathroom, HeatingDemand::Bathroom),
         ),
         //
         // WINDOW CONTACTS

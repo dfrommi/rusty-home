@@ -4,21 +4,19 @@ use crate::automation::Thermostat;
 use crate::core::DeviceConfig;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
-use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, RawValue, Watt};
+use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceAvailability, DeviceStateValue, RawVendorValue, Temperature};
+use crate::device_state::{DeviceAvailability, DeviceStateValue, Temperature};
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
-use crate::device_state::{
-    CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, SetPoint, TotalEnergyConsumption,
-};
+use crate::device_state::{CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, TotalEnergyConsumption};
 
 #[derive(Debug, Clone)]
 pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
-    Thermostat(Thermostat, SetPoint, HeatingDemand, Opened),
+    Thermostat(Thermostat, HeatingDemand),
 }
 
 pub struct Z2mIncomingDataSource {
@@ -90,9 +88,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             }
 
             //Sonoff thermostats
-            Z2mChannel::Thermostat(thermostat, set_point, demand, opened)
-                if thermostat == &Thermostat::RoomOfRequirements =>
-            {
+            Z2mChannel::Thermostat(thermostat, demand) => {
                 let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
 
                 vec![
@@ -112,84 +108,6 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                         DeviceStateValue::Temperature(
                             Temperature::ThermostatOnDevice(thermostat.clone()),
                             DegreeCelsius(payload.local_temperature),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    availability(device_id, payload.last_seen),
-                    //Resetting unsupported values
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(
-                            Temperature::ThermostatExternal(thermostat.clone()),
-                            DegreeCelsius(0.0),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::SetPoint(set_point.clone(), DegreeCelsius(0.0)),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(DeviceStateValue::Opened(opened.clone(), false), payload.last_seen).into(),
-                ]
-            }
-
-            Z2mChannel::Thermostat(thermostat, set_point, demand, opened) => {
-                let payload: AllyThermostatPayload = serde_json::from_str(&msg.payload)?;
-
-                vec![
-                    DataPoint::new(
-                        DeviceStateValue::SetPoint(set_point.clone(), DegreeCelsius(payload.occupied_heating_setpoint)),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::HeatingDemand(
-                            demand.clone(),
-                            Percent(if payload.pi_heating_demand > 1.0 {
-                                payload.pi_heating_demand
-                            } else {
-                                //sometimes reports 1% when closed
-                                0.0
-                            }),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::Opened(opened.clone(), payload.window_open_external),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(
-                            Temperature::ThermostatOnDevice(thermostat.clone()),
-                            DegreeCelsius(payload.local_temperature),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(
-                            Temperature::ThermostatExternal(thermostat.clone()),
-                            DegreeCelsius(payload.external_measured_room_sensor / 100.0),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::RawVendorValue(
-                            RawVendorValue::AllyLoadEstimate(thermostat.clone()),
-                            RawValue::from(payload.load_estimate as f64),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::RawVendorValue(
-                            RawVendorValue::AllyLoadMean(thermostat.clone()),
-                            RawValue::from(payload.load_room_mean as f64),
                         ),
                         payload.last_seen,
                     )
@@ -246,18 +164,6 @@ fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {
 struct ClimateSensor {
     temperature: f64,
     humidity: f64,
-    last_seen: DateTime,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct AllyThermostatPayload {
-    occupied_heating_setpoint: f64,
-    pi_heating_demand: f64,
-    window_open_external: bool,
-    load_room_mean: i64,
-    load_estimate: i64,
-    local_temperature: f64,
-    external_measured_room_sensor: f64,
     last_seen: DateTime,
 }
 

@@ -65,26 +65,6 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
         Command::SetPower { device, power_on } => {
             ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
         }
-        Command::SetHeating { device, target_state } => (
-            "SetHeating",
-            device.to_string(),
-            match target_state {
-                HeatingTargetState::Off => "off".to_string(),
-                HeatingTargetState::WindowOpen => "window_open".to_string(),
-                HeatingTargetState::Heat {
-                    temperature,
-                    low_priority,
-                } => {
-                    format!("{} [prio {}]", temperature, if *low_priority { "low" } else { "normal" })
-                }
-            },
-        ),
-        Command::SetThermostatAmbientTemperature { device, temperature } => {
-            ("SetThermostatAmbientTemperature", device.to_string(), temperature.to_string())
-        }
-        Command::SetThermostatLoadMean { device, value } => {
-            ("SetThermostatLoadMean", device.to_string(), value.to_string())
-        }
         Command::SetThermostatValveOpeningPosition { device, value } => {
             ("SetThermostatValveOpeningPosition", device.to_string(), value.to_string())
         }

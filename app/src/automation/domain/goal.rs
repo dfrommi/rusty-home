@@ -10,7 +10,6 @@ pub enum HomeGoal {
     #[display("BetterRoomClimate[{}]", _0)]
     BetterRoomClimate(Room),
     TvControl,
-    CoreControl,
     ResetToDefaltSettings,
 }
 
@@ -28,7 +27,6 @@ pub fn get_active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
         HomeGoal::PreventMouldInBathroom,
         HomeGoal::StayInformed,
         HomeGoal::TvControl,
-        HomeGoal::CoreControl,
         HomeGoal::ResetToDefaltSettings,
     ];
 

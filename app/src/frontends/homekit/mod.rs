@@ -14,11 +14,8 @@ use self::{
 };
 use crate::{
     Infrastructure,
-    core::{
-        timeseries::DataPoint,
-        unit::{DegreeCelsius, FanAirflow},
-    },
-    home_state::{HomeStateEvent, HomeStateValue},
+    core::unit::{DegreeCelsius, FanAirflow},
+    home_state::HomeStateEvent,
     trigger::TriggerClient,
 };
 

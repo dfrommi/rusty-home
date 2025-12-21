@@ -121,7 +121,7 @@ impl CommandRepository {
 
         let commands = records
             .into_iter()
-            .map_while(|row| {
+            .filter_map(|row| {
                 let source = ExternalId::new(row.source_type, row.source_id);
                 match serde_json::from_value::<Command>(row.command) {
                     Ok(command) => Some(CommandExecution {

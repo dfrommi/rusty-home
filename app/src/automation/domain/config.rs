@@ -1,10 +1,10 @@
-use crate::automation::{HeatingZone, LoadBalancedThermostat, Room, Thermostat};
+use crate::automation::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::frontends::homekit::HomekitCommandTarget;
 
 use super::action::{
-    AutoTurnOff, FollowDefaultSetting, FollowHeatingSchedule, FollowTargetHeatingDemand, InformWindowOpen,
-    ProvideAmbientTemperature, ProvideLoadRoomMean, ReduceNoiseAtNight, SupportVentilationWithFan, UserTriggerAction,
+    AutoTurnOff, FollowDefaultSetting, FollowTargetHeatingDemand, InformWindowOpen, ReduceNoiseAtNight,
+    SupportVentilationWithFan, UserTriggerAction,
 };
 use super::action::{Dehumidify, HomeAction};
 use super::goal::HomeGoal;
@@ -14,30 +14,37 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     vec![
     (
         HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
-        smarter_heating_actions(HeatingZone::LivingRoom)
+        vec![
+            FollowTargetHeatingDemand::new(HeatingZone::LivingRoom).into(),
+        ]
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::Bedroom),
         {
-            let mut a = vec![
+            vec![
                 UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
                 AutoTurnOff::IrHeater.into(),
-            ]; 
-            a.extend(smarter_heating_actions(HeatingZone::Bedroom));
-            a
+                FollowTargetHeatingDemand::new(HeatingZone::Bedroom).into(),
+            ] 
         }
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::Kitchen),
-        smarter_heating_actions(HeatingZone::Kitchen)
+        vec![
+            FollowTargetHeatingDemand::new(HeatingZone::Kitchen).into(),
+        ]
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
-        smarter_heating_actions(HeatingZone::RoomOfRequirements)
+        vec![
+            FollowTargetHeatingDemand::new(HeatingZone::RoomOfRequirements).into(),
+        ]
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::Bathroom),
-        smarter_heating_actions(HeatingZone::Bathroom)
+        vec![
+            FollowTargetHeatingDemand::new(HeatingZone::Bathroom).into(),
+        ]
     ),
     (
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
@@ -79,18 +86,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         ]
     ),
     (
-        HomeGoal::CoreControl,
-        vec![
-            ProvideLoadRoomMean::LivingRoom.into(),
-            ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomBig).into(), 
-            ProvideAmbientTemperature::Thermostat(Thermostat::LivingRoomSmall).into(), 
-            ProvideAmbientTemperature::Thermostat(Thermostat::Bedroom).into(), 
-            ProvideAmbientTemperature::Thermostat(Thermostat::Kitchen).into(), 
-            ProvideAmbientTemperature::Thermostat(Thermostat::RoomOfRequirements).into(), 
-            ProvideAmbientTemperature::Thermostat(Thermostat::Bathroom).into(), 
-            ]
-    ),
-    (
         HomeGoal::ResetToDefaltSettings,
         vec![
             FollowDefaultSetting::new(CommandTarget::SetPower {
@@ -101,30 +96,6 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             }).into(),
             FollowDefaultSetting::new(CommandTarget::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::LivingRoomBig,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::LivingRoomSmall,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::Bedroom,
-            }).into(),
-            // FollowDefaultSetting::new(CommandTarget::SetHeating {
-            //     device: Thermostat::RoomOfRequirements,
-            // }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::Kitchen,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetHeating {
-                device: Thermostat::Bathroom,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetThermostatLoadMean {
-                device: LoadBalancedThermostat::LivingRoomBig,
-            }).into(),
-            FollowDefaultSetting::new(CommandTarget::SetThermostatLoadMean {
-                device: LoadBalancedThermostat::LivingRoomSmall,
             }).into(),
             FollowDefaultSetting::new(CommandTarget::PushNotify {
                 recipient: NotificationRecipient::Dennis,
@@ -143,16 +114,4 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         ]
     )
     ]
-}
-
-fn smarter_heating_actions(zone: HeatingZone) -> Vec<HomeAction> {
-    let mut actions = vec![];
-
-    if zone == HeatingZone::RoomOfRequirements {
-        actions.push(FollowTargetHeatingDemand::new(zone.clone()).into());
-    }
-
-    actions.push(FollowHeatingSchedule::new(zone).into());
-
-    actions
 }

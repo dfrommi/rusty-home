@@ -48,13 +48,6 @@ pub enum Thermostat {
     Bathroom,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum LoadBalancedThermostat {
-    LivingRoomBig,
-    LivingRoomSmall,
-}
-
 impl HeatingZone {
     pub fn thermostats(&self) -> Vec<Thermostat> {
         match self {
@@ -155,15 +148,6 @@ impl Thermostat {
             Thermostat::Kitchen => HeatingDemand::Kitchen,
             Thermostat::RoomOfRequirements => HeatingDemand::RoomOfRequirements,
             Thermostat::Bathroom => HeatingDemand::Bathroom,
-        }
-    }
-}
-
-impl From<&LoadBalancedThermostat> for Thermostat {
-    fn from(value: &LoadBalancedThermostat) -> Self {
-        match value {
-            LoadBalancedThermostat::LivingRoomBig => Thermostat::LivingRoomBig,
-            LoadBalancedThermostat::LivingRoomSmall => Thermostat::LivingRoomSmall,
         }
     }
 }

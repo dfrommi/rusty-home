@@ -224,7 +224,6 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
         DeviceStateId::FanActivity(id) => DeviceStateValue::FanActivity(id, value.into()),
         DeviceStateId::HeatingDemand(id) => DeviceStateValue::HeatingDemand(id, value.into()),
         DeviceStateId::LightLevel(id) => DeviceStateValue::LightLevel(id, value.into()),
-        DeviceStateId::RawVendorValue(id) => DeviceStateValue::RawVendorValue(id, value.into()),
         DeviceStateId::RelativeHumidity(id) => DeviceStateValue::RelativeHumidity(id, value.into()),
         DeviceStateId::SetPoint(id) => DeviceStateValue::SetPoint(id, value.into()),
         DeviceStateId::Temperature(id) => DeviceStateValue::Temperature(id, value.into()),

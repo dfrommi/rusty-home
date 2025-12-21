@@ -1,39 +1,9 @@
 use super::Z2mCommandTarget;
-use crate::automation::{LoadBalancedThermostat, Thermostat};
+use crate::automation::Thermostat;
 use crate::command::CommandTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![
-        (
-            CommandTarget::SetHeating {
-                device: Thermostat::LivingRoomBig,
-            },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
-        ),
-        (
-            CommandTarget::SetHeating {
-                device: Thermostat::LivingRoomSmall,
-            },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
-        ),
-        (
-            CommandTarget::SetHeating {
-                device: Thermostat::Bedroom,
-            },
-            Z2mCommandTarget::Thermostat("bedroom/radiator_thermostat"),
-        ),
-        (
-            CommandTarget::SetHeating {
-                device: Thermostat::Kitchen,
-            },
-            Z2mCommandTarget::Thermostat("kitchen/radiator_thermostat"),
-        ),
-        // (
-        //     CommandTarget::SetHeating {
-        //         device: Thermostat::RoomOfRequirements,
-        //     },
-        //     Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
-        // ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::RoomOfRequirements,
@@ -41,58 +11,34 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
             Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat_sonoff"),
         ),
         (
-            CommandTarget::SetHeating {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::Bathroom,
             },
-            Z2mCommandTarget::Thermostat("bathroom/radiator_thermostat"),
+            Z2mCommandTarget::Thermostat("bathroom/radiator_thermostat_sonoff"),
         ),
         (
-            CommandTarget::SetThermostatAmbientTemperature {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::LivingRoomBig,
             },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big_sonoff"),
         ),
         (
-            CommandTarget::SetThermostatAmbientTemperature {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::LivingRoomSmall,
             },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
+            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small_sonoff"),
         ),
         (
-            CommandTarget::SetThermostatLoadMean {
-                device: LoadBalancedThermostat::LivingRoomBig,
-            },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_big"),
-        ),
-        (
-            CommandTarget::SetThermostatLoadMean {
-                device: LoadBalancedThermostat::LivingRoomSmall,
-            },
-            Z2mCommandTarget::Thermostat("living_room/radiator_thermostat_small"),
-        ),
-        (
-            CommandTarget::SetThermostatAmbientTemperature {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::Bedroom,
             },
-            Z2mCommandTarget::Thermostat("bedroom/radiator_thermostat"),
+            Z2mCommandTarget::Thermostat("bedroom/radiator_thermostat_sonoff"),
         ),
         (
-            CommandTarget::SetThermostatAmbientTemperature {
+            CommandTarget::SetThermostatValveOpeningPosition {
                 device: Thermostat::Kitchen,
             },
-            Z2mCommandTarget::Thermostat("kitchen/radiator_thermostat"),
-        ),
-        // (
-        //     CommandTarget::SetThermostatAmbientTemperature {
-        //         device: Thermostat::RoomOfRequirements,
-        //     },
-        //     Z2mCommandTarget::Thermostat("room_of_requirements/radiator_thermostat"),
-        // ),
-        (
-            CommandTarget::SetThermostatAmbientTemperature {
-                device: Thermostat::Bathroom,
-            },
-            Z2mCommandTarget::Thermostat("bathroom/radiator_thermostat"),
+            Z2mCommandTarget::Thermostat("kitchen/radiator_thermostat_sonoff"),
         ),
     ]
 }

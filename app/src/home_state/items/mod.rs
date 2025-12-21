@@ -6,12 +6,10 @@ mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
 mod is_running;
-mod load;
 mod occupancy;
 mod opened;
 mod power_available;
 mod presence;
-mod raw_vendor_value;
 mod relative_humidity;
 mod resident;
 mod risk_of_mould;
@@ -30,12 +28,10 @@ pub use fan_activity::*;
 pub use felt_temperature::FeltTemperature;
 pub use heating_demand::HeatingDemand;
 pub use is_running::IsRunning;
-pub use load::Load;
 pub use occupancy::Occupancy;
 pub use opened::OpenedArea;
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
-pub use raw_vendor_value::RawVendorValue;
 pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
@@ -57,7 +53,6 @@ pub enum HomeStateValue {
     DewPoint(DewPoint, DegreeCelsius),
     FeltTemperature(FeltTemperature, DegreeCelsius),
     IsRunning(IsRunning, bool),
-    Load(Load, Percent),
     Occupancy(Occupancy, Probability),
     OpenedArea(OpenedArea, bool),
     Resident(Resident, bool),
@@ -70,7 +65,6 @@ pub enum HomeStateValue {
     HeatingDemand(HeatingDemand, Percent),
     PowerAvailable(PowerAvailable, bool),
     Presence(Presence, bool),
-    RawVendorValue(RawVendorValue, RawValue),
     RelativeHumidity(RelativeHumidity, Percent),
     SetPoint(SetPoint, DegreeCelsius),
     Temperature(Temperature, DegreeCelsius),
@@ -104,9 +98,6 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::IsRunning(id) => is_running::IsRunningStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::IsRunning(id, value)),
-            HomeStateId::Load(id) => load::LoadStateProvider
-                .calculate_current(id, ctx)
-                .map(|value| HomeStateValue::Load(id, value)),
             HomeStateId::Occupancy(id) => occupancy::OccupancyStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Occupancy(id, value)),
@@ -137,9 +128,6 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Presence(id) => presence::PresenceStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Presence(id, value)),
-            HomeStateId::RawVendorValue(id) => raw_vendor_value::RawVendorValueStateProvider
-                .calculate_current(id, ctx)
-                .map(|value| HomeStateValue::RawVendorValue(id, value)),
             HomeStateId::RelativeHumidity(id) => relative_humidity::RelativeHumidityStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::RelativeHumidity(id, value)),

@@ -14,7 +14,6 @@ pub enum Temperature {
     BathroomShower,
     Dehumidifier,
     ThermostatOnDevice(Thermostat),
-    ThermostatExternal(Thermostat),
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,

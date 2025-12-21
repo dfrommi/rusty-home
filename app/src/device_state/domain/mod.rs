@@ -10,7 +10,6 @@ mod light_level;
 mod opened;
 mod power_available;
 mod presence;
-mod raw_vendor_value;
 mod relative_humidity;
 mod set_point;
 mod temperature;
@@ -26,7 +25,6 @@ pub use light_level::LightLevel;
 pub use opened::Opened;
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
-pub use raw_vendor_value::RawVendorValue;
 pub use relative_humidity::RelativeHumidity;
 pub use set_point::SetPoint;
 pub use temperature::Temperature;
@@ -44,7 +42,6 @@ pub enum DeviceStateValue {
     Opened(opened::Opened, bool),
     PowerAvailable(power_available::PowerAvailable, bool),
     Presence(presence::Presence, bool),
-    RawVendorValue(raw_vendor_value::RawVendorValue, RawValue),
     RelativeHumidity(relative_humidity::RelativeHumidity, Percent),
     SetPoint(set_point::SetPoint, DegreeCelsius),
     Temperature(temperature::Temperature, DegreeCelsius),
@@ -60,7 +57,6 @@ impl From<&DeviceStateValue> for f64 {
             DeviceStateValue::FanActivity(_, v) => v.into(),
             DeviceStateValue::HeatingDemand(_, v) => v.into(),
             DeviceStateValue::LightLevel(_, v) => v.into(),
-            DeviceStateValue::RawVendorValue(_, v) => v.into(),
             DeviceStateValue::RelativeHumidity(_, v) => v.into(),
             DeviceStateValue::SetPoint(_, v) => v.into(),
             DeviceStateValue::Temperature(_, v) => v.into(),

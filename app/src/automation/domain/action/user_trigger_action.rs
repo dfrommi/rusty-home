@@ -1,10 +1,9 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::automation::HeatingZone;
-use crate::command::{Command, EnergySavingDevice, HeatingTargetState};
+use crate::command::Command;
 use crate::core::time::Duration;
-use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState};
+use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget};
 use crate::home_state::PowerAvailable;
 use crate::t;
 use crate::trigger::{UserTrigger, UserTriggerTarget};
@@ -73,7 +72,7 @@ impl UserTriggerAction {
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => Some(t!(1 hours)),
+            | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => None,
             UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
         }
     }
@@ -103,39 +102,13 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
             device: Fan::BedroomCeilingFan,
             speed,
         }],
-        UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(state)) => {
-            homekit_heating_actions(HeatingZone::LivingRoom, state)
-        }
-        UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(state)) => {
-            homekit_heating_actions(HeatingZone::Bedroom, state)
-        }
-        UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(state)) => {
-            homekit_heating_actions(HeatingZone::Kitchen, state)
-        }
-        UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state)) => {
-            homekit_heating_actions(HeatingZone::RoomOfRequirements, state)
-        }
-        UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => {
-            homekit_heating_actions(HeatingZone::Bathroom, state)
+        UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(_))
+        | UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(_))
+        | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(_))
+        | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(_))
+        | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(_)) => {
+            tracing::warn!("Homekit heating state triggers are handled by FollowTargetHeatingDemand rule, skipping");
+            vec![]
         }
     }
-}
-
-fn homekit_heating_actions(zone: HeatingZone, state: HomekitHeatingState) -> Vec<Command> {
-    let target_state = match state {
-        HomekitHeatingState::Off => HeatingTargetState::Off,
-        HomekitHeatingState::Heat(temperature) => HeatingTargetState::Heat {
-            temperature,
-            low_priority: false,
-        },
-        HomekitHeatingState::Auto => return vec![],
-    };
-
-    zone.thermostats()
-        .iter()
-        .map(|thermostat| Command::SetHeating {
-            device: thermostat.clone(),
-            target_state: target_state.clone(),
-        })
-        .collect()
 }

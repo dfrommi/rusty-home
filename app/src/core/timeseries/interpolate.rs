@@ -6,7 +6,7 @@ use super::DataFrame;
 
 pub trait Interpolator<T: Clone>: Copy {
     fn interpolate(&self, at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T>;
-    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Result<Option<T>>;
+    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T>;
 }
 
 #[derive(Copy, Clone)]
@@ -16,8 +16,8 @@ impl<T: Clone> Interpolator<T> for LastSeenInterpolator {
         Ok(prev.value.clone())
     }
 
-    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Result<Option<T>> {
-        Ok(df.prev_or_at(at).map(|dp| dp.value.clone()))
+    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T> {
+        df.prev_or_at(at).map(|dp| dp.value.clone())
     }
 }
 
@@ -29,24 +29,38 @@ where
     for<'a> &'a T: Into<f64>,
 {
     fn interpolate(&self, at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T> {
-        linear_dp(at, prev, next)
+        assert_params_consistent(at, prev, next)?;
+        Ok(linear_dp(at, prev, next))
     }
 
-    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Result<Option<T>> {
-        let (prev, next) = match (df.prev_or_at(at), df.next(at)) {
-            (Some(prev), Some(next)) => (prev, next),
-            _ => return Ok(None),
-        };
-
-        self.interpolate(at, prev, next).map(Some)
+    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T> {
+        match (df.prev_or_at(at), df.next(at)) {
+            (Some(prev), Some(next)) => Some(linear_dp(at, &prev, &next)),
+            _ => return None,
+        }
     }
 }
 
-fn linear_dp<T>(at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T>
+#[derive(Copy, Clone)]
+pub struct LinearOrLastSeenInterpolator;
+impl<T> Interpolator<T> for LinearOrLastSeenInterpolator
 where
     T: From<f64> + Clone,
     for<'a> &'a T: Into<f64>,
 {
+    fn interpolate(&self, at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T> {
+        assert_params_consistent(at, prev, next)?;
+        LinearInterpolator.interpolate(at, prev, next)
+    }
+
+    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T> {
+        LinearInterpolator
+            .interpolate_df(at, df)
+            .or_else(|| LastSeenInterpolator.interpolate_df(at, df))
+    }
+}
+
+fn assert_params_consistent<T>(at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<()> {
     if prev.timestamp > at {
         anyhow::bail!(
             "Cannot interpolate: prev timestamp {} is after requested timestamp {}",
@@ -69,10 +83,18 @@ where
         );
     }
 
+    Ok(())
+}
+
+fn linear_dp<T>(at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> T
+where
+    T: From<f64> + Clone,
+    for<'a> &'a T: Into<f64>,
+{
     if prev.timestamp == at {
-        return Ok(prev.value.clone());
+        return prev.value.clone();
     } else if next.timestamp == at {
-        return Ok(next.value.clone());
+        return next.value.clone();
     }
 
     let prev_time: f64 = prev.timestamp.into();
@@ -84,5 +106,5 @@ where
 
     let interpolated_value = prev_value + (next_value - prev_value) * (at_time - prev_time) / (next_time - prev_time);
 
-    Ok(interpolated_value.into())
+    interpolated_value.into()
 }

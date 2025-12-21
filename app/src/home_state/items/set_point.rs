@@ -36,6 +36,31 @@ impl DerivedStateProvider<SetPoint, DegreeCelsius> for SetPointStateProvider {
                 let value = HeatingZone::RoomOfRequirements.setpoint_for_mode(&mode.value);
                 Some(value)
             }
+            SetPoint::LivingRoomBig if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
+                let mode = ctx.get(TargetHeatingMode::LivingRoom)?;
+                let value = HeatingZone::LivingRoom.setpoint_for_mode(&mode.value);
+                Some(value)
+            }
+            SetPoint::LivingRoomSmall if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
+                let mode = ctx.get(TargetHeatingMode::LivingRoom)?;
+                let value = HeatingZone::LivingRoom.setpoint_for_mode(&mode.value);
+                Some(value)
+            }
+            SetPoint::Kitchen if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
+                let mode = ctx.get(TargetHeatingMode::Kitchen)?;
+                let value = HeatingZone::Kitchen.setpoint_for_mode(&mode.value);
+                Some(value)
+            }
+            SetPoint::Bedroom if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
+                let mode = ctx.get(TargetHeatingMode::Bedroom)?;
+                let value = HeatingZone::Bedroom.setpoint_for_mode(&mode.value);
+                Some(value)
+            }
+            SetPoint::Bathroom if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
+                let mode = ctx.get(TargetHeatingMode::Bathroom)?;
+                let value = HeatingZone::Bathroom.setpoint_for_mode(&mode.value);
+                Some(value)
+            }
             SetPoint::RoomOfRequirements => ctx.device_state(DeviceSetPoint::RoomOfRequirements).map(|dp| dp.value),
             SetPoint::LivingRoomBig => ctx.device_state(DeviceSetPoint::LivingRoomBig).map(|dp| dp.value),
             SetPoint::LivingRoomSmall => ctx.device_state(DeviceSetPoint::LivingRoomSmall).map(|dp| dp.value),

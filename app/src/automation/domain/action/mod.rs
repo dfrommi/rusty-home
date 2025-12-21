@@ -93,14 +93,11 @@ impl<T: SimpleRule> Rule for T {
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     InformWindowOpen(InformWindowOpen),
-    ProvideAmbientTemperature(ProvideAmbientTemperature),
-    ProvideLoadRoomMean(ProvideLoadRoomMean),
     AutoTurnOff(AutoTurnOff),
     ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
     SupportVentilationWithFan(SupportVentilationWithFan),
-    FollowHeatingSchedule(FollowHeatingSchedule),
     FollowTargetHeatingDemand(FollowTargetHeatingDemand),
 }
 
@@ -118,12 +115,6 @@ impl Action for HomeAction {
         match self {
             HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, ctx),
             HomeAction::InformWindowOpen(inform_window_open) => evaluate_rule(inform_window_open, ext_id, ctx),
-            HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => {
-                evaluate_rule(provide_ambient_temperature, ext_id, ctx)
-            }
-            HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => {
-                evaluate_rule(provide_load_room_mean, ext_id, ctx)
-            }
             HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, ctx),
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => evaluate_rule(reduce_noise_at_night, ext_id, ctx),
             HomeAction::FollowDefaultSetting(follow_default_setting) => {
@@ -132,9 +123,6 @@ impl Action for HomeAction {
             HomeAction::UserTriggerAction(user_trigger_action) => evaluate_rule(user_trigger_action, ext_id, ctx),
             HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                 evaluate_rule(support_ventilation_with_fan, ext_id, ctx)
-            }
-            HomeAction::FollowHeatingSchedule(follow_heating_schedule) => {
-                evaluate_rule(follow_heating_schedule, ext_id, ctx)
             }
             HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
                 evaluate_rule(follow_target_heating_demand, ext_id, ctx)
@@ -146,8 +134,6 @@ impl Action for HomeAction {
         match self {
             HomeAction::Dehumidify(dehumidify) => dehumidify.ext_id(),
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.ext_id(),
-            HomeAction::ProvideAmbientTemperature(provide_ambient_temperature) => provide_ambient_temperature.ext_id(),
-            HomeAction::ProvideLoadRoomMean(provide_load_room_mean) => provide_load_room_mean.ext_id(),
             HomeAction::AutoTurnOff(auto_turn_off) => auto_turn_off.ext_id(),
             HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.ext_id(),
             HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.ext_id(),
@@ -155,8 +141,9 @@ impl Action for HomeAction {
             HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
                 support_ventilation_with_fan.ext_id()
             }
-            HomeAction::FollowHeatingSchedule(follow_heating_schedule) => follow_heating_schedule.ext_id(),
-            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => follow_target_heating_demand.ext_id(),
+            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
+                follow_target_heating_demand.ext_id()
+            }
         }
     }
 }

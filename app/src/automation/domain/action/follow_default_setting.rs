@@ -1,9 +1,8 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::automation::HeatingZone;
-use crate::command::{Command, CommandTarget, HeatingTargetState, NotificationAction};
-use crate::core::unit::{FanAirflow, Percent, RawValue};
+use crate::command::{Command, CommandTarget, NotificationAction};
+use crate::core::unit::{FanAirflow, Percent};
 
 #[derive(Debug, Clone, Id)]
 pub struct FollowDefaultSetting(CommandTarget);
@@ -21,17 +20,6 @@ impl Rule for FollowDefaultSetting {
                 device,
                 power_on: false,
             },
-            CommandTarget::SetHeating { device } => {
-                let heating_zone = HeatingZone::for_thermostat(&device);
-
-                Command::SetHeating {
-                    device,
-                    target_state: HeatingTargetState::Heat {
-                        temperature: heating_zone.default_setpoint(),
-                        low_priority: true,
-                    },
-                }
-            }
             CommandTarget::PushNotify {
                 recipient,
                 notification,
@@ -45,13 +33,6 @@ impl Rule for FollowDefaultSetting {
                 device,
                 speed: FanAirflow::Off,
             },
-            CommandTarget::SetThermostatLoadMean { device } => Command::SetThermostatLoadMean {
-                device,
-                value: RawValue(-8000.0),
-            },
-            CommandTarget::SetThermostatAmbientTemperature { .. } => {
-                anyhow::bail!("FollowDefaultSetting cannot be applied to SetThermostatAmbientTemperature")
-            }
             CommandTarget::SetThermostatValveOpeningPosition { device } => Command::SetThermostatValveOpeningPosition {
                 device,
                 value: Percent(0.0),

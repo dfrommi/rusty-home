@@ -1,7 +1,7 @@
 mod command_state;
 
-use crate::automation::{LoadBalancedThermostat, Thermostat};
-use crate::core::unit::{DegreeCelsius, FanAirflow, Percent, RawValue};
+use crate::automation::Thermostat;
+use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::trigger::UserTriggerId;
 use derive_more::derive::{Display, From};
@@ -14,19 +14,6 @@ pub enum Command {
     SetPower {
         device: PowerToggle,
         power_on: bool,
-    },
-    SetHeating {
-        device: Thermostat,
-        #[serde(flatten)]
-        target_state: HeatingTargetState,
-    },
-    SetThermostatAmbientTemperature {
-        device: Thermostat,
-        temperature: DegreeCelsius,
-    },
-    SetThermostatLoadMean {
-        device: LoadBalancedThermostat,
-        value: RawValue,
     },
     SetThermostatValveOpeningPosition {
         device: Thermostat,
@@ -52,15 +39,6 @@ pub enum Command {
 pub enum CommandTarget {
     #[display("SetPower[{}]", device)]
     SetPower { device: PowerToggle },
-
-    #[display("SetHeating[{}]", device)]
-    SetHeating { device: Thermostat },
-
-    #[display("SetThermostatAmbientTemperature[{}]", device)]
-    SetThermostatAmbientTemperature { device: Thermostat },
-
-    #[display("SetThermostatLoadMean[{}]", device)]
-    SetThermostatLoadMean { device: LoadBalancedThermostat },
 
     #[display("SetThermostatValveOpeningPosition[{}]", device)]
     SetThermostatValveOpeningPosition { device: Thermostat },
@@ -88,13 +66,6 @@ impl From<&Command> for CommandTarget {
     fn from(val: &Command) -> Self {
         match val {
             Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
-            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
-            Command::SetThermostatAmbientTemperature { device, .. } => {
-                CommandTarget::SetThermostatAmbientTemperature { device: device.clone() }
-            }
-            Command::SetThermostatLoadMean { device, .. } => {
-                CommandTarget::SetThermostatLoadMean { device: device.clone() }
-            }
             Command::SetThermostatValveOpeningPosition { device, .. } => {
                 CommandTarget::SetThermostatValveOpeningPosition { device: device.clone() }
             }

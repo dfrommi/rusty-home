@@ -54,7 +54,7 @@ pub async fn main() {
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
 
-    let mut home_state_module = HomeStateModule::new(
+    let home_state_module = HomeStateModule::new(
         t!(3 hours),
         device_state_module.subscribe(),
         trigger_module.subscribe(),
@@ -96,13 +96,6 @@ pub async fn main() {
                 .expect("HTTP server execution failed");
         }
     };
-
-    tracing::info!("Starting state bootstrapping");
-    home_state_module
-        .bootstrap_snapshot()
-        .await
-        .expect("Error bootstrapping state");
-    tracing::info!("State bootstrapping completed");
 
     tracing::info!("Starting main loop");
 

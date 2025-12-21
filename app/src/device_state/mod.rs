@@ -137,11 +137,6 @@ impl DeviceStateModule {
 }
 
 impl DeviceStateClient {
-    pub async fn update_state(&self, data_point: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
-        self.service.handle_state_update(data_point).await;
-        Ok(())
-    }
-
     pub async fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
         self.service.get_current_for_all().await
     }

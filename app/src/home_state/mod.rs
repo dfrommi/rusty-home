@@ -10,8 +10,7 @@ use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
-use crate::home_state::calc::bootstrap_snapshot;
-use crate::home_state::calc::calculate_new_snapshot;
+use crate::home_state::calc::{StateCalculationContext, bootstrap_context, create_standalone_context};
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
 
@@ -25,7 +24,6 @@ pub enum HomeStateEvent {
 pub struct HomeStateModule {
     duration: Duration,
     device_state: DeviceStateClient,
-    snapshot: StateSnapshot,
     trigger_client: TriggerClient,
     device_state_rx: EventListener<DeviceStateEvent>,
     trigger_rx: EventListener<TriggerEvent>,
@@ -46,7 +44,6 @@ impl HomeStateModule {
         Self {
             duration,
             device_state,
-            snapshot: StateSnapshot::default(),
             trigger_client,
             device_state_rx,
             trigger_rx,
@@ -55,17 +52,22 @@ impl HomeStateModule {
         }
     }
 
-    pub async fn bootstrap_snapshot(&mut self) -> anyhow::Result<()> {
-        self.snapshot = bootstrap_snapshot(self.duration.clone(), &self.trigger_client, &self.device_state).await?;
-        Ok(())
-    }
-
     pub fn subscribe(&self) -> EventListener<HomeStateEvent> {
         self.event_bus.subscribe()
     }
 
     pub async fn run(mut self) {
         use tokio::time::{self, Duration, Instant};
+
+        tracing::info!("Starting bootstrap of home state context");
+        let mut context = bootstrap_context(self.duration.clone(), &self.trigger_client, &self.device_state)
+            .await
+            .expect("Failed to bootstrap home state context");
+        let mut snapshot = context.as_snapshot();
+
+        tracing::info!("Calculating initial home state context");
+        (context, snapshot) = self.update_context(context, snapshot).await;
+        tracing::info!("Completed bootstrap of home state context");
 
         let scheduled_duration = Duration::from_secs(30);
         let debounce_duration = Duration::from_millis(50);
@@ -81,7 +83,7 @@ impl HomeStateModule {
                 },
 
                 event = self.trigger_rx.recv() => if let Some(TriggerEvent::TriggerAdded) = event {
-                    self.update_snapshot().await;
+                    (context, snapshot) = self.update_context(context, snapshot).await;
 
                     //Schedule next regular update
                     debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
@@ -89,7 +91,7 @@ impl HomeStateModule {
 
                 // Debounce elapsed
                 () = &mut debounce_sleeper => {
-                    self.update_snapshot().await;
+                    (context, snapshot) = self.update_context(context, snapshot).await;
                     //Schedule next regular update
                     debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
                 }
@@ -97,22 +99,24 @@ impl HomeStateModule {
         }
     }
 
-    async fn update_snapshot(&mut self) {
-        let old_snapshot = self.snapshot.clone();
-        let new_snapshot = match calculate_new_snapshot(
-            self.duration.clone(),
-            &old_snapshot,
-            &self.device_state,
-            &self.trigger_client,
-        )
-        .await
-        {
-            Ok(snapshot) => snapshot,
+    async fn update_context(
+        &self,
+        old_context: StateCalculationContext,
+        old_snapshot: StateSnapshot,
+    ) -> (StateCalculationContext, StateSnapshot) {
+        tracing::trace!("Updating home state context");
+
+        let new_context = match create_standalone_context(&self.device_state, &self.trigger_client).await {
+            Ok(ctx) => ctx.with_history(Some(old_context), self.duration.clone()),
             Err(e) => {
-                tracing::error!("Error calculating new home state snapshot: {:?}", e);
-                return;
+                tracing::error!("Failed to create next context: {:?}", e);
+                return (old_context, old_snapshot);
             }
         };
+
+        new_context.load_all();
+
+        let new_snapshot = new_context.as_snapshot();
 
         self.event_emitter
             .send(HomeStateEvent::SnapshotUpdated(new_snapshot.clone()));
@@ -132,6 +136,8 @@ impl HomeStateModule {
             }
         }
 
-        self.snapshot = new_snapshot;
+        tracing::trace!("Completed update of home state context");
+
+        (new_context, new_snapshot)
     }
 }

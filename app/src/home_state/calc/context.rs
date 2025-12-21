@@ -13,27 +13,7 @@ use crate::{
 
 use super::StateSnapshot;
 
-pub async fn calculate_new_snapshot(
-    truncate_before: Duration,
-    history: &StateSnapshot,
-    device_state: &DeviceStateClient,
-    trigger_client: &TriggerClient,
-) -> anyhow::Result<StateSnapshot> {
-    let context = create_new_calculation_context(history, device_state, trigger_client).await?;
-
-    //preload all current values
-    for id in HomeStateId::variants().iter() {
-        context.load(*id);
-    }
-
-    let snapshot = context.into_snapshot(DateTimeRange::since(t!(now) - truncate_before));
-
-    Ok(snapshot)
-}
-
-//TODO optimize creation of context using less copy and loops, ideally Arc
-async fn create_new_calculation_context(
-    history: &StateSnapshot,
+pub async fn create_standalone_context(
     device_state: &DeviceStateClient,
     trigger_client: &TriggerClient,
 ) -> anyhow::Result<StateCalculationContext> {
@@ -46,28 +26,23 @@ async fn create_new_calculation_context(
         active_triggers.insert(trigger.target(), trigger);
     }
 
-    let mut history_map: HashMap<HomeStateId, DataFrame<HomeStateValue>> = HashMap::new();
-    for (id, value) in history.home_state_iter() {
-        history_map.insert(id.clone(), value.clone());
-    }
-
     let device_states = device_state.get_current_for_all().await?;
 
     Ok(StateCalculationContext {
         start_time,
         current: RefCell::new(HashMap::new()),
-        history: history_map,
         device_state: device_states,
         active_user_triggers: active_triggers,
+        prev: None,
     })
 }
 
 pub struct StateCalculationContext {
-    start_time: DateTime,
+    pub start_time: DateTime,
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
-    history: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
     device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
     active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+    pub prev: Option<Box<StateCalculationContext>>,
 }
 
 pub trait DerivedStateProvider<ID, T> {
@@ -75,26 +50,87 @@ pub trait DerivedStateProvider<ID, T> {
 }
 
 impl StateCalculationContext {
-    fn load(&self, id: HomeStateId) {
-        let _ = self.get_home_state_value(id);
+    pub fn with_history(
+        self,
+        mut previous: Option<StateCalculationContext>,
+        keep: Duration,
+    ) -> StateCalculationContext {
+        let cutoff = self.start_time - keep;
+        if let Some(prev_ctx) = previous.as_mut() {
+            prev_ctx.truncate_before(cutoff);
+        }
+        StateCalculationContext {
+            start_time: self.start_time,
+            current: self.current,
+            device_state: self.device_state,
+            active_user_triggers: self.active_user_triggers,
+            prev: previous.map(Box::new),
+        }
     }
 
-    fn into_snapshot(self, range: DateTimeRange) -> StateSnapshot {
-        let mut data = HashMap::new();
+    pub fn range(&self) -> DateTimeRange {
+        let mut start = self.start_time;
+        let mut current_ctx = self;
 
-        for (id, current) in self.current.borrow().iter() {
-            let df: Option<DataFrame<HomeStateValue>> = self.history.get(id).cloned();
-            let combined_df = match df {
-                Some(mut df) => {
-                    df.insert(current.clone());
-                    df.retain_range_with_context_before(&range)
-                }
-                None => DataFrame::new(vec![current.clone()]),
-            };
-            data.insert(*id, combined_df);
+        while let Some(prev) = &current_ctx.prev {
+            start = prev.start_time;
+            current_ctx = prev;
         }
 
-        StateSnapshot::new(self.start_time, data, self.active_user_triggers)
+        DateTimeRange::new(start, self.start_time)
+    }
+
+    pub fn load_all(&self) {
+        for id in HomeStateId::variants().iter() {
+            self.get_home_state_value(*id);
+        }
+    }
+
+    fn truncate_before(&mut self, timestamp: DateTime) {
+        let mut current_ctx = self;
+
+        loop {
+            let should_cut = current_ctx
+                .prev
+                .as_ref()
+                .is_some_and(|prev| prev.start_time < timestamp);
+
+            if should_cut {
+                if let Some(ref prev) = current_ctx.prev {
+                    tracing::debug!(
+                        "Truncating state calculation context history at timestamp {}, cutting context starting at {}",
+                        timestamp,
+                        prev.start_time
+                    );
+                }
+
+                current_ctx.prev = None;
+                break;
+            }
+
+            match current_ctx.prev.as_mut() {
+                Some(prev) => current_ctx = prev,
+                None => break,
+            }
+        }
+    }
+
+    pub fn as_snapshot(&self) -> StateSnapshot {
+        let mut data = HashMap::new();
+
+        for id in self.current.borrow().keys() {
+            match self.data_frame(*id, DateTime::min_value()) {
+                Some(df) => {
+                    data.insert(*id, df);
+                }
+                None => {
+                    tracing::warn!("No data-frame found, but current value exists for state {:?}", id);
+                    continue;
+                }
+            }
+        }
+
+        StateSnapshot::new(self.start_time, data, self.active_user_triggers.clone())
     }
 }
 
@@ -113,12 +149,17 @@ impl StateCalculationContext {
         }
     }
 
-    pub fn all_since<S>(&self, id: S, timestamp: DateTime) -> Option<DataFrame<S::Type>>
+    pub fn all_since<S>(&self, id: S, since: DateTime) -> Option<DataFrame<S::Type>>
     where
         S: Into<HomeStateId> + HomeStateItem + Clone,
     {
-        let df = self.data_frame(id.clone().into(), DateTimeRange::since(timestamp))?;
-        downcast_df(id, &df)
+        let df = self
+            .data_frame(id.clone().into(), since)?
+            .map(|dp: &DataPoint<HomeStateValue>| {
+                id.try_downcast(dp.value.clone())
+                    .expect("Internal error: State value projection failed in all_since")
+            });
+        Some(df)
     }
 
     pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
@@ -141,6 +182,7 @@ impl StateCalculationContext {
 }
 
 impl StateCalculationContext {
+    //TODO try to use ref
     fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
         let current_value = {
             let current = self.current.borrow();
@@ -151,7 +193,7 @@ impl StateCalculationContext {
             Some(dp) => Some(dp),
             None => {
                 let calculated_value = HomeStateDerivedStateProvider.calculate_current(id, self)?;
-                let previous_dp = self.history.get(&id).and_then(|df| df.last());
+                let previous_dp = self.prev.as_ref().and_then(|ctx| ctx.get_home_state_value(id));
 
                 //check if previous value is the same, then reuse timestamp
                 let calculated_dp = if let Some(previous_dp) = previous_dp
@@ -170,20 +212,25 @@ impl StateCalculationContext {
         }
     }
 
-    fn data_frame(&self, id: HomeStateId, range: DateTimeRange) -> Option<DataFrame<HomeStateValue>> {
-        let prev_df = self.history.get(&id);
-        let current = self.get_home_state_value(id).take_if(|dp| &dp.timestamp <= range.end());
+    fn data_frame(&self, id: HomeStateId, since: DateTime) -> Option<DataFrame<HomeStateValue>> {
+        let mut current_ctx = self;
+        let mut dps = vec![];
 
-        match (current, prev_df) {
-            //TODO optimize to avoid double retain
-            (Some(current), Some(df)) => {
-                let mut df = df.retain_range_with_context_before(&range);
-                df.insert(current.clone());
-                Some(df.retain_range_with_context_before(&range))
+        while current_ctx.start_time >= since {
+            if let Some(dp) = current_ctx.get_home_state_value(id) {
+                dps.push(dp);
             }
-            (Some(current), None) if current.timestamp <= *range.end() => Some(DataFrame::new(vec![current.clone()])),
-            (None, Some(df)) => Some(df.retain_range_with_context_before(&range)),
-            _ => None,
+
+            match &current_ctx.prev {
+                Some(prev) => current_ctx = prev,
+                None => break,
+            }
+        }
+
+        if dps.is_empty() {
+            None
+        } else {
+            Some(DataFrame::new(dps))
         }
     }
 }

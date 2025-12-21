@@ -38,6 +38,10 @@ impl DateTime {
         self.delegate.timestamp_millis()
     }
 
+    pub fn min_value() -> Self {
+        chrono::DateTime::<chrono::Local>::MIN_UTC.into()
+    }
+
     pub fn max_value() -> Self {
         chrono::DateTime::<chrono::Local>::MAX_UTC.into()
     }

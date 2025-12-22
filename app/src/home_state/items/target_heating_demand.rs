@@ -1,10 +1,10 @@
 use crate::{
-    automation::Thermostat,
+    automation::{HeatingZone, Thermostat},
     core::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{
-            DataFrame,
-            interpolate::{Interpolator, LastSeenInterpolator, LinearInterpolator},
+            DataFrame, DataPoint,
+            interpolate::{Interpolator, LinearOrLastSeenInterpolator},
         },
         unit::{DegreeCelsius, Percent},
     },
@@ -38,28 +38,39 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             Thermostat::Bathroom => Temperature::Bathroom,
         };
 
+        let heating_zone = HeatingZone::for_thermostat(&thermostat);
+
         let mode = ctx.get(mode)?;
 
-        let pid_params = get_pid_params_for_mode(thermostat, &mode.value);
+        let setpoint = heating_zone.setpoint_for_mode(&mode.value);
+        let current_demand = ctx.get(thermostat.heating_demand())?.value;
+
         let output = match mode.value {
-            HeatingMode::Ventilation => Some(Percent(0.0)),
+            HeatingMode::Ventilation => Percent(0.0),
 
             _ => {
                 let start_at = mode.timestamp;
-                let setpoints = match ctx.all_since(thermostat.set_point(), start_at) {
-                    Some(value) => value,
-                    None => return fallback_heating_demand(ctx, thermostat),
+
+                let temperatures = ctx.all_since(temperature_id, start_at);
+
+                let output = if let Some(temperatures) = temperatures
+                    && !temperatures.is_empty()
+                {
+                    calculate_output(mode, current_demand, setpoint, temperatures)
+                } else {
+                    None
                 };
-                let temperatures = match ctx.all_since(temperature_id, start_at) {
-                    Some(value) => value,
-                    None => return fallback_heating_demand(ctx, thermostat),
-                };
-                let output = calculate_pid(&pid_params, &setpoints, &temperatures, mode.timestamp, t!(30 seconds));
-                output.or_else(|| fallback_heating_demand(ctx, thermostat))
+
+                output.unwrap_or(current_demand)
             }
         };
 
-        output.map(|value| normalize_output(&pid_params, value))
+        //Only change output if significant change
+        if output > Percent(0.0) && (current_demand - output).abs() < Percent(5.0) {
+            return Some(current_demand);
+        }
+
+        Some(output)
     }
 }
 
@@ -72,7 +83,7 @@ struct PidParams {
     deadband: DegreeCelsius,
 }
 
-fn get_pid_params_for_mode(_thermostat: Thermostat, mode: &HeatingMode) -> PidParams {
+fn get_pid_params_for_mode(mode: &HeatingMode) -> PidParams {
     match mode {
         HeatingMode::EnergySaving => PidParams {
             kp: 35.0,
@@ -133,57 +144,121 @@ fn get_pid_params_for_mode(_thermostat: Thermostat, mode: &HeatingMode) -> PidPa
     }
 }
 
+impl PidParams {
+    fn clamp(&self, value: Percent) -> Percent {
+        if value < 0.5 * self.min_output {
+            Percent(0.0)
+        } else if value <= self.min_output {
+            self.min_output
+        } else if value >= self.max_output {
+            self.max_output
+        } else {
+            value.round()
+        }
+    }
+}
+
+fn calculate_output(
+    mode: DataPoint<HeatingMode>,
+    current_demand: Percent,
+    setpoint: DegreeCelsius,
+    temperatures: DataFrame<DegreeCelsius>,
+) -> Option<Percent> {
+    let params = get_pid_params_for_mode(&mode.value);
+    let start_at = mode.timestamp;
+
+    let current_temperature = temperatures.last()?.value;
+
+    let error = setpoint - current_temperature;
+
+    if matches!(mode.value, HeatingMode::Manual(_, _)) && error >= DegreeCelsius(1.0) {
+        //One degree is 50% opening
+        return params.clamp(Percent(error.0 * 50.0)).into();
+    }
+
+    //Deadband handling -> observe if this causes infinite low heating that just holds temp
+    if error.0.abs() <= params.deadband.0 {
+        return Some(current_demand);
+    }
+
+    let output = calculate_pid(&params, current_demand, setpoint, &temperatures, start_at, t!(30 seconds))
+        .unwrap_or(current_demand);
+
+    Some(params.clamp(output))
+}
+
 fn calculate_pid(
     params: &PidParams,
-    setpoints: &DataFrame<DegreeCelsius>,
+    current_heating_demand: Percent, // actual or last-commanded TRV opening
+    setpoint: DegreeCelsius,
     temperatures: &DataFrame<DegreeCelsius>,
     start_at: DateTime,
     step: Duration,
 ) -> Option<Percent> {
-    let history_start = (t!(now) - t!(3 hours)).max(start_at);
+    // Limit how far back we integrate.
+    // PID-relevant thermal memory is typically tens of minutes, not hours.
+    let history_start = t!(60 minutes ago).max(start_at);
     let range = DateTimeRange::since(history_start);
-    let step_hours = step.as_hours_f64().max(1e-6);
+
+    let dt_h = step.as_hours_f64().max(1e-6);
+    let dt_s = dt_h * 3600.0;
+
+    // --- Leaky integral time constant (seconds).
+    // Old errors gradually lose influence.
+    let tau_i_s: f64 = 30.0 * 60.0; // 30 minutes
+    let leak = (-dt_s / tau_i_s).exp();
+
     let mut integral = 0.0;
-    let mut prev_error: Option<f64> = None;
+    let mut prev_temp: Option<f64> = None;
     let mut output = 0.0;
-    let output_cap = params.max_output.0.min(100.0);
+
+    // Integral cap so Ki * I alone cannot exceed max_output
     let integral_cap = if params.ki.abs() > 1e-9 {
-        output_cap / params.ki.abs()
+        params.max_output.0 / params.ki.abs()
     } else {
         0.0
     };
+
     let mut sample_count = 0;
 
     for dt in range.step_by(step) {
-        let setpoint = match LastSeenInterpolator.interpolate_df(dt, setpoints).ok().flatten() {
-            Some(value) => value,
+        let temperature = match LinearOrLastSeenInterpolator.interpolate_df(dt, temperatures) {
+            Some(v) => v,
             None => {
-                prev_error = None;
-                continue;
-            }
-        };
-        let temperature = match LinearInterpolator.interpolate_df(dt, temperatures).ok().flatten() {
-            Some(value) => value,
-            None => {
-                prev_error = None;
+                prev_temp = None;
                 continue;
             }
         };
 
         let error = (setpoint - temperature).0;
-        if error.abs() <= params.deadband.0 {
-            integral = 0.0;
-            prev_error = Some(0.0);
-            output = 0.0;
-            sample_count += 1;
-            continue;
+
+        // --- Derivative on measurement (avoids derivative kick on setpoint changes)
+        let dtemp = prev_temp.map(|prev| (temperature.0 - prev) / dt_h).unwrap_or(0.0);
+
+        let p_term = params.kp * error;
+        let d_term = -params.kd * dtemp;
+
+        // --- Anti-windup gating using actual heating demand
+        let pushing_high = current_heating_demand.0 >= params.max_output.0 && error > 0.0;
+        let pushing_low = current_heating_demand.0 <= params.min_output.0 && error < 0.0;
+
+        let outside_deadband = error.abs() > params.deadband.0;
+
+        if outside_deadband && !pushing_high && !pushing_low {
+            // Normal integration with leak
+            integral = integral * leak + error * dt_h;
+        } else {
+            // Let old integral decay, but do not build new windup
+            integral *= leak;
         }
 
-        integral = (integral + error * step_hours).clamp(-integral_cap, integral_cap);
-        let derivative = prev_error.map(|prev| (error - prev) / step_hours).unwrap_or(0.0);
+        integral = integral.clamp(-integral_cap, integral_cap);
 
-        output = params.kp * error + params.ki * integral + params.kd * derivative;
-        prev_error = Some(error);
+        let i_term = params.ki * integral;
+
+        output = p_term + i_term + d_term;
+
+        prev_temp = Some(temperature.0);
         sample_count += 1;
     }
 
@@ -194,24 +269,41 @@ fn calculate_pid(
     Some(Percent(output))
 }
 
-fn fallback_heating_demand(ctx: &StateCalculationContext, thermostat: Thermostat) -> Option<Percent> {
-    ctx.get(thermostat.heating_demand()).map(|dp| dp.value)
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::timeseries::DataPoint;
 
-fn normalize_output(params: &PidParams, output: Percent) -> Percent {
-    let output_cap = params.max_output.0.min(100.0).max(0.0);
-    let clamped = output.0.clamp(0.0, output_cap);
-    let quantized = quantize_percent(clamped);
-    let min_output = params.min_output.0.max(0.0);
-    let final_output = if quantized > 0.0 && quantized < min_output {
-        0.0
-    } else {
-        quantized
-    };
-    Percent(final_output)
-}
+    macro_rules! df {
+        ( $( $time:literal minutes ago => $value:expr ),* $(,)? ) => {
+            {
+                let dps  = vec![
+                $(
+                    DataPoint::new(DegreeCelsius($value), crate::core::time::DateTime::now() - crate::core::time::Duration::minutes($time)),
+                )*
+                ];
+                DataFrame::new(dps)
+            }
+        };
+    }
 
-fn quantize_percent(value: f64) -> f64 {
-    let step = 5.0;
-    (value / step).round() * step
+    #[test]
+    fn test_pid_calculation() {
+        let mode = DataPoint::new(HeatingMode::Comfort, t!(30 minutes ago));
+        let setpoint = DegreeCelsius(20.0);
+        let current_demand = Percent(50.0);
+
+        let temperatures = df![
+            30 minutes ago => 19.0,
+            20 minutes ago => 19.1,
+            10 minutes ago => 19.2,
+        ];
+
+        let output = calculate_output(mode, current_demand, setpoint, temperatures).unwrap();
+
+        println!("PID output: {:?}", output);
+
+        assert!(output.0 > 40.0, "Expected output to increase heating demand");
+        assert_eq!(output.0.fract(), 0.0, "Expected output to be a whole number");
+    }
 }

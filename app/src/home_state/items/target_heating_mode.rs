@@ -58,11 +58,7 @@ impl TargetHeatingMode {
 pub struct TargetHeatingModeStateProvider;
 
 impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeStateProvider {
-    fn calculate_current(
-        &self,
-        id: TargetHeatingMode,
-        ctx: &StateCalculationContext,
-    ) -> Option<HeatingMode> {
+    fn calculate_current(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<HeatingMode> {
         let occupancy_item = match id {
             TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
             TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
@@ -80,8 +76,7 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             ctx.get(Resident::AnyoneSleeping)?,
             occupancy_1h,
             self.get_user_override(id, ctx),
-        )
-        .value)
+        ))
     }
 }
 
@@ -141,17 +136,17 @@ fn calculate_heating_mode(
     sleeping: DataPoint<bool>,
     occupancy_1h: DataFrame<Probability>,
     user_override: Option<UserHeatingOverride>,
-) -> DataPoint<HeatingMode> {
+) -> HeatingMode {
     //away and no later override
     if away.value && user_override.clone().is_none_or(|o| o.timestamp < away.timestamp) {
         tracing::trace!("Heating in away mode as nobody is at home");
-        return DataPoint::new(HeatingMode::Away, away.timestamp);
+        return HeatingMode::Away;
     }
 
     //Or cold-air coming in?
     if window_open.value && window_open.timestamp.elapsed() > t!(20 seconds) {
         tracing::trace!("Heating in ventilation mode as window is open");
-        return DataPoint::new(HeatingMode::Ventilation, window_open.timestamp);
+        return HeatingMode::Ventilation;
     }
 
     if let Some(user_override) = user_override {
@@ -165,10 +160,7 @@ fn calculate_heating_mode(
                 "Heating in manual mode as user override is active to {}°C",
                 user_override.target_temperature.0
             );
-            return DataPoint::new(
-                HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id),
-                user_override.timestamp,
-            );
+            return HeatingMode::Manual(user_override.target_temperature, user_override.trigger_id);
         }
     }
 
@@ -179,14 +171,14 @@ fn calculate_heating_mode(
     //default-temperature of thermostat
     if !window_open.value && window_open.timestamp.elapsed() < TargetHeatingMode::post_ventilation_duration() {
         tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
-        return DataPoint::new(HeatingMode::PostVentilation, window_open.timestamp);
+        return HeatingMode::PostVentilation;
     }
 
     //Use negative occupancy in living room to detect sleep-mode, but only after is was
     //occupied for a while
     if sleeping.value {
-        tracing::trace!("Heating in sleep-mode as Dennis is sleeping");
-        return DataPoint::new(HeatingMode::Sleep, sleeping.timestamp);
+        tracing::trace!("Heating in sleep-mode someone is still sleeping");
+        return HeatingMode::Sleep;
     }
 
     //sleeping preseved until ventilation in that room
@@ -194,7 +186,7 @@ fn calculate_heating_mode(
         //some tampering with window, but not in morning hours
         if !morning_timerange.contains(&window_open.timestamp) {
             tracing::trace!("Heating in sleep-mode as not yet ventilated");
-            return DataPoint::new(HeatingMode::Sleep, sleeping.timestamp);
+            return HeatingMode::Sleep;
         }
     }
 
@@ -205,7 +197,7 @@ fn calculate_heating_mode(
         //On with hysteresis
         if current_occupancy.value >= threshold_high {
             tracing::trace!("Heating in comfort-mode as room is highly occupied");
-            return current_occupancy.map_value(|_| HeatingMode::Comfort);
+            return HeatingMode::Comfort;
         } else if current_occupancy.value >= threshold_low {
             let last_outlier = occupancy_1h.latest_where(|dp| dp.value >= threshold_high || dp.value <= threshold_low);
 
@@ -215,7 +207,7 @@ fn calculate_heating_mode(
                 tracing::trace!(
                     "Heating in comfort-mode as room was highly occupied recently and is now moderately occupied"
                 );
-                return current_occupancy.map_value(|_| HeatingMode::Comfort);
+                return HeatingMode::Comfort;
             } else {
                 tracing::trace!(
                     "Room occupancy is moderate, but no high occupancy recently - not switching to comfort mode"
@@ -226,14 +218,9 @@ fn calculate_heating_mode(
         }
     }
 
-    let max_ts = &[away.timestamp, window_open.timestamp, sleeping.timestamp]
-        .into_iter()
-        .max()
-        .unwrap_or_else(|| t!(now));
-
     tracing::trace!("Heating in energy-saving-mode (fallback) as no higher-prio rule applied");
 
-    DataPoint::new(HeatingMode::EnergySaving, *max_ts)
+    HeatingMode::EnergySaving
 }
 
 #[derive(Debug, Clone)]

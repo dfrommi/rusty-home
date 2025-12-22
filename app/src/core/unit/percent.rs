@@ -18,6 +18,10 @@ impl Percent {
     pub fn abs(self) -> Self {
         Self(self.0.abs())
     }
+
+    pub fn round(self) -> Self {
+        Self(self.0.round())
+    }
 }
 
 impl From<&Percent> for f64 {

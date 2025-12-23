@@ -1,5 +1,4 @@
 use super::*;
-use crate::home_state::{RelativeHumidity, Temperature};
 use anyhow::Result;
 
 use crate::core::unit::{DegreeCelsius, Percent};
@@ -8,6 +7,8 @@ use r#macro::{EnumVariants, Id};
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
     Bathroom,
+    BathroomShower,
+    BathroomDehumidifier,
     LivingRoom,
     Outside,
 }
@@ -15,13 +16,27 @@ pub enum AbsoluteHumidity {
 pub struct AbsoluteHumidityStateProvider;
 
 impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumidityStateProvider {
-    fn calculate_current(
-        &self,
-        id: AbsoluteHumidity,
-        ctx: &StateCalculationContext,
-    ) -> Option<GramPerCubicMeter> {
-        let temperature_dp = ctx.get(id.temperature())?;
-        let humidity_dp = ctx.get(id.relative_humidity())?;
+    fn calculate_current(&self, id: AbsoluteHumidity, ctx: &StateCalculationContext) -> Option<GramPerCubicMeter> {
+        use crate::device_state::RelativeHumidity as DeviceRelativeHumidity;
+        use crate::device_state::Temperature as DeviceTemperature;
+        use crate::home_state::items::RelativeHumidity as HomeRelativeHumidity;
+        use crate::home_state::items::Temperature as HomeTemperature;
+
+        let temperature_dp = match id {
+            AbsoluteHumidity::LivingRoom => ctx.get(HomeTemperature::LivingRoom)?,
+            AbsoluteHumidity::Bathroom => ctx.get(HomeTemperature::Bathroom)?,
+            AbsoluteHumidity::Outside => ctx.get(HomeTemperature::Outside)?,
+            AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
+            AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
+        };
+
+        let humidity_dp = match id {
+            AbsoluteHumidity::LivingRoom => ctx.get(HomeRelativeHumidity::LivingRoom)?,
+            AbsoluteHumidity::Bathroom => ctx.get(HomeRelativeHumidity::Bathroom)?,
+            AbsoluteHumidity::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
+            AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
+            AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,
+        };
 
         let abs_humidity_value = AbsoluteHumidity::calculate_abs_humidity(temperature_dp.value, humidity_dp.value);
 
@@ -30,22 +45,6 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
 }
 
 impl AbsoluteHumidity {
-    fn temperature(&self) -> Temperature {
-        match self {
-            AbsoluteHumidity::LivingRoom => Temperature::LivingRoom,
-            AbsoluteHumidity::Bathroom => Temperature::Bathroom,
-            AbsoluteHumidity::Outside => Temperature::Outside,
-        }
-    }
-
-    fn relative_humidity(&self) -> RelativeHumidity {
-        match self {
-            AbsoluteHumidity::LivingRoom => RelativeHumidity::LivingRoom,
-            AbsoluteHumidity::Bathroom => RelativeHumidity::Bathroom,
-            AbsoluteHumidity::Outside => RelativeHumidity::Outside,
-        }
-    }
-
     pub fn calculate_abs_humidity(temperature: DegreeCelsius, relative_humidity: Percent) -> GramPerCubicMeter {
         let t: f64 = temperature.into();
         let r: f64 = relative_humidity.into();

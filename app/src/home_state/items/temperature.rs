@@ -20,14 +20,24 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
     fn calculate_current(&self, id: Temperature, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         use crate::device_state::Temperature as DeviceTemperature;
 
-        ctx.device_state(match id {
-            Temperature::Outside => DeviceTemperature::Outside,
-            Temperature::LivingRoom => DeviceTemperature::LivingRoomTado,
-            Temperature::RoomOfRequirements => DeviceTemperature::RoomOfRequirementsTado,
-            Temperature::Bedroom => DeviceTemperature::BedroomTado,
-            Temperature::Kitchen => DeviceTemperature::Kitchen,
-            Temperature::Bathroom => DeviceTemperature::BathroomShower,
-        })
-        .map(|dp| dp.value)
+        match id {
+            Temperature::Outside => ctx.device_state(DeviceTemperature::Outside)?.value,
+            Temperature::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
+            Temperature::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
+            Temperature::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
+            Temperature::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
+            Temperature::Bathroom => {
+                let shower = ctx.device_state(DeviceTemperature::BathroomShower);
+                let dehumidifier = ctx.device_state(DeviceTemperature::Dehumidifier);
+
+                match (shower, dehumidifier) {
+                    (Some(shower), Some(dehumidifier)) => DegreeCelsius((shower.value.0 + dehumidifier.value.0) / 2.0),
+                    (Some(shower), None) => shower.value,
+                    (None, Some(dehumidifier)) => dehumidifier.value,
+                    (None, None) => return None,
+                }
+            }
+        }
+        .into()
     }
 }

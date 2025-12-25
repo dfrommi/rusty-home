@@ -87,7 +87,9 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
 
         //scale into range that produces heat
         let range = Percent(100.0) - params.min_output_for_heat;
-        let scaled_demand = params.min_output_for_heat + (pid_demand.factor() * range);
+        let scaled_demand = (params.min_output_for_heat + (pid_demand.factor() * range))
+            .round()
+            .clamp();
 
         //In case of weird calculation results, should never happen, but still important to detect
         if scaled_demand.0.is_nan() {
@@ -101,7 +103,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             return Some(current_demand);
         }
 
-        Some(scaled_demand)
+        Some(scaled_demand.round())
     }
 }
 

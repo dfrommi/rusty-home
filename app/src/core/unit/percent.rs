@@ -1,7 +1,7 @@
 use std::{
     f64,
     fmt::Display,
-    ops::{Mul, Sub},
+    ops::{Add, Mul, Sub},
 };
 
 use derive_more::derive::AsRef;
@@ -11,6 +11,10 @@ use serde::{Deserialize, Serialize};
 pub struct Percent(pub f64);
 
 impl Percent {
+    pub fn factor(self) -> f64 {
+        self.0 / 100.0
+    }
+
     pub fn clamp(self) -> Self {
         Self(self.0.clamp(0.0, 100.0))
     }
@@ -45,6 +49,14 @@ impl From<Percent> for f64 {
 impl Display for Percent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.2} %", self.0)
+    }
+}
+
+impl Add for Percent {
+    type Output = Percent;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Percent(self.0 + rhs.0)
     }
 }
 

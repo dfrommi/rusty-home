@@ -43,9 +43,12 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         let mode = ctx.get(mode)?;
 
         let setpoint = heating_zone.setpoint_for_mode(&mode.value);
-        let current_demand = ctx.get(thermostat.heating_demand())?.value;
+        let (current_demand, current_demand_elapsed) = ctx
+            .get(thermostat.heating_demand())
+            .map(|dp| (dp.value, dp.timestamp.elapsed()))?;
+        let params = get_pid_params_for_mode(&thermostat, &mode.value);
 
-        let output = match mode.value {
+        let mut pid_demand = match mode.value {
             HeatingMode::Ventilation => Percent(0.0),
 
             _ => {
@@ -56,7 +59,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
                 let output = if let Some(temperatures) = temperatures
                     && !temperatures.is_empty()
                 {
-                    calculate_output(mode, current_demand, setpoint, temperatures)
+                    calculate_output(params.clone(), mode, current_demand, setpoint, temperatures)
                 } else {
                     None
                 };
@@ -65,106 +68,130 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             }
         };
 
-        //Only change output if significant change
-        if output > Percent(0.0) && (current_demand - output).abs() < Percent(5.0) {
+        //TODO
+        //deadband
+
+        //stay on 0 when already at 0 until significant demand (with hysteresis)
+        pid_demand = if (current_demand == Percent(0.0) && pid_demand < Percent(3.0))
+            || (current_demand > Percent(0.0) && pid_demand < Percent(1.0))
+        {
+            Percent(0.0)
+        } else {
+            Percent(pid_demand.0.clamp(0.0, params.max_relative_output.0))
+        };
+
+        //If demand is zero, return early, no need to further process
+        if pid_demand == Percent(0.0) {
+            return Some(pid_demand);
+        }
+
+        //scale into range that produces heat
+        let range = Percent(100.0) - params.min_output_for_heat;
+        let scaled_demand = params.min_output_for_heat + (pid_demand.factor() * range);
+
+        //In case of weird calculation results, should never happen, but still important to detect
+        if scaled_demand.0.is_nan() {
+            tracing::error!("Calculated NaN heating demand for {:?}, reverting to current demand", id);
             return Some(current_demand);
         }
 
-        Some(output)
+        //Only change output if significant change or after time
+        let change = (scaled_demand - current_demand).abs();
+        if change < Percent(5.0) && current_demand_elapsed < t!(15 minutes) {
+            return Some(current_demand);
+        }
+
+        Some(scaled_demand)
     }
 }
 
+#[derive(Debug, Clone)]
 struct PidParams {
     kp: f64,
     ki: f64,
     kd: f64,
-    min_output: Percent,
-    max_output: Percent,
+    min_output_for_heat: Percent,
+    max_relative_output: Percent,
     deadband: DegreeCelsius,
 }
 
-fn get_pid_params_for_mode(mode: &HeatingMode) -> PidParams {
+fn get_pid_params_for_mode(thermostat: &Thermostat, mode: &HeatingMode) -> PidParams {
+    let min_output_with_heating_effect = match thermostat {
+        Thermostat::LivingRoomBig => Percent(10.0),
+        Thermostat::LivingRoomSmall => Percent(20.0),
+        Thermostat::Bedroom => Percent(20.0),
+        Thermostat::Kitchen => Percent(20.0),
+        Thermostat::RoomOfRequirements => Percent(20.0),
+        Thermostat::Bathroom => Percent(20.0),
+    };
+
     match mode {
         HeatingMode::EnergySaving => PidParams {
             kp: 35.0,
             ki: 8.0,
             kd: 4.0,
-            min_output: Percent(10.0),
-            max_output: Percent(80.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(80.0),
             deadband: DegreeCelsius(0.3),
         },
         HeatingMode::Comfort => PidParams {
             kp: 50.0,
             ki: 10.0,
             kd: 5.0,
-            min_output: Percent(10.0),
-            max_output: Percent(100.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(100.0),
             deadband: DegreeCelsius(0.2),
         },
         HeatingMode::Sleep => PidParams {
             kp: 20.0,
             ki: 4.0,
             kd: 2.0,
-            min_output: Percent(10.0),
-            max_output: Percent(60.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(60.0),
             deadband: DegreeCelsius(0.4),
         },
         HeatingMode::Away => PidParams {
             kp: 15.0,
             ki: 3.0,
             kd: 2.0,
-            min_output: Percent(10.0),
-            max_output: Percent(40.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(40.0),
             deadband: DegreeCelsius(0.5),
         },
         HeatingMode::Ventilation => PidParams {
             kp: 0.0,
             ki: 0.0,
             kd: 0.0,
-            min_output: Percent(0.0),
-            max_output: Percent(0.0),
+            min_output_for_heat: Percent(0.0),
+            max_relative_output: Percent(0.0),
             deadband: DegreeCelsius(0.0),
         },
         HeatingMode::PostVentilation => PidParams {
             kp: 30.0,
             ki: 6.0,
             kd: 3.0,
-            min_output: Percent(10.0),
-            max_output: Percent(25.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(25.0),
             deadband: DegreeCelsius(0.25),
         },
         HeatingMode::Manual(_, _) => PidParams {
             kp: 70.0,
             ki: 15.0,
             kd: 6.0,
-            min_output: Percent(10.0),
-            max_output: Percent(100.0),
+            min_output_for_heat: min_output_with_heating_effect,
+            max_relative_output: Percent(100.0),
             deadband: DegreeCelsius(0.1),
         },
     }
 }
 
-impl PidParams {
-    fn clamp(&self, value: Percent) -> Percent {
-        if value < 0.5 * self.min_output {
-            Percent(0.0)
-        } else if value <= self.min_output {
-            self.min_output
-        } else if value >= self.max_output {
-            self.max_output
-        } else {
-            value.round()
-        }
-    }
-}
-
 fn calculate_output(
+    params: PidParams,
     mode: DataPoint<HeatingMode>,
     current_demand: Percent,
     setpoint: DegreeCelsius,
     temperatures: DataFrame<DegreeCelsius>,
 ) -> Option<Percent> {
-    let params = get_pid_params_for_mode(&mode.value);
     let start_at = mode.timestamp;
 
     let current_temperature = temperatures.last()?.value;
@@ -173,18 +200,14 @@ fn calculate_output(
 
     if matches!(mode.value, HeatingMode::Manual(_, _)) && error >= DegreeCelsius(1.0) {
         //One degree is 50% opening
-        return params.clamp(Percent(error.0 * 50.0)).into();
-    }
-
-    //Deadband handling -> observe if this causes infinite low heating that just holds temp
-    if error.0.abs() <= params.deadband.0 {
-        return Some(current_demand);
+        return Percent(error.0 * 50.0).clamp().into();
     }
 
     let output = calculate_pid(&params, current_demand, setpoint, &temperatures, start_at, t!(30 seconds))
-        .unwrap_or(current_demand);
+        .unwrap_or(current_demand)
+        .clamp();
 
-    Some(params.clamp(output))
+    Some(output)
 }
 
 fn calculate_pid(
@@ -214,7 +237,7 @@ fn calculate_pid(
 
     // Integral cap so Ki * I alone cannot exceed max_output
     let integral_cap = if params.ki.abs() > 1e-9 {
-        params.max_output.0 / params.ki.abs()
+        100.0 / params.ki.abs()
     } else {
         0.0
     };
@@ -239,8 +262,8 @@ fn calculate_pid(
         let d_term = -params.kd * dtemp;
 
         // --- Anti-windup gating using actual heating demand
-        let pushing_high = current_heating_demand.0 >= params.max_output.0 && error > 0.0;
-        let pushing_low = current_heating_demand.0 <= params.min_output.0 && error < 0.0;
+        let pushing_high = current_heating_demand.0 >= params.max_relative_output.0 && error > 0.0;
+        let pushing_low = current_heating_demand.0 <= params.min_output_for_heat.0 && error < 0.0;
 
         let outside_deadband = error.abs() > params.deadband.0;
 

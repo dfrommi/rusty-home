@@ -2,82 +2,58 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     core::{
-        time::{DateTime, DateTimeRange, Duration},
+        time::{DateTime, Duration},
         timeseries::{DataFrame, DataPoint},
     },
-    device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem, DeviceStateValue},
+    device_state::{DeviceStateId, DeviceStateItem, DeviceStateValue},
     home_state::{HomeStateDerivedStateProvider, HomeStateId, HomeStateItem, HomeStateValue},
     t,
-    trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
+    trigger::{UserTriggerExecution, UserTriggerTarget},
 };
 
 use super::StateSnapshot;
-
-pub async fn create_standalone_context(
-    device_state: &DeviceStateClient,
-    trigger_client: &TriggerClient,
-) -> anyhow::Result<StateCalculationContext> {
-    let start_time = t!(now);
-
-    let triggers = trigger_client.get_all_active_triggers().await?;
-    let mut active_triggers = HashMap::new();
-
-    for trigger in triggers {
-        active_triggers.insert(trigger.target(), trigger);
-    }
-
-    let device_states = device_state.get_current_for_all().await?;
-
-    Ok(StateCalculationContext {
-        start_time,
-        current: RefCell::new(HashMap::new()),
-        device_state: device_states,
-        active_user_triggers: active_triggers,
-        prev: None,
-    })
-}
-
-pub struct StateCalculationContext {
-    pub start_time: DateTime,
-    current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
-    device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
-    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
-    pub prev: Option<Box<StateCalculationContext>>,
-}
 
 pub trait DerivedStateProvider<ID, T> {
     fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<T>;
 }
 
+pub trait DeviceStateProvider: Send + 'static {
+    fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>>;
+}
+
+pub trait UserTriggerProvider: Send + 'static {
+    fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution>;
+    fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution>;
+}
+
+pub struct StateCalculationContext {
+    start_time: DateTime,
+    current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
+    device_state: Box<dyn DeviceStateProvider>,
+    active_user_triggers: Box<dyn UserTriggerProvider>,
+    prev: Option<Box<StateCalculationContext>>,
+}
+
 impl StateCalculationContext {
-    pub fn with_history(
-        self,
+    pub fn new<D: DeviceStateProvider, T: UserTriggerProvider>(
+        device_state: D,
+        active_user_triggers: T,
         mut previous: Option<StateCalculationContext>,
         keep: Duration,
-    ) -> StateCalculationContext {
-        let cutoff = self.start_time - keep;
+    ) -> Self {
+        let start_time = t!(now);
+        let cutoff = start_time - keep;
         if let Some(prev_ctx) = previous.as_mut() {
             prev_ctx.truncate_before(cutoff);
         }
+
         StateCalculationContext {
-            start_time: self.start_time,
-            current: self.current,
-            device_state: self.device_state,
-            active_user_triggers: self.active_user_triggers,
+            start_time,
+            current: RefCell::new(HashMap::new()),
+            device_state: Box::new(device_state),
+            active_user_triggers: Box::new(active_user_triggers),
             prev: previous.map(Box::new),
         }
-    }
-
-    pub fn range(&self) -> DateTimeRange {
-        let mut start = self.start_time;
-        let mut current_ctx = self;
-
-        while let Some(prev) = &current_ctx.prev {
-            start = prev.start_time;
-            current_ctx = prev;
-        }
-
-        DateTimeRange::new(start, self.start_time)
     }
 
     pub fn load_all(&self) {
@@ -130,7 +106,7 @@ impl StateCalculationContext {
             }
         }
 
-        StateSnapshot::new(self.start_time, data, self.active_user_triggers.clone())
+        StateSnapshot::new(self.start_time, data, self.active_user_triggers.get_all())
     }
 }
 
@@ -162,7 +138,7 @@ impl StateCalculationContext {
         Some(df)
     }
 
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
+    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
         self.active_user_triggers.get(&target)
     }
 
@@ -233,15 +209,4 @@ impl StateCalculationContext {
             Some(DataFrame::new(dps))
         }
     }
-}
-
-fn downcast_df<S: HomeStateItem + Into<HomeStateId>>(
-    id: S,
-    df: &DataFrame<HomeStateValue>,
-) -> Option<DataFrame<S::Type>> {
-    Some(df.map(|dp: &DataPoint<HomeStateValue>| {
-        //TODO fail gracefully
-        id.try_downcast(dp.value.clone())
-            .expect("Internal error: State value projection failed in downcast_df")
-    }))
 }

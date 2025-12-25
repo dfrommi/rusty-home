@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::core::time::DateTime;
+use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use crate::trigger::{UserTrigger, UserTriggerExecution, UserTriggerId};
 use anyhow::Context;
@@ -52,11 +52,47 @@ impl TriggerRepository {
         .context("Error adding user trigger")
     }
 
+    pub async fn get_all_triggers_active_anytime_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        let records = sqlx::query!(
+            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_until as "active_until", correlation_id
+                    FROM user_trigger
+                    WHERE (timestamp >= $1 AND timestamp <= $2)
+                    OR (active_until IS NOT NULL AND active_until >= $1 AND active_until <= $2) 
+                    OR (timestamp <= $2 AND (active_until IS NULL OR active_until >= $2))
+               ORDER BY timestamp DESC"#,
+            range.start().into_db(),
+            range.end().into_db(),
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut result = Vec::with_capacity(records.len());
+
+        for row in records {
+            let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+            let timestamp = row.timestamp.into();
+            let active_until = row.active_until.map(|dt| dt.into());
+
+            result.push(UserTriggerExecution {
+                id: row.id.into(),
+                trigger,
+                timestamp,
+                active_until,
+                correlation_id: row.correlation_id,
+            });
+        }
+
+        Ok(result)
+    }
+
     pub async fn get_all_active_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let now = t!(now);
 
         let records = sqlx::query!(
-            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", correlation_id
+            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_until as "active_until", correlation_id
                     FROM user_trigger
                     WHERE timestamp >= $1
                     AND timestamp <= $2
@@ -75,6 +111,7 @@ impl TriggerRepository {
         for row in records {
             let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
             let timestamp = row.timestamp.into();
+            let active_until = row.active_until.map(|dt| dt.into());
 
             let target = trigger.target();
             if seen_targets.contains(&target) {
@@ -86,6 +123,7 @@ impl TriggerRepository {
                 id: row.id.into(),
                 trigger,
                 timestamp,
+                active_until,
                 correlation_id: row.correlation_id,
             });
         }

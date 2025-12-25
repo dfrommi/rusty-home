@@ -1,7 +1,7 @@
 use infrastructure::EventEmitter;
 
 use crate::{
-    core::time::DateTime,
+    core::time::{DateTime, DateTimeRange},
     t,
     trigger::{TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId, adapter::db::TriggerRepository},
 };
@@ -24,6 +24,13 @@ impl TriggerService {
             }
             Err(e) => Err(e),
         }
+    }
+
+    pub async fn get_all_triggers_active_anytime_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        self.repo.get_all_triggers_active_anytime_in_range(range).await
     }
 
     pub async fn get_all_active_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {

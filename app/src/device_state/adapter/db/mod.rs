@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use anyhow::{Context as _, Result};
-use cached::proc_macro::cached;
+use moka::future::Cache;
 use sqlx::{PgPool, postgres::types::PgInterval};
 
 use crate::{
@@ -17,16 +15,20 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct DeviceStateRepository {
     pool: PgPool,
+    tag_id_cache: Cache<DeviceStateId, i64>,
 }
 
 impl DeviceStateRepository {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            tag_id_cache: Cache::builder().build(),
+        }
     }
 
     pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<bool> {
         let fvalue = f64::from(&dp.value);
-        let tag_id = get_tag_id(&self.pool, &dp.value.into()).await?;
+        let tag_id = self.get_tag_id(&dp.value.into()).await?;
 
         let result = sqlx::query!(
             r#"WITH latest_value AS (
@@ -50,7 +52,7 @@ impl DeviceStateRepository {
     }
 
     pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> Result<DataPoint<DeviceStateValue>> {
-        let tag_id = get_tag_id(&self.pool, id).await?;
+        let tag_id = self.get_tag_id(id).await?;
 
         let row = sqlx::query!(
             r#"SELECT value as "value!", timestamp as "timestamp!"
@@ -71,54 +73,36 @@ impl DeviceStateRepository {
         })
     }
 
-    pub async fn get_latest_for_all_devices(&self) -> Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
-        let rows = sqlx::query!(
-            r#"SELECT DISTINCT ON (tag_id)
-                       tag_id as "tag_id!: i64",
-                       value as "value!",
-                       timestamp as "timestamp!"
-                FROM thing_value
-                WHERE timestamp <= $1
-                ORDER BY tag_id, timestamp DESC;"#,
-            t!(now).into_db()
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let lookup = tag_id_lookup(&self.pool).await?;
-
-        let mut result = HashMap::new();
-        for row in rows.into_iter() {
-            let Some(&id) = lookup.get(&row.tag_id) else {
-                tracing::warn!("No DeviceStateId found for tag_id {}", row.tag_id);
-                continue;
-            };
-
-            let dp = DataPoint {
-                value: from_f64_value(id, row.value),
-                timestamp: row.timestamp.into(),
-            };
-
-            result.insert(id, dp);
-        }
-        Ok(result)
-    }
-
-    pub async fn get_all_data_points_in_range(
+    pub async fn get_all_data_points_in_range_ts_asc(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
         let recs = sqlx::query!(
-            r#"SELECT 
-                THING_VALUE.value as "value!: f64", 
-                THING_VALUE.timestamp, 
-                THING_VALUE_TAG.channel, 
-                THING_VALUE_TAG.name
-            FROM THING_VALUE
-            JOIN THING_VALUE_TAG ON THING_VALUE_TAG.id = THING_VALUE.tag_id
-            WHERE THING_VALUE.timestamp >= $1
-            AND THING_VALUE.timestamp <= $2
-            ORDER BY THING_VALUE.timestamp ASC"#,
+            r#"SELECT
+                v.value as "value!: f64",
+                v.timestamp as "timestamp!",
+                t.channel,
+                t.name
+            FROM thing_value_tag t
+            JOIN LATERAL (
+                (
+                    SELECT tv.value, tv.timestamp
+                    FROM thing_value tv
+                    WHERE tv.tag_id = t.id
+                      AND tv.timestamp >= $1
+                      AND tv.timestamp <= $2
+                )
+                UNION ALL
+                (
+                    SELECT tv.value, tv.timestamp
+                    FROM thing_value tv
+                    WHERE tv.tag_id = t.id
+                      AND tv.timestamp < $1
+                    ORDER BY tv.timestamp DESC
+                    LIMIT 1
+                )
+            ) v ON true
+            ORDER BY v.timestamp asc;"#,
             range.start().into_db(),
             range.end().into_db(),
         )
@@ -199,6 +183,13 @@ impl DeviceStateRepository {
 
         Ok(offline_items)
     }
+
+    async fn get_tag_id(&self, id: &DeviceStateId) -> Result<i64> {
+        self.tag_id_cache
+            .try_get_with(*id, get_or_insert_tag_id_from_db(&self.pool, id))
+            .await
+            .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 fn convert_pginterval_to_duration(pg_interval: &PgInterval) -> Duration {
@@ -233,19 +224,7 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
     }
 }
 
-async fn tag_id_lookup(pool: &PgPool) -> Result<HashMap<i64, DeviceStateId>> {
-    let mut res = HashMap::new();
-
-    for id in DeviceStateId::variants() {
-        let tag_id = get_tag_id(pool, &id).await?;
-        res.insert(tag_id, id);
-    }
-
-    Ok(res)
-}
-
-#[cached(result = true, key = "DeviceStateId", convert = r#"{ id.clone() }"#)]
-async fn get_tag_id(db_pool: &PgPool, id: &DeviceStateId) -> Result<i64> {
+async fn get_or_insert_tag_id_from_db(db_pool: &PgPool, id: &DeviceStateId) -> Result<i64> {
     let id = id.ext_id();
 
     let tag_id = sqlx::query_scalar!(
@@ -271,4 +250,92 @@ async fn get_tag_id(db_pool: &PgPool, id: &DeviceStateId) -> Result<i64> {
     .with_context(|| format!("Error getting or creating tag id for {}/{}", id.type_name(), id.variant_name()))?;
 
     Ok(tag_id as i64)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{core::unit::DegreeCelsius, device_state::Temperature};
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_get_all_data_points_in_range_ts_asc(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(pool);
+        prepare_test_data(&repo).await?;
+
+        let dps = repo
+            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(35 minutes ago)))
+            .await?;
+
+        assert_eq!(dps.len(), 4);
+        assert_eq!(
+            dps[0].value,
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0))
+        );
+        assert_eq!(
+            dps[1].value,
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.5))
+        );
+        assert_eq!(
+            dps[2].value,
+            DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0))
+        );
+        assert_eq!(
+            dps[3].value,
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_get_latest_for_device(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(pool);
+        prepare_test_data(&repo).await?;
+
+        let dp = repo
+            .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))
+            .await?;
+
+        assert_eq!(
+            dp.value,
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
+        );
+
+        Ok(())
+    }
+
+    async fn prepare_test_data(repo: &DeviceStateRepository) -> anyhow::Result<()> {
+        repo.save(DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5)),
+            t!(50 minutes ago),
+        ))
+        .await?;
+
+        repo.save(DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
+            t!(40 minutes ago),
+        ))
+        .await?;
+
+        repo.save(DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.5)),
+            t!(30 minutes ago),
+        ))
+        .await?;
+
+        repo.save(DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0)),
+            t!(20 minutes ago),
+        ))
+        .await?;
+
+        repo.save(DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0)),
+            t!(22 minutes ago),
+        ))
+        .await?;
+
+        Ok(())
+    }
 }

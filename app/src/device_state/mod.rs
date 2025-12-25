@@ -13,7 +13,7 @@ use crate::{
     command::CommandEvent,
     core::{
         time::{DateTime, DateTimeRange, Duration},
-        timeseries::DataPoint,
+        timeseries::{DataFrame, DataPoint},
     },
     device_state::{
         adapter::{
@@ -144,11 +144,81 @@ impl DeviceStateClient {
     pub async fn get_all_data_points_in_range(
         &self,
         range: DateTimeRange,
+    ) -> anyhow::Result<HashMap<DeviceStateId, DataFrame<DeviceStateValue>>> {
+        Ok(group_by_device_id(self.service.get_all_data_points_in_range(range).await?))
+    }
+
+    pub async fn get_all_data_points_in_range_strictly(
+        &self,
+        range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
         self.service.get_all_data_points_in_range(range).await
     }
 
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
         self.service.get_offline_items().await
+    }
+}
+
+fn group_by_device_id(
+    data_points: Vec<DataPoint<DeviceStateValue>>,
+) -> HashMap<DeviceStateId, DataFrame<DeviceStateValue>> {
+    data_points.into_iter().fold(HashMap::new(), |mut acc, dp| {
+        let id = DeviceStateId::from(&dp.value);
+        acc.entry(id).or_insert_with(DataFrame::empty).insert(dp);
+        acc
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{core::unit::DegreeCelsius, t};
+
+    use super::*;
+
+    #[test]
+    fn test_group_by_device_id() {
+        let dps = vec![
+            DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.0)),
+                t!(30 minutes ago),
+            ),
+            DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0)),
+                t!(20 minutes ago),
+            ),
+            DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5)),
+                t!(20 minutes ago),
+            ),
+            DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.5)),
+                t!(25 minutes ago),
+            ),
+            DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
+                t!(10 minutes ago),
+            ),
+        ];
+
+        let grouped = group_by_device_id(dps);
+
+        assert_eq!(grouped.len(), 2);
+        let living_room_df = grouped
+            .get(&DeviceStateId::Temperature(Temperature::LivingRoom))
+            .expect("Living room DataFrame not found");
+        let bedroom_df = grouped
+            .get(&DeviceStateId::Temperature(Temperature::Bedroom))
+            .expect("Bedroom DataFrame not found");
+
+        assert_eq!(living_room_df.len(), 3);
+        assert_eq!(
+            living_room_df.prev_or_at(t!(15 minutes ago)).unwrap().value,
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5))
+        );
+
+        assert_eq!(bedroom_df.len(), 2);
+
+        println!("Grouped DataFrames: {:?}", grouped);
     }
 }

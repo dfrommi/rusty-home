@@ -97,9 +97,12 @@ async fn get_states(
 
     let range = time_range.range();
     let mut states = device_client
-        .get_all_data_points_in_range(range.clone())
+        .get_all_data_points_in_range_strictly(range.clone())
         .await
-        .map_err(GrafanaApiError::DataAccessError)?;
+        .map_err(GrafanaApiError::DataAccessError)?
+        .into_iter()
+        .filter(|dp| dp.timestamp >= *range.start())
+        .collect::<Vec<_>>();
 
     states.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 

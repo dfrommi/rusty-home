@@ -10,7 +10,9 @@ use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
-use crate::home_state::calc::{StateCalculationContext, bootstrap_context, create_standalone_context};
+use crate::home_state::calc::{
+    CurrentDeviceStateProvider, CurrentUserTriggerProvider, StateCalculationContext, bootstrap_context,
+};
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
 
@@ -106,11 +108,18 @@ impl HomeStateModule {
     ) -> (StateCalculationContext, StateSnapshot) {
         tracing::trace!("Updating home state context");
 
-        let new_context = match create_standalone_context(&self.device_state, &self.trigger_client).await {
-            Ok(ctx) => ctx.with_history(Some(old_context), self.duration.clone()),
-            Err(e) => {
-                tracing::error!("Failed to create next context: {:?}", e);
-                return (old_context, old_snapshot);
+        let device_state = CurrentDeviceStateProvider::load(&self.device_state).await;
+        let trigger_state = CurrentUserTriggerProvider::load(&self.trigger_client).await;
+
+        let new_context = match (device_state, trigger_state) {
+            (Ok(ds), Ok(ts)) => StateCalculationContext::new(ds, ts, Some(old_context), self.duration.clone()),
+            (Err(e), _) => {
+                tracing::error!("Failed to load device state for home state update: {:?}", e);
+                old_context
+            }
+            (_, Err(e)) => {
+                tracing::error!("Failed to load trigger state for home state update: {:?}", e);
+                old_context
             }
         };
 

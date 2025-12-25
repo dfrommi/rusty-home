@@ -113,7 +113,7 @@ impl DeviceStateService {
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
-        self.repo.get_all_data_points_in_range(range).await
+        self.repo.get_all_data_points_in_range_ts_asc(range).await
     }
 
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {

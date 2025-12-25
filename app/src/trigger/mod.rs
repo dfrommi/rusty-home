@@ -9,7 +9,7 @@ use infrastructure::{EventBus, EventListener};
 use sqlx::PgPool;
 
 use crate::{
-    core::time::DateTime,
+    core::time::{DateTime, DateTimeRange},
     trigger::{adapter::db::TriggerRepository, service::TriggerService},
 };
 
@@ -23,12 +23,20 @@ pub struct UserTriggerExecution {
     pub id: UserTriggerId,
     pub trigger: UserTrigger,
     pub timestamp: DateTime,
+    pub active_until: Option<DateTime>,
     pub correlation_id: Option<String>,
 }
 
 impl UserTriggerExecution {
     pub fn target(&self) -> UserTriggerTarget {
         self.trigger.target()
+    }
+
+    pub fn is_active(&self, at: DateTime) -> bool {
+        match self.active_until {
+            Some(active_until) => self.timestamp >= at && at < active_until,
+            None => self.timestamp >= at,
+        }
     }
 }
 
@@ -49,6 +57,13 @@ impl TriggerClient {
 
     pub async fn get_all_active_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
         self.service.get_all_active_triggers().await
+    }
+
+    pub async fn get_all_triggers_active_anytime_in_range(
+        &self,
+        range: DateTimeRange,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        self.service.get_all_triggers_active_anytime_in_range(range).await
     }
 
     pub async fn disable_triggers_before_except(

@@ -93,14 +93,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 vec![
                     DataPoint::new(
-                        DeviceStateValue::HeatingDemand(
-                            demand.clone(),
-                            Percent(if payload.system_mode == "heat" {
-                                payload.valve_opening_degree
-                            } else {
-                                0.0 //off
-                            }),
-                        ),
+                        DeviceStateValue::HeatingDemand(demand.clone(), Percent(payload.valve_opening_degree)),
                         payload.last_seen,
                     )
                     .into(),

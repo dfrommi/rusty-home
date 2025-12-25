@@ -134,7 +134,7 @@ impl CommandRepository {
                         correlation_id: row.correlation_id,
                     }),
                     Err(e) => {
-                        tracing::warn!("Error mapping command from database, ignoring: {}", e);
+                        tracing::warn!("Error mapping command with id {} from database, ignoring: {}", row.id, e);
                         None
                     }
                 }

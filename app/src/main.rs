@@ -55,7 +55,7 @@ pub async fn main() {
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
 
     let home_state_module = HomeStateModule::new(
-        t!(3 hours),
+        t!(25 hours),
         device_state_module.subscribe(),
         trigger_module.subscribe(),
         trigger_module.client(),

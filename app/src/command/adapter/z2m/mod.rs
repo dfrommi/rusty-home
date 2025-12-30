@@ -57,14 +57,9 @@ impl CommandExecutor for Z2mCommandExecutor {
     }
 }
 
-struct SetPoint {
-    temperature: DegreeCelsius,
-    low_priority: bool,
-}
-
 impl Z2mCommandExecutor {
     pub async fn set_valve_opening_position(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
-        let system_mode = if value.0 > 0.0 { "heat" } else { "off" };
+        let (system_mode, setpoint) = if value.0 > 0.0 { ("heat", 35.0) } else { ("off", 4.0) };
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
         let closed_percentage = 100 - opened_percentage;
 
@@ -75,6 +70,7 @@ impl Z2mCommandExecutor {
                     "system_mode": system_mode,
                     "valve_opening_degree": opened_percentage,
                     "valve_closing_degree": closed_percentage,
+                    "occupied_heating_setpoint": setpoint,
                 })
                 .to_string(),
             )
@@ -82,9 +78,4 @@ impl Z2mCommandExecutor {
 
         Ok(true)
     }
-}
-
-#[derive(Debug, serde::Serialize)]
-struct ThermostatLoadPayload {
-    load_room_mean: i64,
 }

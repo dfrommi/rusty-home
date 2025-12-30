@@ -22,20 +22,20 @@ impl super::MetricsAdapter<DataPoint<DeviceStateValue>> for DeviceMetricsAdapter
 
 impl From<DataPoint<DeviceStateValue>> for Metric {
     fn from(dp: DataPoint<DeviceStateValue>) -> Self {
+        let id = DeviceStateId::from(&dp.value);
         Metric {
-            id: MetricId::from(&dp.value),
+            id: MetricId::from(&id),
             value: (&dp.value).into(),
             timestamp: dp.timestamp,
         }
     }
 }
 
-impl From<&DeviceStateValue> for MetricId {
-    fn from(value: &DeviceStateValue) -> Self {
-        let id = DeviceStateId::from(value.clone());
+impl From<&DeviceStateId> for MetricId {
+    fn from(id: &DeviceStateId) -> Self {
         let ext_id = id.ext_id();
         let mut tags = super::get_common_tags(&ext_id);
-        tags.extend(get_tags_for_device(value));
+        tags.extend(get_tags_for_device(id));
 
         MetricId {
             name: format!("device_{}", ext_id.type_name()),
@@ -66,17 +66,17 @@ fn derived_metrics(metric: &Metric, state: DeviceStateId) -> Vec<Metric> {
     metrics
 }
 
-pub fn get_tags_for_device(value: &DeviceStateValue) -> Vec<MetricLabel> {
+pub fn get_tags_for_device(id: &DeviceStateId) -> Vec<MetricLabel> {
     let mut tags = vec![];
 
-    if let Some(friendly_name) = friendly_name(value.into()) {
+    if let Some(friendly_name) = friendly_name(id) {
         tags.push(MetricLabel::FriendlyName(friendly_name.to_owned()));
     }
 
     tags
 }
 
-fn friendly_name(state: DeviceStateId) -> Option<&'static str> {
+fn friendly_name(state: &DeviceStateId) -> Option<&'static str> {
     match state {
         DeviceStateId::CurrentPowerUsage(s) => Some(match s {
             CurrentPowerUsage::Fridge => "Kühlschrank",

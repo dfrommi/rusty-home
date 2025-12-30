@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::web;
 use infrastructure::TraceContext;
 
@@ -5,13 +7,13 @@ use crate::command::{Command, CommandClient, HeatingTargetState};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
 use crate::observability::adapter::api::grafana::{GrafanaApiError, GrafanaResponse, TimeRangeQuery, csv_response};
 
-pub fn routes(command_client: CommandClient, device_state_client: DeviceStateClient) -> actix_web::Scope {
+pub fn routes(command_client: Arc<CommandClient>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/overview")
         .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
         .route("/offline", web::get().to(get_offline_items))
-        .app_data(web::Data::new(command_client))
-        .app_data(web::Data::new(device_state_client))
+        .app_data(web::Data::from(command_client))
+        .app_data(web::Data::from(device_state_client))
 }
 
 async fn get_commands(
@@ -97,10 +99,11 @@ async fn get_states(
 
     let range = time_range.range();
     let mut states = device_client
-        .get_all_data_points_in_range_strictly(range.clone())
+        .get_all_data_points_in_range(range.clone())
         .await
         .map_err(GrafanaApiError::DataAccessError)?
         .into_iter()
+        .flat_map(|(_, dps)| dps.into_iter())
         .filter(|dp| dp.timestamp >= *range.start())
         .collect::<Vec<_>>();
 

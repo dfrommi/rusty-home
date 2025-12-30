@@ -1,67 +1,116 @@
 use crate::{
     core::timeseries::DataPoint,
     home_state::{HeatingMode, HomeStateId, HomeStateValue},
-    observability::domain::{Metric, MetricId},
+    observability::domain::{Metric, MetricId, MetricLabel},
 };
 
 pub struct HomeMetricsAdapter;
 
 impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
     fn to_metrics(&self, dp: DataPoint<HomeStateValue>) -> Vec<Metric> {
-        vec![dp.into()]
-    }
-}
+        let home_state_id = HomeStateId::from(&dp.value);
+        let timestamp = dp.timestamp;
 
-impl From<DataPoint<HomeStateValue>> for Metric {
-    fn from(dp: DataPoint<HomeStateValue>) -> Self {
-        Metric {
-            id: MetricId::from(&dp.value),
-            value: to_metrics_value(dp.value),
-            timestamp: dp.timestamp,
+        let default_with = |v: f64| {
+            vec![Metric {
+                id: MetricId::from(&home_state_id),
+                timestamp,
+                value: v,
+            }]
+        };
+
+        match dp.value {
+            HomeStateValue::AbsoluteHumidity(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::ColdAirComingIn(_, v) => default_with(v.into()),
+            HomeStateValue::DewPoint(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::FeltTemperature(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::IsRunning(_, v) => default_with(v.into()),
+            HomeStateValue::Occupancy(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::OpenedArea(_, v) => default_with(v.into()),
+            HomeStateValue::Resident(_, v) => default_with(v.into()),
+            HomeStateValue::RiskOfMould(_, v) => default_with(v.into()),
+            HomeStateValue::EnergySaving(_, v) => default_with(v.into()),
+            HomeStateValue::FanActivity(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::HeatingDemand(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::PowerAvailable(_, v) => default_with(v.into()),
+            HomeStateValue::Presence(_, v) => default_with(v.into()),
+            HomeStateValue::RelativeHumidity(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::SetPoint(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::Temperature(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::TargetHeatingDemand(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::PidOutput(_, v) => {
+                vec![
+                    Metric {
+                        id: metric_id(&home_state_id, "p", vec![]),
+                        timestamp,
+                        value: v.p().into(),
+                    },
+                    Metric {
+                        id: metric_id(&home_state_id, "i", vec![]),
+                        timestamp,
+                        value: v.i().into(),
+                    },
+                    Metric {
+                        id: metric_id(&home_state_id, "d", vec![]),
+                        timestamp,
+                        value: v.d().into(),
+                    },
+                    Metric {
+                        id: metric_id(&home_state_id, "total", vec![]),
+                        timestamp,
+                        value: v.total().into(),
+                    },
+                ]
+            }
+            HomeStateValue::TargetHeatingMode(_, v) => {
+                //::variants not possible because of manual parameters
+                let modes_and_values = vec![
+                    ("energy_saving", v == HeatingMode::EnergySaving),
+                    ("comfort", v == HeatingMode::Comfort),
+                    ("sleep", v == HeatingMode::Sleep),
+                    ("ventilation", v == HeatingMode::Ventilation),
+                    ("post_ventilation", v == HeatingMode::PostVentilation),
+                    ("away", v == HeatingMode::Away),
+                    ("manual", matches!(v, HeatingMode::Manual(_, _))),
+                ];
+
+                modes_and_values
+                    .into_iter()
+                    .map(|(mode, value)| Metric {
+                        id: metric_id(&home_state_id, "", vec![MetricLabel::EnumVariant(mode.to_string())]),
+                        timestamp,
+                        value: if value { 1.0 } else { 0.0 },
+                    })
+                    .collect()
+            }
         }
     }
 }
 
-impl From<&HomeStateValue> for MetricId {
-    fn from(value: &HomeStateValue) -> Self {
-        let state = HomeStateId::from(value);
+fn metric_id(state: &HomeStateId, suffix: &str, extra_tags: Vec<MetricLabel>) -> MetricId {
+    let external_id = state.ext_id();
+
+    let name = if suffix.is_empty() {
+        external_id.type_name().to_string()
+    } else {
+        format!("{}_{}", external_id.type_name(), suffix)
+    };
+    let labels = {
+        let mut common_tags = super::get_common_tags(&external_id);
+        common_tags.extend(extra_tags);
+        common_tags
+    };
+
+    MetricId { name, labels }
+}
+
+impl From<&HomeStateId> for MetricId {
+    fn from(state: &HomeStateId) -> Self {
         let external_id = state.ext_id();
 
         MetricId {
             name: external_id.type_name().to_string(),
             labels: super::get_common_tags(&external_id),
         }
-    }
-}
-
-fn to_metrics_value(value: HomeStateValue) -> f64 {
-    match value {
-        HomeStateValue::AbsoluteHumidity(_, v) => f64::from(&v),
-        HomeStateValue::ColdAirComingIn(_, v) => v.into(),
-        HomeStateValue::DewPoint(_, v) => f64::from(&v),
-        HomeStateValue::FeltTemperature(_, v) => f64::from(&v),
-        HomeStateValue::IsRunning(_, v) => v.into(),
-        HomeStateValue::Occupancy(_, v) => f64::from(&v),
-        HomeStateValue::OpenedArea(_, v) => v.into(),
-        HomeStateValue::Resident(_, v) => v.into(),
-        HomeStateValue::RiskOfMould(_, v) => v.into(),
-        HomeStateValue::TargetHeatingMode(_, v) => match v {
-            HeatingMode::Sleep => 10.0,
-            HeatingMode::EnergySaving => 11.0,
-            HeatingMode::Comfort => 12.0,
-            HeatingMode::Manual(_, _) => 13.0,
-            HeatingMode::Ventilation => 1.0,
-            HeatingMode::PostVentilation => 2.0,
-            HeatingMode::Away => -1.0,
-        },
-        HomeStateValue::EnergySaving(_, v) => v.into(),
-        HomeStateValue::FanActivity(_, v) => f64::from(&v),
-        HomeStateValue::HeatingDemand(_, v) => f64::from(&v),
-        HomeStateValue::PowerAvailable(_, v) => v.into(),
-        HomeStateValue::Presence(_, v) => v.into(),
-        HomeStateValue::RelativeHumidity(_, v) => f64::from(&v),
-        HomeStateValue::SetPoint(_, v) => f64::from(&v),
-        HomeStateValue::Temperature(_, v) => f64::from(&v),
-        HomeStateValue::TargetHeatingDemand(_, v) => f64::from(&v),
     }
 }

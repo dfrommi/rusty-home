@@ -148,6 +148,18 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
             }
         }
 
+        impl From<#enum_name> for crate::core::id::ExternalId {
+            fn from(item: #enum_name) -> Self {
+                item.ext_id()
+            }
+        }
+
+        impl From<&#enum_name> for crate::core::id::ExternalId {
+            fn from(item: &#enum_name) -> Self {
+                item.ext_id()
+            }
+        }
+
         #try_from_impl
     }
 }
@@ -233,6 +245,18 @@ pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
                 match self {
                     #(#ext_id_matches),*
                 }
+            }
+        }
+
+        impl From<#name> for crate::core::id::ExternalId {
+            fn from(item: #name) -> Self {
+                item.ext_id()
+            }
+        }
+
+        impl From<&#name> for crate::core::id::ExternalId {
+            fn from(item: &#name) -> Self {
+                item.ext_id()
             }
         }
 

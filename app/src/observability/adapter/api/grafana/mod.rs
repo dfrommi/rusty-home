@@ -1,6 +1,8 @@
 pub mod meta;
 pub mod overview;
 
+use std::sync::Arc;
+
 use crate::core::time::DateTime;
 use crate::core::time::DateTimeRange;
 
@@ -17,7 +19,7 @@ use derive_more::derive::{Display, Error};
 
 type GrafanaResponse = Result<HttpResponse, GrafanaApiError>;
 
-pub fn routes(command_client: CommandClient, device_state_client: DeviceStateClient) -> actix_web::Scope {
+pub fn routes(command_client: Arc<CommandClient>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/grafana")
         .service(overview::routes(command_client, device_state_client))
         .service(meta::routes())

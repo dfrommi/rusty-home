@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use actix_web::{
     Error, HttpResponse,
@@ -7,9 +7,16 @@ use actix_web::{
 use serde::Deserialize;
 
 use crate::{
-    core::time::{DateTime, DateTimeRange},
+    core::{
+        id::ExternalId,
+        time::{DateTime, DateTimeRange},
+    },
+    device_state::{DeviceStateClient, DeviceStateId},
     home_state::HomeStateId,
-    observability::{adapter::repository::VictoriaRepository, domain::Metric},
+    observability::{
+        adapter::{MetricsAdapter, device_metrics::DeviceMetricsAdapter, repository::VictoriaRepository},
+        domain::{Metric, MetricId},
+    },
     t,
 };
 
@@ -22,8 +29,27 @@ struct BackfillQuery {
     #[serde(default)]
     exclude: Option<String>,
 
+    #[serde(flatten)]
+    range: BackfillTimeRangeQuery,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct BackfillTimeRangeQuery {
     start: Option<DateTime>,
     end: Option<DateTime>,
+}
+
+impl BackfillTimeRangeQuery {
+    fn to_range(&self) -> DateTimeRange {
+        //TODO find solution for const timestamps / check at compile time?
+        let absolute_min = DateTime::from_iso("2023-10-01T12:00:00+02:00").expect("Invalid ISO datetime in backfill");
+        let now = t!(now);
+
+        let min_dt = self.start.unwrap_or(absolute_min).max(absolute_min);
+        let max_dt = self.end.unwrap_or(now).min(now);
+
+        DateTimeRange::new(min_dt, max_dt)
+    }
 }
 
 impl BackfillQuery {
@@ -34,118 +60,155 @@ impl BackfillQuery {
             .collect()
     }
 
-    fn contains(list: &[String], s: &HomeStateId) -> bool {
-        list.iter().any(|n| s.ext_id().to_string().starts_with(n))
+    fn contains(list: &[String], s: ExternalId) -> bool {
+        list.iter().any(|n| s.to_string().starts_with(n))
     }
 
-    fn matching_variants(&self) -> Vec<HomeStateId> {
-        let variants = HomeStateId::variants();
+    fn matching_variants<T>(&self, items: Vec<T>) -> Vec<T>
+    where
+        for<'a> &'a T: Into<ExternalId>,
+    {
         let names = Self::split(&self.name);
         let excluded_names = Self::split(&self.exclude);
 
-        variants
+        items
             .into_iter()
-            .filter(|s| self.all || Self::contains(&names, s))
-            .filter(|s| !Self::contains(&excluded_names, s))
+            .filter(|s| self.all || Self::contains(&names, s.into()))
+            .filter(|s| !Self::contains(&excluded_names, s.into()))
             .collect()
     }
 }
 
-pub fn routes(repo: Arc<VictoriaRepository>) -> actix_web::Scope {
+pub fn routes(repo: Arc<VictoriaRepository>, device_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/metrics")
-        .route("/backfill", web::get().to(backfill_handler))
-        .route("/names", web::get().to(items_handler))
+        .route("/home/names", web::get().to(home_state_names_handler))
+        .route("/home/backfill", web::get().to(backfill_handler_home))
+        .route("/device/names", web::get().to(device_state_names_handler))
+        .route("/device/backfill", web::get().to(backfill_handler_device))
         .app_data(web::Data::from(repo))
+        .app_data(web::Data::from(device_client))
 }
 
-async fn backfill_handler(
+async fn backfill_handler_device(
     repo: web::Data<VictoriaRepository>,
+    client: web::Data<DeviceStateClient>,
     query: Query<BackfillQuery>,
 ) -> Result<HttpResponse, Error> {
-    //Date where data collection started
-    let absolute_min_dt = DateTime::from_iso("2023-10-01T12:00:00+02:00")
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Error parsing min datetime: {}", e)))?;
+    let full_range = query.range.to_range();
+    tracing::info!("Backfilling device state metrics for range {}", full_range);
 
-    const BATCH_SIZE: usize = 20000;
-    let buffer: Vec<Metric> = Vec::with_capacity(BATCH_SIZE);
+    let variants = query.matching_variants(DeviceStateId::variants());
 
-    let min_dt = query.start.unwrap_or(absolute_min_dt).max(absolute_min_dt);
-    let max_dt = query.end.unwrap_or(t!(now)).min(t!(now));
-
-    let variants = query.matching_variants();
-    let variants_names = variants.iter().map(|s| s.ext_id().to_string()).collect::<Vec<_>>();
-
-    if variants.is_empty() {
-        return Ok(HttpResponse::BadRequest().body("No matching home state variants found"));
-    }
-
-    let full_range = DateTimeRange::new(min_dt, max_dt);
-    let rate = t!(15 seconds);
-
-    tracing::info!(
-        "Backfilling metrics for range {} in {} steps for items {}",
-        full_range,
-        rate,
-        variants_names.join(", ")
-    );
-
-    //Delete existing data
-    // TODO handle diffrent naming patterns
-    // for state in &variants {
-    //     let id = MetricId::from(&state.ext_id());
-    //     tracing::info!("Deleting existing data for metric: {}", id);
-    //
-    //     repo.delete_series(id.clone()).await.map_err(|e| {
-    //         actix_web::error::ErrorInternalServerError(format!(
-    //             "Error deleting existing metrics {} from VictoriaMetrics: {}",
-    //             id, e
-    //         ))
-    //     })?;
-    // }
+    let mut batch = MetricsBackfillWriter::new(20000, repo.into_inner());
 
     for range in full_range.chunked(t!(30 days)) {
         tracing::info!("Processing range {}", range);
 
-        //TODO fix for StateSnapshot
-        //     for state in &variants {
-        //         //This is expected for states that were added later
-        //         let Ok(frame) = state.get_data_frame(range.clone(), &api).await else {
-        //             tracing::debug!("No data frame found for state {} in range {}, skipping", state.ext_id(), range);
-        //             continue;
-        //         };
-        //
-        //         for dt in range.step_by(rate.clone()) {
-        //             let dp_at = frame.prev_or_at(dt);
-        //
-        //             if let Some(dp) = dp_at {
-        //                 let dp = DataPoint::new(dp.value.clone(), dt);
-        //                 buffer.push(dp.into());
-        //
-        //                 if buffer.len() >= BATCH_SIZE {
-        //                     ctx.repo.push(&buffer).await.map_err(|e| {
-        //                         actix_web::error::ErrorInternalServerError(format!(
-        //                             "Error pushing metrics to VictoriaMetrics: {}",
-        //                             e
-        //                         ))
-        //                     })?;
-        //
-        //                     buffer.clear();
-        //                 }
-        //             }
-        //         }
-        //     }
+        let data = client.get_all_data_points_in_range(range.clone()).await.map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Error fetching device state data points from DeviceStateClient: {}",
+                e
+            ))
+        })?;
+
+        for dt in range.step_by(t!(30 seconds)) {
+            for (id, df) in data.iter() {
+                if !variants.contains(id) {
+                    continue;
+                }
+
+                let dp = match df.prev_or_at(dt) {
+                    Some(dp) => dp.clone().at(dt),
+                    None => continue,
+                };
+
+                for metric in DeviceMetricsAdapter.to_metrics(dp) {
+                    batch.push(metric).await.map_err(|e| {
+                        actix_web::error::ErrorInternalServerError(format!(
+                            "Error buffering metrics for VictoriaMetrics: {}",
+                            e
+                        ))
+                    })?;
+                }
+            }
+        }
+
+        batch.flush().await.map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Error flushing metrics batch to VictoriaMetrics: {}",
+                e
+            ))
+        })?;
     }
 
-    repo.push(&buffer).await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Error pushing metrics to VictoriaMetrics: {}", e))
-    })?;
-
-    Ok(HttpResponse::Ok().body(variants_names.join("\n")))
+    Ok(HttpResponse::NoContent().finish())
 }
 
-async fn items_handler() -> Result<HttpResponse, Error> {
+async fn backfill_handler_home(
+    repo: web::Data<VictoriaRepository>,
+    query: Query<BackfillQuery>,
+) -> Result<HttpResponse, Error> {
+    todo!()
+}
+
+async fn home_state_names_handler() -> Result<HttpResponse, Error> {
     let variants = HomeStateId::variants();
     let items: Vec<String> = variants.iter().map(|s| s.ext_id().to_string()).collect();
 
     Ok(HttpResponse::Ok().body(items.join("\n")))
+}
+
+async fn device_state_names_handler() -> Result<HttpResponse, Error> {
+    let variants = DeviceStateId::variants();
+    let items: Vec<String> = variants.iter().map(|s| s.ext_id().to_string()).collect();
+
+    Ok(HttpResponse::Ok().body(items.join("\n")))
+}
+
+struct MetricsBackfillWriter {
+    repo: Arc<VictoriaRepository>,
+    buffer: Vec<Metric>,
+    deleted: HashSet<MetricId>,
+    capacity: usize,
+}
+
+impl MetricsBackfillWriter {
+    fn new(capacity: usize, repo: Arc<VictoriaRepository>) -> Self {
+        Self {
+            repo,
+            buffer: Vec::with_capacity(capacity),
+            deleted: HashSet::new(),
+            capacity,
+        }
+    }
+
+    async fn push(&mut self, metric: Metric) -> anyhow::Result<()> {
+        self.delete_if_needed(metric.id.clone()).await?;
+
+        self.buffer.push(metric);
+
+        if self.buffer.len() >= self.capacity {
+            self.flush().await?
+        }
+
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> anyhow::Result<()> {
+        if !self.buffer.is_empty() {
+            self.repo.push(&self.buffer).await?;
+            self.buffer.clear();
+        }
+
+        Ok(())
+    }
+
+    async fn delete_if_needed(&mut self, metric_id: MetricId) -> anyhow::Result<()> {
+        if self.deleted.insert(metric_id.clone()) {
+            tracing::info!("Deleting existing data for metric: {}", metric_id);
+            self.repo.delete_series(metric_id).await?;
+        }
+
+        Ok(())
+    }
 }

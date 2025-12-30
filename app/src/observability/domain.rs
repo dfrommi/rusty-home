@@ -7,13 +7,13 @@ pub struct Metric {
     pub timestamp: DateTime,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MetricId {
     pub name: String,
     pub labels: Vec<MetricLabel>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MetricLabel {
     Variant(String),
     Room(String),

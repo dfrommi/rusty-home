@@ -10,6 +10,7 @@ use sqlx::PgPool;
 
 use crate::{
     core::time::{DateTime, DateTimeRange},
+    t,
     trigger::{adapter::db::TriggerRepository, service::TriggerService},
 };
 
@@ -32,10 +33,11 @@ impl UserTriggerExecution {
         self.trigger.target()
     }
 
-    pub fn is_active(&self, at: DateTime) -> bool {
+    pub fn is_active(&self) -> bool {
+        let now = t!(now);
         match self.active_until {
-            Some(active_until) => self.timestamp >= at && at < active_until,
-            None => self.timestamp >= at,
+            Some(active_until) => self.timestamp >= now && now < active_until,
+            None => self.timestamp >= now,
         }
     }
 }

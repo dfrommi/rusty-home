@@ -8,6 +8,7 @@ mod heating_demand;
 mod is_running;
 mod occupancy;
 mod opened;
+mod pid_output;
 mod power_available;
 mod presence;
 mod relative_humidity;
@@ -30,6 +31,7 @@ pub use heating_demand::HeatingDemand;
 pub use is_running::IsRunning;
 pub use occupancy::Occupancy;
 pub use opened::OpenedArea;
+pub use pid_output::{PidOutput, PidResult};
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
@@ -55,6 +57,7 @@ pub enum HomeStateValue {
     IsRunning(IsRunning, bool),
     Occupancy(Occupancy, Probability),
     OpenedArea(OpenedArea, bool),
+    PidOutput(PidOutput, PidResult),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
     TargetHeatingMode(TargetHeatingMode, HeatingMode),
@@ -104,6 +107,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::OpenedArea(id) => opened::OpenedAreaStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::OpenedArea(id, value)),
+            HomeStateId::PidOutput(id) => pid_output::PidOutputStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::PidOutput(id, value)),
             HomeStateId::Resident(id) => resident::ResidentStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Resident(id, value)),

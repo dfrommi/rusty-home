@@ -6,12 +6,10 @@ mod device_state {
     use std::{collections::HashMap, sync::Arc};
 
     use crate::{
-        core::{
-            time::DateTime,
-            timeseries::{DataFrame, DataPoint},
-        },
+        core::timeseries::{DataFrame, DataPoint},
         device_state::{DeviceStateClient, DeviceStateId, DeviceStateValue},
         home_state::calc::context::DeviceStateProvider,
+        t,
     };
 
     pub struct CurrentDeviceStateProvider {
@@ -35,19 +33,15 @@ mod device_state {
         }
     }
 
+    #[derive(Clone)]
     pub struct PreloadedDeviceStateProvider {
-        timestamp: DateTime,
         device_states: Arc<HashMap<DeviceStateId, DataFrame<DeviceStateValue>>>,
     }
 
     impl PreloadedDeviceStateProvider {
-        pub fn new(
-            timestamp: DateTime,
-            device_states: Arc<HashMap<DeviceStateId, DataFrame<DeviceStateValue>>>,
-        ) -> Self {
+        pub fn new(device_states: HashMap<DeviceStateId, DataFrame<DeviceStateValue>>) -> Self {
             Self {
-                timestamp,
-                device_states,
+                device_states: Arc::new(device_states),
             }
         }
     }
@@ -56,7 +50,7 @@ mod device_state {
         fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>> {
             self.device_states
                 .get(id)
-                .and_then(|df| df.prev_or_at(self.timestamp).cloned())
+                .and_then(|df| df.prev_or_at(t!(now)).cloned())
         }
     }
 }
@@ -65,7 +59,6 @@ mod user_trigger {
     use std::{collections::HashMap, sync::Arc};
 
     use crate::{
-        core::time::DateTime,
         home_state::calc::context::UserTriggerProvider,
         trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
     };
@@ -104,19 +97,15 @@ mod user_trigger {
         }
     }
 
+    #[derive(Clone)]
     pub struct PreloadedUserTriggerProvider {
-        timestamp: DateTime,
         trigger_executions: Arc<HashMap<UserTriggerTarget, Vec<UserTriggerExecution>>>,
     }
 
     impl PreloadedUserTriggerProvider {
-        pub fn new(
-            timestamp: DateTime,
-            trigger_executions: Arc<HashMap<UserTriggerTarget, Vec<UserTriggerExecution>>>,
-        ) -> Self {
+        pub fn new(trigger_executions: HashMap<UserTriggerTarget, Vec<UserTriggerExecution>>) -> Self {
             Self {
-                timestamp,
-                trigger_executions,
+                trigger_executions: Arc::new(trigger_executions),
             }
         }
     }
@@ -127,7 +116,7 @@ mod user_trigger {
             self.trigger_executions
                 .get(target)?
                 .iter()
-                .filter(|exec| exec.is_active(self.timestamp))
+                .filter(|exec| exec.is_active())
                 .max_by_key(|exec| exec.timestamp)
                 .cloned()
         }

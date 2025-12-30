@@ -9,6 +9,7 @@ use crate::core::{
 pub trait DataFrameStatsExt<T: Clone> {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
     fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
+    fn average(&self) -> f64;
 }
 
 impl<T> DataFrameStatsExt<T> for DataFrame<T>
@@ -23,6 +24,24 @@ where
     fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64 {
         let (res, count) = age_weighted_sum_and_count(self, tau, interpolator);
         if count > 0 { res } else { 0.0 }
+    }
+
+    fn average(&self) -> f64 {
+        let values = self.map_interval(|dp1, dp2| {
+            let value1: f64 = dp1.value.clone().into();
+            let value2: f64 = dp2.value.clone().into();
+            let weight = dp2.timestamp.elapsed_since(dp1.timestamp).as_secs_f64();
+            let avg = weight * (value1 + value2) / 2.0;
+            (avg, weight)
+        });
+
+        let total_weight: f64 = values.iter().map(|(_, w)| *w).sum();
+        let total_value: f64 = values.iter().map(|(v, _)| *v).sum();
+        if total_weight != 0.0 {
+            total_value / total_weight
+        } else {
+            0.0
+        }
     }
 }
 
@@ -234,6 +253,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::{core::timeseries::DataPoint, t};
+
     use super::*;
 
     #[test]
@@ -278,5 +299,17 @@ mod tests {
         let expected: f64 = expected.into();
         let diff = (actual - expected).abs();
         assert!(diff < 1e-6, "Expected {} to be approx. {}", actual, expected,);
+    }
+
+    #[test]
+    fn test_average() {
+        let df = DataFrame::new(vec![
+            DataPoint::new(10.0, t!(30 minutes ago)),
+            DataPoint::new(20.0, t!(20 minutes ago)),
+            DataPoint::new(30.0, t!(10 minutes ago)),
+        ]);
+
+        let avg = df.average();
+        assert!(avg == 20.0);
     }
 }

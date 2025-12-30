@@ -56,6 +56,10 @@ impl StateCalculationContext {
         }
     }
 
+    pub fn timestamp(&self) -> DateTime {
+        self.start_time
+    }
+
     pub fn load_all(&self) {
         for id in HomeStateId::variants().iter() {
             self.get_home_state_value(*id);

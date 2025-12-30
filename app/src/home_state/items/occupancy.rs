@@ -37,8 +37,8 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
 }
 
 impl Occupancy {
-    pub fn calculate_presence(mut presence: DataFrame<bool>) -> Option<f64> {
-        presence.retain_range(
+    pub fn calculate_presence(presence: DataFrame<bool>) -> Option<f64> {
+        let presence = presence.retain_range(
             &DateTimeRange::since(t!(1 hours ago)),
             LastSeenInterpolator,
             LastSeenInterpolator,

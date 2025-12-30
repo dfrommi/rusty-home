@@ -30,27 +30,29 @@ impl<T: Clone> DataFrame<T> {
     }
 
     pub fn retain_range(
-        &mut self,
+        mut self,
         range: &DateTimeRange,
         start_interpolator: impl Interpolator<T>,
         end_interpolator: impl Interpolator<T>,
-    ) {
+    ) -> Self {
         let start = *range.start();
         let end = *range.end();
 
         if !self.data.contains_key(&start)
-            && let Some(dp_at_start) = start_interpolator.interpolate_df(start, self)
+            && let Some(dp_at_start) = start_interpolator.interpolate_df(start, &self)
         {
             self.data.insert(start, DataPoint::new(dp_at_start, start));
         }
 
         if !self.data.contains_key(&end)
-            && let Some(dp_at_end) = end_interpolator.interpolate_df(end, self)
+            && let Some(dp_at_end) = end_interpolator.interpolate_df(end, &self)
         {
             self.data.insert(end, DataPoint::new(dp_at_end, end));
         }
 
         self.data.retain(|k, _| *k >= start && *k <= end);
+
+        self
     }
 
     pub fn retain_range_with_context_before(&self, range: &DateTimeRange) -> Self {
@@ -121,6 +123,13 @@ impl<T: Clone> DataFrame<T> {
         self.data.values().next_back()
     }
 
+    pub fn last2(&self) -> Option<(&DataPoint<T>, &DataPoint<T>)> {
+        let mut iter = self.data.values().rev();
+        let last = iter.next()?;
+        let second_last = iter.next()?;
+        Some((second_last, last))
+    }
+
     pub fn prev_or_at(&self, at: DateTime) -> Option<&DataPoint<T>> {
         self.data.range(..=at).next_back().map(|(_, v)| v)
     }
@@ -157,6 +166,16 @@ impl<T: Clone> DataFrame<T> {
         }
 
         result
+    }
+}
+
+impl<T: Clone> IntoIterator for DataFrame<T> {
+    type Item = DataPoint<T>;
+    type IntoIter = std::vec::IntoIter<DataPoint<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        //TODO optimize to avoid collecting into vec first
+        self.data.into_values().collect::<Vec<_>>().into_iter()
     }
 }
 

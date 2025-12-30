@@ -73,7 +73,7 @@ impl HeatingZone {
         match self {
             HeatingZone::LivingRoom => DegreeCelsius(19.0),
             HeatingZone::Bedroom => DegreeCelsius(18.5),
-            HeatingZone::Kitchen => DegreeCelsius(18.0),
+            HeatingZone::Kitchen => DegreeCelsius(17.5),
             HeatingZone::RoomOfRequirements => DegreeCelsius(18.0),
             HeatingZone::Bathroom => DegreeCelsius(15.0),
         }

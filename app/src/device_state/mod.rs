@@ -148,13 +148,6 @@ impl DeviceStateClient {
         Ok(group_by_device_id(self.service.get_all_data_points_in_range(range).await?))
     }
 
-    pub async fn get_all_data_points_in_range_strictly(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
-        self.service.get_all_data_points_in_range(range).await
-    }
-
     pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
         self.service.get_offline_items().await
     }

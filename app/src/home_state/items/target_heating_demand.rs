@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use crate::{
     automation::Thermostat,
     core::{timeseries::DataPoint, unit::Percent},
@@ -25,7 +27,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             HeatingMode::Ventilation => (Percent(0.0), Percent(0.0)),
             HeatingMode::PostVentilation => (Percent(10.0), Percent(20.0)),
             //Only avoid cooling down too much long term
-            HeatingMode::EnergySaving if thermostat == Thermostat::Kitchen => (Percent(0.0), Percent(20.0)),
+            HeatingMode::EnergySaving if thermostat == Thermostat::Kitchen => (Percent(13.0), Percent(40.0)),
             HeatingMode::EnergySaving => (Percent(10.0), Percent(60.0)),
             HeatingMode::Comfort => (Percent(10.0), Percent(80.0)),
             HeatingMode::Manual(_, _) => (Percent(10.0), Percent(80.0)),
@@ -55,11 +57,14 @@ fn reduce_valve_movements(
     let significant_change = Percent(20.0);
     let fallback = current_demand.value;
 
-    let off_threshold = Percent(5.0);
     let skip_change_band = Percent(5.0);
     let keep_duration = t!(5 minutes);
 
-    if target_demand < off_threshold {
+    let effectively_off = Percent(3.0);
+    //round halfway to effectively off to avoid rapid on/off cycling
+    let off_threshold = 0.5 * (allowed_range.0 - effectively_off);
+
+    if target_demand < effectively_off || target_demand < off_threshold {
         return off;
     }
 

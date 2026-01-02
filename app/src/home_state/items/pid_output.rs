@@ -4,7 +4,7 @@ use crate::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{
             DataFrame, DataPoint,
-            interpolate::{Interpolator, LinearOrLastSeenInterpolator},
+            interpolate::{Interpolator, LastSeenInterpolator, LinearOrLastSeenInterpolator},
         },
         unit::{DegreeCelsius, Percent},
     },
@@ -63,38 +63,50 @@ impl DerivedStateProvider<PidOutput, PidResult> for PidOutputStateProvider {
             Thermostat::Bathroom => Temperature::Bathroom,
         };
 
-        let heating_zone = HeatingZone::for_thermostat(&thermostat);
+        let lookback_start = t!(3 hours ago);
 
-        let mode = ctx.get(mode)?;
-        let setpoint = DataPoint::new(heating_zone.setpoint_for_mode(&mode.value), mode.timestamp);
-        let temperatures = ctx.all_since(temperature_id, t!(3 hours ago))?;
+        let modes = ctx.all_since(mode, lookback_start)?;
+        let temperatures = ctx.all_since(temperature_id, lookback_start)?;
+        let setpoints = ctx.all_since(thermostat.set_point(), lookback_start)?;
 
-        let params = get_pid_config_for_mode(&mode.value, &thermostat);
+        let params = modes.map(|mode_dp| get_pid_config_for_mode(&mode_dp.value, &thermostat));
 
-        calculate_pid(&params, setpoint, &temperatures)
+        let errors = DataFrame::by_reducing2(
+            (&temperatures, LinearOrLastSeenInterpolator),
+            (&setpoints, LastSeenInterpolator),
+            |temp_dp, setpoint_dp| setpoint_dp.value - temp_dp.value,
+        )
+        .retain_range(
+            //truncate strictly to range
+            &DateTimeRange::since(t!(1 hours ago)),
+            LinearOrLastSeenInterpolator,
+            LastSeenInterpolator,
+        );
+
+        calculate_pid(params, errors)
     }
 }
 
 fn get_pid_config_for_mode(mode: &HeatingMode, thermostat: &Thermostat) -> PidConfig {
     match (mode, thermostat) {
-        (HeatingMode::Ventilation, _) => PidConfig::new(0.0, 0.0, 0.0, None),
-        (HeatingMode::EnergySaving, Thermostat::Kitchen) => PidConfig::new(15.0, 40.0, 0.0, None),
-        (_, _) => PidConfig::time_based_gains(25.0, t!(30 minutes), Duration::zero(), None),
+        (HeatingMode::Manual(_, _), _) => PidConfig::new(30.0, 10.0, 0.0),
+        (HeatingMode::Ventilation, _) => PidConfig::new(0.0, 0.0, 0.0),
+        (HeatingMode::PostVentilation, _) => PidConfig::new(0.0, 0.0, 0.0),
+        (_, Thermostat::Kitchen) => PidConfig::new(15.0, 5.0, 0.0),
+        (_, _) => PidConfig::time_based_gains(25.0, t!(30 minutes), Duration::zero()),
     }
 }
 
+#[derive(Debug, Clone)]
 struct PidConfig {
     pub kp: f64,
     pub ki: f64,
     pub kd: f64,
-
-    //slow down adjustment when close to target
-    pub deadband: Option<DeadbandConfig>,
 }
 
 impl PidConfig {
-    fn new(kp: f64, ki: f64, kd: f64, deadband: Option<DeadbandConfig>) -> Self {
-        Self { kp, ki, kd, deadband }
+    fn new(kp: f64, ki: f64, kd: f64) -> Self {
+        Self { kp, ki, kd }
     }
 
     //create PID config from time-based parameters
@@ -106,7 +118,7 @@ impl PidConfig {
     //kd=kp*td -> how much does the calculation look ahead
     //large: strong damping, react early to changes (less overshoot)
     //small: little damping, more overshoot, but faster reaction
-    fn time_based_gains(kp: f64, ti: Duration, td: Duration, deadband: Option<DeadbandConfig>) -> Self {
+    fn time_based_gains(kp: f64, ti: Duration, td: Duration) -> Self {
         let ki = if ti > Duration::zero() {
             kp / ti.as_hours_f64()
         } else {
@@ -114,89 +126,54 @@ impl PidConfig {
         };
         let kd = kp * td.as_hours_f64();
 
-        Self::new(kp, ki, kd, deadband)
+        Self::new(kp, ki, kd)
     }
 }
 
-struct DeadbandConfig {
-    threshhold_above: DegreeCelsius,
-    threshhold_below: DegreeCelsius,
-    ki_multiplier: f64,
-}
-
-impl DeadbandConfig {
-    fn is_in_deadband(&self, error: DegreeCelsius) -> bool {
-        if error.0 > 0.0 {
-            error <= self.threshhold_above
-        } else {
-            error >= -self.threshhold_below
-        }
-    }
-}
-
-fn calculate_pid(
-    params: &PidConfig,
-    setpoint: DataPoint<DegreeCelsius>,
-    temperatures: &DataFrame<DegreeCelsius>,
-) -> Option<PidResult> {
-    let (mut kp, mut kd) = (params.kp, params.kd);
-
-    let range = DateTimeRange::since(t!(60 minutes ago).max(setpoint.timestamp));
-    let error_df = temperatures.map(|dp| setpoint.value - dp.value).retain_range(
-        &range,
-        LinearOrLastSeenInterpolator,
-        LinearOrLastSeenInterpolator,
-    );
+fn calculate_pid(params: DataFrame<PidConfig>, errors: DataFrame<DegreeCelsius>) -> Option<PidResult> {
+    let current_params = params.last()?.value.clone();
 
     //P-controller
-    let error = error_df.last()?.value;
+    let error = current_params.kp * errors.last()?.value;
 
-    //reduce P and D gains when in deadband
-    if let Some(deadband) = &params.deadband
-        && deadband.is_in_deadband(error)
-    {
-        kp = 0.0;
-        kd = 0.0;
-    }
+    //D-controller
+    let derivative_h = -current_params.kd
+        * errors
+            .last2()
+            .map(|(prev, last)| {
+                let dt_h = last.timestamp.elapsed_since(prev.timestamp).as_hours_f64().max(1e-6);
+                (last.value.0 - prev.value.0) / dt_h
+            })
+            .unwrap_or(0.0);
 
     //I-controller
     let mut integral_h = 0.0;
-    let mut error_current_next = error_df.current_and_next().into_iter();
-    while let Some((prev, Some(next))) = error_current_next.next() {
-        //if in deadband, slow down adjustments
-        let ki = if let Some(deadband) = &params.deadband
-            && deadband.is_in_deadband(prev.value)
-            && deadband.is_in_deadband(next.value)
-        {
-            deadband.ki_multiplier * params.ki
-        } else {
-            params.ki
+
+    for (prev, next) in errors.current_and_next() {
+        let next = match next {
+            Some(n) => n,
+            None => &DataPoint::new(prev.value, t!(now)),
         };
 
-        let value = LinearOrLastSeenInterpolator
-            .interpolate(DateTime::midpoint(&prev.timestamp, &next.timestamp), prev, next)
-            .unwrap_or(prev.value);
-        let dt_h = next.timestamp.elapsed_since(prev.timestamp).as_hours_f64().max(1e-6);
+        let section_mid_time = DateTime::midpoint(&prev.timestamp, &next.timestamp);
+        let section_length = next.timestamp.elapsed_since(prev.timestamp).as_hours_f64().max(1e-6);
 
-        integral_h += ki * value.0 * dt_h;
+        let value = LinearOrLastSeenInterpolator
+            .interpolate(section_mid_time, prev, next)
+            .unwrap_or(prev.value);
+
+        let ki = params.prev_or_at(section_mid_time).map(|p| p.value.ki).unwrap_or(0.0);
+
+        integral_h += ki * value.0 * section_length;
     }
 
     //clamp integral to avoid windup
     integral_h = integral_h.clamp(-100.0, 100.0);
 
-    //D-controller
-    let derivative_h = error_df
-        .last2()
-        .map(|(prev, last)| {
-            let dt_h = last.timestamp.elapsed_since(prev.timestamp).as_hours_f64().max(1e-6);
-            (last.value.0 - prev.value.0) / dt_h
-        })
-        .unwrap_or(0.0);
-
     Some(PidResult {
-        p_term: Percent(kp * error.0),
+        p_term: Percent(error.0),
         i_term: Percent(integral_h),
-        d_term: Percent(-kd * derivative_h),
+        d_term: Percent(derivative_h),
     })
 }
 
@@ -220,52 +197,22 @@ mod tests {
 
     #[test]
     fn test_pid_calculation() {
-        let setpoint = DataPoint::new(DegreeCelsius(19.8), t!(35 minutes ago));
-        let config = PidConfig::time_based_gains(25.0, t!(30 minutes), Duration::zero(), None);
-
+        let config = PidConfig::time_based_gains(25.0, t!(30 minutes), Duration::zero());
         println!("PID Config: kp={}, ki={}, kd={}", config.kp, config.ki, config.kd);
 
-        let temperatures = df![
-            30 minutes ago => 19.0,
-            20 minutes ago => 19.1,
-            10 minutes ago => 19.2,
+        let configs = DataFrame::new(vec![DataPoint::new(config, t!(3 hours ago))]);
+
+        let errors = df![
+            30 minutes ago => 0.8,
+            20 minutes ago => 0.7,
+            10 minutes ago => 0.6,
         ];
 
-        let output = calculate_pid(&config, setpoint, &temperatures).unwrap();
+        let output = calculate_pid(configs, errors).unwrap();
 
         println!("PID output: {:?}", output);
 
         assert!(output.total() > Percent(30.0));
         assert!(output.total() < Percent(40.0));
-    }
-
-    #[test]
-    fn test_pid_with_deadband() {
-        let setpoint = DataPoint::new(DegreeCelsius(19.7), t!(35 minutes ago));
-        let config = PidConfig::time_based_gains(
-            25.0,
-            t!(30 minutes),
-            Duration::zero(),
-            Some(DeadbandConfig {
-                threshhold_above: DegreeCelsius(0.5),
-                threshhold_below: DegreeCelsius(0.5),
-                ki_multiplier: 0.2,
-            }),
-        );
-
-        println!("PID Config: kp={}, ki={}, kd={}", config.kp, config.ki, config.kd);
-
-        let temperatures = df![
-            30 minutes ago => 19.0,
-            20 minutes ago => 19.1,
-            10 minutes ago => 19.2,
-        ];
-
-        let output = calculate_pid(&config, setpoint, &temperatures).unwrap();
-
-        println!("PID output: {:?}", output);
-
-        assert!(output.total() > Percent(10.0));
-        assert!(output.total() < Percent(20.0));
     }
 }

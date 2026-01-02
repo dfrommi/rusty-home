@@ -12,6 +12,7 @@ pub enum AbsoluteHumidity {
     LivingRoom,
     Bedroom,
     RoomOfRequirements,
+    Kitchen,
     Outside,
 }
 
@@ -29,6 +30,7 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
             AbsoluteHumidity::Bathroom => ctx.get(HomeTemperature::Bathroom)?,
             AbsoluteHumidity::Outside => ctx.get(HomeTemperature::Outside)?,
             AbsoluteHumidity::Bedroom => ctx.get(HomeTemperature::Bedroom)?,
+            AbsoluteHumidity::Kitchen => ctx.get(HomeTemperature::Kitchen)?,
             AbsoluteHumidity::RoomOfRequirements => ctx.get(HomeTemperature::RoomOfRequirements)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
@@ -39,6 +41,7 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
             AbsoluteHumidity::Bathroom => ctx.get(HomeRelativeHumidity::Bathroom)?,
             AbsoluteHumidity::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
             AbsoluteHumidity::Bedroom => ctx.get(HomeRelativeHumidity::Bedroom)?,
+            AbsoluteHumidity::Kitchen => ctx.get(HomeRelativeHumidity::Kitchen)?,
             AbsoluteHumidity::RoomOfRequirements => ctx.get(HomeRelativeHumidity::RoomOfRequirements)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,

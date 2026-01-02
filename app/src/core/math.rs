@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 
-use crate::core::{
-    time::{DateTime, Duration},
-    timeseries::{DataFrame, interpolate::Interpolator},
-    unit::{Probability, p},
+use crate::{
+    core::{
+        time::{DateTime, Duration},
+        timeseries::{DataFrame, DataPoint, interpolate::Interpolator},
+        unit::{Probability, p},
+    },
+    t,
 };
 
 pub trait DataFrameStatsExt<T: Clone> {
@@ -17,23 +20,32 @@ where
     T: Into<f64> + Clone,
 {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64 {
-        let (res, _count) = age_weighted_sum_and_count(self, tau, interpolator);
-        res
+        //scale integral to hours
+        age_weighted_sum_and_count(self, tau, interpolator).0 / 3600.0
     }
 
     fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64 {
-        let (res, count) = age_weighted_sum_and_count(self, tau, interpolator);
-        if count > 0 { res } else { 0.0 }
+        let (sum, total_weight) = age_weighted_sum_and_count(self, tau, interpolator);
+        if total_weight != 0.0 { sum / total_weight } else { 0.0 }
     }
 
     fn average(&self) -> f64 {
-        let values = self.map_interval(|dp1, dp2| {
-            let value1: f64 = dp1.value.clone().into();
-            let value2: f64 = dp2.value.clone().into();
-            let weight = dp2.timestamp.elapsed_since(dp1.timestamp).as_secs_f64();
-            let avg = weight * (value1 + value2) / 2.0;
-            (avg, weight)
-        });
+        let values = self
+            .current_and_next()
+            .into_iter()
+            .map(|(dp1, dp2)| {
+                let dp2 = match dp2 {
+                    Some(dp2) => dp2,
+                    None => &DataPoint::new(dp1.value.clone(), t!(now)),
+                };
+
+                let value1: f64 = dp1.value.clone().into();
+                let value2: f64 = dp2.value.clone().into();
+                let weight = dp2.timestamp.elapsed_since(dp1.timestamp).as_secs_f64();
+                let avg = weight * (value1 + value2) / 2.0;
+                (avg, weight)
+            })
+            .collect::<Vec<_>>();
 
         let total_weight: f64 = values.iter().map(|(_, w)| *w).sum();
         let total_value: f64 = values.iter().map(|(v, _)| *v).sum();
@@ -45,30 +57,38 @@ where
     }
 }
 
-fn age_weighted_sum_and_count<T>(df: &DataFrame<T>, tau: Duration, interpolator: impl Interpolator<T>) -> (f64, usize)
+fn age_weighted_sum_and_count<T>(df: &DataFrame<T>, tau: Duration, interpolator: impl Interpolator<T>) -> (f64, f64)
 where
     T: Into<f64> + Clone,
 {
-    let values = df.map_interval(|dp1, dp2| {
-        assert!(dp1.timestamp <= dp2.timestamp);
+    let values = df
+        .current_and_next()
+        .into_iter()
+        .map(|(dp1, dp2)| {
+            let dp2 = match dp2 {
+                Some(dp2) => dp2,
+                None => &DataPoint::new(dp1.value.clone(), t!(now)),
+            };
 
-        let age_factor = tau.as_secs_f64()
-            * (exp_decay_since(dp2.timestamp, tau.clone()) - exp_decay_since(dp1.timestamp, tau.clone()));
+            assert!(dp1.timestamp <= dp2.timestamp);
 
-        let value: T = interpolator
-            .interpolate(DateTime::midpoint(&dp1.timestamp, &dp2.timestamp), dp1, dp2)
-            //this should really never ever happen as "at" is guaranteed to be between dp1 and dp2
-            .unwrap_or(dp1.value.clone());
+            let age_factor = tau.as_secs_f64()
+                * (exp_decay_since(dp2.timestamp, tau.clone()) - exp_decay_since(dp1.timestamp, tau.clone()));
 
-        let value: f64 = value.into();
-        (value, age_factor)
-    });
+            let value: T = interpolator
+                .interpolate(DateTime::midpoint(&dp1.timestamp, &dp2.timestamp), dp1, dp2)
+                //this should really never ever happen as "at" is guaranteed to be between dp1 and dp2
+                .unwrap_or(dp1.value.clone());
 
-    let weights_sum: f64 = values.iter().map(|(_, w)| *w).sum();
+            let value: f64 = value.into();
+            (value, age_factor)
+        })
+        .collect::<Vec<_>>();
+
     let sum: f64 = values.iter().map(|(v, w)| v * w).sum();
+    let weights_sum: f64 = values.iter().map(|(_, w)| *w).sum();
 
-    let res = if weights_sum != 0.0 { sum / weights_sum } else { 0.0 };
-    (res, values.len())
+    (sum, weights_sum)
 }
 
 fn sigmoid<T: Into<f64>>(x: T) -> Probability {
@@ -253,7 +273,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{core::timeseries::DataPoint, t};
+    use crate::{
+        core::{
+            timeseries::{
+                DataPoint,
+                interpolate::{LastSeenInterpolator, LinearInterpolator},
+            },
+            unit::Percent,
+        },
+        t,
+    };
 
     use super::*;
 
@@ -304,12 +333,37 @@ mod tests {
     #[test]
     fn test_average() {
         let df = DataFrame::new(vec![
-            DataPoint::new(10.0, t!(30 minutes ago)),
-            DataPoint::new(20.0, t!(20 minutes ago)),
-            DataPoint::new(30.0, t!(10 minutes ago)),
+            DataPoint::new(10.0, t!(20 minutes ago)),
+            DataPoint::new(20.0, t!(10 minutes ago)),
+            DataPoint::new(30.0, t!(now)),
         ]);
 
         let avg = df.average();
+        println!("Average: {}", avg);
         assert!(avg == 20.0);
+    }
+
+    #[test]
+    fn test_weighted_aged_mean() {
+        let df = DataFrame::new(vec![
+            DataPoint::new(Percent(10.0), t!(30 minutes ago)),
+            DataPoint::new(Percent(20.0), t!(20 minutes ago)),
+            DataPoint::new(Percent(30.0), t!(10 minutes ago)),
+        ]);
+
+        let wam = df.weighted_aged_mean(t!(15 minutes), LastSeenInterpolator);
+        assert!(wam > 20.0 && wam < 25.0);
+    }
+
+    #[test]
+    fn test_weighted_aged_sum() {
+        let df = DataFrame::new(vec![
+            DataPoint::new(Percent(10.0), t!(60 minutes ago)),
+            DataPoint::new(Percent(20.0), t!(40 minutes ago)),
+            DataPoint::new(Percent(30.0), t!(20 minutes ago)),
+        ]);
+
+        let was = df.weighted_aged_sum(t!(30 minutes), LinearInterpolator);
+        assert!(was > 10.0 && was < 12.0);
     }
 }

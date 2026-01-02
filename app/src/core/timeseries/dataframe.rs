@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     core::{
@@ -22,11 +22,51 @@ impl<T: Clone> DataFrame<T> {
 
     pub fn new(values: impl IntoIterator<Item = DataPoint<T>>) -> Self {
         let mut data: BTreeMap<DateTime, DataPoint<T>> = BTreeMap::new();
+
+        //process sorted by timestamp to ensure deterministic behavior when interting
+        let values = {
+            let mut vals: Vec<DataPoint<T>> = values.into_iter().collect();
+            vals.sort_by_key(|dp| dp.timestamp);
+            vals
+        };
+
         for dp in values {
             data.insert(dp.timestamp, dp);
         }
 
         Self { data }
+    }
+
+    pub fn by_reducing2<A, B>(
+        data1: (&DataFrame<A>, impl Interpolator<A>),
+        data2: (&DataFrame<B>, impl Interpolator<B>),
+        f: impl Fn(&DataPoint<A>, &DataPoint<B>) -> T,
+    ) -> Self
+    where
+        A: Clone,
+        B: Clone,
+    {
+        let (df1, interp1) = data1;
+        let (df2, interp2) = data2;
+
+        let mut all_timestamps: BTreeSet<DateTime> = BTreeSet::new();
+        all_timestamps.extend(df1.data.keys());
+        all_timestamps.extend(df2.data.keys());
+        all_timestamps.insert(t!(now));
+
+        let mut new_data_points = Vec::new();
+
+        for dt in all_timestamps {
+            let value1 = interp1.interpolate_df(dt, df1);
+            let value2 = interp2.interpolate_df(dt, df2);
+
+            if let (Some(value1), Some(value2)) = (value1, value2) {
+                let new_value = f(&DataPoint::new(value1, dt), &DataPoint::new(value2, dt));
+                new_data_points.push(DataPoint::new(new_value, dt));
+            }
+        }
+
+        DataFrame::new(new_data_points)
     }
 
     pub fn retain_range(
@@ -79,16 +119,6 @@ impl<T: Clone> DataFrame<T> {
         });
 
         DataFrame::new(values)
-    }
-
-    pub fn map_interval<U, F>(&self, f: F) -> Vec<U>
-    where
-        F: Fn(&DataPoint<T>, &DataPoint<T>) -> U,
-    {
-        self.current_and_next()
-            .into_iter()
-            .filter_map(|(current, next)| next.map(|n| f(current, n)))
-            .collect::<Vec<_>>()
     }
 
     pub fn latest_where(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> Option<&DataPoint<T>> {

@@ -5,7 +5,10 @@ macro_rules! t {
     }};
 
     ($from_hour:literal : $from_minute:literal - $to_hour:literal : $to_minute:literal) => {{
-        $crate::core::time::DailyTimeRange::new(t!($from_hour:$from_minute), t!($to_hour:$to_minute))
+        $crate::core::time::DailyTimeRange::new(
+            $crate::core::time::Time::at($from_hour, $from_minute).unwrap(),
+            $crate::core::time::Time::at($to_hour, $to_minute).unwrap(),
+        )
     }};
 
     ($hour:literal : $minute:literal) => {{

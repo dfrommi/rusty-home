@@ -30,7 +30,7 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
         };
 
         let prior: f64 = -1.7968470630447446;
-        let w_presence: f64 = 3.733237448369802;
+        let w_presence: f64 = 8.635109947226839;
 
         Occupancy::calculate(prior, w_presence, main_df)
     }

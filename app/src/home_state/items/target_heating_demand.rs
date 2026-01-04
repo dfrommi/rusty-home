@@ -23,16 +23,21 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         let TargetHeatingDemand::Thermostat(thermostat) = id;
         let mode = ctx.get(TargetHeatingMode::from_thermostat(thermostat))?;
 
-        let allowed_range = match mode.value {
-            HeatingMode::Ventilation => (Percent(0.0), Percent(0.0)),
-            HeatingMode::PostVentilation => (Percent(10.0), Percent(20.0)),
-            //Only avoid cooling down too much long term
-            HeatingMode::EnergySaving if thermostat == Thermostat::Kitchen => (Percent(13.0), Percent(40.0)),
-            HeatingMode::EnergySaving => (Percent(10.0), Percent(60.0)),
-            HeatingMode::Comfort => (Percent(10.0), Percent(80.0)),
-            HeatingMode::Manual(_, _) => (Percent(10.0), Percent(80.0)),
-            HeatingMode::Sleep => (Percent(10.0), Percent(50.0)),
-            HeatingMode::Away => (Percent(10.0), Percent(60.0)),
+        let force_off_below = match (thermostat, &mode.value) {
+            (_, HeatingMode::Ventilation) => Percent(0.0),
+            (Thermostat::Kitchen, _) => Percent(17.0),
+            (_, _) => Percent(10.0),
+        };
+
+        let max_output = match (thermostat, &mode.value) {
+            (_, HeatingMode::Ventilation) => Percent(0.0),
+            (_, HeatingMode::PostVentilation) => Percent(20.0),
+            (Thermostat::Kitchen, HeatingMode::EnergySaving) => Percent(40.0),
+            (_, HeatingMode::EnergySaving) => Percent(60.0),
+            (_, HeatingMode::Comfort) => Percent(80.0),
+            (_, HeatingMode::Manual(_, _)) => Percent(80.0),
+            (_, HeatingMode::Sleep) => Percent(50.0),
+            (_, HeatingMode::Away) => Percent(60.0),
         };
 
         let current_demand = ctx.get(thermostat.heating_demand())?;
@@ -44,7 +49,11 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         let raw_pid = ctx.get(pid_output_id).map(|pid| pid.value.total())?;
         let heating_demand = raw_pid.round().clamp();
 
-        Some(reduce_valve_movements(heating_demand, current_demand, allowed_range))
+        Some(reduce_valve_movements(
+            heating_demand,
+            current_demand,
+            (force_off_below, max_output),
+        ))
     }
 }
 
@@ -60,11 +69,7 @@ fn reduce_valve_movements(
     let skip_change_band = Percent(5.0);
     let keep_duration = t!(5 minutes);
 
-    let effectively_off = Percent(3.0);
-    //round halfway to effectively off to avoid rapid on/off cycling
-    let off_threshold = 0.5 * (allowed_range.0 - effectively_off);
-
-    if target_demand < effectively_off || target_demand < off_threshold {
+    if target_demand < allowed_range.0 {
         return off;
     }
 

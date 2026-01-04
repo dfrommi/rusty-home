@@ -69,33 +69,6 @@ impl HeatingZone {
         }
     }
 
-    pub fn default_setpoint(&self) -> DegreeCelsius {
-        match self {
-            HeatingZone::LivingRoom => DegreeCelsius(19.0),
-            HeatingZone::Bedroom => DegreeCelsius(18.5),
-            HeatingZone::Kitchen => DegreeCelsius(17.5),
-            HeatingZone::RoomOfRequirements => DegreeCelsius(18.0),
-            HeatingZone::Bathroom => DegreeCelsius(15.0),
-        }
-    }
-
-    pub fn setpoint_for_mode(&self, mode: &HeatingMode) -> DegreeCelsius {
-        let default_temperature = self.default_setpoint();
-
-        match mode {
-            HeatingMode::Manual(t, _) => *t,
-            HeatingMode::Ventilation => DegreeCelsius(0.0),
-            HeatingMode::PostVentilation => default_temperature,
-            HeatingMode::EnergySaving => default_temperature,
-            HeatingMode::Sleep if self == &HeatingZone::LivingRoom => default_temperature - DegreeCelsius(0.5),
-            HeatingMode::Comfort if self == &HeatingZone::LivingRoom => default_temperature + DegreeCelsius(0.5),
-            HeatingMode::Sleep if self == &HeatingZone::Bedroom => default_temperature - DegreeCelsius(0.5),
-            HeatingMode::Sleep => default_temperature - DegreeCelsius(1.0),
-            HeatingMode::Comfort => default_temperature + DegreeCelsius(1.0),
-            HeatingMode::Away => default_temperature - DegreeCelsius(2.0),
-        }
-    }
-
     //TODO use in actions
     pub fn inside_temperature(&self) -> Temperature {
         match self {

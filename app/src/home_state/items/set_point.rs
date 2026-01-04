@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::HeatingZone,
     core::{time::DateTime, unit::DegreeCelsius},
+    home_state::HeatingMode,
 };
 
 use crate::home_state::{
@@ -33,33 +33,27 @@ impl DerivedStateProvider<SetPoint, DegreeCelsius> for SetPointStateProvider {
         match id {
             SetPoint::RoomOfRequirements if from_iso("2025-11-22T15:08:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::RoomOfRequirements)?;
-                let value = HeatingZone::RoomOfRequirements.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::LivingRoomBig if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::LivingRoom)?;
-                let value = HeatingZone::LivingRoom.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::LivingRoomSmall if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::LivingRoom)?;
-                let value = HeatingZone::LivingRoom.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::Kitchen if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::Kitchen)?;
-                let value = HeatingZone::Kitchen.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::Bedroom if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::Bedroom)?;
-                let value = HeatingZone::Bedroom.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::Bathroom if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::Bathroom)?;
-                let value = HeatingZone::Bathroom.setpoint_for_mode(&mode.value);
-                Some(value)
+                setpoint_for_mode(&id, &mode.value).into()
             }
             SetPoint::RoomOfRequirements => ctx.device_state(DeviceSetPoint::RoomOfRequirements).map(|dp| dp.value),
             SetPoint::LivingRoomBig => ctx.device_state(DeviceSetPoint::LivingRoomBig).map(|dp| dp.value),
@@ -69,4 +63,39 @@ impl DerivedStateProvider<SetPoint, DegreeCelsius> for SetPointStateProvider {
             SetPoint::Bathroom => ctx.device_state(DeviceSetPoint::Bathroom).map(|dp| dp.value),
         }
     }
+}
+
+fn setpoint_for_mode(id: &SetPoint, mode: &HeatingMode) -> DegreeCelsius {
+    let t = match (id, mode) {
+        (_, HeatingMode::Manual(t, _)) => t.0,
+        (_, HeatingMode::Ventilation) => 0.0,
+        (SetPoint::LivingRoomBig, HeatingMode::EnergySaving) => 19.0,
+        (SetPoint::LivingRoomBig, HeatingMode::PostVentilation) => 19.0,
+        (SetPoint::LivingRoomBig, HeatingMode::Sleep) => 18.5,
+        (SetPoint::LivingRoomBig, HeatingMode::Comfort) => 19.5,
+        (SetPoint::LivingRoomBig, HeatingMode::Away) => 17.0,
+        (SetPoint::LivingRoomSmall, HeatingMode::EnergySaving) => 19.0,
+        (SetPoint::LivingRoomSmall, HeatingMode::PostVentilation) => 19.0,
+        (SetPoint::LivingRoomSmall, HeatingMode::Sleep) => 18.5,
+        (SetPoint::LivingRoomSmall, HeatingMode::Comfort) => 19.5,
+        (SetPoint::LivingRoomSmall, HeatingMode::Away) => 17.0,
+        (SetPoint::RoomOfRequirements, HeatingMode::EnergySaving) => 18.0,
+        (SetPoint::RoomOfRequirements, HeatingMode::PostVentilation) => 18.0,
+        (SetPoint::RoomOfRequirements, HeatingMode::Sleep) => 17.0,
+        (SetPoint::RoomOfRequirements, HeatingMode::Comfort) => 19.0,
+        (SetPoint::RoomOfRequirements, HeatingMode::Away) => 16.0,
+        (SetPoint::Bedroom, HeatingMode::EnergySaving) => 17.5,
+        (SetPoint::Bedroom, HeatingMode::PostVentilation) => 17.0,
+        (SetPoint::Bedroom, HeatingMode::Sleep) => 18.0,
+        (SetPoint::Bedroom, HeatingMode::Comfort) => 19.0,
+        (SetPoint::Bedroom, HeatingMode::Away) => 16.5,
+        (SetPoint::Kitchen, HeatingMode::EnergySaving) => 17.0,
+        (SetPoint::Kitchen, HeatingMode::PostVentilation) => 16.5,
+        (SetPoint::Kitchen, HeatingMode::Sleep) => 16.5,
+        (SetPoint::Kitchen, HeatingMode::Comfort) => 18.0,
+        (SetPoint::Kitchen, HeatingMode::Away) => 16.0,
+        (SetPoint::Bathroom, _) => 15.0,
+    };
+
+    DegreeCelsius(t)
 }

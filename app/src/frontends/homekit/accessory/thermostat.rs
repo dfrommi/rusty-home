@@ -155,10 +155,10 @@ impl Thermostat {
             if let Some(state) = state {
                 return match state {
                     0 => Some(self.zone_command(HomekitHeatingState::Off)),
-                    1 => {
-                        let temperature = self.status.set_point.unwrap_or_else(|| self.zone.default_setpoint());
-                        Some(self.zone_command(HomekitHeatingState::Heat(temperature)))
-                    }
+                    1 => self
+                        .status
+                        .set_point
+                        .map(|temperature| self.zone_command(HomekitHeatingState::Heat(temperature))),
                     3 => Some(self.zone_command(HomekitHeatingState::Auto)),
                     unsupported => {
                         tracing::warn!(

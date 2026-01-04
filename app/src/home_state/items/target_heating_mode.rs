@@ -71,6 +71,7 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             .unwrap_or(DataFrame::empty());
 
         Some(calculate_heating_mode(
+            &id,
             !ctx.get(Presence::AtHomeDennis)? & !ctx.get(Presence::AtHomeSabine)?,
             ctx.get(id.window())?,
             ctx.get(Resident::AnyoneSleeping)?,
@@ -131,6 +132,7 @@ impl TargetHeatingMode {
 }
 
 fn calculate_heating_mode(
+    id: &TargetHeatingMode,
     away: DataPoint<bool>,
     window_open: DataPoint<bool>,
     sleeping: DataPoint<bool>,
@@ -181,7 +183,7 @@ fn calculate_heating_mode(
         return HeatingMode::Sleep;
     }
 
-    //sleeping preseved until ventilation in that room
+    //sleeping preserved until ventilation in that room
     if let Some(morning_timerange) = t!(5:30 - 12:30).active() {
         //some tampering with window, but not in morning hours
         if !morning_timerange.contains(&window_open.timestamp) {
@@ -216,6 +218,16 @@ fn calculate_heating_mode(
         } else {
             tracing::trace!("Room occupancy is low - not switching to comfort mode");
         }
+    }
+
+    //Starting sleep mode if no higher-prio, like comfort, applies. Overrides in-bed detection in
+    //some zones
+    //TODO "last ventilation of the day" concept for RoR
+    if (id == &TargetHeatingMode::Bedroom && t!(22:00 - 5:00).is_now())
+        || (id == &TargetHeatingMode::RoomOfRequirements && t!(21:00 - 5:00).is_now())
+    {
+        tracing::trace!("Heating in sleep-mode in preparation of going to bed");
+        return HeatingMode::Sleep;
     }
 
     tracing::trace!("Heating in energy-saving-mode (fallback) as no higher-prio rule applied");

@@ -75,6 +75,7 @@ pub async fn main() {
         device_state_module.subscribe(),
         home_state_module.subscribe(),
         device_state_module.client(),
+        home_state_module.client(),
         command_module.client(),
     );
 

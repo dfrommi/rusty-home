@@ -12,9 +12,12 @@ use crate::{
         time::{DateTime, DateTimeRange},
     },
     device_state::{DeviceStateClient, DeviceStateId},
-    home_state::HomeStateId,
+    home_state::{HomeStateClient, HomeStateId},
     observability::{
-        adapter::{MetricsAdapter, device_metrics::DeviceMetricsAdapter, repository::VictoriaRepository},
+        adapter::{
+            MetricsAdapter, device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter,
+            repository::VictoriaRepository,
+        },
         domain::{Metric, MetricId},
     },
     t,
@@ -79,7 +82,11 @@ impl BackfillQuery {
     }
 }
 
-pub fn routes(repo: Arc<VictoriaRepository>, device_client: Arc<DeviceStateClient>) -> actix_web::Scope {
+pub fn routes(
+    repo: Arc<VictoriaRepository>,
+    device_client: Arc<DeviceStateClient>,
+    home_state_client: Arc<HomeStateClient>,
+) -> actix_web::Scope {
     web::scope("/metrics")
         .route("/home/names", web::get().to(home_state_names_handler))
         .route("/home/backfill", web::get().to(backfill_handler_home))
@@ -87,6 +94,7 @@ pub fn routes(repo: Arc<VictoriaRepository>, device_client: Arc<DeviceStateClien
         .route("/device/backfill", web::get().to(backfill_handler_device))
         .app_data(web::Data::from(repo))
         .app_data(web::Data::from(device_client))
+        .app_data(web::Data::from(home_state_client))
 }
 
 async fn backfill_handler_device(
@@ -146,9 +154,42 @@ async fn backfill_handler_device(
 
 async fn backfill_handler_home(
     repo: web::Data<VictoriaRepository>,
+    client: web::Data<HomeStateClient>,
     query: Query<BackfillQuery>,
 ) -> Result<HttpResponse, Error> {
-    todo!()
+    let full_range = query.range.to_range();
+    tracing::info!("Backfilling home state metrics for range {}", full_range);
+
+    let variants = query.matching_variants(HomeStateId::variants());
+
+    let mut batch = MetricsBackfillWriter::new(20000, repo.into_inner());
+    let mut snapshot_iter = client.snapshot_iter(full_range);
+
+    while let Some(snapshot) = snapshot_iter.next().await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!(
+            "Error fetching home state snapshot from HomeStateClient: {}",
+            e
+        ))
+    })? {
+        for id in variants.iter() {
+            if let Some(dp) = snapshot.get(*id) {
+                for metric in HomeMetricsAdapter.to_metrics(dp.clone()).into_iter() {
+                    batch.push(metric).await.map_err(|e| {
+                        actix_web::error::ErrorInternalServerError(format!(
+                            "Error buffering metrics for VictoriaMetrics: {}",
+                            e
+                        ))
+                    })?;
+                }
+            }
+        }
+    }
+
+    batch.flush().await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Error flushing metrics batch to VictoriaMetrics: {}", e))
+    })?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 async fn home_state_names_handler() -> Result<HttpResponse, Error> {

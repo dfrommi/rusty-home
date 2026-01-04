@@ -1,12 +1,12 @@
 mod calc;
 mod items;
 
-pub use calc::StateSnapshot;
+pub use calc::{StateSnapshot, StateSnapshotIterator};
 use infrastructure::EventEmitter;
 use infrastructure::{EventBus, EventListener};
 pub use items::*;
 
-use crate::core::time::Duration;
+use crate::core::time::{DateTimeRange, Duration};
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
@@ -34,6 +34,13 @@ pub struct HomeStateModule {
     event_emitter: EventEmitter<HomeStateEvent>,
 }
 
+#[derive(Clone)]
+pub struct HomeStateClient {
+    keep: Duration,
+    trigger_client: TriggerClient,
+    device_state: DeviceStateClient,
+}
+
 impl HomeStateModule {
     pub fn new(
         duration: Duration,
@@ -58,13 +65,22 @@ impl HomeStateModule {
         self.event_bus.subscribe()
     }
 
+    pub fn client(&self) -> HomeStateClient {
+        HomeStateClient {
+            keep: self.duration.clone(),
+            trigger_client: self.trigger_client.clone(),
+            device_state: self.device_state.clone(),
+        }
+    }
+
     pub async fn run(mut self) {
         use tokio::time::{self, Duration, Instant};
 
         tracing::info!("Starting bootstrap of home state context");
-        let mut context = bootstrap_context(self.duration.clone(), &self.trigger_client, &self.device_state)
-            .await
-            .expect("Failed to bootstrap home state context");
+        let mut context =
+            bootstrap_context(self.duration.clone(), self.device_state.clone(), self.trigger_client.clone())
+                .await
+                .expect("Failed to bootstrap home state context");
         let mut snapshot = context.as_snapshot();
 
         tracing::info!("Calculating initial home state context");
@@ -79,7 +95,7 @@ impl HomeStateModule {
         loop {
             tokio::select! {
                 //Collect state changes as many might come in short intervals
-                event = self.device_state_rx.recv() => if let Some(DeviceStateEvent::Updated(_)) = event {
+                event = self.device_state_rx.recv() => if let Some(DeviceStateEvent::Changed(_)) = event {
                     // Put debounce timer into the near future, expiration triggers calculation
                     debounce_sleeper.as_mut().reset(Instant::now() + debounce_duration);
                 },
@@ -148,5 +164,11 @@ impl HomeStateModule {
         tracing::trace!("Completed update of home state context");
 
         (new_context, new_snapshot)
+    }
+}
+
+impl HomeStateClient {
+    pub fn snapshot_iter(&self, range: DateTimeRange) -> StateSnapshotIterator {
+        StateSnapshotIterator::new(range, self.keep.clone(), self.device_state.clone(), self.trigger_client.clone())
     }
 }

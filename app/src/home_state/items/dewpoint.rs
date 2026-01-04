@@ -1,5 +1,4 @@
 use super::*;
-use crate::home_state::{RelativeHumidity, Temperature};
 use anyhow::Result;
 
 use crate::core::unit::{DegreeCelsius, Percent};
@@ -7,9 +6,13 @@ use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
+    Bathroom,
     BathroomShower,
+    BathroomDehumidifier,
     LivingRoom,
-    RoomOfRequirement,
+    Bedroom,
+    RoomOfRequirements,
+    Kitchen,
     Outside,
 }
 
@@ -17,8 +20,32 @@ pub struct DewPointStateProvider;
 
 impl DerivedStateProvider<DewPoint, DegreeCelsius> for DewPointStateProvider {
     fn calculate_current(&self, id: DewPoint, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
-        let temperature_dp = ctx.get(id.temperature())?;
-        let humidity_dp = ctx.get(id.relative_humidity())?;
+        use crate::device_state::RelativeHumidity as DeviceRelativeHumidity;
+        use crate::device_state::Temperature as DeviceTemperature;
+        use crate::home_state::items::RelativeHumidity as HomeRelativeHumidity;
+        use crate::home_state::items::Temperature as HomeTemperature;
+
+        let temperature_dp = match id {
+            DewPoint::LivingRoom => ctx.get(HomeTemperature::LivingRoom)?,
+            DewPoint::Bathroom => ctx.get(HomeTemperature::Bathroom)?,
+            DewPoint::Outside => ctx.get(HomeTemperature::Outside)?,
+            DewPoint::Bedroom => ctx.get(HomeTemperature::Bedroom)?,
+            DewPoint::Kitchen => ctx.get(HomeTemperature::Kitchen)?,
+            DewPoint::RoomOfRequirements => ctx.get(HomeTemperature::RoomOfRequirements)?,
+            DewPoint::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
+            DewPoint::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
+        };
+
+        let humidity_dp = match id {
+            DewPoint::LivingRoom => ctx.get(HomeRelativeHumidity::LivingRoom)?,
+            DewPoint::Bathroom => ctx.get(HomeRelativeHumidity::Bathroom)?,
+            DewPoint::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
+            DewPoint::Bedroom => ctx.get(HomeRelativeHumidity::Bedroom)?,
+            DewPoint::Kitchen => ctx.get(HomeRelativeHumidity::Kitchen)?,
+            DewPoint::RoomOfRequirements => ctx.get(HomeRelativeHumidity::RoomOfRequirements)?,
+            DewPoint::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
+            DewPoint::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,
+        };
 
         let dew_point_value = DewPoint::calculate_dew_point(temperature_dp.value, humidity_dp.value);
 
@@ -27,24 +54,6 @@ impl DerivedStateProvider<DewPoint, DegreeCelsius> for DewPointStateProvider {
 }
 
 impl DewPoint {
-    fn temperature(&self) -> Temperature {
-        match self {
-            DewPoint::LivingRoom => Temperature::LivingRoom,
-            DewPoint::BathroomShower => Temperature::Bathroom,
-            DewPoint::RoomOfRequirement => Temperature::RoomOfRequirements,
-            DewPoint::Outside => Temperature::Outside,
-        }
-    }
-
-    fn relative_humidity(&self) -> RelativeHumidity {
-        match self {
-            DewPoint::LivingRoom => RelativeHumidity::LivingRoom,
-            DewPoint::BathroomShower => RelativeHumidity::Bathroom,
-            DewPoint::RoomOfRequirement => RelativeHumidity::RoomOfRequirements,
-            DewPoint::Outside => RelativeHumidity::Outside,
-        }
-    }
-
     pub fn calculate_dew_point(temperature: DegreeCelsius, relative_humidity: Percent) -> DegreeCelsius {
         let t: f64 = temperature.into();
         let r: f64 = relative_humidity.into();

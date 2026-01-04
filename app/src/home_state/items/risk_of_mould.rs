@@ -2,9 +2,9 @@ use crate::core::math::DataFrameStatsExt;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::interpolate::LinearInterpolator;
 use crate::core::unit::{DegreeCelsius, Percent};
+use crate::home_state::RelativeHumidity;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
-use crate::home_state::RelativeHumidity;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
@@ -50,7 +50,7 @@ impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
 impl RiskOfMouldStateProvider {
     fn get_reference_dewpoint(id: RiskOfMould, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         let ref_dewpoints = match id {
-            RiskOfMould::Bathroom => vec![DewPoint::LivingRoom, DewPoint::RoomOfRequirement],
+            RiskOfMould::Bathroom => vec![DewPoint::LivingRoom, DewPoint::RoomOfRequirements],
         };
 
         let mut ref_sum: f64 = 0.0;

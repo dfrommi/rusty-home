@@ -2,14 +2,14 @@ mod config;
 
 use crate::{
     command::{Command, CommandTarget, adapter::CommandExecutor},
-    core::unit::{DegreeCelsius, Percent},
+    core::unit::Percent,
 };
 use infrastructure::MqttSender;
 use serde_json::json;
 
 #[derive(Debug, Clone)]
 pub enum Z2mCommandTarget {
-    Thermostat(&'static str),
+    SonoffThermostat(&'static str),
 }
 
 pub struct Z2mCommandExecutor {
@@ -47,9 +47,10 @@ impl CommandExecutor for Z2mCommandExecutor {
         }
 
         match (command, z2m_target.unwrap()) {
-            (Command::SetThermostatValveOpeningPosition { value, .. }, Z2mCommandTarget::Thermostat(device_id)) => {
-                self.set_valve_opening_position(device_id, *value).await
-            }
+            (
+                Command::SetThermostatValveOpeningPosition { value, .. },
+                Z2mCommandTarget::SonoffThermostat(device_id),
+            ) => self.set_valve_opening_position_sonoff(device_id, *value).await,
             (_, z2m_target) => {
                 anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
             }
@@ -58,7 +59,7 @@ impl CommandExecutor for Z2mCommandExecutor {
 }
 
 impl Z2mCommandExecutor {
-    pub async fn set_valve_opening_position(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
+    pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
         let (system_mode, setpoint) = if value.0 > 0.0 { ("heat", 35.0) } else { ("off", 4.0) };
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
         let closed_percentage = 100 - opened_percentage;

@@ -16,7 +16,7 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
-    Thermostat(Thermostat, HeatingDemand),
+    SonoffThermostat(Thermostat, HeatingDemand),
 }
 
 pub struct Z2mIncomingDataSource {
@@ -79,7 +79,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     DataPoint::new(
-                        DeviceStateValue::RelativeHumidity(h.clone(), Percent(payload.humidity)),
+                        DeviceStateValue::RelativeHumidity(*h, Percent(payload.humidity)),
                         payload.last_seen,
                     )
                     .into(),
@@ -88,18 +88,18 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             }
 
             //Sonoff thermostats
-            Z2mChannel::Thermostat(thermostat, demand) => {
+            Z2mChannel::SonoffThermostat(thermostat, demand) => {
                 let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
 
                 vec![
                     DataPoint::new(
-                        DeviceStateValue::HeatingDemand(demand.clone(), Percent(payload.valve_opening_degree)),
+                        DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
                         DeviceStateValue::Temperature(
-                            Temperature::ThermostatOnDevice(thermostat.clone()),
+                            Temperature::ThermostatOnDevice(*thermostat),
                             DegreeCelsius(payload.local_temperature),
                         ),
                         payload.last_seen,
@@ -112,8 +112,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             Z2mChannel::ContactSensor(opened) => {
                 let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
                 vec![
-                    DataPoint::new(DeviceStateValue::Opened(opened.clone(), !payload.contact), payload.last_seen)
-                        .into(),
+                    DataPoint::new(DeviceStateValue::Opened(*opened, !payload.contact), payload.last_seen).into(),
                     availability(device_id, payload.last_seen),
                 ]
             }
@@ -122,13 +121,13 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
                 vec![
                     DataPoint::new(
-                        DeviceStateValue::CurrentPowerUsage(power.clone(), Watt(payload.current_power_w)),
+                        DeviceStateValue::CurrentPowerUsage(*power, Watt(payload.current_power_w)),
                         payload.last_seen,
                     )
                     .into(),
                     DataPoint::new(
                         DeviceStateValue::TotalEnergyConsumption(
-                            energy.clone(),
+                            *energy,
                             KiloWattHours(payload.total_energy_kwh) + *energy_offset,
                         ),
                         payload.last_seen,

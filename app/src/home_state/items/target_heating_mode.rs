@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{
     core::{
-        time::{DateTime, Duration},
+        time::DateTime,
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
@@ -62,7 +62,6 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
         let occupancy_item = match id {
             TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
             TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
-            TargetHeatingMode::Bedroom => Some(Occupancy::BedroomBed),
             _ => None,
         };
 
@@ -70,14 +69,38 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             .and_then(|item| ctx.all_since(item, t!(1 hours ago)))
             .unwrap_or(DataFrame::empty());
 
-        Some(calculate_heating_mode(
+        let result = calculate_heating_mode(
             &id,
             !ctx.get(Presence::AtHomeDennis)? & !ctx.get(Presence::AtHomeSabine)?,
             ctx.get(id.window())?,
-            ctx.get(Resident::AnyoneSleeping)?,
             occupancy_1h,
             self.get_user_override(id, ctx),
-        ))
+        );
+
+        //derive sleep mode from other rooms for kitchen and bathroom
+        if result == HeatingMode::EnergySaving
+            && (id == TargetHeatingMode::Kitchen || id == TargetHeatingMode::Bathroom)
+        {
+            let bedroom_sleep = ctx
+                .get(TargetHeatingMode::Bedroom)
+                .map(|mode| mode.value == HeatingMode::Sleep)
+                .unwrap_or(false);
+            let livingroom_sleep = ctx
+                .get(TargetHeatingMode::LivingRoom)
+                .map(|mode| mode.value == HeatingMode::Sleep)
+                .unwrap_or(false);
+            let room_of_requirements_sleep = ctx
+                .get(TargetHeatingMode::RoomOfRequirements)
+                .map(|mode| mode.value == HeatingMode::Sleep)
+                .unwrap_or(false);
+
+            if bedroom_sleep && livingroom_sleep && room_of_requirements_sleep {
+                tracing::trace!("Setting heating mode to Sleep as all other rooms are in Sleep mode");
+                return Some(HeatingMode::Sleep);
+            }
+        }
+
+        Some(result)
     }
 }
 
@@ -125,17 +148,12 @@ impl TargetHeatingMode {
             TargetHeatingMode::Kitchen => OpenedArea::KitchenWindow,
         }
     }
-
-    pub fn post_ventilation_duration() -> Duration {
-        t!(30 minutes)
-    }
 }
 
 fn calculate_heating_mode(
     id: &TargetHeatingMode,
     away: DataPoint<bool>,
     window_open: DataPoint<bool>,
-    sleeping: DataPoint<bool>,
     occupancy_1h: DataFrame<Probability>,
     user_override: Option<UserHeatingOverride>,
 ) -> HeatingMode {
@@ -171,16 +189,9 @@ fn calculate_heating_mode(
     //mode when setpoint is reached, but make sure it won't toggle on/off.
     //Maybe use a hysteresis for that and don't enter mode unless room is below
     //default-temperature of thermostat
-    if !window_open.value && window_open.timestamp.elapsed() < TargetHeatingMode::post_ventilation_duration() {
+    if !window_open.value && window_open.timestamp.elapsed() < t!(30 minutes) {
         tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
         return HeatingMode::PostVentilation;
-    }
-
-    //Use negative occupancy in living room to detect sleep-mode, but only after is was
-    //occupied for a while
-    if sleeping.value {
-        tracing::trace!("Heating in sleep-mode someone is still sleeping");
-        return HeatingMode::Sleep;
     }
 
     //sleeping preserved until ventilation in that room
@@ -224,7 +235,8 @@ fn calculate_heating_mode(
     //some zones
     //TODO "last ventilation of the day" concept for RoR
     if (id == &TargetHeatingMode::Bedroom && t!(22:00 - 5:00).is_now())
-        || (id == &TargetHeatingMode::RoomOfRequirements && t!(21:00 - 5:00).is_now())
+        || (id == &TargetHeatingMode::LivingRoom && t!(22:00 - 5:00).is_now())
+        || (id == &TargetHeatingMode::RoomOfRequirements && t!(20:00 - 5:00).is_now())
     {
         tracing::trace!("Heating in sleep-mode in preparation of going to bed");
         return HeatingMode::Sleep;

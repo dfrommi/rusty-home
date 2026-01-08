@@ -162,7 +162,14 @@ fn calculate_pid(params: DataFrame<PidConfig>, errors: DataFrame<DegreeCelsius>)
             .interpolate(section_mid_time, prev, next)
             .unwrap_or(prev.value);
 
-        let ki = params.prev_or_at(section_mid_time).map(|p| p.value.ki).unwrap_or(0.0);
+        //Skip if either decides to not integrate
+        let ki_prev = params.prev_or_at(prev.timestamp).map(|p| p.value.ki).unwrap_or(0.0);
+        let ki_next = params.prev_or_at(next.timestamp).map(|p| p.value.ki).unwrap_or(0.0);
+        let ki = if ki_prev == 0.0 || ki_next == 0.0 {
+            0.0
+        } else {
+            (ki_prev + ki_next) / 2.0
+        };
 
         integral_h += ki * value.0 * section_length;
     }

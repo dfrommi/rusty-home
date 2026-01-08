@@ -17,4 +17,5 @@ pub enum Temperature {
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,
+    Radiator(Thermostat),
 }

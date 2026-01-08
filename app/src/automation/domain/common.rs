@@ -113,6 +113,10 @@ impl Thermostat {
         }
     }
 
+    pub fn surface_temperature(&self) -> crate::device_state::Temperature {
+        crate::device_state::Temperature::Radiator(*self)
+    }
+
     pub fn heating_demand(&self) -> HeatingDemand {
         match self {
             Thermostat::LivingRoomBig => HeatingDemand::LivingRoomBig,

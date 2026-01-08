@@ -2,8 +2,7 @@ use r#macro::Id;
 
 use super::{RuleEvaluationContext, SimpleRule};
 use crate::command::{Command, Fan};
-use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed};
-use crate::home_state::Temperature;
+use crate::core::unit::{FanAirflow, FanSpeed};
 use crate::t;
 
 use super::OpenedArea;
@@ -21,23 +20,18 @@ impl SimpleRule for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
             device: self.0.clone(),
-            speed: FanAirflow::Forward(FanSpeed::Low),
+            speed: FanAirflow::Reverse(FanSpeed::Medium),
         }
     }
 
     fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
-        let (window, temp_sensor) = match self.0 {
-            Fan::LivingRoomCeilingFan => (OpenedArea::LivingRoomWindowOrDoor, Temperature::LivingRoom),
-            Fan::BedroomCeilingFan => (OpenedArea::BedroomWindow, Temperature::Bedroom),
+        let window = match self.0 {
+            Fan::LivingRoomCeilingFan => OpenedArea::LivingRoomWindowOrDoor,
+            Fan::BedroomCeilingFan => OpenedArea::BedroomWindow,
         };
 
         let opened_dp = ctx.current_dp(window)?;
         let elapsed = opened_dp.timestamp.elapsed();
-
-        if ctx.current(temp_sensor)? < DegreeCelsius(24.0) {
-            tracing::trace!("Temperature too low, not starting fan");
-            return Ok(false);
-        }
 
         if !opened_dp.value {
             return Ok(false);

@@ -86,7 +86,7 @@ fn setpoint_for_mode(id: &SetPoint, mode: &HeatingMode) -> DegreeCelsius {
         (SetPoint::RoomOfRequirements, HeatingMode::Away) => 16.0,
         (SetPoint::Bedroom, HeatingMode::EnergySaving) => 17.5,
         (SetPoint::Bedroom, HeatingMode::PostVentilation) => 17.0,
-        (SetPoint::Bedroom, HeatingMode::Sleep) => 18.0,
+        (SetPoint::Bedroom, HeatingMode::Sleep) => 18.5,
         (SetPoint::Bedroom, HeatingMode::Comfort) => 19.0,
         (SetPoint::Bedroom, HeatingMode::Away) => 16.5,
         (SetPoint::Kitchen, HeatingMode::EnergySaving) => 17.0,

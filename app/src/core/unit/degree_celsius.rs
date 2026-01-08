@@ -78,6 +78,22 @@ impl std::ops::Mul<DegreeCelsius> for f64 {
     }
 }
 
+impl std::ops::Div<f64> for DegreeCelsius {
+    type Output = DegreeCelsius;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        DegreeCelsius(self.0 / rhs)
+    }
+}
+
+impl std::ops::Div for DegreeCelsius {
+    type Output = f64;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self.0 / rhs.0
+    }
+}
+
 impl std::ops::Neg for DegreeCelsius {
     type Output = DegreeCelsius;
 

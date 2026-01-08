@@ -38,6 +38,19 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::SetPoint(_, v) => default_with(f64::from(&v)),
             HomeStateValue::Temperature(_, v) => default_with(f64::from(&v)),
             HomeStateValue::TargetHeatingDemand(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::TargetHeatingAdjustment(_, v) => {
+                use crate::home_state::AdjustmentDirection::*;
+                let value = match v {
+                    MustIncrease => 2.0,
+                    ShouldIncrease => 1.0,
+                    MustDecrease => -2.0,
+                    ShouldDecrease => -1.0,
+                    MustOff => -4.0,
+                    Hold => 0.0,
+                };
+
+                default_with(value)
+            }
             HomeStateValue::PidOutput(_, v) => {
                 vec![
                     Metric {

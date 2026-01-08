@@ -1,5 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
+use crate::automation::Thermostat;
 use crate::core::unit::DegreeCelsius;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
@@ -12,6 +13,7 @@ pub enum Temperature {
     Bedroom,
     Kitchen,
     Bathroom,
+    Radiator(Thermostat),
 }
 
 pub struct TemperatureStateProvider;
@@ -37,6 +39,7 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
                     (None, None) => return None,
                 }
             }
+            Temperature::Radiator(thermostat) => ctx.device_state(DeviceTemperature::Radiator(thermostat))?.value,
         }
         .into()
     }

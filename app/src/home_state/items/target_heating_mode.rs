@@ -195,7 +195,7 @@ fn calculate_heating_mode(
     }
 
     //sleeping preserved until ventilation in that room
-    if let Some(morning_timerange) = t!(5:30 - 12:30).active() {
+    if let Some(morning_timerange) = t!(5:20 - 12:30).active() {
         //some tampering with window, but not in morning hours
         if !morning_timerange.contains(&window_open.timestamp) {
             tracing::trace!("Heating in sleep-mode as not yet ventilated");
@@ -234,9 +234,9 @@ fn calculate_heating_mode(
     //Starting sleep mode if no higher-prio, like comfort, applies. Overrides in-bed detection in
     //some zones
     //TODO "last ventilation of the day" concept for RoR
-    if (id == &TargetHeatingMode::Bedroom && t!(22:00 - 5:00).is_now())
-        || (id == &TargetHeatingMode::LivingRoom && t!(22:00 - 5:00).is_now())
-        || (id == &TargetHeatingMode::RoomOfRequirements && t!(20:00 - 5:00).is_now())
+    if (id == &TargetHeatingMode::Bedroom && t!(22:00 - 5:30).is_now())
+        || (id == &TargetHeatingMode::LivingRoom && t!(22:00 - 5:30).is_now())
+        || (id == &TargetHeatingMode::RoomOfRequirements && t!(20:00 - 5:30).is_now())
     {
         tracing::trace!("Heating in sleep-mode in preparation of going to bed");
         return HeatingMode::Sleep;

@@ -4,6 +4,7 @@ use crate::{
     core::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::interpolate::Interpolator,
+        unit::RateOfChange,
     },
     t,
 };
@@ -160,6 +161,40 @@ impl<T: Clone> DataFrame<T> {
         Some((second_last, last))
     }
 
+    pub fn last_change(&self, min_duration: Duration) -> Option<RateOfChange<T>>
+    where
+        T: std::ops::Sub<Output = T> + std::ops::Mul<f64, Output = T> + Clone,
+    {
+        self.change_at(t!(now), min_duration)
+    }
+
+    pub fn change_at(&self, at: DateTime, min_duration: Duration) -> Option<RateOfChange<T>>
+    where
+        T: std::ops::Sub<Output = T> + std::ops::Mul<f64, Output = T> + Clone,
+    {
+        let mut iter = self.data.range(..=at).rev();
+        let last = iter.next()?.1;
+
+        for (_, dp) in iter {
+            let duration = last.timestamp.elapsed_since(dp.timestamp);
+            if duration >= min_duration {
+                return Some(RateOfChange::from_dps(dp, last));
+            }
+        }
+
+        None
+    }
+
+    pub fn at(&self, at: DateTime, interpolator: impl Interpolator<T>) -> Option<DataPoint<T>> {
+        if let Some(dp) = self.data.get(&at) {
+            Some(dp.clone())
+        } else {
+            interpolator
+                .interpolate_df(at, self)
+                .map(|value| DataPoint::new(value, at))
+        }
+    }
+
     pub fn prev_or_at(&self, at: DateTime) -> Option<&DataPoint<T>> {
         self.data.range(..=at).next_back().map(|(_, v)| v)
     }
@@ -196,6 +231,14 @@ impl<T: Clone> DataFrame<T> {
         }
 
         result
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DataPoint<T>> {
+        self.data.values()
+    }
+
+    pub fn iter_dt(&self) -> impl Iterator<Item = DateTime> + '_ {
+        self.data.keys().cloned()
     }
 }
 

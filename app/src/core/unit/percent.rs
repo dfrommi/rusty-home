@@ -7,6 +7,8 @@ use std::{
 use derive_more::derive::AsRef;
 use serde::{Deserialize, Serialize};
 
+use crate::core::{time::Duration, unit::RateOfChange};
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, AsRef, Serialize, Deserialize)]
 pub struct Percent(pub f64);
 
@@ -81,5 +83,13 @@ impl Mul<Percent> for f64 {
 
     fn mul(self, rhs: Percent) -> Self::Output {
         Percent(self * rhs.0)
+    }
+}
+
+impl std::ops::Div<Duration> for Percent {
+    type Output = RateOfChange<Percent>;
+
+    fn div(self, rhs: Duration) -> Self::Output {
+        RateOfChange::new(self, rhs)
     }
 }

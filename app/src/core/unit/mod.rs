@@ -1,5 +1,6 @@
 mod degree_celsius;
 mod density;
+mod derivative;
 mod fan;
 mod heating;
 mod kwh;
@@ -11,6 +12,7 @@ mod watt;
 
 pub use degree_celsius::DegreeCelsius;
 pub use density::GramPerCubicMeter;
+pub use derivative::RateOfChange;
 pub use fan::*;
 pub use heating::HeatingUnit;
 pub use kwh::KiloWattHours;

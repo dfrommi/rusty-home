@@ -3,6 +3,8 @@ use std::fmt::Display;
 use derive_more::derive::AsRef;
 use serde::{Deserialize, Serialize};
 
+use crate::core::{time::Duration, unit::RateOfChange};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, AsRef, Serialize, Deserialize)]
 pub struct DegreeCelsius(pub f64);
 
@@ -99,5 +101,13 @@ impl std::ops::Neg for DegreeCelsius {
 
     fn neg(self) -> Self::Output {
         DegreeCelsius(-self.0)
+    }
+}
+
+impl std::ops::Div<Duration> for DegreeCelsius {
+    type Output = RateOfChange<DegreeCelsius>;
+
+    fn div(self, rhs: Duration) -> Self::Output {
+        RateOfChange::new(self, rhs)
     }
 }

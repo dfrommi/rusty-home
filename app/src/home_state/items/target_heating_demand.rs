@@ -5,7 +5,7 @@ use crate::{
         unit::Percent,
     },
     home_state::{
-        AdjustmentDirection, HeatingMode, PidOutput, TargetHeatingAdjustment, TargetHeatingMode,
+        AdjustmentDirection, HeatingDemand, HeatingMode, PidOutput, TargetHeatingAdjustment, TargetHeatingMode,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -33,11 +33,12 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             TargetHeatingAdjustment::HeatingDemand(thermostat),
             current_demand.timestamp.max(t!(30 minutes ago)),
         )?;
+        let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(thermostat))?.value;
 
         match id {
             TargetHeatingDemand::Thermostat(_) => demand_from_pid(&thermostat, mode, ctx),
             TargetHeatingDemand::ByRadiatorTemperature(_) => {
-                combined_demand(&thermostat, mode, adjustments, current_demand)
+                combined_demand(mode, adjustments, current_demand, barely_warm_output)
             }
         }
     }
@@ -51,22 +52,15 @@ struct ControlLimits {
 }
 
 fn combined_demand(
-    thermostat: &Thermostat,
     mode: DataPoint<HeatingMode>,
     adjustments: DataFrame<AdjustmentDirection>,
     current_demand: DataPoint<Percent>,
+    barely_warm_output: Percent,
 ) -> Option<Percent> {
     let adjustment = adjustments.last()?.value.clone();
 
     let limits = ControlLimits {
-        barely_warm: Percent(match thermostat {
-            Thermostat::LivingRoomBig => 16.0,
-            Thermostat::LivingRoomSmall => 18.0,
-            Thermostat::Bedroom => 16.0,
-            Thermostat::Kitchen => 18.0,
-            Thermostat::RoomOfRequirements => 14.0,
-            _ => 16.0,
-        }),
+        barely_warm: barely_warm_output,
         step: Percent(2.0),
         min_output: Percent(8.0),
         max_output: match &mode.value {
@@ -126,6 +120,7 @@ fn combined_demand(
 }
 
 //Gap: current_demand is not necessarily updated when adjustment was applied (keeps same value)
+//Maybe that belongs to the automation?
 fn adjustment_needed(
     adjustments: &DataFrame<AdjustmentDirection>,
     current_demand: &DataPoint<Percent>,
@@ -151,13 +146,13 @@ fn adjustment_needed(
         new_adjustment_after_last_change = second.timestamp > current_demand.timestamp;
 
         if matches!(first.value, MustIncrease | ShouldIncrease | Hold)
-            && matches!(second.value, MustDecrease | ShouldDecrease | Hold)
+            && matches!(second.value, MustIncrease | ShouldIncrease | Hold)
         {
             new_adjustment_in_same_direction = true;
         }
 
         if matches!(first.value, MustDecrease | ShouldDecrease | Hold)
-            && matches!(second.value, MustIncrease | ShouldIncrease | Hold)
+            && matches!(second.value, MustDecrease | ShouldDecrease | Hold)
         {
             new_adjustment_in_same_direction = true;
         }

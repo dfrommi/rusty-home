@@ -185,7 +185,7 @@ impl HeatingAdjustmentStrategy {
         Self {
             min: range.0,
             max: range.1,
-            band: (range.1 - range.0) * 0.25,
+            band: (range.1 - range.0) * 1.0 / 3.0,
             min_heatup_change_per_hour,
             max_overshoot,
         }

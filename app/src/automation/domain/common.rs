@@ -117,6 +117,10 @@ impl Thermostat {
         Temperature::Radiator(*self)
     }
 
+    pub fn room_temperature(&self) -> Temperature {
+        HeatingZone::for_thermostat(self).inside_temperature()
+    }
+
     pub fn heating_demand(&self) -> HeatingDemand {
         match self {
             Thermostat::LivingRoomBig => HeatingDemand::LivingRoomBig,

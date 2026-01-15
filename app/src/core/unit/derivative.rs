@@ -3,6 +3,7 @@ use crate::{
     t,
 };
 
+#[derive(Debug, Clone)]
 pub struct RateOfChange<T> {
     delta: T,
     duration: Duration,

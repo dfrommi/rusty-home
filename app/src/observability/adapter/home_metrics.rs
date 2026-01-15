@@ -2,6 +2,7 @@ use crate::{
     core::timeseries::DataPoint,
     home_state::{HeatingMode, HomeStateId, HomeStateValue},
     observability::domain::{Metric, MetricId, MetricLabel},
+    t,
 };
 
 pub struct HomeMetricsAdapter;
@@ -37,6 +38,19 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::RelativeHumidity(_, v) => default_with(f64::from(&v)),
             HomeStateValue::SetPoint(_, v) => default_with(f64::from(&v)),
             HomeStateValue::Temperature(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::TemperatureChange(_, v) => [
+                ("1m", t!(1 minutes)),
+                ("10m", t!(10 minutes)),
+                ("15m", t!(15 minutes)),
+                ("1h", t!(1 hours)),
+            ]
+            .into_iter()
+            .map(|(suffix, duration)| Metric {
+                id: metric_id(&home_state_id, suffix, vec![]),
+                timestamp,
+                value: f64::from(v.per(duration)),
+            })
+            .collect(),
             HomeStateValue::TargetHeatingDemand(_, v) => default_with(f64::from(&v)),
             HomeStateValue::TargetHeatingAdjustment(_, v) => {
                 use crate::home_state::AdjustmentDirection::*;

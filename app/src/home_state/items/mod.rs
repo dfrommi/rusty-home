@@ -19,6 +19,7 @@ mod target_heating_adjustment;
 mod target_heating_demand;
 mod target_heating_mode;
 mod temperature;
+mod temperature_change;
 
 use std::fmt::Debug;
 
@@ -43,6 +44,7 @@ pub use target_heating_adjustment::{AdjustmentDirection, TargetHeatingAdjustment
 pub use target_heating_demand::TargetHeatingDemand;
 pub use target_heating_mode::*;
 pub use temperature::Temperature;
+pub use temperature_change::TemperatureChange;
 
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
@@ -74,6 +76,7 @@ pub enum HomeStateValue {
     RelativeHumidity(RelativeHumidity, Percent),
     SetPoint(SetPoint, DegreeCelsius),
     Temperature(Temperature, DegreeCelsius),
+    TemperatureChange(TemperatureChange, RateOfChange<DegreeCelsius>),
 }
 
 impl HomeStateItem for HomeStateId {
@@ -146,6 +149,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Temperature(id) => temperature::TemperatureStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Temperature(id, value)),
+            HomeStateId::TemperatureChange(id) => temperature_change::TemperatureChangeStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::TemperatureChange(id, value)),
             HomeStateId::TargetHeatingDemand(id) => target_heating_demand::HeatingDemandStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::TargetHeatingDemand(id, value)),

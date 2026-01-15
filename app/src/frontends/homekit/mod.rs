@@ -14,7 +14,7 @@ use self::{
 };
 use crate::{
     Infrastructure,
-    core::unit::{DegreeCelsius, FanAirflow},
+    core::unit::{DegreeCelsius, FanAirflow, Percent},
     home_state::HomeStateEvent,
     trigger::TriggerClient,
 };
@@ -76,6 +76,12 @@ pub enum HomekitCommand {
     KitchenHeatingState(HomekitHeatingState),
     RoomOfRequirementsHeatingState(HomekitHeatingState),
     BathroomHeatingState(HomekitHeatingState),
+    LivingRoomBigHeatingDemand(Percent),
+    LivingRoomSmallHeatingDemand(Percent),
+    BedroomHeatingDemand(Percent),
+    KitchenHeatingDemand(Percent),
+    RoomOfRequirementsHeatingDemand(Percent),
+    BathroomHeatingDemand(Percent),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
@@ -92,6 +98,12 @@ pub enum HomekitCommandTarget {
     KitchenHeatingState,
     RoomOfRequirementsHeatingState,
     BathroomHeatingState,
+    LivingRoomBigHeatingDemand,
+    LivingRoomSmallHeatingDemand,
+    BedroomHeatingDemand,
+    KitchenHeatingDemand,
+    RoomOfRequirementsHeatingDemand,
+    BathroomHeatingDemand,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

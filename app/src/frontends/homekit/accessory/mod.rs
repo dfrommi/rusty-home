@@ -1,12 +1,13 @@
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
 use crate::{
-    automation::HeatingZone,
+    automation::{HeatingZone, Thermostat as HeatingThermostat},
     command::PowerToggle,
     frontends::homekit::{
         HomekitCommand, HomekitEvent, HomekitTargetConfig,
         accessory::{
             climate_sensor::ClimateSensor, energy_saving_switch::EnergySavingSwitch, fan::Fan,
-            power_switch::PowerSwitch, thermostat::Thermostat, window_sensor::WindowSensor,
+            heating_demand::HeatingDemandAccessory, power_switch::PowerSwitch, thermostat::Thermostat,
+            window_sensor::WindowSensor,
         },
     },
 };
@@ -14,6 +15,7 @@ use crate::{
 mod climate_sensor;
 mod energy_saving_switch;
 mod fan;
+mod heating_demand;
 mod power_switch;
 mod thermostat;
 mod window_sensor;
@@ -22,6 +24,7 @@ enum HomekitAccessory {
     ClimateSensor(ClimateSensor),
     EnergySavingSwitch(EnergySavingSwitch),
     Fan(Fan),
+    HeatingDemand(HeatingDemandAccessory),
     PowerSwitch(PowerSwitch),
     Thermostat(Thermostat),
     WindowSensor(WindowSensor),
@@ -43,6 +46,7 @@ impl HomekitRegistry {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.get_all_targets(),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.get_all_targets(),
                 HomekitAccessory::Fan(fan) => fan.get_all_targets(),
+                HomekitAccessory::HeatingDemand(demand) => demand.get_all_targets(),
                 HomekitAccessory::Thermostat(sensor) => sensor.get_all_targets(),
                 HomekitAccessory::WindowSensor(sensor) => sensor.get_all_targets(),
                 HomekitAccessory::PowerSwitch(power_switch) => power_switch.get_all_targets(),
@@ -57,6 +61,7 @@ impl HomekitRegistry {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.export_state(state),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.export_state(state),
                 HomekitAccessory::Fan(fan) => fan.export_state(state),
+                HomekitAccessory::HeatingDemand(demand) => demand.export_state(state),
                 HomekitAccessory::Thermostat(sensor) => sensor.export_state(state),
                 HomekitAccessory::WindowSensor(sensor) => sensor.export_state(state),
                 HomekitAccessory::PowerSwitch(power_switch) => power_switch.export_state(state),
@@ -70,6 +75,7 @@ impl HomekitRegistry {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.process_trigger(trigger),
                 HomekitAccessory::Fan(fan) => fan.process_trigger(trigger),
+                HomekitAccessory::HeatingDemand(demand) => demand.process_trigger(trigger),
                 HomekitAccessory::Thermostat(sensor) => sensor.process_trigger(trigger),
                 HomekitAccessory::WindowSensor(sensor) => sensor.process_trigger(trigger),
                 HomekitAccessory::PowerSwitch(power_switch) => power_switch.process_trigger(trigger),
@@ -132,6 +138,24 @@ fn config() -> Vec<HomekitAccessory> {
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Arbeitszimmer", HeatingZone::RoomOfRequirements)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
+            "Radiator Wohnzimmer groß",
+            HeatingThermostat::LivingRoomBig,
+        )),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
+            "Radiator Wohnzimmer klein",
+            HeatingThermostat::LivingRoomSmall,
+        )),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
+            "Radiator Schlafzimmer",
+            HeatingThermostat::Bedroom,
+        )),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
+            "Radiator Arbeitszimmer",
+            HeatingThermostat::RoomOfRequirements,
+        )),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Küche", HeatingThermostat::Kitchen)),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Bad", HeatingThermostat::Bathroom)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
         HomekitAccessory::EnergySavingSwitch(EnergySavingSwitch::new(

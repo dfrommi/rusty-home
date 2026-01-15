@@ -15,6 +15,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
         vec![
+            UserTriggerAction::new(HomekitCommandTarget::LivingRoomBigHeatingDemand.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::LivingRoomSmallHeatingDemand.into()).into(),
             FollowTargetHeatingDemand::new(HeatingZone::LivingRoom).into(),
         ]
     ),
@@ -24,6 +26,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             vec![
                 UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
                 AutoTurnOff::IrHeater.into(),
+                UserTriggerAction::new(HomekitCommandTarget::BedroomHeatingDemand.into()).into(),
                 FollowTargetHeatingDemand::new(HeatingZone::Bedroom).into(),
             ] 
         }
@@ -31,18 +34,21 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::SmarterHeating(HeatingZone::Kitchen),
         vec![
+            UserTriggerAction::new(HomekitCommandTarget::KitchenHeatingDemand.into()).into(),
             FollowTargetHeatingDemand::new(HeatingZone::Kitchen).into(),
         ]
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
         vec![
+            UserTriggerAction::new(HomekitCommandTarget::RoomOfRequirementsHeatingDemand.into()).into(),
             FollowTargetHeatingDemand::new(HeatingZone::RoomOfRequirements).into(),
         ]
     ),
     (
         HomeGoal::SmarterHeating(HeatingZone::Bathroom),
         vec![
+            UserTriggerAction::new(HomekitCommandTarget::BathroomHeatingDemand.into()).into(),
             FollowTargetHeatingDemand::new(HeatingZone::Bathroom).into(),
         ]
     ),

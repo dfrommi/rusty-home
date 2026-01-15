@@ -57,6 +57,24 @@ impl UserTrigger {
                 HomekitCommand::BathroomHeatingState(_) => {
                     UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState)
                 }
+                HomekitCommand::LivingRoomBigHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomBigHeatingDemand)
+                }
+                HomekitCommand::LivingRoomSmallHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomSmallHeatingDemand)
+                }
+                HomekitCommand::BedroomHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingDemand)
+                }
+                HomekitCommand::KitchenHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingDemand)
+                }
+                HomekitCommand::RoomOfRequirementsHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingDemand)
+                }
+                HomekitCommand::BathroomHeatingDemand(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingDemand)
+                }
             },
         }
     }

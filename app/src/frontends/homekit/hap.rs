@@ -6,6 +6,7 @@ pub enum HomekitService {
     ContactSensor,
     Fanv2,
     HumiditySensor,
+    Lightbulb,
     TemperatureSensor,
     Switch,
     Thermostat,
@@ -15,6 +16,7 @@ pub enum HomekitService {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HomekitCharacteristic {
     Active,
+    Brightness,
     ContactSensorState,
     CurrentHeatingCoolingState,
     CurrentRelativeHumidity,

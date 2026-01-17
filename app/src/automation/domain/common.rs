@@ -22,7 +22,7 @@ pub enum Room {
     Bathroom,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HeatingZone {
     #[display("LivingRoom")]

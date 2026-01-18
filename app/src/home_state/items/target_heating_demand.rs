@@ -2,10 +2,11 @@ use crate::{
     automation::Thermostat,
     core::{
         timeseries::{DataFrame, DataPoint},
-        unit::Percent,
+        unit::{DegreeCelsius, Percent, RateOfChange},
     },
     home_state::{
         AdjustmentDirection, HeatingDemand, HeatingMode, PidOutput, TargetHeatingAdjustment, TargetHeatingMode,
+        TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -34,11 +35,12 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             current_demand.timestamp.max(t!(30 minutes ago)),
         )?;
         let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(thermostat))?.value;
+        let radiator_roc = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
 
         match id {
             TargetHeatingDemand::Thermostat(_) => demand_from_pid(&thermostat, mode, ctx),
             TargetHeatingDemand::ByRadiatorTemperature(_) => {
-                combined_demand(mode, adjustments, current_demand, barely_warm_output)
+                combined_demand(mode, adjustments, current_demand, barely_warm_output, radiator_roc)
             }
         }
     }
@@ -56,6 +58,7 @@ fn combined_demand(
     adjustments: DataFrame<AdjustmentDirection>,
     current_demand: DataPoint<Percent>,
     barely_warm_output: Percent,
+    radiator_roc: RateOfChange<DegreeCelsius>,
 ) -> Option<Percent> {
     let adjustment = adjustments.last()?.value.clone();
 
@@ -75,6 +78,12 @@ fn combined_demand(
     };
 
     if limits.max_output <= Percent(0.0) {
+        return Some(Percent(0.0));
+    }
+
+    //Heating present, but temperature on radiator still dropping -> not enough open to release heat
+    //Turn off if cooldown intended, but not if anyway in heatup phase already to not interrupt it
+    if heating_but_no_effect(&current_demand, &radiator_roc) && adjustment <= AdjustmentDirection::Hold {
         return Some(Percent(0.0));
     }
 
@@ -165,6 +174,10 @@ fn adjustment_needed(
     new_mode_after_last_change
         || min_adjustment_time_reached
         || (new_adjustment_after_last_change && !new_adjustment_in_same_direction)
+}
+
+fn heating_but_no_effect(current_demand: &DataPoint<Percent>, radiator_roc: &RateOfChange<DegreeCelsius>) -> bool {
+    current_demand.value > Percent(0.0) && radiator_roc.per_hour() < DegreeCelsius(-2.0)
 }
 
 fn demand_from_pid(

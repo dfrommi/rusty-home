@@ -1,11 +1,12 @@
 use r#macro::Id;
 
 use super::{RuleEvaluationContext, SimpleRule};
+use crate::automation::RoomWithWindow;
 use crate::command::{Command, Fan};
 use crate::core::unit::{FanAirflow, FanSpeed};
 use crate::t;
 
-use super::OpenedArea;
+use super::Opened;
 
 #[derive(Debug, Clone, Id)]
 pub struct SupportVentilationWithFan(Fan);
@@ -26,8 +27,8 @@ impl SimpleRule for SupportVentilationWithFan {
 
     fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
         let window = match self.0 {
-            Fan::LivingRoomCeilingFan => OpenedArea::LivingRoomWindowOrDoor,
-            Fan::BedroomCeilingFan => OpenedArea::BedroomWindow,
+            Fan::LivingRoomCeilingFan => Opened::Room(RoomWithWindow::LivingRoom),
+            Fan::BedroomCeilingFan => Opened::Room(RoomWithWindow::Bedroom),
         };
 
         let opened_dp = ctx.current_dp(window)?;

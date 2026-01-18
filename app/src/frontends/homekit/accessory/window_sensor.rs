@@ -2,16 +2,16 @@ use crate::{
     frontends::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
     },
-    home_state::{HomeStateValue, OpenedArea},
+    home_state::{HomeStateValue, Opened},
 };
 
 pub struct WindowSensor {
     name: &'static str,
-    opened_area: OpenedArea,
+    opened_area: Opened,
 }
 
 impl WindowSensor {
-    pub fn new(name: &'static str, opened_area: OpenedArea) -> Self {
+    pub fn new(name: &'static str, opened_area: Opened) -> Self {
         Self { name, opened_area }
     }
 
@@ -28,7 +28,7 @@ impl WindowSensor {
 
     pub fn export_state(&self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         match state {
-            HomeStateValue::OpenedArea(area, is_open) if area == &self.opened_area => {
+            HomeStateValue::Opened(area, is_open) if area == &self.opened_area => {
                 // HomeKit reports 0 when the window is closed (contact detected) and 1 when it is open.
                 let sensor_state = if *is_open { 1 } else { 0 };
                 vec![HomekitEvent {

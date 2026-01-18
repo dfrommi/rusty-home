@@ -1,4 +1,5 @@
-use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
+use crate::automation::RoomWithWindow;
+use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
 use crate::{
     automation::{HeatingZone, Radiator as HeatingRadiator, Room},
     command::PowerToggle,
@@ -125,13 +126,16 @@ fn config() -> Vec<HomekitAccessory> {
         )),
         HomekitAccessory::WindowSensor(WindowSensor::new(
             "Fenstersensor Wohnzimmer",
-            OpenedArea::LivingRoomWindowOrDoor,
+            Opened::Room(RoomWithWindow::LivingRoom),
         )),
-        HomekitAccessory::WindowSensor(WindowSensor::new("Fenstersensor Schlafzimmer", OpenedArea::BedroomWindow)),
-        HomekitAccessory::WindowSensor(WindowSensor::new("Fenstersensor Küche", OpenedArea::KitchenWindow)),
+        HomekitAccessory::WindowSensor(WindowSensor::new(
+            "Fenstersensor Schlafzimmer",
+            Opened::Room(RoomWithWindow::Bedroom),
+        )),
+        HomekitAccessory::WindowSensor(WindowSensor::new("Fenstersensor Küche", Opened::Room(RoomWithWindow::Kitchen))),
         HomekitAccessory::WindowSensor(WindowSensor::new(
             "Fenstersensor Arbeitszimmer",
-            OpenedArea::RoomOfRequirementsWindow,
+            Opened::Room(RoomWithWindow::RoomOfRequirements),
         )),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Wohnzimmer", HeatingZone::LivingRoom)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Schlafzimmer", HeatingZone::Bedroom)),
@@ -146,10 +150,7 @@ fn config() -> Vec<HomekitAccessory> {
             "Radiator Wohnzimmer klein",
             HeatingRadiator::LivingRoomSmall,
         )),
-        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
-            "Radiator Schlafzimmer",
-            HeatingRadiator::Bedroom,
-        )),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Schlafzimmer", HeatingRadiator::Bedroom)),
         HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
             "Radiator Arbeitszimmer",
             HeatingRadiator::RoomOfRequirements,

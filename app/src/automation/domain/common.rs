@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::home_state::{HeatingDemand, OpenedArea, SetPoint, Temperature};
+use crate::home_state::{HeatingDemand, Opened, SetPoint, Temperature};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
 #[allow(clippy::enum_variant_names)]
@@ -17,6 +17,20 @@ pub enum Room {
     RoomOfRequirements,
     #[display("Bathroom")]
     Bathroom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
+#[allow(clippy::enum_variant_names)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomWithWindow {
+    #[display("LivingRoom")]
+    LivingRoom,
+    #[display("Bedroom")]
+    Bedroom,
+    #[display("Kitchen")]
+    Kitchen,
+    #[display("RoomOfRequirements")]
+    RoomOfRequirements,
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, derive_more::Display, Id, EnumVariants, Serialize, Deserialize)]
@@ -68,15 +82,6 @@ impl HeatingZone {
 
     pub fn inside_temperature(&self) -> Temperature {
         Temperature::Room(self.room())
-    }
-
-    pub fn window(&self) -> OpenedArea {
-        match self {
-            HeatingZone::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
-            HeatingZone::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
-            HeatingZone::Bedroom | HeatingZone::Bathroom => OpenedArea::BedroomWindow,
-            HeatingZone::Kitchen => OpenedArea::KitchenWindow,
-        }
     }
 }
 

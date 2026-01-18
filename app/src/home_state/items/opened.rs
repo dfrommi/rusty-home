@@ -1,32 +1,30 @@
+use crate::automation::RoomWithWindow;
 use crate::core::timeseries::DataPoint;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
-pub enum OpenedArea {
-    LivingRoomWindowOrDoor,
-    BedroomWindow,
-    KitchenWindow,
-    RoomOfRequirementsWindow,
+pub enum Opened {
+    Room(RoomWithWindow),
 }
 
-pub struct OpenedAreaStateProvider;
+pub struct OpenedStateProvider;
 
-impl DerivedStateProvider<OpenedArea, bool> for OpenedAreaStateProvider {
-    fn calculate_current(&self, id: OpenedArea, ctx: &StateCalculationContext) -> Option<bool> {
+impl DerivedStateProvider<Opened, bool> for OpenedStateProvider {
+    fn calculate_current(&self, id: Opened, ctx: &StateCalculationContext) -> Option<bool> {
         use crate::device_state::Opened as DeviceOpened;
 
         let opened_items = match id {
-            OpenedArea::LivingRoomWindowOrDoor => vec![
+            Opened::Room(RoomWithWindow::LivingRoom) => vec![
                 DeviceOpened::LivingRoomWindowLeft,
                 DeviceOpened::LivingRoomWindowRight,
                 DeviceOpened::LivingRoomWindowSide,
                 DeviceOpened::LivingRoomBalconyDoor,
             ],
-            OpenedArea::BedroomWindow => vec![DeviceOpened::BedroomWindow],
-            OpenedArea::KitchenWindow => vec![DeviceOpened::KitchenWindow],
-            OpenedArea::RoomOfRequirementsWindow => vec![
+            Opened::Room(RoomWithWindow::Bedroom) => vec![DeviceOpened::BedroomWindow],
+            Opened::Room(RoomWithWindow::Kitchen) => vec![DeviceOpened::KitchenWindow],
+            Opened::Room(RoomWithWindow::RoomOfRequirements) => vec![
                 DeviceOpened::RoomOfRequirementsWindowLeft,
                 DeviceOpened::RoomOfRequirementsWindowRight,
                 DeviceOpened::RoomOfRequirementsWindowSide,

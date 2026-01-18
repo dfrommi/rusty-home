@@ -1,16 +1,14 @@
+use crate::automation::RoomWithWindow;
 use crate::core::unit::DegreeCelsius;
-use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::home_state::Temperature;
+use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use r#macro::{EnumVariants, Id};
 
-use super::OpenedArea;
+use super::Opened;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum ColdAirComingIn {
-    LivingRoom,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
+    Room(RoomWithWindow),
 }
 
 pub struct ColdAirComingInStateProvider;
@@ -25,10 +23,7 @@ impl DerivedStateProvider<ColdAirComingIn, bool> for ColdAirComingInStateProvide
         }
 
         let window_opened = match id {
-            ColdAirComingIn::LivingRoom => ctx.get(OpenedArea::LivingRoomWindowOrDoor)?,
-            ColdAirComingIn::Bedroom => ctx.get(OpenedArea::BedroomWindow)?,
-            ColdAirComingIn::Kitchen => ctx.get(OpenedArea::KitchenWindow)?,
-            ColdAirComingIn::RoomOfRequirements => ctx.get(OpenedArea::RoomOfRequirementsWindow)?,
+            ColdAirComingIn::Room(room) => ctx.get(Opened::Room(room))?,
         };
 
         let message = if window_opened.value {

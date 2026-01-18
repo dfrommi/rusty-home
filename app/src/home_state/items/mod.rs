@@ -31,7 +31,7 @@ pub use felt_temperature::FeltTemperature;
 pub use heating_demand::HeatingDemand;
 pub use is_running::IsRunning;
 pub use occupancy::Occupancy;
-pub use opened::OpenedArea;
+pub use opened::Opened;
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
@@ -58,7 +58,7 @@ pub enum HomeStateValue {
     FeltTemperature(FeltTemperature, DegreeCelsius),
     IsRunning(IsRunning, bool),
     Occupancy(Occupancy, Probability),
-    OpenedArea(OpenedArea, bool),
+    Opened(Opened, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
     TargetHeatingAdjustment(TargetHeatingAdjustment, AdjustmentDirection),
@@ -107,9 +107,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Occupancy(id) => occupancy::OccupancyStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Occupancy(id, value)),
-            HomeStateId::OpenedArea(id) => opened::OpenedAreaStateProvider
+            HomeStateId::Opened(id) => opened::OpenedStateProvider
                 .calculate_current(id, ctx)
-                .map(|value| HomeStateValue::OpenedArea(id, value)),
+                .map(|value| HomeStateValue::Opened(id, value)),
             HomeStateId::Resident(id) => resident::ResidentStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Resident(id, value)),

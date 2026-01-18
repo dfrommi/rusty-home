@@ -27,7 +27,7 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::FeltTemperature(_, v) => default_with(f64::from(&v)),
             HomeStateValue::IsRunning(_, v) => default_with(v.into()),
             HomeStateValue::Occupancy(_, v) => default_with(f64::from(&v)),
-            HomeStateValue::OpenedArea(_, v) => default_with(v.into()),
+            HomeStateValue::Opened(_, v) => default_with(v.into()),
             HomeStateValue::Resident(_, v) => default_with(v.into()),
             HomeStateValue::RiskOfMould(_, v) => default_with(v.into()),
             HomeStateValue::EnergySaving(_, v) => default_with(v.into()),

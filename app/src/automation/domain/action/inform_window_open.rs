@@ -1,6 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
+use crate::automation::RoomWithWindow;
 use crate::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
@@ -63,7 +64,7 @@ impl InformWindowOpen {
     fn preconditions_fulfilled_light(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
         let cold_air_coming_in = ColdAirComingIn::variants()
             .iter()
-            .filter(|&it| it != &ColdAirComingIn::LivingRoom)
+            .filter(|&it| it != &ColdAirComingIn::Room(RoomWithWindow::LivingRoom))
             .map(|item| ctx.current_dp(item.clone()))
             .collect::<anyhow::Result<Vec<_>>>()?;
 

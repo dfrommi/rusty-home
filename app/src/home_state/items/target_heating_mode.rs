@@ -1,9 +1,9 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::{HeatingZone, Radiator},
+    automation::{HeatingZone, Radiator, RoomWithWindow},
     home_state::{
-        Occupancy, OpenedArea, Presence,
+        Occupancy, Opened, Presence,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
 };
@@ -132,9 +132,14 @@ impl TargetHeatingModeStateProvider {
 }
 
 impl TargetHeatingMode {
-    fn window(&self) -> OpenedArea {
+    fn window(&self) -> Opened {
         match self {
-            TargetHeatingMode::HeatingZone(heating_zone) => heating_zone.window(),
+            TargetHeatingMode::HeatingZone(heating_zone) => match heating_zone {
+                HeatingZone::LivingRoom => Opened::Room(RoomWithWindow::LivingRoom),
+                HeatingZone::Kitchen => Opened::Room(RoomWithWindow::Kitchen),
+                HeatingZone::RoomOfRequirements => Opened::Room(RoomWithWindow::RoomOfRequirements),
+                HeatingZone::Bedroom | HeatingZone::Bathroom => Opened::Room(RoomWithWindow::Bedroom),
+            },
         }
     }
 }

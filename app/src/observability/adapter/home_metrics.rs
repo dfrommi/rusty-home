@@ -65,30 +65,6 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
 
                 default_with(value)
             }
-            HomeStateValue::PidOutput(_, v) => {
-                vec![
-                    Metric {
-                        id: metric_id(&home_state_id, "p", vec![]),
-                        timestamp,
-                        value: v.p().into(),
-                    },
-                    Metric {
-                        id: metric_id(&home_state_id, "i", vec![]),
-                        timestamp,
-                        value: v.i().into(),
-                    },
-                    Metric {
-                        id: metric_id(&home_state_id, "d", vec![]),
-                        timestamp,
-                        value: v.d().into(),
-                    },
-                    Metric {
-                        id: metric_id(&home_state_id, "total", vec![]),
-                        timestamp,
-                        value: v.total().into(),
-                    },
-                ]
-            }
             HomeStateValue::TargetHeatingMode(_, v) => {
                 //::variants not possible because of manual parameters
                 let modes_and_values = vec![

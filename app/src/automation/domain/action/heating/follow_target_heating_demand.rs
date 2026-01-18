@@ -25,7 +25,7 @@ impl Rule for FollowTargetHeatingDemand {
         let commands = thermostats
             .into_iter()
             .map(|thermostat| {
-                let demand = ctx.current(TargetHeatingDemand::ByRadiatorTemperature(thermostat))?;
+                let demand = ctx.current(TargetHeatingDemand::ControlAndObserve(thermostat))?;
                 Ok(Command::SetThermostatValveOpeningPosition {
                     device: thermostat,
                     value: demand,

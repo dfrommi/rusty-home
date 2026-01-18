@@ -271,3 +271,21 @@ impl HeatingAdjustmentStrategy {
         AdjustmentDirection::Hold
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use AdjustmentDirection::*;
+
+    #[test]
+    fn text_adjustment_ordering() {
+        assert!(MustIncrease > ShouldIncrease);
+        assert!(ShouldIncrease > Hold);
+        assert!(Hold > ShouldDecrease);
+        assert!(ShouldDecrease > MustDecrease);
+        assert!(MustDecrease > MustOff);
+
+        assert!(MustIncrease > Hold);
+        assert!(Hold > ShouldDecrease);
+    }
+}

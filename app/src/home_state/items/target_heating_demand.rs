@@ -5,8 +5,7 @@ use crate::{
         unit::{DegreeCelsius, Percent, RateOfChange},
     },
     home_state::{
-        AdjustmentDirection, HeatingDemand, HeatingMode, PidOutput, TargetHeatingAdjustment, TargetHeatingMode,
-        TemperatureChange,
+        AdjustmentDirection, HeatingDemand, HeatingMode, TargetHeatingAdjustment, TargetHeatingMode, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -15,18 +14,14 @@ use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingDemand {
-    Thermostat(Thermostat),
-    ByRadiatorTemperature(Thermostat),
+    ControlAndObserve(Thermostat),
 }
 
 pub struct HeatingDemandStateProvider;
 
 impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStateProvider {
     fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
-        let thermostat = match id {
-            TargetHeatingDemand::Thermostat(thermostat) => thermostat,
-            TargetHeatingDemand::ByRadiatorTemperature(thermostat) => thermostat,
-        };
+        let TargetHeatingDemand::ControlAndObserve(thermostat) = id;
 
         let mode = ctx.get(TargetHeatingMode::from_thermostat(thermostat))?;
         let current_demand = ctx.get(thermostat.heating_demand())?;
@@ -37,12 +32,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(thermostat))?.value;
         let radiator_roc = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
 
-        match id {
-            TargetHeatingDemand::Thermostat(_) => demand_from_pid(&thermostat, mode, ctx),
-            TargetHeatingDemand::ByRadiatorTemperature(_) => {
-                combined_demand(mode, adjustments, current_demand, barely_warm_output, radiator_roc)
-            }
-        }
+        combined_demand(mode, adjustments, current_demand, barely_warm_output, radiator_roc)
     }
 }
 
@@ -178,64 +168,4 @@ fn adjustment_needed(
 
 fn heating_but_no_effect(current_demand: &DataPoint<Percent>, radiator_roc: &RateOfChange<DegreeCelsius>) -> bool {
     current_demand.value > Percent(0.0) && radiator_roc.per_hour() < DegreeCelsius(-2.0)
-}
-
-fn demand_from_pid(
-    thermostat: &Thermostat,
-    mode: DataPoint<HeatingMode>,
-    ctx: &StateCalculationContext,
-) -> Option<Percent> {
-    let force_off_below = match (thermostat, &mode.value) {
-        (_, HeatingMode::Ventilation) => Percent(0.0),
-        (Thermostat::Kitchen, _) => Percent(17.0),
-        (_, _) => Percent(10.0),
-    };
-
-    let max_output = match (thermostat, &mode.value) {
-        (_, HeatingMode::Ventilation) => Percent(0.0),
-        (_, HeatingMode::PostVentilation) => Percent(20.0),
-        (Thermostat::Kitchen, HeatingMode::EnergySaving) => Percent(40.0),
-        (_, HeatingMode::EnergySaving) => Percent(60.0),
-        (_, HeatingMode::Comfort) => Percent(80.0),
-        (_, HeatingMode::Manual(_, _)) => Percent(80.0),
-        (_, HeatingMode::Sleep) => Percent(50.0),
-        (_, HeatingMode::Away) => Percent(60.0),
-    };
-
-    let current_demand = ctx.get(thermostat.heating_demand())?;
-
-    let pid_output_id = PidOutput::Thermostat(*thermostat);
-    let raw_pid = ctx.get(pid_output_id).map(|pid| pid.value.total())?;
-    let heating_demand = raw_pid.round().clamp();
-
-    Some(reduce_valve_movements(
-        heating_demand,
-        current_demand,
-        (force_off_below, max_output),
-    ))
-}
-
-fn reduce_valve_movements(
-    target_demand: Percent,
-    current_demand: DataPoint<Percent>,
-    allowed_range: (Percent, Percent),
-) -> Percent {
-    let off = Percent(0.0);
-    let significant_change = Percent(10.0);
-    let fallback = current_demand.value;
-
-    let keep_duration = t!(10 minutes);
-
-    if target_demand < allowed_range.0 {
-        return off;
-    }
-
-    let mut output = Percent(target_demand.0.clamp(allowed_range.0.0, allowed_range.1.0));
-    let diff = (output - current_demand.value).abs();
-
-    if current_demand.timestamp.elapsed() < keep_duration && diff < significant_change {
-        output = fallback;
-    }
-
-    output
 }

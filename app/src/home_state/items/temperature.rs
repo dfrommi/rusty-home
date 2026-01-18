@@ -7,7 +7,6 @@ use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
-//TODO remove EnumVariants, only for state-debug
 pub enum Temperature {
     Outside,
     LivingRoom,

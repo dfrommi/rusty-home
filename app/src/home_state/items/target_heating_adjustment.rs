@@ -45,15 +45,22 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::HeatingDemand(radiator) => radiator,
         };
         let heating_zone = radiator.heating_zone();
-        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?.value;
+        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
 
         match id {
+            //Force ventilation always into full off
+            _ if mode.value == HeatingMode::Ventilation => Some(AdjustmentDirection::MustOff),
+            //give post-ventilation some time to settle
+            _ if mode.value == HeatingMode::PostVentilation && mode.timestamp.elapsed() < t!(5 minutes) => {
+                Some(AdjustmentDirection::MustOff)
+            }
+
             TargetHeatingAdjustment::Radiator(radiator) => {
                 let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
 
-                let radiator_strategy = radiator_strategy(room_temperature, mode);
+                let radiator_strategy = radiator_strategy(room_temperature, mode.value);
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
             }
             TargetHeatingAdjustment::RadiatorIn15Minutes(radiator) => {
@@ -62,7 +69,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
 
-                let radiator_strategy = radiator_strategy(room_temperature, mode);
+                let radiator_strategy = radiator_strategy(room_temperature, mode.value);
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
             }
             TargetHeatingAdjustment::Setpoint(radiator) => {
@@ -70,7 +77,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(radiator.set_point())?.value;
 
-                let setpoint_strategy = setpoint_strategy(setpoint, mode);
+                let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
                 Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
             }
@@ -80,7 +87,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(radiator.set_point())?.value;
 
-                let setpoint_strategy = setpoint_strategy(setpoint, mode);
+                let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
                 Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
             }

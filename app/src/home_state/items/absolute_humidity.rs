@@ -1,7 +1,7 @@
 use super::*;
 use anyhow::Result;
 
-use crate::automation::HeatingZone;
+use crate::automation::Room;
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 
@@ -9,7 +9,7 @@ use r#macro::{EnumVariants, Id};
 pub enum AbsoluteHumidity {
     BathroomShower,
     BathroomDehumidifier,
-    HeatingZone(HeatingZone),
+    Room(Room),
     Outside,
 }
 
@@ -23,14 +23,14 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
         use crate::home_state::items::Temperature as HomeTemperature;
 
         let temperature_dp = match id {
-            AbsoluteHumidity::HeatingZone(heating_zone) => ctx.get(HomeTemperature::HeatingZone(heating_zone))?,
+            AbsoluteHumidity::Room(room) => ctx.get(HomeTemperature::Room(room))?,
             AbsoluteHumidity::Outside => ctx.get(HomeTemperature::Outside)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
         };
 
         let humidity_dp = match id {
-            AbsoluteHumidity::HeatingZone(heating_zone) => ctx.get(HomeRelativeHumidity::HeatingZone(heating_zone))?,
+            AbsoluteHumidity::Room(room) => ctx.get(HomeRelativeHumidity::Room(room))?,
             AbsoluteHumidity::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,

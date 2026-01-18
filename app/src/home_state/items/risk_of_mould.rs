@@ -2,7 +2,7 @@ use crate::core::math::DataFrameStatsExt;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::interpolate::LinearInterpolator;
 use crate::core::unit::{DegreeCelsius, Percent};
-use crate::automation::HeatingZone;
+use crate::automation::Room;
 use crate::home_state::RelativeHumidity;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
@@ -21,7 +21,7 @@ pub struct RiskOfMouldStateProvider;
 impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
     fn calculate_current(&self, id: RiskOfMould, ctx: &StateCalculationContext) -> Option<bool> {
         let humidity = match id {
-            RiskOfMould::Bathroom => ctx.get(RelativeHumidity::HeatingZone(HeatingZone::Bathroom))?,
+            RiskOfMould::Bathroom => ctx.get(RelativeHumidity::Room(Room::Bathroom))?,
         };
 
         if humidity.value < Percent(70.0) {
@@ -52,8 +52,8 @@ impl RiskOfMouldStateProvider {
     fn get_reference_dewpoint(id: RiskOfMould, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         let ref_dewpoints = match id {
             RiskOfMould::Bathroom => vec![
-                DewPoint::HeatingZone(HeatingZone::LivingRoom),
-                DewPoint::HeatingZone(HeatingZone::RoomOfRequirements),
+                DewPoint::Room(Room::LivingRoom),
+                DewPoint::Room(Room::RoomOfRequirements),
             ],
         };
 

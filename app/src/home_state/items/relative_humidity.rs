@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::HeatingZone,
+    automation::Room,
     core::unit::Percent,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
     Outside,
-    HeatingZone(HeatingZone),
+    Room(Room),
 }
 
 pub struct RelativeHumidityStateProvider;
@@ -20,14 +20,14 @@ impl DerivedStateProvider<RelativeHumidity, Percent> for RelativeHumidityStatePr
 
         match id {
             RelativeHumidity::Outside => ctx.device_state(DeviceRelativeHumidity::Outside)?.value,
-            RelativeHumidity::HeatingZone(heating_zone) => match heating_zone {
-                HeatingZone::LivingRoom => ctx.device_state(DeviceRelativeHumidity::LivingRoomTado)?.value,
-                HeatingZone::RoomOfRequirements => {
+            RelativeHumidity::Room(room) => match room {
+                Room::LivingRoom => ctx.device_state(DeviceRelativeHumidity::LivingRoomTado)?.value,
+                Room::RoomOfRequirements => {
                     ctx.device_state(DeviceRelativeHumidity::RoomOfRequirementsTado)?.value
                 }
-                HeatingZone::Bedroom => ctx.device_state(DeviceRelativeHumidity::BedroomTado)?.value,
-                HeatingZone::Kitchen => ctx.device_state(DeviceRelativeHumidity::Kitchen)?.value,
-                HeatingZone::Bathroom => {
+                Room::Bedroom => ctx.device_state(DeviceRelativeHumidity::BedroomTado)?.value,
+                Room::Kitchen => ctx.device_state(DeviceRelativeHumidity::Kitchen)?.value,
+                Room::Bathroom => {
                     let shower = ctx.device_state(DeviceRelativeHumidity::BathroomShower);
                     let dehumidifier = ctx.device_state(DeviceRelativeHumidity::Dehumidifier);
 

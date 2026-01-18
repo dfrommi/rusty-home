@@ -1,6 +1,6 @@
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
 use crate::{
-    automation::{HeatingZone, Radiator as HeatingRadiator},
+    automation::{HeatingZone, Radiator as HeatingRadiator, Room},
     command::PowerToggle,
     frontends::homekit::{
         HomekitCommand, HomekitEvent, HomekitTargetConfig,
@@ -100,28 +100,28 @@ fn config() -> Vec<HomekitAccessory> {
     vec![
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Wohnzimmer",
-            Temperature::HeatingZone(HeatingZone::LivingRoom),
-            RelativeHumidity::HeatingZone(HeatingZone::LivingRoom),
+            Temperature::Room(Room::LivingRoom),
+            RelativeHumidity::Room(Room::LivingRoom),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Schlafzimmer",
-            Temperature::HeatingZone(HeatingZone::Bedroom),
-            RelativeHumidity::HeatingZone(HeatingZone::Bedroom),
+            Temperature::Room(Room::Bedroom),
+            RelativeHumidity::Room(Room::Bedroom),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Arbeitszimmer",
-            Temperature::HeatingZone(HeatingZone::RoomOfRequirements),
-            RelativeHumidity::HeatingZone(HeatingZone::RoomOfRequirements),
+            Temperature::Room(Room::RoomOfRequirements),
+            RelativeHumidity::Room(Room::RoomOfRequirements),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Küche",
-            Temperature::HeatingZone(HeatingZone::Kitchen),
-            RelativeHumidity::HeatingZone(HeatingZone::Kitchen),
+            Temperature::Room(Room::Kitchen),
+            RelativeHumidity::Room(Room::Kitchen),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Bad",
-            Temperature::HeatingZone(HeatingZone::Bathroom),
-            RelativeHumidity::HeatingZone(HeatingZone::Bathroom),
+            Temperature::Room(Room::Bathroom),
+            RelativeHumidity::Room(Room::Bathroom),
         )),
         HomekitAccessory::WindowSensor(WindowSensor::new(
             "Fenstersensor Wohnzimmer",

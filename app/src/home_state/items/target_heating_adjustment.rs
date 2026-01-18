@@ -60,14 +60,14 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let radiator_temperature = ctx.get(Temperature::RadiatorIn15Minutes(radiator))?.value;
                 //Assume current ROC still active in 15 minutes
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
-                let room_temperature = ctx.get(Temperature::HeatingZoneIn15Minutes(heating_zone))?.value;
+                let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode);
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
             }
             TargetHeatingAdjustment::Setpoint(radiator) => {
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
-                let room_roc = ctx.get(TemperatureChange::HeatingZone(heating_zone))?.value;
+                let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(radiator.set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode);
@@ -75,9 +75,9 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
             }
             TargetHeatingAdjustment::SetpointIn15Minutes(radiator) => {
-                let room_temperature = ctx.get(Temperature::HeatingZoneIn15Minutes(heating_zone))?.value;
+                let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
                 //Assume current ROC still active in 15 minutes
-                let room_roc = ctx.get(TemperatureChange::HeatingZone(heating_zone))?.value;
+                let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(radiator.set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode);

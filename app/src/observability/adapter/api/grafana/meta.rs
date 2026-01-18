@@ -1,7 +1,7 @@
 use actix_web::web;
 
 use crate::{
-    automation::{HeatingZone, Room},
+    automation::Room,
     observability::adapter::api::grafana::{GrafanaResponse, csv_response},
 };
 
@@ -12,15 +12,15 @@ pub fn routes() -> actix_web::Scope {
 async fn get_rooms() -> GrafanaResponse {
     #[derive(serde::Serialize)]
     struct Row {
-        id: HeatingZone,
+        id: Room,
         label: String,
     }
 
-    let rows: Vec<Row> = HeatingZone::variants()
-        .into_iter()
-        .map(|zone| Row {
-            id: zone.clone(),
-            label: display_heating_zone(&zone).to_string(),
+    let rows: Vec<Row> = Room::variants()
+        .iter()
+        .map(|room| Row {
+            id: *room,
+            label: display_room(*room).to_string(),
         })
         .collect();
 
@@ -34,15 +34,5 @@ fn display_room(room: Room) -> &'static str {
         Room::Kitchen => "Küche",
         Room::RoomOfRequirements => "Room of Requirements",
         Room::Bathroom => "Bad",
-    }
-}
-
-fn display_heating_zone(heating_zone: &HeatingZone) -> &'static str {
-    match heating_zone {
-        HeatingZone::LivingRoom => "Wohnzimmer",
-        HeatingZone::Bedroom => "Schlafzimmer",
-        HeatingZone::Kitchen => "Küche",
-        HeatingZone::RoomOfRequirements => "Room of Requirements",
-        HeatingZone::Bathroom => "Bad",
     }
 }

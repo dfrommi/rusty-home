@@ -3,7 +3,7 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     automation::{HeatingZone, Radiator},
     home_state::{
-        Occupancy, OpenedArea, Presence, Resident,
+        Occupancy, OpenedArea, Presence,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
 };

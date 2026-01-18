@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::{HeatingZone, Radiator};
+use crate::automation::{Radiator, Room};
 use crate::core::unit::DegreeCelsius;
 use crate::home_state::TemperatureChange;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
@@ -9,10 +9,10 @@ use crate::t;
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Temperature {
     Outside,
-    HeatingZone(HeatingZone),
+    Room(Room),
     Radiator(Radiator),
     RadiatorIn15Minutes(Radiator),
-    HeatingZoneIn15Minutes(HeatingZone),
+    RoomIn15Minutes(Room),
 }
 
 pub struct TemperatureStateProvider;
@@ -23,12 +23,12 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
 
         match id {
             Temperature::Outside => ctx.device_state(DeviceTemperature::Outside)?.value,
-            Temperature::HeatingZone(heating_zone) => match heating_zone {
-                HeatingZone::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
-                HeatingZone::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
-                HeatingZone::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
-                HeatingZone::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
-                HeatingZone::Bathroom => {
+            Temperature::Room(room) => match room {
+                Room::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
+                Room::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
+                Room::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
+                Room::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
+                Room::Bathroom => {
                     let shower = ctx.device_state(DeviceTemperature::BathroomShower);
                     let dehumidifier = ctx.device_state(DeviceTemperature::Dehumidifier);
 
@@ -48,9 +48,9 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
                 let change = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
                 current + change.per(t!(15 minutes))
             }
-            Temperature::HeatingZoneIn15Minutes(heating_zone) => {
-                let current = ctx.get(heating_zone.inside_temperature())?.value;
-                let change = ctx.get(TemperatureChange::HeatingZone(heating_zone))?.value;
+            Temperature::RoomIn15Minutes(room) => {
+                let current = ctx.get(Temperature::Room(room))?.value;
+                let change = ctx.get(TemperatureChange::Room(room))?.value;
                 current + change.per(t!(15 minutes))
             }
         }

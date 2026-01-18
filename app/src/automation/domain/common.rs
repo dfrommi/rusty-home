@@ -1,12 +1,9 @@
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    core::unit::DegreeCelsius,
-    home_state::{HeatingDemand, HeatingMode, OpenedArea, SetPoint, Temperature},
-};
+use crate::home_state::{HeatingDemand, OpenedArea, SetPoint, Temperature};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
 #[allow(clippy::enum_variant_names)]
 #[serde(rename_all = "snake_case")]
 pub enum Room {
@@ -49,6 +46,16 @@ pub enum Radiator {
 }
 
 impl HeatingZone {
+    pub fn room(&self) -> Room {
+        match self {
+            HeatingZone::LivingRoom => Room::LivingRoom,
+            HeatingZone::Bedroom => Room::Bedroom,
+            HeatingZone::Kitchen => Room::Kitchen,
+            HeatingZone::RoomOfRequirements => Room::RoomOfRequirements,
+            HeatingZone::Bathroom => Room::Bathroom,
+        }
+    }
+
     pub fn radiators(&self) -> Vec<Radiator> {
         match self {
             HeatingZone::LivingRoom => vec![Radiator::LivingRoomBig, Radiator::LivingRoomSmall],
@@ -60,15 +67,15 @@ impl HeatingZone {
     }
 
     pub fn inside_temperature(&self) -> Temperature {
-        Temperature::HeatingZone(*self)
+        Temperature::Room(self.room())
     }
 
     pub fn window(&self) -> OpenedArea {
         match self {
             HeatingZone::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
-            HeatingZone::Kitchen => OpenedArea::KitchenWindow,
             HeatingZone::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
             HeatingZone::Bedroom | HeatingZone::Bathroom => OpenedArea::BedroomWindow,
+            HeatingZone::Kitchen => OpenedArea::KitchenWindow,
         }
     }
 }
@@ -96,14 +103,7 @@ impl Radiator {
     }
 
     pub fn set_point(&self) -> SetPoint {
-        match self {
-            Radiator::LivingRoomBig => SetPoint::Radiator(Radiator::LivingRoomBig),
-            Radiator::LivingRoomSmall => SetPoint::Radiator(Radiator::LivingRoomSmall),
-            Radiator::Bedroom => SetPoint::Radiator(Radiator::Bedroom),
-            Radiator::Kitchen => SetPoint::Radiator(Radiator::Kitchen),
-            Radiator::RoomOfRequirements => SetPoint::Radiator(Radiator::RoomOfRequirements),
-            Radiator::Bathroom => SetPoint::Radiator(Radiator::Bathroom),
-        }
+        SetPoint::Radiator(*self)
     }
 
     pub fn surface_temperature(&self) -> Temperature {
@@ -111,17 +111,10 @@ impl Radiator {
     }
 
     pub fn room_temperature(&self) -> Temperature {
-        self.heating_zone().inside_temperature()
+        Temperature::Room(self.heating_zone().room())
     }
 
     pub fn heating_demand(&self) -> HeatingDemand {
-        match self {
-            Radiator::LivingRoomBig => HeatingDemand::Radiator(Radiator::LivingRoomBig),
-            Radiator::LivingRoomSmall => HeatingDemand::Radiator(Radiator::LivingRoomSmall),
-            Radiator::Bedroom => HeatingDemand::Radiator(Radiator::Bedroom),
-            Radiator::Kitchen => HeatingDemand::Radiator(Radiator::Kitchen),
-            Radiator::RoomOfRequirements => HeatingDemand::Radiator(Radiator::RoomOfRequirements),
-            Radiator::Bathroom => HeatingDemand::Radiator(Radiator::Bathroom),
-        }
+        HeatingDemand::Radiator(*self)
     }
 }

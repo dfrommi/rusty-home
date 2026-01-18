@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::{HeatingZone, Thermostat};
+use crate::automation::{HeatingZone, Radiator};
 use crate::core::unit::{DegreeCelsius, RateOfChange};
 use crate::home_state::Temperature;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
@@ -8,7 +8,7 @@ use crate::t;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TemperatureChange {
-    Radiator(Thermostat),
+    Radiator(Radiator),
     HeatingZone(HeatingZone),
 }
 

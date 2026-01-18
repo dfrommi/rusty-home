@@ -1,18 +1,15 @@
 use super::*;
 use anyhow::Result;
 
+use crate::automation::HeatingZone;
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum DewPoint {
-    Bathroom,
     BathroomShower,
     BathroomDehumidifier,
-    LivingRoom,
-    Bedroom,
-    RoomOfRequirements,
-    Kitchen,
+    HeatingZone(HeatingZone),
     Outside,
 }
 
@@ -26,23 +23,15 @@ impl DerivedStateProvider<DewPoint, DegreeCelsius> for DewPointStateProvider {
         use crate::home_state::items::Temperature as HomeTemperature;
 
         let temperature_dp = match id {
-            DewPoint::LivingRoom => ctx.get(HomeTemperature::LivingRoom)?,
-            DewPoint::Bathroom => ctx.get(HomeTemperature::Bathroom)?,
+            DewPoint::HeatingZone(heating_zone) => ctx.get(HomeTemperature::HeatingZone(heating_zone))?,
             DewPoint::Outside => ctx.get(HomeTemperature::Outside)?,
-            DewPoint::Bedroom => ctx.get(HomeTemperature::Bedroom)?,
-            DewPoint::Kitchen => ctx.get(HomeTemperature::Kitchen)?,
-            DewPoint::RoomOfRequirements => ctx.get(HomeTemperature::RoomOfRequirements)?,
             DewPoint::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
             DewPoint::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
         };
 
         let humidity_dp = match id {
-            DewPoint::LivingRoom => ctx.get(HomeRelativeHumidity::LivingRoom)?,
-            DewPoint::Bathroom => ctx.get(HomeRelativeHumidity::Bathroom)?,
+            DewPoint::HeatingZone(heating_zone) => ctx.get(HomeRelativeHumidity::HeatingZone(heating_zone))?,
             DewPoint::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
-            DewPoint::Bedroom => ctx.get(HomeRelativeHumidity::Bedroom)?,
-            DewPoint::Kitchen => ctx.get(HomeRelativeHumidity::Kitchen)?,
-            DewPoint::RoomOfRequirements => ctx.get(HomeRelativeHumidity::RoomOfRequirements)?,
             DewPoint::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
             DewPoint::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,
         };

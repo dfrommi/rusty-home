@@ -20,27 +20,21 @@ impl FollowTargetHeatingDemand {
 
 impl Rule for FollowTargetHeatingDemand {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
-        let thermostats = self.zone.thermostats();
+        let radiators = self.zone.radiators();
 
-        let commands = thermostats
+        let commands = radiators
             .into_iter()
-            .map(|thermostat| {
-                let demand = ctx.current(TargetHeatingDemand::ControlAndObserve(thermostat))?;
+            .map(|radiator| {
+                let demand = ctx.current(TargetHeatingDemand::ControlAndObserve(radiator))?;
                 Ok(Command::SetThermostatValveOpeningPosition {
-                    device: thermostat,
+                    device: radiator,
                     value: demand,
                 })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         //Not ideal but needed to keep the trigger going. Look for better solution with triggers
-        let mode = ctx.current(match self.zone {
-            HeatingZone::RoomOfRequirements => TargetHeatingMode::RoomOfRequirements,
-            HeatingZone::LivingRoom => TargetHeatingMode::LivingRoom,
-            HeatingZone::Bedroom => TargetHeatingMode::Bedroom,
-            HeatingZone::Kitchen => TargetHeatingMode::Kitchen,
-            HeatingZone::Bathroom => TargetHeatingMode::Bathroom,
-        })?;
+        let mode = ctx.current(TargetHeatingMode::HeatingZone(self.zone))?;
 
         if let HeatingMode::Manual(_, trigger_id) = mode {
             Ok(RuleResult::ExecuteTrigger(commands, trigger_id))

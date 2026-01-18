@@ -1,5 +1,5 @@
 use crate::{
-    automation::Thermostat,
+    automation::Radiator,
     core::unit::Percent,
     frontends::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
@@ -24,17 +24,17 @@ impl Default for HeatingDemandStatus {
 
 pub struct HeatingDemandAccessory {
     name: &'static str,
-    thermostat: Thermostat,
+    radiator: Radiator,
     demand: HeatingDemand,
     status: HeatingDemandStatus,
 }
 
 impl HeatingDemandAccessory {
-    pub fn new(name: &'static str, thermostat: Thermostat) -> Self {
+    pub fn new(name: &'static str, radiator: Radiator) -> Self {
         Self {
             name,
-            thermostat,
-            demand: thermostat.heating_demand(),
+            radiator,
+            demand: radiator.heating_demand(),
             status: HeatingDemandStatus::default(),
         }
     }
@@ -127,13 +127,13 @@ impl HeatingDemandAccessory {
     }
 
     fn command(&self, demand: Percent) -> HomekitCommand {
-        match self.thermostat {
-            Thermostat::LivingRoomBig => HomekitCommand::LivingRoomBigHeatingDemand(demand),
-            Thermostat::LivingRoomSmall => HomekitCommand::LivingRoomSmallHeatingDemand(demand),
-            Thermostat::Bedroom => HomekitCommand::BedroomHeatingDemand(demand),
-            Thermostat::Kitchen => HomekitCommand::KitchenHeatingDemand(demand),
-            Thermostat::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingDemand(demand),
-            Thermostat::Bathroom => HomekitCommand::BathroomHeatingDemand(demand),
+        match self.radiator {
+            Radiator::LivingRoomBig => HomekitCommand::LivingRoomBigHeatingDemand(demand),
+            Radiator::LivingRoomSmall => HomekitCommand::LivingRoomSmallHeatingDemand(demand),
+            Radiator::Bedroom => HomekitCommand::BedroomHeatingDemand(demand),
+            Radiator::Kitchen => HomekitCommand::KitchenHeatingDemand(demand),
+            Radiator::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingDemand(demand),
+            Radiator::Bathroom => HomekitCommand::BathroomHeatingDemand(demand),
         }
     }
 }

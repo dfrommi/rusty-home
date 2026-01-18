@@ -1,4 +1,4 @@
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -13,9 +13,9 @@ pub enum Temperature {
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,
-    ThermostatOnDevice(Thermostat),
+    ThermostatOnDevice(Radiator),
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,
-    Radiator(Thermostat),
+    Radiator(Radiator),
 }

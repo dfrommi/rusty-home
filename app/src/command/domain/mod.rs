@@ -1,6 +1,6 @@
 mod command_state;
 
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::trigger::UserTriggerId;
@@ -16,7 +16,7 @@ pub enum Command {
         power_on: bool,
     },
     SetThermostatValveOpeningPosition {
-        device: Thermostat,
+        device: Radiator,
         value: Percent,
     },
     PushNotify {
@@ -41,7 +41,7 @@ pub enum CommandTarget {
     SetPower { device: PowerToggle },
 
     #[display("SetThermostatValveOpeningPosition[{}]", device)]
-    SetThermostatValveOpeningPosition { device: Thermostat },
+    SetThermostatValveOpeningPosition { device: Radiator },
 
     #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {

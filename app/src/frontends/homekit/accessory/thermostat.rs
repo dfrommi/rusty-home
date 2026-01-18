@@ -1,6 +1,6 @@
 use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
 use crate::{
-    automation::HeatingZone,
+    automation::{HeatingZone, Radiator},
     core::unit::DegreeCelsius,
     frontends::homekit::{
         HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitHeatingState, HomekitService, HomekitTarget,
@@ -31,33 +31,33 @@ impl Thermostat {
             //TODO handle multiple radiators properly
             HeatingZone::LivingRoom => (
                 zone.inside_temperature(),
-                SetPoint::LivingRoomBig,
-                TargetHeatingMode::LivingRoom,
-                HeatingDemand::LivingRoomBig,
+                SetPoint::Radiator(Radiator::LivingRoomBig),
+                TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom),
+                HeatingDemand::Radiator(Radiator::LivingRoomBig),
             ),
             HeatingZone::Bedroom => (
                 zone.inside_temperature(),
-                SetPoint::Bedroom,
-                TargetHeatingMode::Bedroom,
-                HeatingDemand::Bedroom,
+                SetPoint::Radiator(Radiator::Bedroom),
+                TargetHeatingMode::HeatingZone(HeatingZone::Bedroom),
+                HeatingDemand::Radiator(Radiator::Bedroom),
             ),
             HeatingZone::Kitchen => (
                 zone.inside_temperature(),
-                SetPoint::Kitchen,
-                TargetHeatingMode::Kitchen,
-                HeatingDemand::Kitchen,
+                SetPoint::Radiator(Radiator::Kitchen),
+                TargetHeatingMode::HeatingZone(HeatingZone::Kitchen),
+                HeatingDemand::Radiator(Radiator::Kitchen),
             ),
             HeatingZone::RoomOfRequirements => (
                 zone.inside_temperature(),
-                SetPoint::RoomOfRequirements,
-                TargetHeatingMode::RoomOfRequirements,
-                HeatingDemand::RoomOfRequirements,
+                SetPoint::Radiator(Radiator::RoomOfRequirements),
+                TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements),
+                HeatingDemand::Radiator(Radiator::RoomOfRequirements),
             ),
             HeatingZone::Bathroom => (
                 zone.inside_temperature(),
-                SetPoint::Bathroom,
-                TargetHeatingMode::Bathroom,
-                HeatingDemand::Bathroom,
+                SetPoint::Radiator(Radiator::Bathroom),
+                TargetHeatingMode::HeatingZone(HeatingZone::Bathroom),
+                HeatingDemand::Radiator(Radiator::Bathroom),
             ),
         };
 

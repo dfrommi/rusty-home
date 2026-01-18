@@ -1,5 +1,5 @@
 use crate::{
-    automation::Thermostat,
+    automation::Radiator,
     core::{
         time::DateTime,
         timeseries::{DataFrame, interpolate::LinearInterpolator},
@@ -12,14 +12,8 @@ use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum HeatingDemand {
-    LivingRoomBig,
-    LivingRoomSmall,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
-
-    BarelyWarmSurface(Thermostat),
+    Radiator(Radiator),
+    BarelyWarmSurface(Radiator),
 }
 
 pub struct HeatingDemandStateProvider;
@@ -29,17 +23,19 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
         use crate::device_state::HeatingDemand as DeviceHeatingDemand;
 
         match id {
-            HeatingDemand::LivingRoomBig => ctx.device_state(DeviceHeatingDemand::LivingRoomBig)?.value,
-            HeatingDemand::LivingRoomSmall => ctx.device_state(DeviceHeatingDemand::LivingRoomSmall)?.value,
-            HeatingDemand::Bedroom => ctx.device_state(DeviceHeatingDemand::Bedroom)?.value,
-            HeatingDemand::Kitchen => ctx.device_state(DeviceHeatingDemand::Kitchen)?.value,
-            HeatingDemand::RoomOfRequirements => ctx.device_state(DeviceHeatingDemand::RoomOfRequirements)?.value,
-            HeatingDemand::Bathroom => ctx.device_state(DeviceHeatingDemand::Bathroom)?.value,
-            HeatingDemand::BarelyWarmSurface(thermostat) => {
-                let radiator_temperatures = ctx.all_since(thermostat.surface_temperature(), t!(3 hours ago))?;
-                let room_temperatures = ctx.all_since(thermostat.room_temperature(), t!(3 hours ago))?;
-                let demands = ctx.all_since(thermostat.heating_demand(), t!(3 hours ago))?;
-                estimate_barely_warm_surface(&thermostat, radiator_temperatures, room_temperatures, demands)
+            HeatingDemand::Radiator(radiator) => match radiator {
+                Radiator::LivingRoomBig => ctx.device_state(DeviceHeatingDemand::LivingRoomBig)?.value,
+                Radiator::LivingRoomSmall => ctx.device_state(DeviceHeatingDemand::LivingRoomSmall)?.value,
+                Radiator::Bedroom => ctx.device_state(DeviceHeatingDemand::Bedroom)?.value,
+                Radiator::Kitchen => ctx.device_state(DeviceHeatingDemand::Kitchen)?.value,
+                Radiator::RoomOfRequirements => ctx.device_state(DeviceHeatingDemand::RoomOfRequirements)?.value,
+                Radiator::Bathroom => ctx.device_state(DeviceHeatingDemand::Bathroom)?.value,
+            },
+            HeatingDemand::BarelyWarmSurface(radiator) => {
+                let radiator_temperatures = ctx.all_since(radiator.surface_temperature(), t!(3 hours ago))?;
+                let room_temperatures = ctx.all_since(radiator.room_temperature(), t!(3 hours ago))?;
+                let demands = ctx.all_since(radiator.heating_demand(), t!(3 hours ago))?;
+                estimate_barely_warm_surface(&radiator, radiator_temperatures, room_temperatures, demands)
             }
         }
         .into()
@@ -47,7 +43,7 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
 }
 
 fn estimate_barely_warm_surface(
-    thermostat: &Thermostat,
+    radiator: &Radiator,
     radiator_temperatures: DataFrame<DegreeCelsius>,
     room_temperatures: DataFrame<DegreeCelsius>,
     demands: DataFrame<Percent>,
@@ -116,7 +112,7 @@ fn estimate_barely_warm_surface(
     {
         tracing::trace!(
             "Estimated barely warm surface demand for {:?} as {:?} (increase: {}/h, is_increasing: {}, is_hot_and_holding: {}, time: {:?})",
-            thermostat,
+            radiator,
             min.demand,
             min.increase.per_hour(),
             min.is_increasing,
@@ -130,12 +126,12 @@ fn estimate_barely_warm_surface(
     //on previous day
 
     //TODO should take outside temperature into account, as overall heating availability changes with it
-    match thermostat {
-        Thermostat::LivingRoomBig => Percent(16.0),
-        Thermostat::LivingRoomSmall => Percent(18.0),
-        Thermostat::Bedroom => Percent(16.0),
-        Thermostat::Kitchen => Percent(18.0),
-        Thermostat::RoomOfRequirements => Percent(14.0),
-        Thermostat::Bathroom => Percent(20.0),
+    match radiator {
+        Radiator::LivingRoomBig => Percent(16.0),
+        Radiator::LivingRoomSmall => Percent(18.0),
+        Radiator::Bedroom => Percent(16.0),
+        Radiator::Kitchen => Percent(18.0),
+        Radiator::RoomOfRequirements => Percent(14.0),
+        Radiator::Bathroom => Percent(20.0),
     }
 }

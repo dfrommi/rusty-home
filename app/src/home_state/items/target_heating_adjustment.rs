@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::{HeatingZone, Thermostat},
+    automation::{HeatingZone, Radiator},
     core::unit::{DegreeCelsius, RateOfChange},
     home_state::{
         HeatingMode, TargetHeatingMode, Temperature, TemperatureChange,
@@ -12,11 +12,11 @@ use crate::{
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingAdjustment {
-    Radiator(Thermostat),
-    RadiatorIn15Minutes(Thermostat),
-    Setpoint(Thermostat),
-    SetpointIn15Minutes(Thermostat),
-    HeatingDemand(Thermostat),
+    Radiator(Radiator),
+    RadiatorIn15Minutes(Radiator),
+    Setpoint(Radiator),
+    SetpointIn15Minutes(Radiator),
+    HeatingDemand(Radiator),
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -37,58 +37,58 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
         id: TargetHeatingAdjustment,
         ctx: &StateCalculationContext,
     ) -> Option<AdjustmentDirection> {
-        let thermostat = match id {
-            TargetHeatingAdjustment::Radiator(thermostat) => thermostat,
-            TargetHeatingAdjustment::RadiatorIn15Minutes(thermostat) => thermostat,
-            TargetHeatingAdjustment::Setpoint(thermostat) => thermostat,
-            TargetHeatingAdjustment::SetpointIn15Minutes(thermostat) => thermostat,
-            TargetHeatingAdjustment::HeatingDemand(thermostat) => thermostat,
+        let radiator = match id {
+            TargetHeatingAdjustment::Radiator(radiator) => radiator,
+            TargetHeatingAdjustment::RadiatorIn15Minutes(radiator) => radiator,
+            TargetHeatingAdjustment::Setpoint(radiator) => radiator,
+            TargetHeatingAdjustment::SetpointIn15Minutes(radiator) => radiator,
+            TargetHeatingAdjustment::HeatingDemand(radiator) => radiator,
         };
-        let heating_zone = HeatingZone::for_thermostat(&thermostat);
-        let mode = ctx.get(TargetHeatingMode::from_thermostat(thermostat))?.value;
+        let heating_zone = radiator.heating_zone();
+        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?.value;
 
         match id {
-            TargetHeatingAdjustment::Radiator(thermostat) => {
-                let radiator_temperature = ctx.get(thermostat.surface_temperature())?.value;
-                let radiator_roc = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
+            TargetHeatingAdjustment::Radiator(radiator) => {
+                let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
+                let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode);
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
             }
-            TargetHeatingAdjustment::RadiatorIn15Minutes(thermostat) => {
-                let radiator_temperature = ctx.get(Temperature::RadiatorIn15Minutes(thermostat))?.value;
+            TargetHeatingAdjustment::RadiatorIn15Minutes(radiator) => {
+                let radiator_temperature = ctx.get(Temperature::RadiatorIn15Minutes(radiator))?.value;
                 //Assume current ROC still active in 15 minutes
-                let radiator_roc = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
+                let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(Temperature::HeatingZoneIn15Minutes(heating_zone))?.value;
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode);
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
             }
-            TargetHeatingAdjustment::Setpoint(thermostat) => {
+            TargetHeatingAdjustment::Setpoint(radiator) => {
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
                 let room_roc = ctx.get(TemperatureChange::HeatingZone(heating_zone))?.value;
-                let setpoint = ctx.get(thermostat.set_point())?.value;
+                let setpoint = ctx.get(radiator.set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode);
 
                 Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
             }
-            TargetHeatingAdjustment::SetpointIn15Minutes(thermostat) => {
+            TargetHeatingAdjustment::SetpointIn15Minutes(radiator) => {
                 let room_temperature = ctx.get(Temperature::HeatingZoneIn15Minutes(heating_zone))?.value;
                 //Assume current ROC still active in 15 minutes
                 let room_roc = ctx.get(TemperatureChange::HeatingZone(heating_zone))?.value;
-                let setpoint = ctx.get(thermostat.set_point())?.value;
+                let setpoint = ctx.get(radiator.set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode);
 
                 Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
             }
-            TargetHeatingAdjustment::HeatingDemand(thermostat) => {
+            TargetHeatingAdjustment::HeatingDemand(radiator) => {
                 use AdjustmentDirection::*;
 
-                let radiator_now = ctx.get(TargetHeatingAdjustment::Radiator(thermostat))?.value;
-                let radiator_in_15 = ctx.get(TargetHeatingAdjustment::RadiatorIn15Minutes(thermostat))?.value;
+                let radiator_now = ctx.get(TargetHeatingAdjustment::Radiator(radiator))?.value;
+                let radiator_in_15 = ctx.get(TargetHeatingAdjustment::RadiatorIn15Minutes(radiator))?.value;
 
                 //Stop radiator from overheating
                 let radiator_adjustment = match (radiator_now, radiator_in_15) {
@@ -99,8 +99,8 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                     _ => Hold,
                 };
 
-                let setpoint_now = ctx.get(TargetHeatingAdjustment::Setpoint(thermostat))?.value;
-                let setpoint_in_15 = ctx.get(TargetHeatingAdjustment::SetpointIn15Minutes(thermostat))?.value;
+                let setpoint_now = ctx.get(TargetHeatingAdjustment::Setpoint(radiator))?.value;
+                let setpoint_in_15 = ctx.get(TargetHeatingAdjustment::SetpointIn15Minutes(radiator))?.value;
 
                 //Push for heat by setpoint
                 let setpoint_adjustment = setpoint_now.merge(&setpoint_in_15.no_must()).unwrap_or(Hold);

@@ -1,6 +1,6 @@
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, OpenedArea, RelativeHumidity, Temperature};
 use crate::{
-    automation::{HeatingZone, Thermostat as HeatingThermostat},
+    automation::{HeatingZone, Radiator as HeatingRadiator},
     command::PowerToggle,
     frontends::homekit::{
         HomekitCommand, HomekitEvent, HomekitTargetConfig,
@@ -100,28 +100,28 @@ fn config() -> Vec<HomekitAccessory> {
     vec![
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Wohnzimmer",
-            Temperature::LivingRoom,
-            RelativeHumidity::LivingRoom,
+            Temperature::HeatingZone(HeatingZone::LivingRoom),
+            RelativeHumidity::HeatingZone(HeatingZone::LivingRoom),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Schlafzimmer",
-            Temperature::Bedroom,
-            RelativeHumidity::Bedroom,
+            Temperature::HeatingZone(HeatingZone::Bedroom),
+            RelativeHumidity::HeatingZone(HeatingZone::Bedroom),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Arbeitszimmer",
-            Temperature::RoomOfRequirements,
-            RelativeHumidity::RoomOfRequirements,
+            Temperature::HeatingZone(HeatingZone::RoomOfRequirements),
+            RelativeHumidity::HeatingZone(HeatingZone::RoomOfRequirements),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Küche",
-            Temperature::Kitchen,
-            RelativeHumidity::Kitchen,
+            Temperature::HeatingZone(HeatingZone::Kitchen),
+            RelativeHumidity::HeatingZone(HeatingZone::Kitchen),
         )),
         HomekitAccessory::ClimateSensor(ClimateSensor::new(
             "Klimasensor Bad",
-            Temperature::Bathroom,
-            RelativeHumidity::Bathroom,
+            Temperature::HeatingZone(HeatingZone::Bathroom),
+            RelativeHumidity::HeatingZone(HeatingZone::Bathroom),
         )),
         HomekitAccessory::WindowSensor(WindowSensor::new(
             "Fenstersensor Wohnzimmer",
@@ -140,22 +140,22 @@ fn config() -> Vec<HomekitAccessory> {
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
         HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
             "Radiator Wohnzimmer groß",
-            HeatingThermostat::LivingRoomBig,
+            HeatingRadiator::LivingRoomBig,
         )),
         HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
             "Radiator Wohnzimmer klein",
-            HeatingThermostat::LivingRoomSmall,
+            HeatingRadiator::LivingRoomSmall,
         )),
         HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
             "Radiator Schlafzimmer",
-            HeatingThermostat::Bedroom,
+            HeatingRadiator::Bedroom,
         )),
         HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new(
             "Radiator Arbeitszimmer",
-            HeatingThermostat::RoomOfRequirements,
+            HeatingRadiator::RoomOfRequirements,
         )),
-        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Küche", HeatingThermostat::Kitchen)),
-        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Bad", HeatingThermostat::Bathroom)),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Küche", HeatingRadiator::Kitchen)),
+        HomekitAccessory::HeatingDemand(HeatingDemandAccessory::new("Radiator Bad", HeatingRadiator::Bathroom)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
         HomekitAccessory::EnergySavingSwitch(EnergySavingSwitch::new(

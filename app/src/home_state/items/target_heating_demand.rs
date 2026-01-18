@@ -1,5 +1,5 @@
 use crate::{
-    automation::Thermostat,
+    automation::Radiator,
     core::{
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Percent, RateOfChange},
@@ -14,23 +14,23 @@ use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingDemand {
-    ControlAndObserve(Thermostat),
+    ControlAndObserve(Radiator),
 }
 
 pub struct HeatingDemandStateProvider;
 
 impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStateProvider {
     fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
-        let TargetHeatingDemand::ControlAndObserve(thermostat) = id;
+        let TargetHeatingDemand::ControlAndObserve(radiator) = id;
 
-        let mode = ctx.get(TargetHeatingMode::from_thermostat(thermostat))?;
-        let current_demand = ctx.get(thermostat.heating_demand())?;
+        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
+        let current_demand = ctx.get(radiator.heating_demand())?;
         let adjustments = ctx.all_since(
-            TargetHeatingAdjustment::HeatingDemand(thermostat),
+            TargetHeatingAdjustment::HeatingDemand(radiator),
             current_demand.timestamp.max(t!(30 minutes ago)),
         )?;
-        let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(thermostat))?.value;
-        let radiator_roc = ctx.get(TemperatureChange::Radiator(thermostat))?.value;
+        let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(radiator))?.value;
+        let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
 
         combined_demand(mode, adjustments, current_demand, barely_warm_output, radiator_roc)
     }

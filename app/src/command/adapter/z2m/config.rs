@@ -1,42 +1,42 @@
 use super::Z2mCommandTarget;
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 use crate::command::CommandTarget;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::RoomOfRequirements,
+                device: Radiator::RoomOfRequirements,
             },
             Z2mCommandTarget::SonoffThermostat("room_of_requirements/radiator_thermostat_sonoff"),
         ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::Bathroom,
+                device: Radiator::Bathroom,
             },
             Z2mCommandTarget::SonoffThermostat("bathroom/radiator_thermostat_sonoff"),
         ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::LivingRoomBig,
+                device: Radiator::LivingRoomBig,
             },
             Z2mCommandTarget::SonoffThermostat("living_room/radiator_thermostat_big_sonoff"),
         ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::LivingRoomSmall,
+                device: Radiator::LivingRoomSmall,
             },
             Z2mCommandTarget::SonoffThermostat("living_room/radiator_thermostat_small_sonoff"),
         ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::Bedroom,
+                device: Radiator::Bedroom,
             },
             Z2mCommandTarget::SonoffThermostat("bedroom/radiator_thermostat_sonoff"),
         ),
         (
             CommandTarget::SetThermostatValveOpeningPosition {
-                device: Thermostat::Kitchen,
+                device: Radiator::Kitchen,
             },
             Z2mCommandTarget::SonoffThermostat("kitchen/radiator_thermostat_sonoff"),
         ),

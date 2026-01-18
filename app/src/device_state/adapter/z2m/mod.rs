@@ -1,6 +1,6 @@
 mod config;
 
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 use crate::core::DeviceConfig;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
@@ -16,7 +16,7 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
-    SonoffThermostat(Thermostat, HeatingDemand),
+    SonoffThermostat(Radiator, HeatingDemand),
 }
 
 pub struct Z2mIncomingDataSource {

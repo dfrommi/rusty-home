@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {
@@ -16,5 +16,5 @@ pub enum RelativeHumidity {
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,
-    Radiator(Thermostat),
+    Radiator(Radiator),
 }

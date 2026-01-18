@@ -39,7 +39,7 @@ pub enum HeatingZone {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
-pub enum Thermostat {
+pub enum Radiator {
     LivingRoomBig,
     LivingRoomSmall,
     Bedroom,
@@ -49,35 +49,18 @@ pub enum Thermostat {
 }
 
 impl HeatingZone {
-    pub fn thermostats(&self) -> Vec<Thermostat> {
+    pub fn radiators(&self) -> Vec<Radiator> {
         match self {
-            HeatingZone::LivingRoom => vec![Thermostat::LivingRoomBig, Thermostat::LivingRoomSmall],
-            HeatingZone::Bedroom => vec![Thermostat::Bedroom],
-            HeatingZone::Kitchen => vec![Thermostat::Kitchen],
-            HeatingZone::RoomOfRequirements => vec![Thermostat::RoomOfRequirements],
-            HeatingZone::Bathroom => vec![Thermostat::Bathroom],
+            HeatingZone::LivingRoom => vec![Radiator::LivingRoomBig, Radiator::LivingRoomSmall],
+            HeatingZone::Bedroom => vec![Radiator::Bedroom],
+            HeatingZone::Kitchen => vec![Radiator::Kitchen],
+            HeatingZone::RoomOfRequirements => vec![Radiator::RoomOfRequirements],
+            HeatingZone::Bathroom => vec![Radiator::Bathroom],
         }
     }
 
-    pub fn for_thermostat(thermostat: &Thermostat) -> HeatingZone {
-        match thermostat {
-            Thermostat::LivingRoomBig | Thermostat::LivingRoomSmall => HeatingZone::LivingRoom,
-            Thermostat::Bedroom => HeatingZone::Bedroom,
-            Thermostat::Kitchen => HeatingZone::Kitchen,
-            Thermostat::RoomOfRequirements => HeatingZone::RoomOfRequirements,
-            Thermostat::Bathroom => HeatingZone::Bathroom,
-        }
-    }
-
-    //TODO use in actions
     pub fn inside_temperature(&self) -> Temperature {
-        match self {
-            HeatingZone::LivingRoom => Temperature::LivingRoom,
-            HeatingZone::Bedroom => Temperature::Bedroom,
-            HeatingZone::Kitchen => Temperature::Kitchen,
-            HeatingZone::RoomOfRequirements => Temperature::RoomOfRequirements,
-            HeatingZone::Bathroom => Temperature::Bathroom,
-        }
+        Temperature::HeatingZone(*self)
     }
 
     pub fn window(&self) -> OpenedArea {
@@ -90,26 +73,36 @@ impl HeatingZone {
     }
 }
 
-impl Thermostat {
+impl Radiator {
     pub fn heating_factor(&self) -> f64 {
         match self {
-            Thermostat::LivingRoomBig => 1.728,
-            Thermostat::LivingRoomSmall => 0.501,
-            Thermostat::Bedroom => 1.401,
-            Thermostat::Kitchen => 1.485,
-            Thermostat::RoomOfRequirements => 1.193,
-            Thermostat::Bathroom => 0.496,
+            Radiator::LivingRoomBig => 1.728,
+            Radiator::LivingRoomSmall => 0.501,
+            Radiator::Bedroom => 1.401,
+            Radiator::Kitchen => 1.485,
+            Radiator::RoomOfRequirements => 1.193,
+            Radiator::Bathroom => 0.496,
+        }
+    }
+
+    pub fn heating_zone(&self) -> HeatingZone {
+        match self {
+            Radiator::LivingRoomBig | Radiator::LivingRoomSmall => HeatingZone::LivingRoom,
+            Radiator::Bedroom => HeatingZone::Bedroom,
+            Radiator::Kitchen => HeatingZone::Kitchen,
+            Radiator::RoomOfRequirements => HeatingZone::RoomOfRequirements,
+            Radiator::Bathroom => HeatingZone::Bathroom,
         }
     }
 
     pub fn set_point(&self) -> SetPoint {
         match self {
-            Thermostat::LivingRoomBig => SetPoint::LivingRoomBig,
-            Thermostat::LivingRoomSmall => SetPoint::LivingRoomSmall,
-            Thermostat::Bedroom => SetPoint::Bedroom,
-            Thermostat::Kitchen => SetPoint::Kitchen,
-            Thermostat::RoomOfRequirements => SetPoint::RoomOfRequirements,
-            Thermostat::Bathroom => SetPoint::Bathroom,
+            Radiator::LivingRoomBig => SetPoint::Radiator(Radiator::LivingRoomBig),
+            Radiator::LivingRoomSmall => SetPoint::Radiator(Radiator::LivingRoomSmall),
+            Radiator::Bedroom => SetPoint::Radiator(Radiator::Bedroom),
+            Radiator::Kitchen => SetPoint::Radiator(Radiator::Kitchen),
+            Radiator::RoomOfRequirements => SetPoint::Radiator(Radiator::RoomOfRequirements),
+            Radiator::Bathroom => SetPoint::Radiator(Radiator::Bathroom),
         }
     }
 
@@ -118,17 +111,17 @@ impl Thermostat {
     }
 
     pub fn room_temperature(&self) -> Temperature {
-        HeatingZone::for_thermostat(self).inside_temperature()
+        self.heating_zone().inside_temperature()
     }
 
     pub fn heating_demand(&self) -> HeatingDemand {
         match self {
-            Thermostat::LivingRoomBig => HeatingDemand::LivingRoomBig,
-            Thermostat::LivingRoomSmall => HeatingDemand::LivingRoomSmall,
-            Thermostat::Bedroom => HeatingDemand::Bedroom,
-            Thermostat::Kitchen => HeatingDemand::Kitchen,
-            Thermostat::RoomOfRequirements => HeatingDemand::RoomOfRequirements,
-            Thermostat::Bathroom => HeatingDemand::Bathroom,
+            Radiator::LivingRoomBig => HeatingDemand::Radiator(Radiator::LivingRoomBig),
+            Radiator::LivingRoomSmall => HeatingDemand::Radiator(Radiator::LivingRoomSmall),
+            Radiator::Bedroom => HeatingDemand::Radiator(Radiator::Bedroom),
+            Radiator::Kitchen => HeatingDemand::Radiator(Radiator::Kitchen),
+            Radiator::RoomOfRequirements => HeatingDemand::Radiator(Radiator::RoomOfRequirements),
+            Radiator::Bathroom => HeatingDemand::Radiator(Radiator::Bathroom),
         }
     }
 }

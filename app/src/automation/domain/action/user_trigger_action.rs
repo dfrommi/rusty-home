@@ -1,7 +1,7 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::automation::Thermostat;
+use crate::automation::Radiator;
 use crate::command::Command;
 use crate::core::time::Duration;
 use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget};
@@ -119,37 +119,37 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
         }
         UserTrigger::Homekit(HomekitCommand::LivingRoomBigHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::LivingRoomBig,
+                device: Radiator::LivingRoomBig,
                 value: demand,
             }]
         }
         UserTrigger::Homekit(HomekitCommand::LivingRoomSmallHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::LivingRoomSmall,
+                device: Radiator::LivingRoomSmall,
                 value: demand,
             }]
         }
         UserTrigger::Homekit(HomekitCommand::BedroomHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::Bedroom,
+                device: Radiator::Bedroom,
                 value: demand,
             }]
         }
         UserTrigger::Homekit(HomekitCommand::KitchenHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::Kitchen,
+                device: Radiator::Kitchen,
                 value: demand,
             }]
         }
         UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::RoomOfRequirements,
+                device: Radiator::RoomOfRequirements,
                 value: demand,
             }]
         }
         UserTrigger::Homekit(HomekitCommand::BathroomHeatingDemand(demand)) => {
             vec![Command::SetThermostatValveOpeningPosition {
-                device: Thermostat::Bathroom,
+                device: Radiator::Bathroom,
                 value: demand,
             }]
         }

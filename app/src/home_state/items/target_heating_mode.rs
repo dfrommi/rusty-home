@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::Thermostat,
+    automation::{HeatingZone, Radiator},
     home_state::{
         Occupancy, OpenedArea, Presence, Resident,
         calc::{DerivedStateProvider, StateCalculationContext},
@@ -35,23 +35,12 @@ pub enum HeatingMode {
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingMode {
-    LivingRoom,
-    Bedroom,
-    Kitchen,
-    RoomOfRequirements,
-    Bathroom,
+    HeatingZone(HeatingZone),
 }
 
 impl TargetHeatingMode {
-    pub fn from_thermostat(thermostat: Thermostat) -> Self {
-        match thermostat {
-            Thermostat::LivingRoomSmall => TargetHeatingMode::LivingRoom,
-            Thermostat::LivingRoomBig => TargetHeatingMode::LivingRoom,
-            Thermostat::Bedroom => TargetHeatingMode::Bedroom,
-            Thermostat::Kitchen => TargetHeatingMode::Kitchen,
-            Thermostat::RoomOfRequirements => TargetHeatingMode::RoomOfRequirements,
-            Thermostat::Bathroom => TargetHeatingMode::Bathroom,
-        }
+    pub fn from_radiator(radiator: Radiator) -> Self {
+        TargetHeatingMode::HeatingZone(radiator.heating_zone())
     }
 }
 
@@ -60,8 +49,8 @@ pub struct TargetHeatingModeStateProvider;
 impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeStateProvider {
     fn calculate_current(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<HeatingMode> {
         let occupancy_item = match id {
-            TargetHeatingMode::LivingRoom => Some(Occupancy::LivingRoomCouch),
-            TargetHeatingMode::RoomOfRequirements => Some(Occupancy::RoomOfRequirementsDesk),
+            TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) => Some(Occupancy::LivingRoomCouch),
+            TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) => Some(Occupancy::RoomOfRequirementsDesk),
             _ => None,
         };
 
@@ -79,18 +68,19 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
 
         //derive sleep mode from other rooms for kitchen and bathroom
         if result == HeatingMode::EnergySaving
-            && (id == TargetHeatingMode::Kitchen || id == TargetHeatingMode::Bathroom)
+            && (id == TargetHeatingMode::HeatingZone(HeatingZone::Kitchen)
+                || id == TargetHeatingMode::HeatingZone(HeatingZone::Bathroom))
         {
             let bedroom_sleep = ctx
-                .get(TargetHeatingMode::Bedroom)
+                .get(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))
                 .map(|mode| mode.value == HeatingMode::Sleep)
                 .unwrap_or(false);
             let livingroom_sleep = ctx
-                .get(TargetHeatingMode::LivingRoom)
+                .get(TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom))
                 .map(|mode| mode.value == HeatingMode::Sleep)
                 .unwrap_or(false);
             let room_of_requirements_sleep = ctx
-                .get(TargetHeatingMode::RoomOfRequirements)
+                .get(TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements))
                 .map(|mode| mode.value == HeatingMode::Sleep)
                 .unwrap_or(false);
 
@@ -107,11 +97,13 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
 impl TargetHeatingModeStateProvider {
     fn get_user_override(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<UserHeatingOverride> {
         let user_trigger = ctx.user_trigger(UserTriggerTarget::Homekit(match id {
-            TargetHeatingMode::LivingRoom => HomekitCommandTarget::LivingRoomHeatingState,
-            TargetHeatingMode::Bedroom => HomekitCommandTarget::BedroomHeatingState,
-            TargetHeatingMode::Kitchen => HomekitCommandTarget::KitchenHeatingState,
-            TargetHeatingMode::RoomOfRequirements => HomekitCommandTarget::RoomOfRequirementsHeatingState,
-            TargetHeatingMode::Bathroom => HomekitCommandTarget::BathroomHeatingState,
+            TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) => HomekitCommandTarget::LivingRoomHeatingState,
+            TargetHeatingMode::HeatingZone(HeatingZone::Bedroom) => HomekitCommandTarget::BedroomHeatingState,
+            TargetHeatingMode::HeatingZone(HeatingZone::Kitchen) => HomekitCommandTarget::KitchenHeatingState,
+            TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) => {
+                HomekitCommandTarget::RoomOfRequirementsHeatingState
+            }
+            TargetHeatingMode::HeatingZone(HeatingZone::Bathroom) => HomekitCommandTarget::BathroomHeatingState,
         }))?;
 
         let target_temperature = match &user_trigger.trigger {
@@ -142,10 +134,7 @@ impl TargetHeatingModeStateProvider {
 impl TargetHeatingMode {
     fn window(&self) -> OpenedArea {
         match self {
-            TargetHeatingMode::RoomOfRequirements => OpenedArea::RoomOfRequirementsWindow,
-            TargetHeatingMode::LivingRoom => OpenedArea::LivingRoomWindowOrDoor,
-            TargetHeatingMode::Bedroom | TargetHeatingMode::Bathroom => OpenedArea::BedroomWindow,
-            TargetHeatingMode::Kitchen => OpenedArea::KitchenWindow,
+            TargetHeatingMode::HeatingZone(heating_zone) => heating_zone.window(),
         }
     }
 }
@@ -234,9 +223,9 @@ fn calculate_heating_mode(
     //Starting sleep mode if no higher-prio, like comfort, applies. Overrides in-bed detection in
     //some zones
     //TODO "last ventilation of the day" concept for RoR
-    if (id == &TargetHeatingMode::Bedroom && t!(22:00 - 5:30).is_now())
-        || (id == &TargetHeatingMode::LivingRoom && t!(22:00 - 5:30).is_now())
-        || (id == &TargetHeatingMode::RoomOfRequirements && t!(20:00 - 5:30).is_now())
+    if (id == &TargetHeatingMode::HeatingZone(HeatingZone::Bedroom) && t!(22:00 - 5:30).is_now())
+        || (id == &TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) && t!(22:00 - 5:30).is_now())
+        || (id == &TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) && t!(20:00 - 5:30).is_now())
     {
         tracing::trace!("Heating in sleep-mode in preparation of going to bed");
         return HeatingMode::Sleep;

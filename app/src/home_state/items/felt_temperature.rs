@@ -1,6 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
+    automation::HeatingZone,
     core::{
         math::{Sigmoid, Tanh},
         unit::{DegreeCelsius, GramPerCubicMeter},
@@ -36,13 +37,13 @@ impl DerivedStateProvider<FeltTemperature, DegreeCelsius> for FeltTemperatureSta
 impl FeltTemperature {
     fn temperature(&self) -> Temperature {
         match self {
-            FeltTemperature::LivingRoom => Temperature::LivingRoom,
+            FeltTemperature::LivingRoom => Temperature::HeatingZone(HeatingZone::LivingRoom),
         }
     }
 
     fn abs_humidity(&self) -> AbsoluteHumidity {
         match self {
-            FeltTemperature::LivingRoom => AbsoluteHumidity::LivingRoom,
+            FeltTemperature::LivingRoom => AbsoluteHumidity::HeatingZone(HeatingZone::LivingRoom),
         }
     }
 }

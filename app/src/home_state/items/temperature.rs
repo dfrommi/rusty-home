@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::{HeatingZone, Thermostat};
+use crate::automation::{HeatingZone, Radiator};
 use crate::core::unit::DegreeCelsius;
 use crate::home_state::TemperatureChange;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
@@ -9,13 +9,9 @@ use crate::t;
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Temperature {
     Outside,
-    LivingRoom,
-    RoomOfRequirements,
-    Bedroom,
-    Kitchen,
-    Bathroom,
-    Radiator(Thermostat),
-    RadiatorIn15Minutes(Thermostat),
+    HeatingZone(HeatingZone),
+    Radiator(Radiator),
+    RadiatorIn15Minutes(Radiator),
     HeatingZoneIn15Minutes(HeatingZone),
 }
 
@@ -27,21 +23,25 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
 
         match id {
             Temperature::Outside => ctx.device_state(DeviceTemperature::Outside)?.value,
-            Temperature::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
-            Temperature::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
-            Temperature::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
-            Temperature::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
-            Temperature::Bathroom => {
-                let shower = ctx.device_state(DeviceTemperature::BathroomShower);
-                let dehumidifier = ctx.device_state(DeviceTemperature::Dehumidifier);
+            Temperature::HeatingZone(heating_zone) => match heating_zone {
+                HeatingZone::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
+                HeatingZone::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
+                HeatingZone::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
+                HeatingZone::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
+                HeatingZone::Bathroom => {
+                    let shower = ctx.device_state(DeviceTemperature::BathroomShower);
+                    let dehumidifier = ctx.device_state(DeviceTemperature::Dehumidifier);
 
-                match (shower, dehumidifier) {
-                    (Some(shower), Some(dehumidifier)) => DegreeCelsius((shower.value.0 + dehumidifier.value.0) / 2.0),
-                    (Some(shower), None) => shower.value,
-                    (None, Some(dehumidifier)) => dehumidifier.value,
-                    (None, None) => return None,
+                    match (shower, dehumidifier) {
+                        (Some(shower), Some(dehumidifier)) => {
+                            DegreeCelsius((shower.value.0 + dehumidifier.value.0) / 2.0)
+                        }
+                        (Some(shower), None) => shower.value,
+                        (None, Some(dehumidifier)) => dehumidifier.value,
+                        (None, None) => return None,
+                    }
                 }
-            }
+            },
             Temperature::Radiator(thermostat) => ctx.device_state(DeviceTemperature::Radiator(thermostat))?.value,
             Temperature::RadiatorIn15Minutes(thermostat) => {
                 let current = ctx.device_state(DeviceTemperature::Radiator(thermostat))?.value;

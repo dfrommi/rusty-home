@@ -8,7 +8,7 @@ use crate::home_state::EnergySaving;
 
 use super::{
     Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, Notification, NotificationAction,
-    NotificationRecipient, NotificationTarget, PowerToggle, Thermostat,
+    NotificationRecipient, NotificationTarget, PowerToggle, Radiator,
 };
 
 impl Command {
@@ -36,7 +36,7 @@ impl Command {
 }
 
 fn is_set_thermostat_valve_opening_position_reflected_in_state(
-    device: &Thermostat,
+    device: &Radiator,
     value: &Percent,
     snapshot: &StateSnapshot,
 ) -> Result<bool> {

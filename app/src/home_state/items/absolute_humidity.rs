@@ -1,18 +1,15 @@
 use super::*;
 use anyhow::Result;
 
+use crate::automation::HeatingZone;
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum AbsoluteHumidity {
-    Bathroom,
     BathroomShower,
     BathroomDehumidifier,
-    LivingRoom,
-    Bedroom,
-    RoomOfRequirements,
-    Kitchen,
+    HeatingZone(HeatingZone),
     Outside,
 }
 
@@ -26,23 +23,15 @@ impl DerivedStateProvider<AbsoluteHumidity, GramPerCubicMeter> for AbsoluteHumid
         use crate::home_state::items::Temperature as HomeTemperature;
 
         let temperature_dp = match id {
-            AbsoluteHumidity::LivingRoom => ctx.get(HomeTemperature::LivingRoom)?,
-            AbsoluteHumidity::Bathroom => ctx.get(HomeTemperature::Bathroom)?,
+            AbsoluteHumidity::HeatingZone(heating_zone) => ctx.get(HomeTemperature::HeatingZone(heating_zone))?,
             AbsoluteHumidity::Outside => ctx.get(HomeTemperature::Outside)?,
-            AbsoluteHumidity::Bedroom => ctx.get(HomeTemperature::Bedroom)?,
-            AbsoluteHumidity::Kitchen => ctx.get(HomeTemperature::Kitchen)?,
-            AbsoluteHumidity::RoomOfRequirements => ctx.get(HomeTemperature::RoomOfRequirements)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceTemperature::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceTemperature::Dehumidifier)?,
         };
 
         let humidity_dp = match id {
-            AbsoluteHumidity::LivingRoom => ctx.get(HomeRelativeHumidity::LivingRoom)?,
-            AbsoluteHumidity::Bathroom => ctx.get(HomeRelativeHumidity::Bathroom)?,
+            AbsoluteHumidity::HeatingZone(heating_zone) => ctx.get(HomeRelativeHumidity::HeatingZone(heating_zone))?,
             AbsoluteHumidity::Outside => ctx.get(HomeRelativeHumidity::Outside)?,
-            AbsoluteHumidity::Bedroom => ctx.get(HomeRelativeHumidity::Bedroom)?,
-            AbsoluteHumidity::Kitchen => ctx.get(HomeRelativeHumidity::Kitchen)?,
-            AbsoluteHumidity::RoomOfRequirements => ctx.get(HomeRelativeHumidity::RoomOfRequirements)?,
             AbsoluteHumidity::BathroomShower => ctx.device_state(DeviceRelativeHumidity::BathroomShower)?,
             AbsoluteHumidity::BathroomDehumidifier => ctx.device_state(DeviceRelativeHumidity::Dehumidifier)?,
         };

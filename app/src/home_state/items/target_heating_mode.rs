@@ -3,7 +3,7 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     automation::{HeatingZone, Radiator, RoomWithWindow},
     home_state::{
-        Occupancy, Opened, Presence,
+        Occupancy, Presence, Ventilation,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
 };
@@ -48,6 +48,8 @@ pub struct TargetHeatingModeStateProvider;
 
 impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeStateProvider {
     fn calculate_current(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<HeatingMode> {
+        let TargetHeatingMode::HeatingZone(heating_zone) = id;
+
         let occupancy_item = match id {
             TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) => Some(Occupancy::LivingRoomCouch),
             TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) => Some(Occupancy::RoomOfRequirementsDesk),
@@ -58,10 +60,17 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             .and_then(|item| ctx.all_since(item, t!(1 hours ago)))
             .unwrap_or(DataFrame::empty());
 
+        let ventilation_item = Ventilation::Room(match heating_zone {
+            HeatingZone::LivingRoom => RoomWithWindow::LivingRoom,
+            HeatingZone::Bedroom | HeatingZone::Bathroom => RoomWithWindow::Bedroom,
+            HeatingZone::Kitchen => RoomWithWindow::Kitchen,
+            HeatingZone::RoomOfRequirements => RoomWithWindow::RoomOfRequirements,
+        });
+
         let result = calculate_heating_mode(
             &id,
             !ctx.get(Presence::AtHomeDennis)? & !ctx.get(Presence::AtHomeSabine)?,
-            ctx.get(id.window())?,
+            ctx.get(ventilation_item)?,
             occupancy_1h,
             self.get_user_override(id, ctx),
         );
@@ -131,23 +140,10 @@ impl TargetHeatingModeStateProvider {
     }
 }
 
-impl TargetHeatingMode {
-    fn window(&self) -> Opened {
-        match self {
-            TargetHeatingMode::HeatingZone(heating_zone) => match heating_zone {
-                HeatingZone::LivingRoom => Opened::Room(RoomWithWindow::LivingRoom),
-                HeatingZone::Kitchen => Opened::Room(RoomWithWindow::Kitchen),
-                HeatingZone::RoomOfRequirements => Opened::Room(RoomWithWindow::RoomOfRequirements),
-                HeatingZone::Bedroom | HeatingZone::Bathroom => Opened::Room(RoomWithWindow::Bedroom),
-            },
-        }
-    }
-}
-
 fn calculate_heating_mode(
     id: &TargetHeatingMode,
     away: DataPoint<bool>,
-    window_open: DataPoint<bool>,
+    ventilation: DataPoint<bool>,
     occupancy_1h: DataFrame<Probability>,
     user_override: Option<UserHeatingOverride>,
 ) -> HeatingMode {
@@ -158,7 +154,7 @@ fn calculate_heating_mode(
     }
 
     //Or cold-air coming in?
-    if window_open.value && window_open.timestamp.elapsed() > t!(20 seconds) {
+    if ventilation.value {
         tracing::trace!("Heating in ventilation mode as window is open");
         return HeatingMode::Ventilation;
     }
@@ -183,7 +179,7 @@ fn calculate_heating_mode(
     //mode when setpoint is reached, but make sure it won't toggle on/off.
     //Maybe use a hysteresis for that and don't enter mode unless room is below
     //default-temperature of thermostat
-    if !window_open.value && window_open.timestamp.elapsed() < t!(30 minutes) {
+    if !ventilation.value && ventilation.timestamp.elapsed() < t!(30 minutes) {
         tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
         return HeatingMode::PostVentilation;
     }
@@ -191,7 +187,7 @@ fn calculate_heating_mode(
     //sleeping preserved until ventilation in that room
     if let Some(morning_timerange) = t!(5:20 - 12:30).active() {
         //some tampering with window, but not in morning hours
-        if !morning_timerange.contains(&window_open.timestamp) {
+        if !morning_timerange.contains(&ventilation.timestamp) {
             tracing::trace!("Heating in sleep-mode as not yet ventilated");
             return HeatingMode::Sleep;
         }

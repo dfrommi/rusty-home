@@ -19,6 +19,7 @@ mod target_heating_demand;
 mod target_heating_mode;
 mod temperature;
 mod temperature_change;
+mod ventilation;
 
 use std::fmt::Debug;
 
@@ -43,6 +44,7 @@ pub use target_heating_demand::TargetHeatingDemand;
 pub use target_heating_mode::*;
 pub use temperature::Temperature;
 pub use temperature_change::TemperatureChange;
+pub use ventilation::Ventilation;
 
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
@@ -61,6 +63,7 @@ pub enum HomeStateValue {
     Opened(Opened, bool),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
+    Ventilation(Ventilation, bool),
     TargetHeatingAdjustment(TargetHeatingAdjustment, AdjustmentDirection),
     TargetHeatingMode(TargetHeatingMode, HeatingMode),
     TargetHeatingDemand(TargetHeatingDemand, Percent),
@@ -110,6 +113,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Opened(id) => opened::OpenedStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Opened(id, value)),
+            HomeStateId::Ventilation(id) => ventilation::VentilationStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::Ventilation(id, value)),
             HomeStateId::Resident(id) => resident::ResidentStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Resident(id, value)),

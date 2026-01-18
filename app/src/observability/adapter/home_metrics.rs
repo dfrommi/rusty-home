@@ -30,6 +30,7 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::Opened(_, v) => default_with(v.into()),
             HomeStateValue::Resident(_, v) => default_with(v.into()),
             HomeStateValue::RiskOfMould(_, v) => default_with(v.into()),
+            HomeStateValue::Ventilation(_, v) => default_with(v.into()),
             HomeStateValue::EnergySaving(_, v) => default_with(v.into()),
             HomeStateValue::FanActivity(_, v) => default_with(f64::from(&v)),
             HomeStateValue::HeatingDemand(_, v) => default_with(f64::from(&v)),

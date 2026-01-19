@@ -190,6 +190,7 @@ pub enum EnergySavingDevice {
 pub enum Fan {
     LivingRoomCeilingFan,
     BedroomCeilingFan,
+    BedroomDehumidifier,
 }
 
 #[cfg(test)]

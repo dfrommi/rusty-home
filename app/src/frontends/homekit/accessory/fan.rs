@@ -6,6 +6,15 @@ use crate::{
     home_state::{FanActivity, HomeStateValue},
 };
 
+const ALL_SPEEDS: [FanSpeed; 5] = [
+    FanSpeed::Silent,
+    FanSpeed::Low,
+    FanSpeed::Medium,
+    FanSpeed::High,
+    FanSpeed::Turbo,
+];
+const DEHUMIDIFIER_SPEEDS: [FanSpeed; 3] = [FanSpeed::Low, FanSpeed::Medium, FanSpeed::High];
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum FanDirection {
     Forward,
@@ -48,6 +57,97 @@ impl FanDirection {
     }
 }
 
+#[derive(Clone, Copy)]
+struct FanConfig {
+    supports_reverse: bool,
+    speeds: &'static [FanSpeed],
+}
+
+impl FanConfig {
+    fn for_activity(activity: FanActivity) -> Self {
+        match activity {
+            FanActivity::BedroomDehumidifier => Self {
+                supports_reverse: false,
+                speeds: &DEHUMIDIFIER_SPEEDS,
+            },
+            FanActivity::LivingRoomCeilingFan | FanActivity::BedroomCeilingFan => Self {
+                supports_reverse: true,
+                speeds: &ALL_SPEEDS,
+            },
+        }
+    }
+
+    fn min_step(&self) -> f64 {
+        if self.speeds.is_empty() {
+            100.0
+        } else {
+            100.0 / self.speeds.len() as f64
+        }
+    }
+
+    fn default_speed(&self) -> FanSpeed {
+        self.speeds.first().cloned().unwrap_or(FanSpeed::Low)
+    }
+
+    fn normalize_speed(&self, speed: &FanSpeed) -> FanSpeed {
+        if self.speeds.iter().any(|candidate| candidate == speed) {
+            return speed.clone();
+        }
+
+        let target = speed_rank(speed);
+        self.speeds
+            .iter()
+            .min_by_key(|candidate| (speed_rank(candidate) - target).abs())
+            .cloned()
+            .unwrap_or_else(|| self.default_speed())
+    }
+
+    fn normalize_airflow(&self, airflow: &FanAirflow) -> FanAirflow {
+        match airflow {
+            FanAirflow::Off => FanAirflow::Off,
+            FanAirflow::Forward(speed) => FanAirflow::Forward(self.normalize_speed(speed)),
+            FanAirflow::Reverse(speed) => {
+                let speed = self.normalize_speed(speed);
+                if self.supports_reverse {
+                    FanAirflow::Reverse(speed)
+                } else {
+                    FanAirflow::Forward(speed)
+                }
+            }
+        }
+    }
+
+    fn airflow_to_percent(&self, airflow: &FanAirflow) -> f64 {
+        match airflow {
+            FanAirflow::Off => 0.0,
+            FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => self.speed_to_percent(speed),
+        }
+    }
+
+    fn speed_to_percent(&self, speed: &FanSpeed) -> f64 {
+        let speed = self.normalize_speed(speed);
+        let index = self
+            .speeds
+            .iter()
+            .position(|candidate| candidate == &speed)
+            .unwrap_or(0);
+
+        (index as f64 + 1.0) * self.min_step()
+    }
+
+    fn percent_to_speed(&self, percent: f64) -> FanSpeed {
+        if self.speeds.is_empty() {
+            return FanSpeed::Low;
+        }
+
+        let ratio = (percent / 100.0).clamp(0.0, 1.0);
+        let raw_index = (ratio * self.speeds.len() as f64).ceil() as usize;
+        let index = raw_index.saturating_sub(1).min(self.speeds.len() - 1);
+
+        self.speeds[index].clone()
+    }
+}
+
 #[derive(Clone)]
 struct FanStatus {
     airflow: FanAirflow,
@@ -55,18 +155,18 @@ struct FanStatus {
     last_speed: FanSpeed,
 }
 
-impl Default for FanStatus {
-    fn default() -> Self {
+impl FanStatus {
+    fn new(default_speed: FanSpeed) -> Self {
         Self {
             airflow: FanAirflow::Off,
             last_direction: FanDirection::Forward,
-            last_speed: FanSpeed::Silent,
+            last_speed: default_speed,
         }
     }
-}
 
-impl FanStatus {
-    fn apply_state(&mut self, airflow: FanAirflow) {
+    fn apply_state(&mut self, airflow: FanAirflow, config: &FanConfig) {
+        let airflow = config.normalize_airflow(&airflow);
+
         match &airflow {
             FanAirflow::Forward(speed) => {
                 self.last_direction = FanDirection::Forward;
@@ -105,44 +205,58 @@ impl FanStatus {
 pub struct Fan {
     name: &'static str,
     activity: FanActivity,
+    config: FanConfig,
     status: FanStatus,
 }
 
 impl Fan {
     pub fn new(name: &'static str, activity: FanActivity) -> Self {
+        let config = FanConfig::for_activity(activity);
+
         Self {
             name,
             activity,
-            status: FanStatus::default(),
+            config,
+            status: FanStatus::new(config.default_speed()),
         }
     }
 
     pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
-        vec![
+        let mut targets = vec![
             self.target(HomekitCharacteristic::Active).into_config(),
             self.target(HomekitCharacteristic::RotationSpeed)
-                .with_config(serde_json::json!({ "minStep": 20 })),
-            self.target(HomekitCharacteristic::RotationDirection).into_config(),
-        ]
+                .with_config(serde_json::json!({ "minStep": self.config.min_step() })),
+        ];
+
+        if self.config.supports_reverse {
+            targets.push(self.target(HomekitCharacteristic::RotationDirection).into_config());
+        }
+
+        targets
     }
 
     pub fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         match state {
             HomeStateValue::FanActivity(activity, airflow) if *activity == self.activity => {
-                self.status.apply_state(airflow.clone());
+                self.status.apply_state(airflow.clone(), &self.config);
 
                 let direction = self.status.current_direction();
-                let speed_percent = airflow_to_percent(&self.status.airflow());
+                let speed_percent = self.config.airflow_to_percent(&self.status.airflow());
                 let active = self.status.is_active();
 
-                vec![
+                let mut events = vec![
                     self.event(HomekitCharacteristic::Active, serde_json::json!(if active { 1 } else { 0 })),
                     self.event(HomekitCharacteristic::RotationSpeed, serde_json::json!(speed_percent)),
-                    self.event(
+                ];
+
+                if self.config.supports_reverse {
+                    events.push(self.event(
                         HomekitCharacteristic::RotationDirection,
                         serde_json::json!(direction.characteristic_value()),
-                    ),
-                ]
+                    ));
+                }
+
+                events
             }
             _ => Vec::new(),
         }
@@ -177,8 +291,12 @@ impl Fan {
                 let new_airflow = if percent <= 0.0 {
                     FanAirflow::Off
                 } else {
-                    let speed = percent_to_speed(percent);
-                    let direction = self.status.current_direction();
+                    let speed = self.config.percent_to_speed(percent);
+                    let direction = if self.config.supports_reverse {
+                        self.status.current_direction()
+                    } else {
+                        FanDirection::Forward
+                    };
                     direction.with_speed(speed)
                 };
 
@@ -190,6 +308,14 @@ impl Fan {
         }
 
         if trigger.target == self.target(HomekitCharacteristic::RotationDirection) {
+            if !self.config.supports_reverse {
+                tracing::warn!(
+                    "Fan {} received RotationDirection payload, but reverse is not supported",
+                    self.name
+                );
+                return None;
+            }
+
             if let Some(direction) = FanDirection::try_from_value(&trigger.value) {
                 self.status.last_direction = direction;
 
@@ -224,47 +350,29 @@ impl Fan {
     }
 
     fn command_with_state(&mut self, airflow: FanAirflow) -> Option<HomekitCommand> {
+        let airflow = self.config.normalize_airflow(&airflow);
+
         if airflow == self.status.airflow() {
             return None;
         }
 
-        self.status.apply_state(airflow.clone());
+        self.status.apply_state(airflow.clone(), &self.config);
 
-        Some(match self.activity {
-            FanActivity::LivingRoomCeilingFan => HomekitCommand::LivingRoomCeilingFanSpeed(airflow),
-            FanActivity::BedroomCeilingFan => HomekitCommand::BedroomCeilingFanSpeed(airflow),
-        })
+        match self.activity {
+            FanActivity::LivingRoomCeilingFan => Some(HomekitCommand::LivingRoomCeilingFanSpeed(airflow)),
+            FanActivity::BedroomCeilingFan => Some(HomekitCommand::BedroomCeilingFanSpeed(airflow)),
+            FanActivity::BedroomDehumidifier => Some(HomekitCommand::BedroomDehumidifierFanSpeed(airflow)),
+        }
     }
 }
 
-fn airflow_to_percent(airflow: &FanAirflow) -> f64 {
-    match airflow {
-        FanAirflow::Off => 0.0,
-        FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => speed_to_percent(speed),
-    }
-}
-
-fn speed_to_percent(speed: &FanSpeed) -> f64 {
+fn speed_rank(speed: &FanSpeed) -> i32 {
     match speed {
-        FanSpeed::Silent => 20.0,
-        FanSpeed::Low => 40.0,
-        FanSpeed::Medium => 60.0,
-        FanSpeed::High => 80.0,
-        FanSpeed::Turbo => 100.0,
-    }
-}
-
-fn percent_to_speed(percent: f64) -> FanSpeed {
-    if percent <= 20.0 {
-        FanSpeed::Silent
-    } else if percent <= 40.0 {
-        FanSpeed::Low
-    } else if percent <= 60.0 {
-        FanSpeed::Medium
-    } else if percent <= 80.0 {
-        FanSpeed::High
-    } else {
-        FanSpeed::Turbo
+        FanSpeed::Silent => 0,
+        FanSpeed::Low => 1,
+        FanSpeed::Medium => 2,
+        FanSpeed::High => 3,
+        FanSpeed::Turbo => 4,
     }
 }
 

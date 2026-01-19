@@ -42,6 +42,9 @@ impl UserTrigger {
                 HomekitCommand::BedroomCeilingFanSpeed(_) => {
                     UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed)
                 }
+                HomekitCommand::BedroomDehumidifierFanSpeed(_) => {
+                    UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomDehumidifierFanSpeed)
+                }
                 HomekitCommand::LivingRoomHeatingState(_) => {
                     UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
                 }

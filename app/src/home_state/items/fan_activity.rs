@@ -9,6 +9,7 @@ use crate::{
 pub enum FanActivity {
     LivingRoomCeilingFan,
     BedroomCeilingFan,
+    BedroomDehumidifier,
 }
 
 pub struct FanActivityStateProvider;
@@ -20,6 +21,7 @@ impl DerivedStateProvider<FanActivity, FanAirflow> for FanActivityStateProvider 
         ctx.device_state(match id {
             FanActivity::LivingRoomCeilingFan => DeviceFanActivity::LivingRoomCeilingFan,
             FanActivity::BedroomCeilingFan => DeviceFanActivity::BedroomCeilingFan,
+            FanActivity::BedroomDehumidifier => DeviceFanActivity::BedroomDehumidifier,
         })
         .map(|dp| dp.value)
     }

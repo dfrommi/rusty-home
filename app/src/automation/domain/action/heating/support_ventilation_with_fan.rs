@@ -9,26 +9,32 @@ use crate::t;
 use super::Opened;
 
 #[derive(Debug, Clone, Id)]
-pub struct SupportVentilationWithFan(Fan);
+pub enum SupportVentilationWithFan {
+    LivingRoomCeilingFan,
+    BedroomCeilingFan,
+}
 
 impl SupportVentilationWithFan {
-    pub fn new(fan: Fan) -> Self {
-        Self(fan)
+    fn fan(&self) -> Fan {
+        match self {
+            SupportVentilationWithFan::LivingRoomCeilingFan => Fan::LivingRoomCeilingFan,
+            SupportVentilationWithFan::BedroomCeilingFan => Fan::BedroomCeilingFan,
+        }
     }
 }
 
 impl SimpleRule for SupportVentilationWithFan {
     fn command(&self) -> Command {
         Command::ControlFan {
-            device: self.0.clone(),
+            device: self.fan(),
             speed: FanAirflow::Reverse(FanSpeed::Medium),
         }
     }
 
     fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<bool> {
-        let window = match self.0 {
-            Fan::LivingRoomCeilingFan => Opened::Room(RoomWithWindow::LivingRoom),
-            Fan::BedroomCeilingFan => Opened::Room(RoomWithWindow::Bedroom),
+        let window = match self {
+            SupportVentilationWithFan::LivingRoomCeilingFan => Opened::Room(RoomWithWindow::LivingRoom),
+            SupportVentilationWithFan::BedroomCeilingFan => Opened::Room(RoomWithWindow::Bedroom),
         };
 
         let opened_dp = ctx.current_dp(window)?;

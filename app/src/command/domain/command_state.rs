@@ -103,6 +103,7 @@ fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, snapsho
     let state_device = match device {
         Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
         Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
+        Fan::BedroomDehumidifier => FanActivity::BedroomDehumidifier,
     };
 
     let current_flow = snapshot.try_get(state_device)?.value;

@@ -97,6 +97,14 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "fan.ceiling_fan_bedroom",
             HaChannel::WindcalmFanSpeed(FanActivity::BedroomCeilingFan),
         ),
+        (
+            "fan.dehumidifier_34e8_fan",
+            HaChannel::ComfeeDehumidifierFanSpeed(FanActivity::BedroomDehumidifier),
+        ),
+        (
+            "humidifier.dehumidifier_34e8",
+            HaChannel::ComfeeDehumidifierFanPowerState(FanActivity::BedroomDehumidifier),
+        ),
         //
         // LIGHT LEVEL
         //

@@ -3,7 +3,7 @@ mod config;
 use infrastructure::{Mqtt, MqttSubscription};
 use serde::Deserialize;
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
@@ -18,10 +18,17 @@ use serde::Deserializer;
 use serde_json::Value;
 
 use crate::core::timeseries::DataPoint;
-use crate::core::unit::{DegreeCelsius, FanAirflow, Lux, Percent};
+use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed, Lux, Percent};
 use crate::device_state::DeviceStateValue;
 
 use crate::core::DeviceConfig;
+use std::sync::Mutex;
+
+#[derive(Debug, Default, Clone)]
+struct ComfeeFanCache {
+    powered: Option<bool>,
+    fan_speed: Option<FanSpeed>,
+}
 
 #[derive(Debug, Clone)]
 pub enum HaChannel {
@@ -32,6 +39,8 @@ pub enum HaChannel {
     PresenceFromDeviceTracker(Presence),
     PresenceFromFP2(Presence),
     WindcalmFanSpeed(FanActivity),
+    ComfeeDehumidifierFanPowerState(FanActivity),
+    ComfeeDehumidifierFanSpeed(FanActivity),
     LightLevel(LightLevel),
 }
 
@@ -69,6 +78,7 @@ pub struct HomeAssistantIncomingDataSource {
     listener: HaMqttClient,
     config: DeviceConfig<HaChannel>,
     initial_load: Option<Vec<StateChangedEvent>>,
+    comfee_cache: Mutex<HashMap<FanActivity, ComfeeFanCache>>,
 }
 
 impl HomeAssistantIncomingDataSource {
@@ -87,6 +97,7 @@ impl HomeAssistantIncomingDataSource {
             listener: mqtt_client,
             config,
             initial_load: None,
+            comfee_cache: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -131,8 +142,13 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HomeAssistantIncomingD
             StateValue::Available(state_value) => {
                 tracing::info!("Received supported event {}", device_id);
 
-                let dp_result =
-                    to_persistent_data_point(channel.clone(), state_value, &msg.attributes, msg.last_changed);
+                let dp_result = to_persistent_data_point(
+                    channel.clone(),
+                    state_value,
+                    &msg.attributes,
+                    msg.last_changed,
+                    &self.comfee_cache,
+                );
 
                 match dp_result {
                     Ok(Some(dp)) => vec![dp],
@@ -158,8 +174,9 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HomeAssistantIncomingD
 fn to_persistent_data_point(
     channel: HaChannel,
     ha_value: &str,
-    _attributes: &HashMap<String, serde_json::Value>,
+    attributes: &HashMap<String, serde_json::Value>,
     timestamp: DateTime,
+    comfee_cache: &Mutex<HashMap<FanActivity, ComfeeFanCache>>,
 ) -> anyhow::Result<Option<IncomingData>> {
     let dp: Option<IncomingData> = match channel {
         HaChannel::Temperature(channel) => Some(
@@ -190,6 +207,22 @@ fn to_persistent_data_point(
         }
         HaChannel::PresenceFromFP2(channel) => {
             Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "on"), timestamp).into())
+        }
+        HaChannel::ComfeeDehumidifierFanSpeed(channel) => {
+            let preset_mode = attributes.get("preset_mode").and_then(|v| v.as_str());
+            let fan_speed = match preset_mode {
+                Some("Low") => FanSpeed::Low,
+                Some("Medium") => FanSpeed::Medium,
+                Some("High") => FanSpeed::High,
+                _ => bail!("Unknown fan speed value: {:?}", preset_mode),
+            };
+
+            update_comfee_state(comfee_cache, channel, ComfeeFanUpdate::FanSpeed(fan_speed), timestamp)?
+        }
+        HaChannel::ComfeeDehumidifierFanPowerState(channel) => {
+            let on = ha_value == "on";
+
+            update_comfee_state(comfee_cache, channel, ComfeeFanUpdate::Powered(on), timestamp)?
         }
         HaChannel::WindcalmFanSpeed(channel) => {
             //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
@@ -222,6 +255,57 @@ fn to_persistent_data_point(
                 None
             }
         }
+    };
+
+    Ok(dp)
+}
+
+#[derive(Debug, Clone)]
+enum ComfeeFanUpdate {
+    FanSpeed(FanSpeed),
+    Powered(bool),
+}
+
+fn update_comfee_state(
+    comfee_cache: &Mutex<HashMap<FanActivity, ComfeeFanCache>>,
+    channel: FanActivity,
+    update: ComfeeFanUpdate,
+    timestamp: DateTime,
+) -> anyhow::Result<Option<IncomingData>> {
+    tracing::info!(
+        "Trying to update Comfee state for channel {:?} with update {:?}",
+        channel,
+        update
+    );
+
+    let mut cache = comfee_cache
+        .lock()
+        .map_err(|e| anyhow::anyhow!("Error locking Comfee cache: {:?}", e))?;
+    let state = cache.entry(channel).or_default();
+
+    tracing::info!("Current Comfee state for channel {:?} is {:?}", channel, state);
+
+    match update {
+        ComfeeFanUpdate::FanSpeed(fan_speed) => state.fan_speed = Some(fan_speed),
+        ComfeeFanUpdate::Powered(on) => state.powered = Some(on),
+    }
+
+    let dp = match (state.powered, state.fan_speed.clone()) {
+        (Some(false), Some(_)) => {
+            tracing::info!("Comfee fan is powered off, setting airflow to Off");
+            Some(DataPoint::new(DeviceStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
+        }
+        (Some(true), Some(fan_speed)) => {
+            tracing::info!("Comfee fan is powered on, setting airflow to Forward({:?})", fan_speed);
+            Some(
+                DataPoint::new(
+                    DeviceStateValue::FanActivity(channel, FanAirflow::Forward(fan_speed)),
+                    timestamp,
+                )
+                .into(),
+            )
+        }
+        _ => None,
     };
 
     Ok(dp)

@@ -70,6 +70,7 @@ impl UserTriggerAction {
             }
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
+            UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomDehumidifierFanSpeed) => Some(t!(1 hours)),
             UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
@@ -107,6 +108,10 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
         }],
         UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(speed)) => vec![Command::ControlFan {
             device: Fan::BedroomCeilingFan,
+            speed,
+        }],
+        UserTrigger::Homekit(HomekitCommand::BedroomDehumidifierFanSpeed(speed)) => vec![Command::ControlFan {
+            device: Fan::BedroomDehumidifier,
             speed,
         }],
         UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(_))

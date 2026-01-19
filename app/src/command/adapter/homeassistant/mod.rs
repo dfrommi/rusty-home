@@ -1,5 +1,6 @@
 mod config;
 
+use anyhow::bail;
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
@@ -14,6 +15,10 @@ enum HaServiceTarget {
     PushNotification(&'static str),
     LgWebosSmartTv(&'static str),
     WindcalmFanSpeed(&'static str),
+    ComfeeDehumidifier {
+        humidifier_id: &'static str,
+        fan_id: &'static str,
+    },
 }
 
 pub struct HomeAssistantCommandExecutor {
@@ -86,6 +91,9 @@ impl HomeAssistantCommandExecutor {
             (WindcalmFanSpeed(id), Command::ControlFan { device, speed }) => {
                 self.windcalm_fan_speed(id, device, speed).await
             }
+            (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
+                self.comfee_fan_speed(humidifier_id, fan_id, speed).await
+            }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }
     }
@@ -153,6 +161,54 @@ impl HomeAssistantCommandExecutor {
                     )
                     .await?
             }
+        };
+
+        Ok(())
+    }
+
+    async fn comfee_fan_speed(&self, humidifier_id: &str, fan_id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+        match airflow {
+            FanAirflow::Off => {
+                self.client
+                    .call_service(
+                        "humidifier",
+                        "turn_off",
+                        json!({
+                            "entity_id": vec![humidifier_id.to_string()]
+                        }),
+                    )
+                    .await?
+            }
+            FanAirflow::Forward(fan_speed) => {
+                let fan_preset = match fan_speed {
+                    FanSpeed::Low => "Low",
+                    FanSpeed::Medium => "Medium",
+                    FanSpeed::High => "High",
+                    _ => bail!("Unsupported fan speed for Comfee dehumidifier: {:?}", fan_speed),
+                };
+
+                self.client
+                    .call_service(
+                        "humidifier",
+                        "turn_on",
+                        json!({
+                            "entity_id": vec![humidifier_id.to_string()]
+                        }),
+                    )
+                    .await?;
+                self.client
+                    .call_service(
+                        "fan",
+                        "set_preset_mode",
+                        json!({
+                            "entity_id": vec![fan_id.to_string()],
+                            "preset_mode": fan_preset
+                        }),
+                    )
+                    .await?
+            }
+
+            FanAirflow::Reverse(_) => bail!("Comfee dehumidifier does not support reverse airflow"),
         };
 
         Ok(())

@@ -4,4 +4,5 @@ use r#macro::{EnumVariants, Id};
 pub enum FanActivity {
     LivingRoomCeilingFan,
     BedroomCeilingFan,
+    BedroomDehumidifier,
 }

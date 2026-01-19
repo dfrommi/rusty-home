@@ -67,6 +67,7 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
                         match device {
                             Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
                             Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
+                            Fan::BedroomDehumidifier => FanActivity::BedroomDehumidifier,
                         },
                         speed.clone(),
                     ),

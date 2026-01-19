@@ -55,15 +55,16 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
         vec![
-            SupportVentilationWithFan::new(Fan::LivingRoomCeilingFan).into(),
+            SupportVentilationWithFan::LivingRoomCeilingFan.into(),
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomCeilingFanSpeed.into()).into(),
         ]
     ),
     (
         HomeGoal::BetterRoomClimate(Room::Bedroom),
         vec![
-            SupportVentilationWithFan::new(Fan::BedroomCeilingFan).into(),
+            SupportVentilationWithFan::BedroomCeilingFan.into(),
             UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
+            UserTriggerAction::new(HomekitCommandTarget::BedroomDehumidifierFanSpeed.into()).into(),
         ]
     ),
     (
@@ -116,6 +117,9 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             }).into(),
             FollowDefaultSetting::new(CommandTarget::ControlFan {
                 device: Fan::BedroomCeilingFan,
+            }).into(),
+            FollowDefaultSetting::new(CommandTarget::ControlFan {
+                device: Fan::BedroomDehumidifier,
             }).into(),
         ]
     )

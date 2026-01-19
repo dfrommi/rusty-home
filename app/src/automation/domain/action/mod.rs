@@ -1,8 +1,8 @@
+mod block_automation;
 mod dehumidify;
 mod follow_default_setting;
 mod heating;
 mod inform_window_open;
-mod reduce_noise_at_night;
 mod user_trigger_action;
 
 use std::fmt::Debug;
@@ -16,11 +16,11 @@ use crate::trigger::UserTriggerId;
 use crate::trigger::UserTriggerTarget;
 use anyhow::Result;
 
+pub use block_automation::BlockAutomation;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
-pub use reduce_noise_at_night::ReduceNoiseAtNight;
 pub use user_trigger_action::UserTriggerAction;
 
 use crate::automation::planner::{Action, ActionEvaluationResult};
@@ -94,11 +94,11 @@ pub enum HomeAction {
     Dehumidify(Dehumidify),
     InformWindowOpen(InformWindowOpen),
     AutoTurnOff(AutoTurnOff),
-    ReduceNoiseAtNight(ReduceNoiseAtNight),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
-    SupportVentilationWithFan(SupportVentilationWithFan),
+    SupportWithFan(SupportWithFan),
     FollowTargetHeatingDemand(FollowTargetHeatingDemand),
+    BlockAutomation(BlockAutomation),
 }
 
 impl Display for HomeAction {
@@ -116,17 +116,17 @@ impl Action for HomeAction {
             HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, ctx),
             HomeAction::InformWindowOpen(inform_window_open) => evaluate_rule(inform_window_open, ext_id, ctx),
             HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, ctx),
-            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => evaluate_rule(reduce_noise_at_night, ext_id, ctx),
             HomeAction::FollowDefaultSetting(follow_default_setting) => {
                 evaluate_rule(follow_default_setting, ext_id, ctx)
             }
             HomeAction::UserTriggerAction(user_trigger_action) => evaluate_rule(user_trigger_action, ext_id, ctx),
-            HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
+            HomeAction::SupportWithFan(support_ventilation_with_fan) => {
                 evaluate_rule(support_ventilation_with_fan, ext_id, ctx)
             }
             HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
                 evaluate_rule(follow_target_heating_demand, ext_id, ctx)
             }
+            HomeAction::BlockAutomation(block_automation) => evaluate_rule(block_automation, ext_id, ctx),
         }
     }
 
@@ -135,15 +135,13 @@ impl Action for HomeAction {
             HomeAction::Dehumidify(dehumidify) => dehumidify.ext_id(),
             HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.ext_id(),
             HomeAction::AutoTurnOff(auto_turn_off) => auto_turn_off.ext_id(),
-            HomeAction::ReduceNoiseAtNight(reduce_noise_at_night) => reduce_noise_at_night.ext_id(),
             HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.ext_id(),
             HomeAction::UserTriggerAction(user_trigger_action) => user_trigger_action.ext_id(),
-            HomeAction::SupportVentilationWithFan(support_ventilation_with_fan) => {
-                support_ventilation_with_fan.ext_id()
-            }
+            HomeAction::SupportWithFan(support_ventilation_with_fan) => support_ventilation_with_fan.ext_id(),
             HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
                 follow_target_heating_demand.ext_id()
             }
+            HomeAction::BlockAutomation(block_automation) => block_automation.ext_id(),
         }
     }
 }

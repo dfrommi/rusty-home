@@ -18,6 +18,16 @@ pub enum FanSpeed {
     Turbo,
 }
 
+impl FanAirflow {
+    pub fn is_off(&self) -> bool {
+        self == &FanAirflow::Off
+    }
+
+    pub fn is_on(&self) -> bool {
+        !self.is_off()
+    }
+}
+
 impl Display for FanAirflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

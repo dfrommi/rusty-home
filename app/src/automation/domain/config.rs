@@ -1,10 +1,10 @@
+use crate::automation::domain::action::BlockAutomation;
 use crate::automation::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::frontends::homekit::HomekitCommandTarget;
 
 use super::action::{
-    AutoTurnOff, FollowDefaultSetting, FollowTargetHeatingDemand, InformWindowOpen, ReduceNoiseAtNight,
-    SupportVentilationWithFan, UserTriggerAction,
+    AutoTurnOff, FollowDefaultSetting, FollowTargetHeatingDemand, InformWindowOpen, SupportWithFan, UserTriggerAction,
 };
 use super::action::{Dehumidify, HomeAction};
 use super::goal::HomeGoal;
@@ -12,6 +12,13 @@ use super::goal::HomeGoal;
 #[rustfmt::skip]
 pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     vec![
+    (
+        HomeGoal::PreventNoise,
+        vec![
+            BlockAutomation::BathroomDehumidifier.into(),
+            BlockAutomation::BedroomDehumidifier.into(),
+        ],
+    ),
     (
         HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
         vec![
@@ -55,16 +62,18 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
     (
         HomeGoal::BetterRoomClimate(Room::LivingRoom),
         vec![
-            SupportVentilationWithFan::LivingRoomCeilingFan.into(),
+            SupportWithFan::LivingRoomVentilation.into(),
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomCeilingFanSpeed.into()).into(),
         ]
     ),
     (
         HomeGoal::BetterRoomClimate(Room::Bedroom),
         vec![
-            SupportVentilationWithFan::BedroomCeilingFan.into(),
             UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
             UserTriggerAction::new(HomekitCommandTarget::BedroomDehumidifierFanSpeed.into()).into(),
+            SupportWithFan::BedroomVentilation.into(),
+            Dehumidify::Bedroom.into(),
+            SupportWithFan::BedroomDehumidification.into()
         ]
     ),
     (
@@ -76,11 +85,10 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         ],
     ),
     (
-        HomeGoal::PreventMouldInBathroom,
+        HomeGoal::PreventMould,
         vec![
             UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
-            ReduceNoiseAtNight::Dehumidifier.into(),
-            Dehumidify::Dehumidifier.into()
+            Dehumidify::Bathroom.into()
         ],
     ),
     (

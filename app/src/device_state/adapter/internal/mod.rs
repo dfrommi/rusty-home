@@ -67,7 +67,7 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
                         match device {
                             Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
                             Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
-                            Fan::BedroomDehumidifier => FanActivity::BedroomDehumidifier,
+                            Fan::BedroomDehumidifier => return Ok(vec![]),
                         },
                         speed.clone(),
                     ),
@@ -78,6 +78,8 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
 
             _ => {}
         }
+
+        tracing::debug!("InternalDataSource produced incoming data: {:?}", res);
 
         Ok(res)
     }

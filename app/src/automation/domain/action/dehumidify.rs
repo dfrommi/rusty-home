@@ -1,9 +1,13 @@
 use super::{RuleEvaluationContext, SimpleRule};
 use crate::{
-    automation::{Room, RoomWithWindow},
+    automation::{HeatingZone, Room, RoomWithWindow},
     command::{Command, Fan, PowerToggle},
-    core::unit::{DegreeCelsius, FanAirflow::Forward, FanSpeed::High, FanSpeed::Medium},
-    home_state::{DewPoint, FanActivity, Ventilation},
+    core::unit::{
+        DegreeCelsius,
+        FanAirflow::Forward,
+        FanSpeed::{High, Medium},
+    },
+    home_state::{DewPoint, FanActivity, HeatingMode, TargetHeatingMode, Ventilation},
     t,
 };
 use anyhow::Result;
@@ -46,6 +50,8 @@ impl SimpleRule for Dehumidify {
                 let current_fan_state = ctx.current_dp(FanActivity::BedroomDehumidifier)?;
                 let current_dewpoint = ctx.current(DewPoint::Room(Room::Bedroom))?;
                 let last_ventilation = ctx.current_dp(Ventilation::Room(RoomWithWindow::Bedroom))?.timestamp;
+                let sleep_mode =
+                    ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))? == HeatingMode::Sleep;
 
                 let running_long_enough =
                     current_fan_state.value.is_on() && current_fan_state.timestamp.elapsed() > t!(30 minutes);
@@ -56,6 +62,7 @@ impl SimpleRule for Dehumidify {
                 Ok(!running_long_enough
                     && !was_running_recently
                     && !ventilated_recently
+                    && !sleep_mode
                     && hysterisis_above(
                         current_fan_state.value.is_on(),
                         current_dewpoint,

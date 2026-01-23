@@ -66,7 +66,9 @@ impl Z2mCommandExecutor {
     pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
         let (system_mode, setpoint) = if value.0 > 0.0 { ("heat", 35.0) } else { ("off", 4.0) };
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
-        let closed_percentage = 100 - opened_percentage;
+        //use always full max closing instead of `100 - opened_percentage` as it might avoid loosing
+        //calibration over time and shouldn't have any impact on when it's actually closed
+        let closed_percentage = 100;
 
         self.sender
             .send_transient(

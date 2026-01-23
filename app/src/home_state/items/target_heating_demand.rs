@@ -67,7 +67,7 @@ fn combined_demand(
 
     let limits = ControlLimits {
         barely_warm: barely_warm_output,
-        step: Percent(2.0),
+        step: Percent(3.0),
         min_output: Percent(8.0),
         max_output: match &mode.value {
             HeatingMode::Ventilation => Percent(0.0),

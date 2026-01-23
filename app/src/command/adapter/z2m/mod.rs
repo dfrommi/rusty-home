@@ -10,6 +10,7 @@ use serde_json::json;
 #[derive(Debug, Clone)]
 pub enum Z2mCommandTarget {
     SonoffThermostat(&'static str),
+    PowerPlug(&'static str),
 }
 
 pub struct Z2mCommandExecutor {
@@ -51,6 +52,9 @@ impl CommandExecutor for Z2mCommandExecutor {
                 Command::SetThermostatValveOpeningPosition { value, .. },
                 Z2mCommandTarget::SonoffThermostat(device_id),
             ) => self.set_valve_opening_position_sonoff(device_id, *value).await,
+            (Command::SetPower { power_on, .. }, Z2mCommandTarget::PowerPlug(device_id)) => {
+                self.set_power_state(device_id, *power_on).await
+            }
             (_, z2m_target) => {
                 anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
             }
@@ -77,6 +81,21 @@ impl Z2mCommandExecutor {
             )
             .await?;
 
+        Ok(true)
+    }
+
+    pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<bool> {
+        let power_state = if power_on { "ON" } else { "OFF" };
+
+        self.sender
+            .send_transient(
+                self.target_topic(device_id),
+                json!({
+                    "state": power_state,
+                })
+                .to_string(),
+            )
+            .await?;
         Ok(true)
     }
 }

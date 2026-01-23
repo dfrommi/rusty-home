@@ -1,9 +1,12 @@
 use super::Z2mCommandTarget;
 use crate::automation::Radiator;
-use crate::command::CommandTarget;
+use crate::command::{CommandTarget, PowerToggle};
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![
+        //
+        // THERMOSTATS
+        //
         (
             CommandTarget::SetThermostatValveOpeningPosition {
                 device: Radiator::RoomOfRequirements,
@@ -39,6 +42,15 @@ pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
                 device: Radiator::Kitchen,
             },
             Z2mCommandTarget::SonoffThermostat("kitchen/radiator_thermostat_sonoff"),
+        ),
+        //
+        // POWER PLUGS
+        //
+        (
+            CommandTarget::SetPower {
+                device: PowerToggle::Dehumidifier,
+            },
+            Z2mCommandTarget::PowerPlug("bathroom/dehumidifier_plug"),
         ),
     ]
 }

@@ -151,6 +151,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 CurrentPowerUsage::KitchenMultiPlug,
                 TotalEnergyConsumption::KitchenMultiPlug,
                 KiloWattHours(0.0),
+                None,
             ),
         ),
         (
@@ -159,6 +160,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 CurrentPowerUsage::CouchPlug,
                 TotalEnergyConsumption::CouchPlug,
                 KiloWattHours(0.0),
+                None,
             ),
         ),
         (
@@ -167,6 +169,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 CurrentPowerUsage::RoomOfRequirementsDesk,
                 TotalEnergyConsumption::RoomOfRequirementsDesk,
                 KiloWattHours(0.0),
+                None,
             ),
         ),
         (
@@ -175,6 +178,16 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
                 CurrentPowerUsage::RoomOfRequirementsMonitor,
                 TotalEnergyConsumption::RoomOfRequirementsMonitor,
                 KiloWattHours(0.0),
+                None,
+            ),
+        ),
+        (
+            "bathroom/dehumidifier_plug",
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::Dehumidifier,
+                TotalEnergyConsumption::Dehumidifier,
+                KiloWattHours(127.294),
+                Some(PowerAvailable::Dehumidifier),
             ),
         ),
     ]

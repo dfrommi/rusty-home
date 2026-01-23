@@ -20,11 +20,6 @@ pub fn default_tasmota_state_config() -> Vec<(&'static str, TasmotaChannel)> {
             TasmotaChannel::EnergyMeter(CurrentPowerUsage::Fridge, TotalEnergyConsumption::Fridge),
         ),
         (
-            "dehumidifier",
-            TasmotaChannel::EnergyMeter(CurrentPowerUsage::Dehumidifier, TotalEnergyConsumption::Dehumidifier),
-        ),
-        ("dehumidifier", TasmotaChannel::PowerToggle(PowerAvailable::Dehumidifier)),
-        (
             "airpurifier",
             TasmotaChannel::EnergyMeter(CurrentPowerUsage::AirPurifier, TotalEnergyConsumption::AirPurifier),
         ),

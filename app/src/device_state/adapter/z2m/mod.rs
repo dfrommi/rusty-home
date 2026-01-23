@@ -6,7 +6,7 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceAvailability, DeviceStateValue, Temperature};
+use crate::device_state::{DeviceAvailability, DeviceStateValue, PowerAvailable, Temperature};
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::device_state::{CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, TotalEnergyConsumption};
@@ -15,7 +15,7 @@ use crate::device_state::{CurrentPowerUsage, HeatingDemand, Opened, RelativeHumi
 pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
-    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours),
+    PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours, Option<PowerAvailable>),
     SonoffThermostat(Radiator, HeatingDemand),
 }
 
@@ -117,9 +117,9 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                 ]
             }
 
-            Z2mChannel::PowerPlug(power, energy, energy_offset) => {
+            Z2mChannel::PowerPlug(power, energy, energy_offset, power_available) => {
                 let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
-                vec![
+                let mut items = vec![
                     DataPoint::new(
                         DeviceStateValue::CurrentPowerUsage(*power, Watt(payload.current_power_w)),
                         payload.last_seen,
@@ -134,7 +134,19 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     availability(device_id, payload.last_seen),
-                ]
+                ];
+
+                if let Some(power_available) = power_available {
+                    items.push(
+                        DataPoint::new(
+                            DeviceStateValue::PowerAvailable(*power_available, payload.state == "ON"),
+                            payload.last_seen,
+                        )
+                        .into(),
+                    );
+                }
+
+                items
             }
         };
 
@@ -179,5 +191,6 @@ struct PowerPlug {
     current_power_w: f64,
     #[serde(rename = "energy")]
     total_energy_kwh: f64,
+    state: String,
     last_seen: DateTime,
 }

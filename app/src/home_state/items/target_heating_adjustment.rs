@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::{HeatingZone, Radiator},
+    automation::Radiator,
     core::unit::{DegreeCelsius, RateOfChange},
     home_state::{
         HeatingMode, TargetHeatingMode, Temperature, TemperatureChange,

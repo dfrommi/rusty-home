@@ -126,6 +126,10 @@ impl<T: Clone> DataFrame<T> {
         self.data.values().rev().find(|dp| predicate(dp))
     }
 
+    pub fn fulfilled_since(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> Option<&DataPoint<T>> {
+        self.data.values().rev().take_while(|dp| predicate(dp)).last()
+    }
+
     pub fn insert(&mut self, dp: DataPoint<T>)
     where
         T: PartialEq,

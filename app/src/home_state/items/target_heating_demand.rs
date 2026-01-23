@@ -1,6 +1,7 @@
 use crate::{
     automation::Radiator,
     core::{
+        time::Duration,
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Percent, RateOfChange},
     },
@@ -31,8 +32,19 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         )?;
         let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(radiator))?.value;
         let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
+        let coldstart_delay = match (&mode.value, &radiator) {
+            (_, Radiator::LivingRoomSmall) => Some(t!(20 minutes)),
+            _ => None,
+        };
 
-        combined_demand(mode, adjustments, current_demand, barely_warm_output, radiator_roc)
+        combined_demand(
+            mode,
+            adjustments,
+            current_demand,
+            barely_warm_output,
+            radiator_roc,
+            coldstart_delay,
+        )
     }
 }
 
@@ -49,6 +61,7 @@ fn combined_demand(
     current_demand: DataPoint<Percent>,
     barely_warm_output: Percent,
     radiator_roc: RateOfChange<DegreeCelsius>,
+    coldstart_delay: Option<Duration>,
 ) -> Option<Percent> {
     let adjustment = adjustments.last()?.value.clone();
 
@@ -69,6 +82,18 @@ fn combined_demand(
 
     if limits.max_output <= Percent(0.0) {
         return Some(Percent(0.0));
+    }
+
+    //Not heating currently, but heat is requested. Wait until delay passed
+    if let Some(coldstart_delay) = coldstart_delay {
+        let heat_requested_since = adjustments
+            .fulfilled_since(|dp| dp.value > AdjustmentDirection::Hold)
+            .map(|dp| dp.timestamp);
+        if current_demand.value <= Percent(0.0)
+            && heat_requested_since.is_some_and(|since| since.elapsed() < coldstart_delay)
+        {
+            return Some(Percent(0.0));
+        }
     }
 
     //Heating present, but temperature on radiator still dropping -> not enough open to release heat

@@ -17,6 +17,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
         vec![
             BlockAutomation::BathroomDehumidifier.into(),
             BlockAutomation::BedroomDehumidifier.into(),
+            BlockAutomation::BedroomCeilingFan.into(),
         ],
     ),
     (
@@ -25,6 +26,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomBigHeatingDemand.into()).into(),
             UserTriggerAction::new(HomekitCommandTarget::LivingRoomSmallHeatingDemand.into()).into(),
             FollowTargetHeatingDemand::new(HeatingZone::LivingRoom).into(),
+            //SupportWithFan::LivingRoomHeating.into()
         ]
     ),
     (
@@ -35,6 +37,8 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
                 AutoTurnOff::IrHeater.into(),
                 UserTriggerAction::new(HomekitCommandTarget::BedroomHeatingDemand.into()).into(),
                 FollowTargetHeatingDemand::new(HeatingZone::Bedroom).into(),
+                SupportWithFan::BedroomVentilation.into(),
+                SupportWithFan::BedroomHeating.into(),
             ] 
         }
     ),

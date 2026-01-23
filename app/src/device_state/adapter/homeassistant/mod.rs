@@ -224,36 +224,48 @@ fn to_persistent_data_point(
 
             update_comfee_state(comfee_cache, channel, ComfeeFanUpdate::Powered(on), timestamp)?
         }
-        HaChannel::WindcalmFanSpeed(channel) => {
-            //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
-            //trigger, otherwise assume command worked an directly set state from command
-            //processing, assuming everything is done via the smart home
-            /*
-            last_seent fan_speed = match attributes.get("percentage").and_then(|v| v.as_f64()) {
-                Some(1.0) => FanSpeed::Silent,
-                Some(f_value) if f_value <= 20.0 => FanSpeed::Low,
-                Some(f_value) if f_value <= 40.0 => FanSpeed::Medium,
-                Some(f_value) if f_value <= 60.0 => FanSpeed::High,
-                Some(_) => FanSpeed::Turbo,
-                _ => bail!("No temperature found in attributes or not a number"),
-            };
 
-            let airflow = if ha_value == "off" {
-                FanAirflow::Off
-            } else if attributes.get("direction").and_then(|v| v.as_str()) == Some("reverse") {
-                FanAirflow::Reverse(fan_speed)
-            } else {
-                FanAirflow::Forward(fan_speed)
-            };
-
-            Some(DataPoint::new(ChannelValue::FanActivity(channel, airflow), timestamp).into())
-            */
-
-            if ha_value == "off" {
-                Some(DataPoint::new(DeviceStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
-            } else {
-                None
-            }
+        // Super unreliable updates. Not even on/off state is reliable. -> handle via command
+        // feedback only
+        HaChannel::WindcalmFanSpeed(_) => {
+            //     //Fan-Speed updates are extremely unreliable at the moment. Only use Off as a reset
+            //     //trigger, otherwise assume command worked an directly set state from command
+            //     //processing, assuming everything is done via the smart home
+            //     /*
+            //     last_seent fan_speed = match attributes.get("percentage").and_then(|v| v.as_f64()) {
+            //         Some(1.0) => FanSpeed::Silent,
+            //         Some(f_value) if f_value <= 20.0 => FanSpeed::Low,
+            //         Some(f_value) if f_value <= 40.0 => FanSpeed::Medium,
+            //         Some(f_value) if f_value <= 60.0 => FanSpeed::High,
+            //         Some(_) => FanSpeed::Turbo,
+            //         _ => bail!("No temperature found in attributes or not a number"),
+            //     };
+            //
+            //     let airflow = if ha_value == "off" {
+            //         FanAirflow::Off
+            //     } else if attributes.get("direction").and_then(|v| v.as_str()) == Some("reverse") {
+            //         FanAirflow::Reverse(fan_speed)
+            //     } else {
+            //         FanAirflow::Forward(fan_speed)
+            //     };
+            //
+            //     Some(DataPoint::new(ChannelValue::FanActivity(channel, airflow), timestamp).into())
+            //     */
+            //
+            //     if ha_value == "off" {
+            //         tracing::debug!("Setting Windcalm fan airflow of {:?} to Off due to received off state", channel);
+            //         Some(DataPoint::new(DeviceStateValue::FanActivity(channel, FanAirflow::Off), timestamp).into())
+            //     } else {
+            //         tracing::debug!(
+            //             "Windcalm fan speed update received for {:?}, but ignored due to unreliable state reporting: {} / {:?}",
+            //             channel,
+            //             ha_value,
+            //             attributes
+            //         );
+            //
+            //         None
+            //     }
+            None
         }
     };
 

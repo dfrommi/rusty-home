@@ -25,11 +25,6 @@ pub fn enum_variants_derive(input: TokenStream) -> TokenStream {
     enum_variants::derive_typed_item(input)
 }
 
-#[proc_macro_attribute]
-pub fn trace_state(attr: TokenStream, item: TokenStream) -> TokenStream {
-    state_trace::trace_state_access(attr, item)
-}
-
 fn enum_variants(data: syn::Data) -> Vec<syn::Variant> {
     // Ensure it's an enum
     if let syn::Data::Enum(data_enum) = data {

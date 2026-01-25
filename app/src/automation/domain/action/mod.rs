@@ -49,22 +49,68 @@ impl RuleEvaluationContext {
 
     pub fn current_dp<S>(&self, id: S) -> Result<DataPoint<S::Type>>
     where
-        S: Into<HomeStateId> + HomeStateItem + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone + Into<ExternalId>,
+        S::Type: std::fmt::Display,
     {
-        self.snapshot
+        let ext_id: ExternalId = id.clone().into();
+        let span = tracing::trace_span!(
+            "get_home_state",
+            otel.name = tracing::field::Empty,
+            home_state = ext_id.to_string(),
+            dp.value = tracing::field::Empty,
+            dp.timestamp = tracing::field::Empty,
+            dp.elapsed = tracing::field::Empty,
+        );
+        let _enter = span.enter();
+
+        let result = self
+            .snapshot
             .get(id.clone())
-            .ok_or_else(|| anyhow::anyhow!("Current value for state {:?} not found", id.into()))
+            .ok_or_else(|| anyhow::anyhow!("Current value for state {:?} not found", ext_id));
+
+        if let Ok(ref dp) = result {
+            span.record("otel.name", format!("{} - {}", ext_id, dp.value));
+            span.record("dp.value", dp.value.to_string());
+            span.record("dp.timestamp", dp.timestamp.to_iso_string());
+            span.record("dp.elapsed", dp.timestamp.elapsed().to_iso_string());
+        } else {
+            span.record("otel.name", format!("{} - error", ext_id));
+        }
+
+        result
     }
 
     pub fn current<S>(&self, id: S) -> Result<S::Type>
     where
-        S: Into<HomeStateId> + HomeStateItem + Clone,
+        S: Into<HomeStateId> + HomeStateItem + Clone + Into<ExternalId>,
+        S::Type: std::fmt::Display,
     {
         self.current_dp(id).map(|dp| dp.value)
     }
 
     pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
-        self.snapshot.user_trigger(target)
+        let span = tracing::trace_span!(
+            "get_latest_user_trigger",
+            otel.name = tracing::field::Empty,
+            trigger_target = target.to_string(),
+            trigger_id = tracing::field::Empty,
+            trigger_timestamp = tracing::field::Empty,
+            trigger_elapsed = tracing::field::Empty,
+        );
+        let _enter = span.enter();
+
+        let result = self.snapshot.user_trigger(target.clone());
+
+        if let Some(trigger) = result {
+            span.record("otel.name", format!("✓ {}", target));
+            span.record("trigger_id", trigger.id.to_string());
+            span.record("trigger_timestamp", trigger.timestamp.to_iso_string());
+            span.record("trigger_elapsed", trigger.timestamp.elapsed().to_iso_string());
+        } else {
+            span.record("otel.name", format!("𐄂 {}", target));
+        }
+
+        result
     }
 }
 

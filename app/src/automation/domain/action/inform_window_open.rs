@@ -74,6 +74,7 @@ impl InformWindowOpen {
 
 fn should_send_push_notification(cold_air_coming_in: Vec<DataPoint<bool>>, recipient_at_home: bool) -> bool {
     if !recipient_at_home {
+        tracing::info!("Recipient not at home; skipping push notification");
         return false;
     }
 
@@ -84,11 +85,28 @@ fn should_send_push_notification(cold_air_coming_in: Vec<DataPoint<bool>>, recip
         .collect();
 
     match (active_values.iter().min(), active_values.iter().max()) {
-        (Some(_), Some(max_dt)) => t!(now).elapsed_since(*max_dt) > t!(3 minutes),
-        _ => false,
+        (Some(_), Some(max_dt)) => {
+            if t!(now).elapsed_since(*max_dt) > t!(3 minutes) {
+                tracing::info!("Window has been open for more than 3 minutes; allowing push notification");
+                true
+            } else {
+                tracing::info!("Window opened within 3 minutes; suppressing push notification");
+                false
+            }
+        }
+        _ => {
+            tracing::info!("No cold-air events detected; skipping push notification");
+            false
+        }
     }
 }
 
 fn should_turn_on_light(cold_air_coming_in: Vec<DataPoint<bool>>) -> bool {
-    cold_air_coming_in.into_iter().any(|dp| dp.value)
+    let any_open = cold_air_coming_in.into_iter().any(|dp| dp.value);
+    if any_open {
+        tracing::info!("Cold air coming in detected; allowing notification light");
+    } else {
+        tracing::info!("No cold-air events detected; skipping notification light");
+    }
+    any_open
 }

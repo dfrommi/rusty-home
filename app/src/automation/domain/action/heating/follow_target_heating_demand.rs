@@ -37,8 +37,10 @@ impl Rule for FollowTargetHeatingDemand {
         let mode = ctx.current(TargetHeatingMode::HeatingZone(self.zone))?;
 
         if let HeatingMode::Manual(_, trigger_id) = mode {
+            tracing::info!("Manual mode active; applying target heating demand");
             Ok(RuleResult::ExecuteTrigger(commands, trigger_id))
         } else {
+            tracing::info!("Applying target heating demand");
             Ok(RuleResult::Execute(commands))
         }
     }

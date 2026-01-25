@@ -25,29 +25,29 @@ impl Rule for UserTriggerAction {
         let trigger_max_duration = match self.default_duration(ctx) {
             Some(duration) => duration,
             None => {
-                tracing::trace!("User-trigger action currently disabled, skipping");
+                tracing::info!("User-trigger action disabled, skipping");
                 return Ok(RuleResult::Skip);
             }
         };
 
         let Some(latest_trigger) = ctx.latest_trigger(self.target.clone()) else {
-            tracing::trace!("No user-trigger found, skipping");
+            tracing::info!("No user-trigger found, skipping");
             return Ok(RuleResult::Skip);
         };
 
         if latest_trigger.timestamp.elapsed() > trigger_max_duration {
-            tracing::trace!("Trigger expired after {}, skipping", trigger_max_duration);
+            tracing::info!("Trigger older than {trigger_max_duration}, skipping");
             return Ok(RuleResult::Skip);
         }
 
         let commands = into_command(&latest_trigger.trigger);
 
         if commands.is_empty() {
-            tracing::trace!("Trigger not handled by this action, skipping");
+            tracing::info!("Trigger not handled by this action, skipping");
             return Ok(RuleResult::Skip);
         }
 
-        tracing::trace!(?commands, ?latest_trigger, "User-trigger action(s) ready to be executed");
+        tracing::info!("User-trigger accepted");
 
         Ok(RuleResult::ExecuteTrigger(commands, latest_trigger.id.clone()))
     }
@@ -119,7 +119,7 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
         | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(_))
         | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(_))
         | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(_)) => {
-            tracing::warn!("Homekit heating state triggers are handled by FollowTargetHeatingDemand rule, skipping");
+            tracing::info!("Heating state trigger handled elsewhere, skipping");
             vec![]
         }
         UserTrigger::Homekit(HomekitCommand::LivingRoomBigHeatingDemand(demand)) => {

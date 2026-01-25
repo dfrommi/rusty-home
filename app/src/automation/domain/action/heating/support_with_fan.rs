@@ -83,31 +83,43 @@ fn heating(
     let diff_now = radiator_temp_now - room_temp_now;
     let diff_in_15min = radiator_temp_in_15min - room_temp_now;
 
-    if (diff_now > DegreeCelsius(5.0) && diff_in_15min > DegreeCelsius(10.5)) || diff_now > DegreeCelsius(10.0) {
-        Some(Command::ControlFan {
+    if diff_now > DegreeCelsius(10.0) {
+        tracing::info!("Radiator more than 10C warmer than room; supporting heating");
+        return Some(Command::ControlFan {
             device,
             speed: FanAirflow::Reverse(speed),
-        })
-    } else {
-        None
+        });
     }
+
+    if diff_now > DegreeCelsius(5.0) && diff_in_15min > DegreeCelsius(10.5) {
+        tracing::info!("Radiator more than 5C warmer now and more than 10.5C in 15 minutes; supporting heating");
+        return Some(Command::ControlFan {
+            device,
+            speed: FanAirflow::Reverse(speed),
+        });
+    }
+
+    tracing::info!("Radiator not warm enough; skipping heating support");
+    None
 }
 
 fn ventilation(device: Fan, window: DataPoint<bool>) -> Option<Command> {
     let elapsed = window.timestamp.elapsed();
 
     if !window.value {
+        tracing::info!("Window closed; skipping ventilation support");
         return None;
     }
 
     if elapsed < t!(1 minutes) {
-        tracing::trace!("Window is open, but for less than a minute");
+        tracing::info!("Window open for less than 1 minute; skipping ventilation support");
         return None;
     } else if elapsed > t!(10 minutes) {
-        tracing::trace!("Window is open, but for more than 10 minutes. Stopping active support");
+        tracing::info!("Window open for more than 10 minutes; stopping ventilation support");
         return None;
     }
 
+    tracing::info!("Window open between 1 and 10 minutes; supporting ventilation");
     Some(Command::ControlFan {
         device,
         speed: FanAirflow::Reverse(FanSpeed::Medium),
@@ -116,9 +128,11 @@ fn ventilation(device: Fan, window: DataPoint<bool>) -> Option<Command> {
 
 fn dehumidify(device: Fan, is_on: bool) -> Option<Command> {
     if !is_on {
+        tracing::info!("Dehumidifier off; skipping dehumidification support");
         return None;
     }
 
+    tracing::info!("Dehumidifier running; supporting dehumidification");
     Some(Command::ControlFan {
         device,
         speed: FanAirflow::Reverse(FanSpeed::Medium),

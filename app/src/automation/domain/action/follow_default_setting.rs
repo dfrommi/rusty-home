@@ -15,6 +15,7 @@ impl FollowDefaultSetting {
 
 impl Rule for FollowDefaultSetting {
     fn evaluate(&self, _: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
+        tracing::info!("Applying default setting");
         let command = match self.0.clone() {
             CommandTarget::SetPower { device } => Command::SetPower {
                 device,

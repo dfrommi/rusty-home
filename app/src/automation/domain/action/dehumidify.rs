@@ -45,7 +45,15 @@ impl SimpleRule for Dehumidify {
 
     fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> Result<bool> {
         match self {
-            Dehumidify::Bathroom => ctx.current(RiskOfMould::Bathroom),
+            Dehumidify::Bathroom => {
+                let risk = ctx.current(RiskOfMould::Bathroom)?;
+                if risk {
+                    tracing::info!("Risk of mould detected; dehumidifying bathroom");
+                } else {
+                    tracing::info!("No mould risk; skipping bathroom dehumidification");
+                }
+                Ok(risk)
+            }
             Dehumidify::Bedroom => {
                 let current_fan_state = ctx.current_dp(FanActivity::BedroomDehumidifier)?;
                 let current_dewpoint = ctx.current(DewPoint::Room(Room::Bedroom))?;
@@ -53,21 +61,40 @@ impl SimpleRule for Dehumidify {
                 let sleep_mode =
                     ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))? == HeatingMode::Sleep;
 
-                let running_long_enough =
-                    current_fan_state.value.is_on() && current_fan_state.timestamp.elapsed() > t!(30 minutes);
-                let was_running_recently =
-                    current_fan_state.value.is_off() && current_fan_state.timestamp.elapsed() < t!(60 minutes);
-                let ventilated_recently = last_ventilation.elapsed() < t!(45 minutes);
+                //TODO move to central blocker
+                if sleep_mode {
+                    tracing::info!("Sleep mode active; skipping bedroom dehumidification");
+                    return Ok(false);
+                }
 
-                Ok(!running_long_enough
-                    && !was_running_recently
-                    && !ventilated_recently
-                    && !sleep_mode
-                    && hysterisis_above(
-                        current_fan_state.value.is_on(),
-                        current_dewpoint,
-                        (DegreeCelsius(10.0), DegreeCelsius(10.5)),
-                    ))
+                if current_fan_state.value.is_on() && current_fan_state.timestamp.elapsed() > t!(30 minutes) {
+                    tracing::info!("Dehumidifier fan running for more than 30 minutes; stopping");
+                    return Ok(false);
+                }
+
+                if current_fan_state.value.is_off() && current_fan_state.timestamp.elapsed() < t!(60 minutes) {
+                    tracing::info!("Dehumidifier fan ran within the last 60 minutes; skipping");
+                    return Ok(false);
+                }
+
+                if last_ventilation.elapsed() < t!(45 minutes) {
+                    tracing::info!("Ventilated within the last 45 minutes; skipping dehumidification");
+                    return Ok(false);
+                }
+
+                let above_dewpoint = hysterisis_above(
+                    current_fan_state.value.is_on(),
+                    current_dewpoint,
+                    (DegreeCelsius(10.0), DegreeCelsius(10.5)),
+                );
+
+                if above_dewpoint {
+                    tracing::info!("Dewpoint high enough; dehumidifying bedroom");
+                    Ok(true)
+                } else {
+                    tracing::info!("Dewpoint low enough; skipping dehumidification");
+                    Ok(false)
+                }
             }
         }
     }
@@ -75,7 +102,7 @@ impl SimpleRule for Dehumidify {
 
 fn hysterisis_above<T>(is_active: bool, current: T, range: (T, T)) -> bool
 where
-    T: PartialOrd,
+    T: PartialOrd + std::fmt::Display,
 {
     let (low, high) = if range.0 < range.1 {
         (range.0, range.1)
@@ -83,5 +110,26 @@ where
         (range.1, range.0)
     };
 
-    current > high || (is_active && current >= low && current <= high)
+    if current > high {
+        tracing::debug!("Value {current} is above high threshold {high}; enabled");
+        return true;
+    } else if current < low {
+        tracing::debug!("Value {current} is below low threshold {low}; disabled");
+        return false;
+    }
+
+    //in hysteresis range
+    if is_active {
+        tracing::debug!(
+            "Value {current} is within hysteresis range ({low} - {high}) and currently active; remains enabled"
+        );
+
+        true
+    } else {
+        tracing::debug!(
+            "Value {current} is within hysteresis range ({low} - {high}) and currently inactive; remains disabled"
+        );
+
+        false
+    }
 }

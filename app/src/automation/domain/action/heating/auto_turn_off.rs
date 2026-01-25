@@ -13,17 +13,20 @@ pub enum AutoTurnOff {
 
 impl Rule for AutoTurnOff {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
-        let command = match self {
-            AutoTurnOff::IrHeater if on_for_at_least(PowerAvailable::InfraredHeater, t!(1 hours), ctx)? => {
-                Command::SetPower {
-                    device: PowerToggle::InfraredHeater,
-                    power_on: false,
-                }
-            }
-            _ => return Ok(RuleResult::Skip),
+        let should_turn_off = match self {
+            AutoTurnOff::IrHeater => on_for_at_least(PowerAvailable::InfraredHeater, t!(1 hours), ctx)?,
         };
 
-        Ok(RuleResult::Execute(vec![command]))
+        if should_turn_off {
+            tracing::info!("Infrared heater on for more than 1 hour; turning off");
+            Ok(RuleResult::Execute(vec![Command::SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: false,
+            }]))
+        } else {
+            tracing::info!("Infrared heater not on for more than 1 hour; skipping");
+            Ok(RuleResult::Skip)
+        }
     }
 }
 

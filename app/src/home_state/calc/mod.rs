@@ -23,7 +23,7 @@ pub async fn bootstrap_context(
 ) -> anyhow::Result<StateCalculationContext> {
     let range = DateTimeRange::of_last(duration.clone());
 
-    let mut it = iter::StateCalculationContextIterator::new(range, duration, device_state, trigger_client);
+    let mut it = iter::StateCalculationContextIterator::new(range, duration, device_state, trigger_client, false);
 
     while let Some(ctx) = it.next().await? {
         tracing::trace!("Bootstrapping context for {}", ctx.timestamp());

@@ -117,6 +117,7 @@ impl HomeStateModule {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn update_context(
         &self,
         old_context: StateCalculationContext,
@@ -128,7 +129,7 @@ impl HomeStateModule {
         let trigger_state = CurrentUserTriggerProvider::load(&self.trigger_client).await;
 
         let new_context = match (device_state, trigger_state) {
-            (Ok(ds), Ok(ts)) => StateCalculationContext::new(ds, ts, Some(old_context), self.duration.clone()),
+            (Ok(ds), Ok(ts)) => StateCalculationContext::new(ds, ts, Some(old_context), self.duration.clone(), true),
             (Err(e), _) => {
                 tracing::error!("Failed to load device state for home state update: {:?}", e);
                 old_context
@@ -169,6 +170,12 @@ impl HomeStateModule {
 
 impl HomeStateClient {
     pub fn snapshot_iter(&self, range: DateTimeRange) -> StateSnapshotIterator {
-        StateSnapshotIterator::new(range, self.keep.clone(), self.device_state.clone(), self.trigger_client.clone())
+        StateSnapshotIterator::new(
+            range,
+            self.keep.clone(),
+            self.device_state.clone(),
+            self.trigger_client.clone(),
+            false,
+        )
     }
 }

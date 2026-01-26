@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use opentelemetry::trace::TraceContextExt;
+use opentelemetry::{propagation::TextMapPropagator, trace::TraceContextExt};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -23,12 +24,19 @@ impl TraceContext {
     }
 
     pub fn from_correlation_id(correlation_id: &str) -> Self {
+        let propagator = TraceContextPropagator::default();
+
         let mut ctx: HashMap<String, String> = HashMap::new();
         ctx.insert("traceparent".to_string(), correlation_id.to_string());
 
-        let otel_ctx = opentelemetry::global::get_text_map_propagator(|propagator| propagator.extract(&ctx));
+        let otel_ctx = propagator.extract(&ctx);
 
         Self { otel_ctx }
+    }
+
+    pub fn for_span(span: tracing::Span) -> Self {
+        let ctx: opentelemetry::Context = span.context();
+        Self { otel_ctx: ctx }
     }
 
     pub fn continue_from(correlation_id: &Option<String>) {
@@ -37,8 +45,12 @@ impl TraceContext {
         }
     }
 
+    pub fn make_parent_of(&self, span: &tracing::Span) {
+        span.set_parent(self.otel_ctx.clone());
+    }
+
     pub fn make_parent(&self) {
-        tracing::Span::current().set_parent(self.otel_ctx.clone());
+        self.make_parent_of(&tracing::Span::current());
     }
 
     pub fn current_correlation_id() -> Option<String> {
@@ -46,10 +58,10 @@ impl TraceContext {
     }
 
     pub fn correlation_id(&self) -> String {
+        let propagator = TraceContextPropagator::default();
+
         let mut headers: HashMap<String, String> = HashMap::new();
-        opentelemetry::global::get_text_map_propagator(|propagator| {
-            propagator.inject_context(&self.otel_ctx, &mut headers)
-        });
+        propagator.inject_context(&self.otel_ctx, &mut headers);
 
         headers.get("traceparent").cloned().unwrap_or_default().to_string()
     }

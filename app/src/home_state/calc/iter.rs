@@ -19,6 +19,7 @@ pub struct StateCalculationContextIterator {
     device_client: DeviceStateClient,
     trigger_client: TriggerClient,
     keep_duration: Duration,
+    enable_tracing: bool,
 
     current: Option<StateCalculationContext>,
 
@@ -33,6 +34,7 @@ impl StateCalculationContextIterator {
         keep_duration: Duration,
         device_client: DeviceStateClient,
         trigger_client: TriggerClient,
+        enable_tracing: bool,
     ) -> Self {
         Self {
             preload_range: Self::preload_range_starting_at(*full_range.start(), &full_range),
@@ -43,6 +45,7 @@ impl StateCalculationContextIterator {
             trigger_client,
             keep_duration,
             current: None,
+            enable_tracing,
         }
     }
 
@@ -94,6 +97,7 @@ impl StateCalculationContextIterator {
                     trigger_ds,
                     self.current.take(),
                     self.keep_duration.clone(),
+                    self.enable_tracing,
                 );
                 new_ctx.load_all();
                 new_ctx
@@ -141,9 +145,16 @@ impl StateSnapshotIterator {
         keep_duration: Duration,
         device_client: DeviceStateClient,
         trigger_client: TriggerClient,
+        enable_tracing: bool,
     ) -> Self {
         Self {
-            inner: StateCalculationContextIterator::new(full_range, keep_duration, device_client, trigger_client),
+            inner: StateCalculationContextIterator::new(
+                full_range,
+                keep_duration,
+                device_client,
+                trigger_client,
+                enable_tracing,
+            ),
         }
     }
 

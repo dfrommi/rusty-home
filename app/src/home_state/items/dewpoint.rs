@@ -37,6 +37,8 @@ impl DerivedStateProvider<DewPoint, DegreeCelsius> for DewPointStateProvider {
         };
 
         let dew_point_value = DewPoint::calculate_dew_point(temperature_dp.value, humidity_dp.value);
+        ctx.trace(id, "temperature", temperature_dp.value);
+        ctx.trace(id, "relative_humidity", humidity_dp.value);
 
         Some(dew_point_value)
     }

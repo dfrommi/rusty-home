@@ -6,7 +6,7 @@ use crate::{
     home_state::{
         StateSnapshot,
         calc::{
-            StateCalculationContext,
+            StateCalculationContext, StateCalculationResult,
             datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
         },
     },
@@ -14,21 +14,21 @@ use crate::{
     trigger::{TriggerClient, UserTriggerExecution},
 };
 
-pub struct StateCalculationContextIterator {
+pub struct StateCalculationResultIterator {
     full_range: DateTimeRange,
     device_client: DeviceStateClient,
     trigger_client: TriggerClient,
     keep_duration: Duration,
     enable_tracing: bool,
 
-    current: Option<StateCalculationContext>,
+    current: Option<StateCalculationResult>,
 
     preload_range: DateTimeRange,
     device_data_source: Option<PreloadedDeviceStateProvider>,
     trigger_data_source: Option<PreloadedUserTriggerProvider>,
 }
 
-impl StateCalculationContextIterator {
+impl StateCalculationResultIterator {
     pub fn new(
         full_range: DateTimeRange,
         keep_duration: Duration,
@@ -49,11 +49,11 @@ impl StateCalculationContextIterator {
         }
     }
 
-    pub fn take(mut self) -> Option<StateCalculationContext> {
+    pub fn take(mut self) -> Option<StateCalculationResult> {
         self.current.take()
     }
 
-    pub async fn next(&mut self) -> anyhow::Result<Option<&StateCalculationContext>> {
+    pub async fn next(&mut self) -> anyhow::Result<Option<&StateCalculationResult>> {
         let next_dt = match &self.current {
             Some(ctx) => ctx.timestamp() + t!(30 seconds),
             None => *self.full_range.start(),
@@ -95,7 +95,7 @@ impl StateCalculationContextIterator {
                 let new_ctx = StateCalculationContext::new(
                     device_ds,
                     trigger_ds,
-                    self.current.take(),
+                    self.current.take().unwrap_or_default(),
                     self.keep_duration.clone(),
                     self.enable_tracing,
                 );
@@ -104,7 +104,7 @@ impl StateCalculationContextIterator {
             })
             .await;
 
-        self.current = Some(new_ctx);
+        self.current = Some(new_ctx.into_result());
 
         Ok(self.current.as_ref())
     }
@@ -136,7 +136,7 @@ impl StateCalculationContextIterator {
 }
 
 pub struct StateSnapshotIterator {
-    inner: StateCalculationContextIterator,
+    inner: StateCalculationResultIterator,
 }
 
 impl StateSnapshotIterator {
@@ -148,7 +148,7 @@ impl StateSnapshotIterator {
         enable_tracing: bool,
     ) -> Self {
         Self {
-            inner: StateCalculationContextIterator::new(
+            inner: StateCalculationResultIterator::new(
                 full_range,
                 keep_duration,
                 device_client,
@@ -160,7 +160,8 @@ impl StateSnapshotIterator {
 
     pub async fn next(&mut self) -> anyhow::Result<Option<StateSnapshot>> {
         match self.inner.next().await? {
-            Some(ctx) => Ok(Some(ctx.as_snapshot())),
+            //TODO avoid clone
+            Some(res) => Ok(Some(StateSnapshot::new(res.clone()))),
             None => Ok(None),
         }
     }

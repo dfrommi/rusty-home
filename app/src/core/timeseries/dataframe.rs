@@ -96,21 +96,16 @@ impl<T: Clone> DataFrame<T> {
         self
     }
 
-    pub fn retain_range_with_context_before(&self, range: &DateTimeRange) -> Self {
-        let in_range = self.data.range(*range.start()..=*range.end());
-        let before = self.prev(*range.start());
-
-        let mut points = Vec::new();
-
-        if let Some(dp) = before {
-            points.push(dp.clone());
-        }
-
-        for (_, dp) in in_range {
-            points.push(dp.clone());
-        }
-
+    pub fn get_since_plus_one(&self, since: DateTime) -> Self {
+        let cutoff = self.prev_or_at(since).map(|dp| dp.timestamp).unwrap_or(since);
+        let points = self.data.range(cutoff..).map(|(_, dp)| dp.clone()).collect::<Vec<_>>();
         DataFrame::new(points)
+    }
+
+    pub fn remove_before_keep_one_more(&mut self, before: DateTime) {
+        let cutoff = self.prev_or_at(before).map(|dp| dp.timestamp).unwrap_or(before);
+        //Is there a bulk operation?
+        self.data.retain(|k, _| *k >= cutoff);
     }
 
     pub fn map<U: Clone>(&self, f: impl Fn(&DataPoint<T>) -> U) -> DataFrame<U> {
@@ -263,5 +258,14 @@ where
 {
     fn from(val: &DataFrame<T>) -> Self {
         val.map(|dp| dp.value.clone().into())
+    }
+}
+
+impl<T> Default for DataFrame<T>
+where
+    T: Clone,
+{
+    fn default() -> Self {
+        Self::empty()
     }
 }

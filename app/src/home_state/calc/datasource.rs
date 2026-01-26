@@ -21,6 +21,7 @@ mod device_state {
             Self { device_states }
         }
 
+        #[tracing::instrument(skip_all, "load_current_device_states")]
         pub async fn load(device_state_client: &DeviceStateClient) -> anyhow::Result<Self> {
             let device_states = device_state_client.get_current_for_all().await?;
             Ok(Self::new(device_states))
@@ -81,6 +82,7 @@ mod user_trigger {
             }
         }
 
+        #[tracing::instrument(skip_all, "load_current_user_triggers")]
         pub async fn load(trigger_client: &TriggerClient) -> anyhow::Result<Self> {
             let active_triggers = trigger_client.get_all_active_triggers().await?;
             Ok(Self::new(active_triggers))

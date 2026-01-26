@@ -1,66 +1,43 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     core::{
         time::DateTime,
         timeseries::{DataFrame, DataPoint},
     },
-    home_state::{HomeStateId, HomeStateItem, HomeStateValue},
+    home_state::{HomeStateId, HomeStateItem, HomeStateValue, calc::StateCalculationResult},
     trigger::{UserTriggerExecution, UserTriggerTarget},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StateSnapshot {
-    timestamp: DateTime,
-    data: Arc<HashMap<HomeStateId, DataFrame<HomeStateValue>>>,
-    active_user_triggers: Arc<HashMap<UserTriggerTarget, UserTriggerExecution>>,
+    inner: Arc<StateCalculationResult>,
 }
 
 impl Default for StateSnapshot {
     fn default() -> Self {
         StateSnapshot {
-            timestamp: DateTime::now(),
-            data: Arc::new(HashMap::new()),
-            active_user_triggers: Arc::new(HashMap::new()),
+            inner: Arc::new(StateCalculationResult::default()),
         }
-    }
-}
-
-impl std::fmt::Debug for StateSnapshot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StateSnapshot")
-            .field("timestamp", &self.timestamp)
-            .field("data_keys", &self.data.keys().collect::<Vec<_>>())
-            .field(
-                "active_user_triggers_keys",
-                &self.active_user_triggers.keys().collect::<Vec<_>>(),
-            )
-            .finish()
     }
 }
 
 impl StateSnapshot {
-    pub fn new(
-        start_of_calculation: DateTime,
-        data: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
-        active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
-    ) -> Self {
+    pub fn new(result: StateCalculationResult) -> Self {
         StateSnapshot {
-            timestamp: start_of_calculation,
-            data: Arc::new(data),
-            active_user_triggers: Arc::new(active_user_triggers),
+            inner: Arc::new(result),
         }
     }
 
     pub fn timestamp(&self) -> DateTime {
-        self.timestamp
+        self.inner.timestamp()
     }
 
     pub fn get<S>(&self, id: S) -> Option<DataPoint<S::Type>>
     where
         S: Into<HomeStateId> + HomeStateItem + Clone,
     {
-        let state_value = self.data.get(&id.clone().into())?.last()?;
+        let state_value = self.inner.get_home_state_value(id.clone().into())?;
         let value = id
             .try_downcast(state_value.value.clone())
             .expect("Internal error: HomeStateValue type mismatch");
@@ -85,10 +62,10 @@ impl StateSnapshot {
     // }
 
     pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
-        self.active_user_triggers.get(&target)
+        self.inner.user_trigger(target)
     }
 
     pub fn home_state_iter(&self) -> impl Iterator<Item = (&HomeStateId, &DataFrame<HomeStateValue>)> {
-        self.data.iter()
+        self.inner.home_state_iter()
     }
 }

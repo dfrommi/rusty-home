@@ -1,6 +1,9 @@
 mod adapter;
 mod domain;
 
+pub use infrastructure::meter::increment as system_metric_increment;
+pub use infrastructure::meter::set as system_metric_set;
+
 use std::sync::Arc;
 
 use infrastructure::EventListener;

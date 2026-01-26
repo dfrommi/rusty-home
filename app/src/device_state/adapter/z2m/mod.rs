@@ -1,5 +1,7 @@
 mod config;
 
+use std::collections::HashMap;
+
 use crate::automation::Radiator;
 use crate::core::DeviceConfig;
 use crate::core::time::DateTime;
@@ -68,6 +70,8 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
         channel: &Z2mChannel,
         msg: &MqttInMessage,
     ) -> anyhow::Result<Vec<IncomingData>> {
+        emit_debug_metrics(device_id, &msg.payload);
+
         let result: Vec<IncomingData> = match channel {
             Z2mChannel::ClimateSensor(t, h) => {
                 let payload: ClimateSensor = serde_json::from_str(&msg.payload)?;
@@ -173,7 +177,6 @@ struct ClimateSensor {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct SonoffThermostatPayload {
-    system_mode: String,
     valve_opening_degree: f64,
     local_temperature: f64,
     last_seen: DateTime,
@@ -193,4 +196,59 @@ struct PowerPlug {
     total_energy_kwh: f64,
     state: String,
     last_seen: DateTime,
+}
+
+fn emit_debug_metrics(device_id: &str, payload: &str) {
+    let parsed: HashMap<String, serde_json::Value> = match serde_json::from_str(payload) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::error!("Error parsing Sonoff thermostat payload for debug metrics: {:?}", e);
+            return;
+        }
+    };
+
+    const METRIC_NAME: &str = "z2m_state";
+
+    for (key, value) in parsed {
+        let mut high_cardinality = false;
+
+        let f_value = if let Some(num) = value.as_number().and_then(|n| n.as_f64()) {
+            Some(num)
+        } else if let Some(b) = value.as_bool() {
+            Some(if b { 1.0 } else { 0.0 })
+        } else if let Some(s) = value.as_str() {
+            match s {
+                "ON" | "on" => Some(1.0),
+                "OFF" | "off" => Some(0.0),
+                "auto" => Some(0.5),
+                "heat" => Some(1.0),
+                "internal" => Some(0.0),
+                _ if s.starts_with("external") => Some(1.0),
+                "LOCK" => Some(1.0),
+                "UNLOCK" => Some(0.0),
+                "timer" => Some(1.0),
+                "boost" => Some(2.0),
+                _ if key == "last_seen" => {
+                    high_cardinality = true;
+                    DateTime::from_iso(s).ok().map(|dt| dt.elapsed().as_minutes_f64())
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        if let Some(f_value) = f_value {
+            let raw = if !high_cardinality {
+                value.to_string()
+            } else {
+                "<omitted>".to_string()
+            };
+            crate::observability::system_metric_set(
+                METRIC_NAME,
+                f_value,
+                &[("item", key.as_str()), ("device_id", device_id), ("raw", &raw)],
+            );
+        }
+    }
 }

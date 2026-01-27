@@ -4,6 +4,7 @@ use super::CommandExecutor;
 
 use crate::command::{Command, CommandTarget};
 
+use super::metrics::*;
 use infrastructure::MqttSender;
 
 #[derive(Debug, Clone)]
@@ -50,6 +51,13 @@ impl CommandExecutor for TasmotaCommandExecutor {
                         if *power_on { "ON".to_string() } else { "OFF".to_string() },
                     )
                     .await?;
+
+                CommandMetric::Executed {
+                    device_id: device_id.to_string(),
+                    system: CommandTargetSystem::Tasmota,
+                }
+                .record();
+
                 Ok(true)
             }
 

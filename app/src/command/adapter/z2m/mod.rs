@@ -1,5 +1,6 @@
 mod config;
 
+use super::metrics::*;
 use crate::{
     command::{Command, CommandTarget, adapter::CommandExecutor},
     core::unit::Percent,
@@ -70,18 +71,16 @@ impl Z2mCommandExecutor {
         //calibration over time and shouldn't have any impact on when it's actually closed
         let closed_percentage = 100;
 
-        self.sender
-            .send_transient(
-                self.target_topic(device_id),
-                json!({
-                    "system_mode": system_mode,
-                    "valve_opening_degree": opened_percentage,
-                    "valve_closing_degree": closed_percentage,
-                    "occupied_heating_setpoint": setpoint,
-                })
-                .to_string(),
-            )
-            .await?;
+        self.send_message(
+            device_id,
+            json!({
+                "system_mode": system_mode,
+                "valve_opening_degree": opened_percentage,
+                "valve_closing_degree": closed_percentage,
+                "occupied_heating_setpoint": setpoint,
+            }),
+        )
+        .await?;
 
         Ok(true)
     }
@@ -89,15 +88,28 @@ impl Z2mCommandExecutor {
     pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<bool> {
         let power_state = if power_on { "ON" } else { "OFF" };
 
-        self.sender
-            .send_transient(
-                self.target_topic(device_id),
-                json!({
-                    "state": power_state,
-                })
-                .to_string(),
-            )
-            .await?;
+        self.send_message(
+            device_id,
+            json!({
+                "state": power_state,
+            }),
+        )
+        .await?;
+
         Ok(true)
+    }
+
+    async fn send_message(&self, device_id: &str, payload: serde_json::Value) -> anyhow::Result<()> {
+        self.sender
+            .send_transient(self.target_topic(device_id), payload.to_string())
+            .await?;
+
+        CommandMetric::Executed {
+            device_id: device_id.to_string(),
+            system: CommandTargetSystem::Z2M,
+        }
+        .record();
+
+        Ok(())
     }
 }

@@ -4,6 +4,7 @@ use anyhow::bail;
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
+use super::metrics::*;
 use crate::command::adapter::CommandExecutor;
 use crate::command::{Command, CommandTarget, Fan};
 use crate::core::unit::{FanAirflow, FanSpeed};
@@ -108,7 +109,9 @@ impl HomeAssistantCommandExecutor {
                     "entity_id": vec![id.to_string()],
                 }),
             )
-            .await
+            .await?;
+        record_executed(id);
+        Ok(())
     }
 
     async fn windcalm_fan_speed(&self, id: &str, fan: &Fan, airflow: &FanAirflow) -> anyhow::Result<()> {
@@ -132,7 +135,8 @@ impl HomeAssistantCommandExecutor {
                             "entity_id": vec![id.to_string()]
                         }),
                     )
-                    .await?
+                    .await?;
+                record_executed(id);
             }
             FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => {
                 let direction = match airflow {
@@ -150,6 +154,8 @@ impl HomeAssistantCommandExecutor {
                         }),
                     )
                     .await?;
+                record_executed(id);
+
                 self.client
                     .call_service(
                         "fan",
@@ -159,7 +165,8 @@ impl HomeAssistantCommandExecutor {
                             "percentage": to_percent(fan_speed)
                         }),
                     )
-                    .await?
+                    .await?;
+                record_executed(id);
             }
         };
 
@@ -196,6 +203,8 @@ impl HomeAssistantCommandExecutor {
                         }),
                     )
                     .await?;
+                record_executed(humidifier_id);
+
                 self.client
                     .call_service(
                         "fan",
@@ -205,7 +214,8 @@ impl HomeAssistantCommandExecutor {
                             "preset_mode": fan_preset
                         }),
                     )
-                    .await?
+                    .await?;
+                record_executed(fan_id);
             }
 
             FanAirflow::Reverse(_) => bail!("Comfee dehumidifier does not support reverse airflow"),
@@ -227,7 +237,11 @@ impl HomeAssistantCommandExecutor {
                     }
                 }),
             )
-            .await
+            .await?;
+
+        record_executed(mobile_id);
+
+        Ok(())
     }
 
     async fn dismiss_window_opened_notification(&self, mobile_id: &str) -> anyhow::Result<()> {
@@ -242,7 +256,11 @@ impl HomeAssistantCommandExecutor {
                     }
                 }),
             )
-            .await
+            .await?;
+
+        record_executed(mobile_id);
+
+        Ok(())
     }
 
     async fn lg_tv_energy_saving_mode(&self, id: &str, energy_saving: bool) -> anyhow::Result<()> {
@@ -264,6 +282,7 @@ impl HomeAssistantCommandExecutor {
                 ),
             )
             .await;
+        record_executed(id);
 
         if luna_result.is_ok() {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
@@ -277,6 +296,7 @@ impl HomeAssistantCommandExecutor {
                     }),
                 )
                 .await?;
+            record_executed(id);
 
             if !energy_saving {
                 tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
@@ -290,11 +310,20 @@ impl HomeAssistantCommandExecutor {
                         }),
                     )
                     .await?;
+                record_executed(id);
             }
         }
 
         Ok(())
     }
+}
+
+fn record_executed(id: &str) {
+    CommandMetric::Executed {
+        device_id: id.to_string(),
+        system: CommandTargetSystem::HomeAssistant,
+    }
+    .record();
 }
 
 fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> serde_json::Value {

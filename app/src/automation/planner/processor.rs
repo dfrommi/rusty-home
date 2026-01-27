@@ -217,11 +217,26 @@ async fn should_execute(
         .filter(|e| e.source == *source && e.command == *command)
         .map(|e| e.created);
 
-    let was_just_executed = last_execution.is_some_and(|dt| dt > t!(30 seconds ago));
+    if let Some(last_execution) = last_execution {
+        let elapsed = last_execution.elapsed();
 
-    if was_just_executed {
-        tracing::trace!("Command for {target} was just executed, skipping");
-        return Ok(false);
+        if elapsed < t!(30 seconds) {
+            tracing::trace!(
+                "Command for {target} was last executed less than 30 seconds ago, waiting for state update. Skipping for now."
+            );
+            return Ok(false);
+        }
+
+        if let Some(min_wait) = command.min_wait_duration_between_executions()
+            && elapsed < min_wait
+        {
+            tracing::trace!(
+                "Command for {target} was last executed {:?} ago, which is less than the minimum wait duration of {:?}. Skipping for now.",
+                elapsed,
+                min_wait
+            );
+            return Ok(false);
+        }
     }
 
     let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), command_client).await?;

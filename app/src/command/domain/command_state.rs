@@ -1,4 +1,5 @@
 use crate::command::CommandClient;
+use crate::core::time::Duration;
 use crate::core::unit::{FanAirflow, Percent};
 use crate::home_state::{FanActivity, PowerAvailable, StateSnapshot};
 use crate::t;
@@ -31,6 +32,16 @@ impl Command {
                 is_set_energy_saving_reflected_in_state(device, *on, command_client, snapshot).await
             }
             Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
+        }
+    }
+
+    pub fn min_wait_duration_between_executions(&self) -> Option<Duration> {
+        match self {
+            Command::SetThermostatValveOpeningPosition { .. } => Some(t!(2 minutes)),
+            Command::SetPower { .. } => Some(t!(1 minutes)),
+            Command::SetEnergySaving { .. } => Some(t!(2 minutes)),
+            Command::ControlFan { .. } => Some(t!(3 minutes)),
+            Command::PushNotify { .. } => None,
         }
     }
 }

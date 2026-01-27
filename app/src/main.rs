@@ -89,7 +89,6 @@ pub async fn main() {
                 .run_server(move || {
                     vec![
                         frontends::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
-                        frontends::mcp::new_routes(),
                         metrics_export_api.routes(),
                     ]
                 })

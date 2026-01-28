@@ -22,6 +22,7 @@ pub use trace::TraceContext;
 //KNOWN ISSUES:
 // - EnvFilter on layer-level looses log-statements! Try again in a later version by adding statements in between planning
 // - OpenTelemetry log appender doesn't contain trace-id and attributes from the span. Issue and PR open
+//     https://github.com/open-telemetry/opentelemetry-rust/pull/2438
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MonitoringConfig {

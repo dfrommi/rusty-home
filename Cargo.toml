@@ -38,7 +38,7 @@ rumqttc = "*"
 
 #Web dependencies
 actix-web = "4"
-reqwest = { version = "*", features = ["json", "stream"] }
+reqwest = { version = "*", features = ["json", "stream", "form"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 
@@ -60,15 +60,15 @@ moka = { version = "0.12", features = ["future"] }
 
 #Tracing dependencies
 tracing = "0.1"
-tracing-opentelemetry = "0.31"
+tracing-opentelemetry = "0.32"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-opentelemetry = { version = "0.30", features = ["trace"] }
-opentelemetry-appender-tracing = "0.30"
-opentelemetry-otlp = { version = "0.30", features = ["grpc-tonic"] }
-opentelemetry-stdout = "0.30"
-opentelemetry_sdk = { version = "0.30", features = ["trace", "rt-tokio"] }
-tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_29"] }
-reqwest-tracing = { version = "0.5", features = ["opentelemetry_0_29"] }
+opentelemetry = { version = "0.31", features = ["trace"] }
+opentelemetry-appender-tracing = "0.31"
+opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"] }
+opentelemetry-stdout = "0.31"
+opentelemetry_sdk = { version = "0.31", features = ["trace", "rt-tokio"] }
+tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_30"] }
+reqwest-tracing = { version = "0.6", features = ["opentelemetry_0_30"] }
 
 #Test dependencies
 assert-json-diff = "2"
@@ -77,4 +77,4 @@ mockito = "1"
 linfa = "0.8"
 linfa-logistic = "0.8"
 linfa-linear = "0.8"
-ndarray = "0.16"
+ndarray = "0.17"

@@ -95,12 +95,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             Z2mChannel::SonoffThermostat(thermostat, demand) => {
                 let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
 
-                vec![
-                    DataPoint::new(
-                        DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
-                        payload.last_seen,
-                    )
-                    .into(),
+                let mut result = vec![
                     DataPoint::new(
                         DeviceStateValue::Temperature(
                             Temperature::ThermostatOnDevice(*thermostat),
@@ -110,7 +105,28 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     )
                     .into(),
                     availability(device_id, payload.last_seen),
-                ]
+                ];
+
+                //Check consistency => update was not fully applied
+                if payload.is_consitent_demand() {
+                    result.push(
+                        DataPoint::new(
+                            DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
+                            payload.last_seen,
+                        )
+                        .into(),
+                    );
+                } else {
+                    tracing::error!(
+                        "Inconsistent Sonoff thermostat state for device {}: valve opening degree is {} while system mode is '{}' and occupied heating setpoint is {}°C. Skipping heating demand update.",
+                        device_id,
+                        payload.valve_opening_degree,
+                        payload.system_mode,
+                        payload.occupied_heating_setpoint
+                    );
+                }
+
+                result
             }
 
             Z2mChannel::ContactSensor(opened) => {
@@ -176,13 +192,6 @@ struct ClimateSensor {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-struct SonoffThermostatPayload {
-    valve_opening_degree: f64,
-    local_temperature: f64,
-    last_seen: DateTime,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
 struct ContactSensor {
     contact: bool,
     last_seen: DateTime,
@@ -196,6 +205,23 @@ struct PowerPlug {
     total_energy_kwh: f64,
     state: String,
     last_seen: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct SonoffThermostatPayload {
+    valve_opening_degree: f64,
+    local_temperature: f64,
+    last_seen: DateTime,
+    //for debugging purposes
+    system_mode: String,
+    occupied_heating_setpoint: f64,
+}
+
+impl SonoffThermostatPayload {
+    fn is_consitent_demand(&self) -> bool {
+        (self.valve_opening_degree == 0.0 && self.system_mode == "off" && self.occupied_heating_setpoint <= 7.0)
+            || (self.valve_opening_degree > 0.0 && self.system_mode == "heat" && self.occupied_heating_setpoint >= 30.0)
+    }
 }
 
 fn emit_debug_metrics(device_id: &str, payload: &str) {

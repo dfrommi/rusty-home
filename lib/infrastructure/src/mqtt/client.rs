@@ -21,7 +21,7 @@ pub struct Mqtt {
 
 struct MqttSubscriptionHandle {
     topic: String,
-    tx: mpsc::Sender<MqttInMessage>,
+    txs: Vec<mpsc::Sender<MqttInMessage>>,
 }
 
 impl Mqtt {
@@ -52,11 +52,18 @@ impl Mqtt {
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
 
         for topic in topic {
-            tracing::info!("Subscribing to topic: {:?}", &topic);
+            if let Some(subscription) = self.subsciptions.iter_mut().find(|s| s.topic == *topic) {
+                tracing::info!("Adding subscription to already exsinging subscription: {:?}", &topic);
+
+                subscription.txs.push(tx.clone());
+                continue;
+            };
+
+            tracing::info!("Creating new subscription for topic: {:?}", &topic);
 
             let subscription = MqttSubscriptionHandle {
                 topic: topic.clone(),
-                tx: tx.clone(),
+                txs: vec![tx.clone()],
             };
 
             self.subsciptions.push(subscription);
@@ -117,18 +124,19 @@ impl Mqtt {
         for id in subscription_ids {
             match self.subsciptions.get(id - 1) {
                 Some(sub) => {
-                    tracing::trace!(
-                        "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
-                        sub.topic,
-                        sub.tx.is_closed(),
-                        mqtt_in_message
-                    );
-                    if let Err(e) = sub
-                        .tx
-                        .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
-                        .await
-                    {
-                        tracing::error!("Failed to forward MQTT message to subscriber {}: {}", sub.topic, e);
+                    for tx in sub.txs.iter() {
+                        tracing::trace!(
+                            "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
+                            sub.topic,
+                            tx.is_closed(),
+                            mqtt_in_message
+                        );
+                        if let Err(e) = tx
+                            .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
+                            .await
+                        {
+                            tracing::error!("Failed to forward MQTT message to subscriber {}: {}", sub.topic, e);
+                        }
                     }
                 }
                 None => {

@@ -30,12 +30,13 @@ pub async fn main() {
 
     let command_module = CommandModule::new(
         infrastructure.db_pool.clone(),
-        infrastructure.mqtt_client.sender(),
+        &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
-    );
+    )
+    .await;
 
     let energy_meter_bus = EventBus::new(64);
 
@@ -117,6 +118,10 @@ pub async fn main() {
 
     tokio::spawn(async move {
         http_server_exec.await;
+    });
+
+    tokio::spawn(async move {
+        command_module.run().await;
     });
 
     tokio::spawn(async move {

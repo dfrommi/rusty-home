@@ -55,6 +55,11 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
     fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
         let topic = &msg.topic;
 
+        //Command topics end with /set and should be ignored. State not yet applied
+        if topic.ends_with("/set") {
+            return None;
+        }
+
         topic
             .strip_prefix(&self.base_topic)
             .map(|topic| topic.trim_matches('/').to_owned())
@@ -107,25 +112,27 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ];
 
-                //Check consistency => update was not fully applied
-                if payload.is_consitent_demand() {
-                    result.push(
-                        DataPoint::new(
-                            DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
-                            payload.last_seen,
-                        )
-                        .into(),
-                    );
+                let current_demand = if payload.system_mode == "off" {
+                    Percent(0.0)
                 } else {
+                    Percent(payload.valve_opening_degree)
+                };
+
+                //Check consistency => update was not fully applied
+                if !payload.is_consitent_demand() {
                     tracing::error!(
-                        "Inconsistent Sonoff thermostat state for device {}: valve opening degree is {} while system mode is '{}' and occupied heating setpoint is {}°C. Skipping heating demand update.",
+                        "Inconsistent Sonoff thermostat state for device {}: valve opening degree is {} while system mode is '{}' and occupied heating setpoint is {}°C. Applying partial update {}",
                         device_id,
                         payload.valve_opening_degree,
                         payload.system_mode,
-                        payload.occupied_heating_setpoint
+                        payload.occupied_heating_setpoint,
+                        current_demand
                     );
                 }
 
+                result.push(
+                    DataPoint::new(DeviceStateValue::HeatingDemand(*demand, current_demand), payload.last_seen).into(),
+                );
                 result
             }
 

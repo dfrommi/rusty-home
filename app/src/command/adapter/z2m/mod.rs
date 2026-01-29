@@ -1,11 +1,12 @@
 mod config;
+pub mod sender;
 
 use super::metrics::*;
 use crate::{
     command::{Command, CommandTarget, adapter::CommandExecutor},
     core::unit::Percent,
 };
-use infrastructure::MqttSender;
+use sender::Z2mSender;
 use serde_json::json;
 
 #[derive(Debug, Clone)]
@@ -15,23 +16,17 @@ pub enum Z2mCommandTarget {
 }
 
 pub struct Z2mCommandExecutor {
-    base_topic: String,
     config: Vec<(CommandTarget, Z2mCommandTarget)>,
-    sender: MqttSender,
+    sender: Z2mSender,
 }
 
 impl Z2mCommandExecutor {
-    pub fn new(mqtt_sender: MqttSender, event_topic: &str) -> Self {
+    pub fn new(mqtt_sender: Z2mSender) -> Self {
         let config = config::default_z2m_command_config();
         Self {
-            base_topic: event_topic.to_string(),
             config,
             sender: mqtt_sender,
         }
-    }
-
-    fn target_topic(&self, device_id: &str) -> String {
-        format!("{}/{}/set", self.base_topic, device_id)
     }
 }
 
@@ -65,22 +60,31 @@ impl CommandExecutor for Z2mCommandExecutor {
 
 impl Z2mCommandExecutor {
     pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
-        let (system_mode, setpoint) = if value.0 > 0.0 { ("heat", 35.0) } else { ("off", 4.0) };
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
-        //use always full max closing instead of `100 - opened_percentage` as it might avoid loosing
-        //calibration over time and shouldn't have any impact on when it's actually closed
-        let closed_percentage = 100;
 
-        self.send_message(
-            device_id,
-            json!({
-                "system_mode": system_mode,
-                "valve_opening_degree": opened_percentage,
-                "valve_closing_degree": closed_percentage,
-                "occupied_heating_setpoint": setpoint,
-            }),
-        )
-        .await?;
+        let payloads = if opened_percentage > 0 {
+            vec![
+                json!({
+                    "valve_opening_degree": opened_percentage,
+                }),
+                json!({
+                    "system_mode": "heat",
+                    "occupied_heating_setpoint": 35,
+                }),
+            ]
+        } else {
+            vec![
+                json!({
+                    "valve_opening_degree": opened_percentage,
+                }),
+                // Goes automatically to frost protection temperature
+                json!({
+                    "system_mode": "off",
+                }),
+            ]
+        };
+
+        self.send_message(device_id, payloads, false).await?;
 
         Ok(true)
     }
@@ -90,19 +94,23 @@ impl Z2mCommandExecutor {
 
         self.send_message(
             device_id,
-            json!({
+            vec![json!({
                 "state": power_state,
-            }),
+            })],
+            true,
         )
         .await?;
 
         Ok(true)
     }
 
-    async fn send_message(&self, device_id: &str, payload: serde_json::Value) -> anyhow::Result<()> {
-        self.sender
-            .send_transient(self.target_topic(device_id), payload.to_string())
-            .await?;
+    async fn send_message(
+        &self,
+        device_id: &str,
+        payloads: Vec<serde_json::Value>,
+        optimistic: bool,
+    ) -> anyhow::Result<()> {
+        self.sender.send(device_id, payloads, optimistic).await?;
 
         CommandMetric::Executed {
             device_id: device_id.to_string(),

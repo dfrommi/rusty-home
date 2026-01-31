@@ -21,6 +21,7 @@ opentelemetry_sdk = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
 
 serde = { workspace = true }
+serde_json = { workspace = true }
 cached = { workspace = true }
 
 #MQTT dependencies

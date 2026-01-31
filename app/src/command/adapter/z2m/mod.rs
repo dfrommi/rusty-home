@@ -61,25 +61,28 @@ impl CommandExecutor for Z2mCommandExecutor {
 impl Z2mCommandExecutor {
     pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
+        let closing_percentage = 100 - opened_percentage;
 
         let payloads = if opened_percentage > 0 {
             vec![
                 json!({
                     "valve_opening_degree": opened_percentage,
+                    "valve_closing_degree": closing_percentage,
                 }),
                 json!({
                     "system_mode": "heat",
-                    "occupied_heating_setpoint": 35,
+                    "occupied_heating_setpoint": 25,
                 }),
             ]
         } else {
             vec![
                 json!({
                     "valve_opening_degree": opened_percentage,
+                    "valve_closing_degree": closing_percentage,
                 }),
-                // Goes automatically to frost protection temperature
                 json!({
-                    "system_mode": "off",
+                    "system_mode": "heat",
+                    "occupied_heating_setpoint": 7,
                 }),
             ]
         };

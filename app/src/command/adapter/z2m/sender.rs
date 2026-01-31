@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::core::time::{DateTime, Duration};
-use infrastructure::{Mqtt, MqttInMessage, MqttSender, MqttSubscription};
+use crate::observability::system_metric_set;
+use infrastructure::{Mqtt, MqttSender, MqttSubscription, TraceContext};
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -22,34 +23,164 @@ struct Z2mCommandRequest {
     device_id: String,
     payloads: Vec<Value>,
     optimistic: bool,
+    correlation_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 struct DeviceTracker {
+    device_id: String,
     payloads: Vec<Value>,
     last_payload_sent: Option<Value>,
     last_payload_sent_at: Option<DateTime>,
     last_state: Value,
-    consecutive_no_progress: u32,
-    halted: bool,
+    backoff: ExponentialBackoff,
 }
-
-const MAX_NO_PROGRESS: u32 = 10;
 
 fn resend_delay() -> Duration {
     Duration::seconds(5)
 }
 
-impl DeviceTracker {
-    fn new() -> Self {
+fn max_backoff_delay() -> Duration {
+    Duration::seconds(300)
+}
+
+#[derive(Debug, Clone)]
+struct ExponentialBackoff {
+    attempts: u32,
+    base_delay: Duration,
+    max_delay: Duration,
+}
+
+impl ExponentialBackoff {
+    fn new(base_delay: Duration, max_delay: Duration) -> Self {
         Self {
+            attempts: 0,
+            base_delay,
+            max_delay,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.attempts = 0;
+    }
+
+    fn next_delay(&self) -> Duration {
+        let base = self.base_delay.as_secs();
+        let multiplier = 2i64.saturating_pow(self.attempts.min(31));
+        let delay = base.saturating_mul(multiplier).min(self.max_delay.as_secs());
+        Duration::seconds(delay)
+    }
+
+    fn bump(&mut self) {
+        self.attempts = self.attempts.saturating_add(1);
+    }
+}
+
+impl DeviceTracker {
+    fn new(device_id: &str) -> Self {
+        Self {
+            device_id: device_id.to_string(),
             payloads: Vec::new(),
             last_payload_sent: None,
             last_payload_sent_at: None,
             last_state: empty_state(),
-            consecutive_no_progress: 0,
-            halted: false,
+            backoff: ExponentialBackoff::new(resend_delay(), max_backoff_delay()),
         }
+    }
+
+    fn reset_for_payloads(&mut self, payloads: Vec<Value>) {
+        self.payloads = payloads;
+        self.last_payload_sent = None;
+        self.last_payload_sent_at = None;
+        self.reset_backoff();
+    }
+
+    fn update_state(&mut self, state: Value) {
+        self.last_state = state;
+    }
+
+    fn next_payload(&self) -> Option<&Value> {
+        self.payloads
+            .iter()
+            .find(|payload| !matches_expected_subset(payload, &self.last_state))
+    }
+
+    fn last_payload_matches(&self, payload: &Value) -> bool {
+        self.last_payload_sent.as_ref() == Some(payload)
+    }
+
+    fn record_send(&mut self, payload: Value) -> Value {
+        self.last_payload_sent = Some(payload.clone());
+        self.last_payload_sent_at = Some(DateTime::now());
+        payload
+    }
+
+    fn reset_backoff(&mut self) {
+        self.backoff.reset();
+        self.record_metric();
+    }
+
+    fn bump_backoff(&mut self) {
+        self.backoff.bump();
+        self.record_metric();
+    }
+
+    fn should_delay_resend(&self, payload: &Value) -> Option<Duration> {
+        let last_sent_at = self.last_payload_sent_at?;
+        if !self.last_payload_matches(payload) {
+            return None;
+        }
+
+        let delay = self.backoff.next_delay();
+        let elapsed = DateTime::now().elapsed_since(last_sent_at);
+        if elapsed < delay {
+            return Some(delay);
+        }
+
+        None
+    }
+
+    fn next_payload_to_send(&mut self) -> Option<Value> {
+        let Some(next_payload) = self.next_payload().cloned() else {
+            self.reset_backoff();
+            tracing::debug!(state = %self.last_state, "Z2M sync: state already reflected for all payloads; done");
+            return None;
+        };
+
+        let is_same_payload = self.last_payload_matches(&next_payload);
+        if !is_same_payload {
+            self.reset_backoff();
+        }
+
+        if let Some(delay) = self.should_delay_resend(&next_payload) {
+            tracing::info!(
+                command = %next_payload,
+                state = %self.last_state,
+                "Z2M sync: payload resend delayed by backoff of {}",
+                delay
+            );
+            return None;
+        }
+
+        if is_same_payload {
+            self.bump_backoff();
+        }
+
+        Some(next_payload)
+    }
+
+    fn record_metric(&self) {
+        system_metric_set(
+            "z2m_command_resend_attempts",
+            self.backoff.attempts as f64,
+            &[("device_id", &self.device_id)],
+        );
+
+        system_metric_set(
+            "z2m_command_resend_delay_seconds",
+            self.backoff.next_delay().as_secs_f64(),
+            &[("device_id", &self.device_id)],
+        );
     }
 }
 
@@ -73,12 +204,20 @@ impl Z2mSender {
     }
 
     pub async fn send(&self, device_id: &str, payloads: Vec<Value>, optimistic: bool) -> anyhow::Result<()> {
+        if payloads.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Z2M send received with empty payload list for device {}",
+                device_id
+            ));
+        }
+
         self.tx
             .send_timeout(
                 Z2mCommandRequest {
                     device_id: device_id.to_string(),
                     payloads,
                     optimistic,
+                    correlation_id: TraceContext::current_correlation_id(),
                 },
                 tokio::time::Duration::from_secs(5),
             )
@@ -89,6 +228,16 @@ impl Z2mSender {
 
 impl Z2mSenderRunner {
     pub async fn run(mut self) {
+        let mut schedule = tokio::time::interval(tokio::time::Duration::from_secs(600));
+        let sonoff_devices = vec![
+            "bedroom/radiator_thermostat_sonoff",
+            "living_room/radiator_thermostat_big_sonoff",
+            "living_room/radiator_thermostat_small_sonoff",
+            "room_of_requirements/radiator_thermostat_sonoff",
+            "kitchen/radiator_thermostat_sonoff",
+            "bathroom/radiator_thermostat_sonoff",
+        ];
+
         loop {
             tokio::select! {
                 cmd = self.cmd_rx.recv() => {
@@ -96,29 +245,55 @@ impl Z2mSenderRunner {
                         tracing::error!("Z2M sender channel closed; stopping runner");
                         break;
                     };
+                    TraceContext::continue_from(&cmd.correlation_id);
                     self.handle_command(cmd).await;
                 }
                 msg = self.receiver.recv() => {
                     let Some(msg) = msg else {
                         continue;
                     };
-                    self.handle_state(msg).await;
+
+                    let topic = Z2mTopic::new(&self.base_topic, &msg.topic);
+                    self.handle_state(topic, &msg.payload).await;
+                }
+                _ = schedule.tick() => {
+                    for device_id in &sonoff_devices {
+                        self.sonoff_thermostat_hack(device_id).await;
+                    }
                 }
             }
         }
     }
 
-    async fn handle_command(&mut self, cmd: Z2mCommandRequest) {
-        if cmd.payloads.is_empty() {
-            tracing::warn!(device_id = %cmd.device_id, "Z2M send received with empty payload list; skipping");
-            return;
-        }
+    #[tracing::instrument(name = "sonoff_thermostat_hack", skip(self), fields(%device_id))]
+    async fn sonoff_thermostat_hack(&self, device_id: &str) {
+        tracing::debug!("Waking up Sonoff thermostat {} actively", device_id);
 
+        // Placeholder for any device-specific hacks or adjustments
+        let payload = serde_json::json!({
+            "valve_opening_degree": "",
+            "valve_closing_degree": "",
+            "system_mode": "",
+            "occupied_heating_setpoint": "",
+        });
+        let topic = Z2mTopic::new(&self.base_topic, device_id);
+
+        if let Err(e) = self
+            .sender
+            .send_transient(topic.active_get_topic(), payload.to_string())
+            .await
+        {
+            tracing::error!("Failed to publish active get for Sonoff thermostat {}: {}", device_id, e);
+        }
+    }
+
+    #[tracing::instrument(name = "handle_z2m_command", skip(self, cmd), fields(device_id = %cmd.device_id, command = tracing::field::Empty))]
+    async fn handle_command(&mut self, cmd: Z2mCommandRequest) {
         if cmd.optimistic {
-            tracing::debug!(%cmd.device_id, "Z2M optimistic send requested; sending payload list without tracking");
+            tracing::debug!("Z2M optimistic send requested; sending payload list without tracking");
             for payload in cmd.payloads {
                 if let Err(e) = self.publish(&cmd.device_id, &payload).await {
-                    tracing::error!(%cmd.device_id, command = %payload, "Failed to publish Z2M payload for device {}: {}", cmd.device_id, e);
+                    tracing::error!(command = %payload, "Failed to publish Z2M payload for device {}: {}", cmd.device_id, e);
                     return;
                 }
             }
@@ -128,170 +303,139 @@ impl Z2mSenderRunner {
         let entry = self
             .devices
             .entry(cmd.device_id.clone())
-            .or_insert_with(DeviceTracker::new);
+            .or_insert_with(|| DeviceTracker::new(&cmd.device_id));
 
-        entry.payloads = cmd.payloads;
-        entry.last_payload_sent = None;
-        entry.last_payload_sent_at = None;
-        entry.consecutive_no_progress = 0;
-        entry.halted = false;
+        entry.reset_for_payloads(cmd.payloads);
 
-        tracing::trace!(device_id = %cmd.device_id, "Z2M command received; replaced payload list for tracking");
+        tracing::trace!("Z2M sync: command received; replaced payload list for tracking");
 
-        self.maybe_send_next(&cmd.device_id, true, false).await;
+        self.maybe_send_next(&cmd.device_id).await;
     }
 
-    async fn handle_state(&mut self, msg: MqttInMessage) {
-        tracing::trace!(topic = %msg.topic, "Received Z2M state message on topic {}", msg.topic);
+    #[tracing::instrument(name = "handle_z2m_state", skip_all, fields(%topic, device_id = tracing::field::Empty, state = tracing::field::Empty))]
+    async fn handle_state(&mut self, topic: Z2mTopic, payload: &str) {
+        tracing::trace!("Z2M sync: received Z2M state message on topic {}", topic);
 
-        if is_set_topic(&msg.topic) {
-            tracing::trace!(topic = %msg.topic, "Ignoring Z2M state message on set topic");
+        if !topic.is_state_update() {
+            tracing::trace!("Z2M sync: ignoring Z2M state message on set topic");
             return;
         }
 
-        let device_id = match device_id_from_topic(&self.base_topic, &msg.topic) {
-            Some(device_id) => device_id,
+        let device_id = match topic.device_id() {
+            Some(device_id) => {
+                TraceContext::record("device_id", &device_id);
+                device_id
+            }
             None => {
-                tracing::warn!(topic = %msg.topic, "Failed to extract device ID from topic; ignoring Z2M state message");
+                tracing::warn!(
+                    "Z2M sync: failed to extract device ID from topic {}; ignoring Z2M state message",
+                    topic
+                );
                 return;
             }
         };
 
-        let entry = match self.devices.get_mut(&device_id) {
-            Some(entry) => entry,
-            None => return,
-        };
-
-        tracing::trace!(%device_id, "Processing Z2M state message for device {}", device_id);
-
-        let state = match serde_json::from_str::<Value>(&msg.payload) {
-            Ok(state) => state,
+        let state = match serde_json::from_str::<Value>(payload) {
+            Ok(state) => {
+                TraceContext::record_json("state", &state);
+                state
+            }
             Err(e) => {
-                tracing::error!(%device_id, "Failed to parse Z2M state payload for device {}: {}", device_id, e);
+                TraceContext::record("state", payload);
+                tracing::error!("Z2M sync: failed to parse Z2M state payload for device {}: {}", device_id, e);
                 return;
             }
         };
 
-        let state_unchanged = entry.last_state == state;
-        entry.last_state = state;
+        {
+            let entry = match self.devices.get_mut(&device_id) {
+                Some(entry) => entry,
+                None => return,
+            };
 
-        if state_unchanged && entry.consecutive_no_progress > 0 {
-            tracing::debug!(%device_id, state = %entry.last_state, "Z2M state unchanged since last update; evaluating next send");
-        } else {
-            tracing::debug!(%device_id, state = %entry.last_state, "Z2M state updated; evaluating next send");
+            tracing::trace!("Z2M sync: processing Z2M state message for device {}", device_id);
+            entry.update_state(state);
+            tracing::debug!("Z2M sync: state update received; evaluating next send");
         }
 
-        self.maybe_send_next(&device_id, false, state_unchanged).await;
+        self.maybe_send_next(&device_id).await;
     }
 
-    async fn maybe_send_next(&mut self, device_id: &str, from_send: bool, state_unchanged: bool) {
-        let Some((next_payload, state_snapshot)) = self.prepare_next_payload(device_id, from_send, state_unchanged)
-        else {
+    async fn maybe_send_next(&mut self, device_id: &str) {
+        let payload = {
+            let Some(entry) = self.devices.get_mut(device_id) else {
+                return;
+            };
+            entry.next_payload_to_send()
+        };
+
+        let Some(payload) = payload else {
             return;
         };
 
-        if let Err(e) = self.publish(device_id, &next_payload).await {
-            tracing::error!(%device_id, command = %next_payload, "Failed to publish Z2M payload for device {}: {}", device_id, e);
+        TraceContext::record_json("command", &payload);
+
+        if let Err(e) = self.publish(device_id, &payload).await {
+            tracing::error!("Failed to publish Z2M payload for device {}: {}", device_id, e);
             return;
         }
 
         if let Some(entry) = self.devices.get_mut(device_id) {
-            entry.last_payload_sent = Some(next_payload.clone());
-            entry.last_payload_sent_at = Some(DateTime::now());
-            entry.consecutive_no_progress = 0;
+            entry.record_send(payload.clone());
         }
 
-        tracing::info!(%device_id, command = %next_payload, state = %state_snapshot, "Z2M payload sent as next step");
-    }
-
-    fn prepare_next_payload(
-        &mut self,
-        device_id: &str,
-        from_send: bool,
-        state_unchanged: bool,
-    ) -> Option<(Value, Value)> {
-        let entry = self.devices.get_mut(device_id)?;
-
-        if entry.payloads.is_empty() {
-            tracing::info!(%device_id, "Z2M payload list empty; skipping send evaluation");
-            return None;
-        }
-
-        if entry.halted {
-            tracing::info!(%device_id, "Z2M sender halted for device; skipping send evaluation");
-            return None;
-        }
-
-        let next_payload = entry
-            .payloads
-            .iter()
-            .find(|payload| !matches_expected_subset(payload, &entry.last_state));
-
-        let Some(next_payload) = next_payload else {
-            entry.consecutive_no_progress = 0;
-            tracing::debug!(%device_id, state = %entry.last_state, "Z2M state already reflects all payloads; no send needed");
-            return None;
-        };
-
-        if !from_send {
-            if state_unchanged && entry.last_payload_sent.as_ref() == Some(next_payload) {
-                entry.consecutive_no_progress += 1;
-                if entry.consecutive_no_progress >= MAX_NO_PROGRESS {
-                    entry.halted = true;
-                    tracing::info!(
-                        %device_id,
-                        command = %next_payload,
-                        state = %entry.last_state,
-                        "Z2M sender halted after {} unchanged updates with pending payload",
-                        entry.consecutive_no_progress
-                    );
-                    return None;
-                }
-            } else {
-                entry.consecutive_no_progress = 0;
-            }
-        }
-
-        if entry.last_payload_sent.as_ref() == Some(next_payload)
-            && let Some(last_sent_at) = entry.last_payload_sent_at
-        {
-            let delay = resend_delay();
-            if DateTime::now().elapsed_since(last_sent_at) < delay {
-                tracing::info!(
-                    %device_id,
-                    command = %next_payload,
-                    state = %entry.last_state,
-                    "Z2M payload was sent within {} seconds; delaying resend",
-                    delay.as_secs()
-                );
-                return None;
-            }
-        }
-
-        Some((next_payload.clone(), entry.last_state.clone()))
+        tracing::info!("Z2M payload sent as next step");
     }
 
     async fn publish(&self, device_id: &str, payload: &Value) -> anyhow::Result<()> {
-        tracing::info!(%device_id, command = %payload, "Publishing Z2M command payload to device {}", device_id);
+        tracing::info!("Publishing Z2M command payload to device {}", device_id);
         self.sender
-            .send_transient(target_topic(&self.base_topic, device_id), payload.to_string())
+            .send_transient(Z2mTopic::new(&self.base_topic, device_id).command_topic(), payload.to_string())
             .await
     }
 }
 
-fn target_topic(base_topic: &str, device_id: &str) -> String {
-    format!("{}/{}/set", base_topic, device_id)
+struct Z2mTopic {
+    base_topic: String,
+    topic: String,
 }
 
-fn device_id_from_topic(base_topic: &str, topic: &str) -> Option<String> {
-    topic
-        .strip_prefix(base_topic)
-        .map(|topic| topic.trim_matches('/').to_owned())
-        .filter(|device_id| !device_id.is_empty())
+impl Z2mTopic {
+    fn new(base_topic: &str, topic: &str) -> Self {
+        Self {
+            base_topic: base_topic.to_string(),
+            topic: topic.to_string(),
+        }
+    }
+
+    fn is_command(&self) -> bool {
+        self.topic.ends_with("/set")
+    }
+
+    fn is_state_update(&self) -> bool {
+        !self.is_command()
+    }
+
+    fn device_id(&self) -> Option<String> {
+        self.topic
+            .strip_prefix(&self.base_topic)
+            .map(|topic| topic.trim_matches('/').to_owned())
+            .filter(|device_id| !device_id.is_empty())
+    }
+
+    fn command_topic(&self) -> String {
+        format!("{}/{}/set", self.base_topic, self.topic)
+    }
+
+    fn active_get_topic(&self) -> String {
+        format!("{}/{}/get", self.base_topic, self.topic)
+    }
 }
 
-fn is_set_topic(topic: &str) -> bool {
-    topic.ends_with("/set")
+impl std::fmt::Display for Z2mTopic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.topic)
+    }
 }
 
 fn empty_state() -> Value {

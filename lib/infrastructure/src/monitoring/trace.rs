@@ -46,7 +46,7 @@ impl TraceContext {
     }
 
     pub fn make_parent_of(&self, span: &tracing::Span) {
-        span.set_parent(self.otel_ctx.clone());
+        let _ = span.set_parent(self.otel_ctx.clone());
     }
 
     pub fn make_parent(&self) {
@@ -76,6 +76,16 @@ impl TraceContext {
 
     pub fn set_current_span_name(name: String) {
         tracing::Span::current().record("otel.name", name.to_string());
+    }
+
+    pub fn record(key: &str, value: impl Into<String>) {
+        tracing::Span::current().record(key, value.into());
+    }
+
+    pub fn record_json(key: &str, value: &serde_json::Value) {
+        if let Ok(value_str) = serde_json::to_string_pretty(&value) {
+            tracing::Span::current().record(key, value_str);
+        }
     }
 }
 

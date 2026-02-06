@@ -67,7 +67,7 @@ fn combined_demand(
 
     let limits = ControlLimits {
         barely_warm: barely_warm_output,
-        step: Percent(3.0),
+        step: Percent(5.0),
         min_output: Percent(8.0),
         max_output: match &mode.value {
             HeatingMode::Ventilation => Percent(0.0),
@@ -164,24 +164,24 @@ fn adjustment_needed(
     //Same direction already applied?
     let mut new_adjustment_after_last_change = false;
     let mut new_adjustment_in_same_direction = false;
-    if let Some((first, second)) = adjustments.last2() {
+    if let Some((previous, latest)) = adjustments.last2() {
         use AdjustmentDirection::*;
 
-        new_adjustment_after_last_change = second.timestamp > current_demand.timestamp;
+        new_adjustment_after_last_change = latest.timestamp > current_demand.timestamp;
 
-        if matches!(first.value, MustIncrease | ShouldIncrease | Hold)
-            && matches!(second.value, MustIncrease | ShouldIncrease | Hold)
+        if matches!(previous.value, MustIncrease | ShouldIncrease | Hold)
+            && matches!(latest.value, MustIncrease | ShouldIncrease | Hold)
         {
             new_adjustment_in_same_direction = true;
         }
 
-        if matches!(first.value, MustDecrease | ShouldDecrease | Hold)
-            && matches!(second.value, MustDecrease | ShouldDecrease | Hold)
+        if matches!(previous.value, MustDecrease | ShouldDecrease | Hold)
+            && matches!(latest.value, MustDecrease | ShouldDecrease | Hold)
         {
             new_adjustment_in_same_direction = true;
         }
 
-        if first.value == MustOff && second.value == MustOff {
+        if previous.value == MustOff && latest.value == MustOff {
             new_adjustment_in_same_direction = true;
         }
     }

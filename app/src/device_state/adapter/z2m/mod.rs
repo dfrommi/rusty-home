@@ -112,27 +112,26 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ];
 
-                let current_demand = if payload.system_mode == "off" {
-                    Percent(0.0)
-                } else {
-                    Percent(payload.valve_opening_degree)
-                };
-
                 //Check consistency => update was not fully applied
-                if !payload.is_consitent_demand() {
-                    tracing::error!(
-                        "Inconsistent Sonoff thermostat state for device {}: valve opening degree is {} while system mode is '{}' and occupied heating setpoint is {}°C. Applying partial update {}",
-                        device_id,
-                        payload.valve_opening_degree,
-                        payload.system_mode,
-                        payload.occupied_heating_setpoint,
-                        current_demand
-                    );
-                }
-
+                // if payload.is_consitent_demand() {
                 result.push(
-                    DataPoint::new(DeviceStateValue::HeatingDemand(*demand, current_demand), payload.last_seen).into(),
+                    DataPoint::new(
+                        DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
+                        payload.last_seen,
+                    )
+                    .into(),
                 );
+                // } else {
+                // tracing::warn!(
+                //     %device_id,
+                //     "Inconsistent Sonoff thermostat state for device {}: {}% / {} / {}°C. Skipping demand update.",
+                //     device_id,
+                //     payload.valve_opening_degree,
+                //     payload.system_mode,
+                //     payload.occupied_heating_setpoint,
+                // );
+                //}
+
                 result
             }
 

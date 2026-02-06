@@ -57,8 +57,8 @@ impl TryInto<EnvFilter> for EnvFilterConfig {
 impl MonitoringConfig {
     pub fn init(&self) -> Result<(), Box<dyn Error>> {
         let resource = Resource::builder()
+            .with_attribute(KeyValue::new("service.namespace", "smart-home"))
             .with_attribute(KeyValue::new("service.name", self.service_name.clone()))
-            .with_attribute(KeyValue::new("app.name", self.app_name.clone()))
             .build();
 
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::default());
@@ -67,6 +67,7 @@ impl MonitoringConfig {
             let fmt_filter: EnvFilter = self.logs.clone().try_into()?;
             let fmt_layer = tracing_subscriber::fmt::layer().with_filter(fmt_filter);
 
+            //TODO check 0.32 release when available: are tracing-field added to log events?
             let logger_provider = init_logs(resource.clone(), otlp_config.url.clone())?;
             let logging_filter: EnvFilter = self.logs.clone().try_into()?;
             let logging_layer = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(logging_filter);

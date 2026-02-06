@@ -63,7 +63,9 @@ tracing = "0.1"
 tracing-opentelemetry = "0.32"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 opentelemetry = { version = "0.31", features = ["trace"] }
-opentelemetry-appender-tracing = "0.31"
+
+# add feature "experimental_span_attributes" when 0.32 is released
+opentelemetry-appender-tracing = { version = "0.31", features = [ "experimental_metadata_attributes" ] }
 opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"] }
 opentelemetry-stdout = "0.31"
 opentelemetry_sdk = { version = "0.31", features = ["trace", "rt-tokio"] }

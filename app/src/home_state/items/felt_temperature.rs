@@ -20,11 +20,7 @@ pub enum FeltTemperature {
 pub struct FeltTemperatureStateProvider;
 
 impl DerivedStateProvider<FeltTemperature, DegreeCelsius> for FeltTemperatureStateProvider {
-    fn calculate_current(
-        &self,
-        id: FeltTemperature,
-        ctx: &StateCalculationContext,
-    ) -> Option<DegreeCelsius> {
+    fn calculate_current(&self, id: FeltTemperature, ctx: &StateCalculationContext) -> Option<DegreeCelsius> {
         let temperature_dp = ctx.get(id.temperature())?;
         let abs_humidity_dp = ctx.get(id.abs_humidity())?;
 

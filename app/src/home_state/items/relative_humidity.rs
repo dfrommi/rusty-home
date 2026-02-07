@@ -22,9 +22,7 @@ impl DerivedStateProvider<RelativeHumidity, Percent> for RelativeHumidityStatePr
             RelativeHumidity::Outside => ctx.device_state(DeviceRelativeHumidity::Outside)?.value,
             RelativeHumidity::Room(room) => match room {
                 Room::LivingRoom => ctx.device_state(DeviceRelativeHumidity::LivingRoomTado)?.value,
-                Room::RoomOfRequirements => {
-                    ctx.device_state(DeviceRelativeHumidity::RoomOfRequirementsTado)?.value
-                }
+                Room::RoomOfRequirements => ctx.device_state(DeviceRelativeHumidity::RoomOfRequirementsTado)?.value,
                 Room::Bedroom => ctx.device_state(DeviceRelativeHumidity::BedroomTado)?.value,
                 Room::Kitchen => ctx.device_state(DeviceRelativeHumidity::Kitchen)?.value,
                 Room::Bathroom => {

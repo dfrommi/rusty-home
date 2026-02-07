@@ -1,8 +1,8 @@
+use crate::automation::Room;
 use crate::core::math::DataFrameStatsExt;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::interpolate::LinearInterpolator;
 use crate::core::unit::{DegreeCelsius, Percent};
-use crate::automation::Room;
 use crate::home_state::RelativeHumidity;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
@@ -61,7 +61,7 @@ impl RiskOfMouldStateProvider {
         let ref_len = ref_dewpoints.len();
         for ref_dp in ref_dewpoints.into_iter() {
             let range = DateTimeRange::new(t!(3 hours ago), t!(now));
-            let df = ctx.all_since(ref_dp.clone(), *range.start())?;
+            let df = ctx.all_since(ref_dp, *range.start())?;
             ref_sum += df.weighted_aged_mean(t!(2 hours), LinearInterpolator);
         }
 

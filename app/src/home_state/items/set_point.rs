@@ -27,39 +27,27 @@ impl DerivedStateProvider<SetPoint, DegreeCelsius> for SetPointStateProvider {
         use crate::device_state::SetPoint as DeviceSetPoint;
 
         match id {
-            SetPoint::Radiator(Radiator::RoomOfRequirements)
-                if from_iso("2025-11-22T15:08:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::RoomOfRequirements) if from_iso("2025-11-22T15:08:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }
-            SetPoint::Radiator(Radiator::LivingRoomBig)
-                if from_iso("2025-12-21T18:00:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::LivingRoomBig) if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }
-            SetPoint::Radiator(Radiator::LivingRoomSmall)
-                if from_iso("2025-12-21T18:00:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::LivingRoomSmall) if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }
-            SetPoint::Radiator(Radiator::Kitchen)
-                if from_iso("2025-12-21T18:00:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::Kitchen) if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::Kitchen))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }
-            SetPoint::Radiator(Radiator::Bedroom)
-                if from_iso("2025-12-21T18:00:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::Bedroom) if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }
-            SetPoint::Radiator(Radiator::Bathroom)
-                if from_iso("2025-12-21T18:00:00+00:00").is_passed() =>
-            {
+            SetPoint::Radiator(Radiator::Bathroom) if from_iso("2025-12-21T18:00:00+00:00").is_passed() => {
                 let mode = ctx.get(TargetHeatingMode::HeatingZone(HeatingZone::Bathroom))?;
                 setpoint_for_mode(&id, &mode.value).into()
             }

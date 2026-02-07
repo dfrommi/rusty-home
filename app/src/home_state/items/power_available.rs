@@ -13,11 +13,7 @@ pub enum PowerAvailable {
 pub struct PowerAvailableStateProvider;
 
 impl DerivedStateProvider<PowerAvailable, bool> for PowerAvailableStateProvider {
-    fn calculate_current(
-        &self,
-        id: PowerAvailable,
-        ctx: &StateCalculationContext,
-    ) -> Option<bool> {
+    fn calculate_current(&self, id: PowerAvailable, ctx: &StateCalculationContext) -> Option<bool> {
         use crate::device_state::PowerAvailable as DevicePowerAvailable;
 
         ctx.device_state(match id {

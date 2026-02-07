@@ -83,8 +83,8 @@ impl Mqtt {
         Ok(MqttSubscription::new(rx))
     }
 
-    pub fn sender(&self) -> MqttSender {
-        MqttSender::new(self.client.clone())
+    pub fn sender(&self, base_topic: impl Into<String>) -> MqttSender {
+        MqttSender::new(self.client.clone(), base_topic)
     }
 
     pub async fn run(mut self) {

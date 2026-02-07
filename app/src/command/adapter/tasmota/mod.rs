@@ -13,17 +13,15 @@ enum TasmotaCommandTarget {
 }
 
 pub struct TasmotaCommandExecutor {
-    base_topic: String,
     config: Vec<(CommandTarget, TasmotaCommandTarget)>,
     sender: MqttSender,
 }
 
 impl TasmotaCommandExecutor {
-    pub fn new(event_topic: &str, mqtt_sender: MqttSender) -> TasmotaCommandExecutor {
+    pub fn new(mqtt_sender: MqttSender) -> TasmotaCommandExecutor {
         let config = config::default_tasmota_command_config();
 
         Self {
-            base_topic: event_topic.to_string(),
             config,
             sender: mqtt_sender,
         }
@@ -47,7 +45,7 @@ impl CommandExecutor for TasmotaCommandExecutor {
             (Command::SetPower { power_on, .. }, TasmotaCommandTarget::PowerSwitch(device_id)) => {
                 self.sender
                     .send_transient(
-                        format!("{}/cmnd/{}/Power1", self.base_topic, device_id),
+                        format!("cmnd/{}/Power1", device_id),
                         if *power_on { "ON".to_string() } else { "OFF".to_string() },
                     )
                     .await?;

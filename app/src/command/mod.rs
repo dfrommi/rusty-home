@@ -44,8 +44,7 @@ impl CommandModule {
         let repo = CommandRepository::new(pool);
         let event_bus = EventBus::new(64);
 
-        let mqtt_sender = mqtt_client.sender();
-        let tasmota_executor = adapter::TasmotaCommandExecutor::new(tasmota_event_topic, mqtt_sender.clone());
+        let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
 
         let (z2m_sender, z2m_sender_runner) = adapter::z2m::sender::Z2mSender::new(mqtt_client, z2m_event_topic)
             .await

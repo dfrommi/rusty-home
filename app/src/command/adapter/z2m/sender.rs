@@ -195,7 +195,7 @@ impl Z2mSender {
             Self { tx },
             Z2mSenderRunner {
                 base_topic,
-                sender: mqtt_client.sender(),
+                sender: mqtt_client.sender(event_topic),
                 receiver,
                 cmd_rx,
                 devices: HashMap::new(),
@@ -424,11 +424,11 @@ impl Z2mTopic {
     }
 
     fn command_topic(&self) -> String {
-        format!("{}/{}/set", self.base_topic, self.topic)
+        format!("{}/set", self.topic.trim_matches('/'))
     }
 
     fn active_get_topic(&self) -> String {
-        format!("{}/{}/get", self.base_topic, self.topic)
+        format!("{}/get", self.topic.trim_matches('/'))
     }
 }
 

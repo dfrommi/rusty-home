@@ -136,9 +136,8 @@ impl Homekit {
         HomekitRunner::new(
             HomekitRegistry::default(),
             state_change_rx,
-            infrastructure.mqtt_client.sender(),
+            infrastructure.mqtt_client.sender(&self.base_topic),
             mqtt_receiver,
-            self.base_topic.clone(),
             trigger_client,
         )
     }

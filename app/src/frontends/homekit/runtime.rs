@@ -19,7 +19,6 @@ pub struct HomekitRunner {
     state_change_rx: EventListener<HomeStateEvent>,
     mqtt_sender: MqttSender,
     mqtt_receiver: MqttSubscription,
-    mqtt_base_topic: String,
     trigger_client: TriggerClient,
     trigger_debounce: HashMap<HomekitTarget, JoinHandle<()>>,
 }
@@ -30,7 +29,6 @@ impl HomekitRunner {
         state_change_rx: EventListener<HomeStateEvent>,
         mqtt_sender: MqttSender,
         mqtt_receiver: MqttSubscription,
-        mqtt_base_topic: String,
         trigger_client: TriggerClient,
     ) -> Self {
         Self {
@@ -38,7 +36,6 @@ impl HomekitRunner {
             state_change_rx,
             mqtt_sender,
             mqtt_receiver,
-            mqtt_base_topic,
             trigger_client,
             trigger_debounce: HashMap::new(),
         }
@@ -90,7 +87,7 @@ impl HomekitRunner {
             .collect::<Vec<OutgoingMessage>>();
 
         for export in exports {
-            let topic = format!("{}/to/set", self.mqtt_base_topic);
+            let topic = "to/set";
             let payload = match serde_json::to_string(&export) {
                 Ok(p) => p,
                 Err(e) => {
@@ -99,7 +96,7 @@ impl HomekitRunner {
                 }
             };
 
-            if let Err(e) = self.mqtt_sender.send_transient(&topic, payload).await {
+            if let Err(e) = self.mqtt_sender.send_transient(topic, payload).await {
                 tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }
@@ -163,15 +160,15 @@ impl HomekitRunner {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
             let topic = if already_registered.contains(&name) {
-                format!("{}/to/add/service", self.mqtt_base_topic)
+                "to/add/service"
             } else {
                 already_registered.push(name.clone());
-                format!("{}/to/add", self.mqtt_base_topic)
+                "to/add"
             };
 
             let payload = Self::service_registration_payload(name.clone(), service.clone(), &characteristics);
 
-            if let Err(e) = self.mqtt_sender.send_transient(&topic, payload.to_string()).await {
+            if let Err(e) = self.mqtt_sender.send_transient(topic, payload.to_string()).await {
                 tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
             }
         }

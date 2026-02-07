@@ -30,6 +30,101 @@ impl Z2mCommandExecutor {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct Z2mTopic {
+    device_id: String,
+}
+
+impl Z2mTopic {
+    pub(super) fn new(device_id: &str) -> Self {
+        Self {
+            device_id: device_id.trim_matches('/').to_string(),
+        }
+    }
+
+    pub(super) fn from_topic(topic: &str) -> Option<Self> {
+        let topic = topic.trim_matches('/');
+        let device_id = topic
+            .strip_suffix("/set")
+            .or_else(|| topic.strip_suffix("/get"))
+            .unwrap_or(topic)
+            .trim_matches('/');
+
+        if device_id.is_empty() {
+            return None;
+        }
+
+        Some(Self::new(device_id))
+    }
+
+    pub(super) fn is_command(topic: &str) -> bool {
+        topic.trim_matches('/').ends_with("/set")
+    }
+
+    pub(super) fn is_state_update(topic: &str) -> bool {
+        !Self::is_command(topic)
+    }
+
+    pub(super) fn device_id(&self) -> &str {
+        &self.device_id
+    }
+
+    pub(super) fn command_topic(&self) -> String {
+        format!("{}/set", self.device_id)
+    }
+
+    pub(super) fn active_get_topic(&self) -> String {
+        format!("{}/get", self.device_id)
+    }
+}
+
+impl std::fmt::Display for Z2mTopic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.device_id())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Z2mTopic;
+
+    #[test]
+    fn z2m_topic_command_topic_uses_device_id_only() {
+        let topic = Z2mTopic::new("/kitchen/light/");
+        assert_eq!(topic.command_topic(), "kitchen/light/set");
+    }
+
+    #[test]
+    fn z2m_topic_from_state_topic_extracts_device_id() {
+        let topic = Z2mTopic::from_topic("living_room/sensor").expect("valid state topic");
+        assert_eq!(topic.device_id(), "living_room/sensor");
+    }
+
+    #[test]
+    fn z2m_topic_from_set_topic_extracts_device_id() {
+        let topic = Z2mTopic::from_topic("living_room/sensor/set").expect("valid set topic");
+        assert_eq!(topic.device_id(), "living_room/sensor");
+    }
+
+    #[test]
+    fn z2m_topic_from_get_topic_extracts_device_id() {
+        let topic = Z2mTopic::from_topic("living_room/sensor/get").expect("valid get topic");
+        assert_eq!(topic.device_id(), "living_room/sensor");
+    }
+
+    #[test]
+    fn z2m_topic_is_command_is_static() {
+        assert!(Z2mTopic::is_command("living_room/sensor/set"));
+        assert!(!Z2mTopic::is_command("living_room/sensor"));
+    }
+
+    #[test]
+    fn z2m_topic_is_state_update_is_static() {
+        assert!(Z2mTopic::is_state_update("living_room/sensor"));
+        assert!(!Z2mTopic::is_state_update("living_room/sensor/set"));
+    }
+}
+
 impl CommandExecutor for Z2mCommandExecutor {
     #[tracing::instrument(name = "execute_command Z2M", ret, skip(self))]
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {

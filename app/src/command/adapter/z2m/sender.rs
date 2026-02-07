@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use super::Z2mTopic;
 use crate::core::resilience::ExponentialBackoff;
 use crate::core::time::{DateTime, Duration};
 use crate::observability::system_metric_set;
@@ -222,8 +223,7 @@ impl Z2mSenderRunner {
                         continue;
                     };
 
-                    let topic = Z2mTopic::new(&self.base_topic, &msg.topic);
-                    self.handle_state(topic, &msg.payload).await;
+                    self.handle_state(&msg.topic, &msg.payload).await;
                 }
                 _ = schedule.tick() => {
                     for device_id in &sonoff_devices {
@@ -245,7 +245,7 @@ impl Z2mSenderRunner {
             "system_mode": "",
             "occupied_heating_setpoint": "",
         });
-        let topic = Z2mTopic::new(&self.base_topic, device_id);
+        let topic = Z2mTopic::new(device_id);
 
         if let Err(e) = self
             .sender
@@ -281,28 +281,25 @@ impl Z2mSenderRunner {
         self.maybe_send_next(&cmd.device_id).await;
     }
 
-    #[tracing::instrument(name = "handle_z2m_state", skip_all, fields(%topic, device_id = tracing::field::Empty, state = tracing::field::Empty))]
-    async fn handle_state(&mut self, topic: Z2mTopic, payload: &str) {
-        tracing::trace!("Z2M sync: received Z2M state message on topic {}", topic);
+    #[tracing::instrument(name = "handle_z2m_state", skip_all, fields(topic = %mqtt_topic, device_id = tracing::field::Empty, state = tracing::field::Empty))]
+    async fn handle_state(&mut self, mqtt_topic: &str, payload: &str) {
+        tracing::trace!("Z2M sync: received Z2M state message on topic {}", mqtt_topic);
 
-        if !topic.is_state_update() {
+        if !Z2mTopic::is_state_update(mqtt_topic) {
             tracing::trace!("Z2M sync: ignoring Z2M state message on set topic");
             return;
         }
 
-        let device_id = match topic.device_id() {
-            Some(device_id) => {
-                TraceContext::record("device_id", &device_id);
-                device_id
-            }
-            None => {
-                tracing::warn!(
-                    "Z2M sync: failed to extract device ID from topic {}; ignoring Z2M state message",
-                    topic
-                );
-                return;
-            }
+        let Some(topic) = self.topic_from_incoming(mqtt_topic) else {
+            tracing::warn!(
+                "Z2M sync: failed to extract device ID from topic {}; ignoring Z2M state message",
+                mqtt_topic
+            );
+            return;
         };
+
+        let device_id = topic.device_id().to_string();
+        TraceContext::record("device_id", &device_id);
 
         let state = match serde_json::from_str::<Value>(payload) {
             Ok(state) => {
@@ -359,51 +356,17 @@ impl Z2mSenderRunner {
     async fn publish(&self, device_id: &str, payload: &Value) -> anyhow::Result<()> {
         tracing::info!("Publishing Z2M command payload to device {}", device_id);
         self.sender
-            .send_transient(Z2mTopic::new(&self.base_topic, device_id).command_topic(), payload.to_string())
+            .send_transient(Z2mTopic::new(device_id).command_topic(), payload.to_string())
             .await
     }
-}
 
-struct Z2mTopic {
-    base_topic: String,
-    topic: String,
-}
-
-impl Z2mTopic {
-    fn new(base_topic: &str, topic: &str) -> Self {
-        Self {
-            base_topic: base_topic.to_string(),
-            topic: topic.to_string(),
-        }
-    }
-
-    fn is_command(&self) -> bool {
-        self.topic.ends_with("/set")
-    }
-
-    fn is_state_update(&self) -> bool {
-        !self.is_command()
-    }
-
-    fn device_id(&self) -> Option<String> {
-        self.topic
+    fn topic_from_incoming(&self, mqtt_topic: &str) -> Option<Z2mTopic> {
+        mqtt_topic
+            .trim_matches('/')
             .strip_prefix(&self.base_topic)
-            .map(|topic| topic.trim_matches('/').to_owned())
-            .filter(|device_id| !device_id.is_empty())
-    }
-
-    fn command_topic(&self) -> String {
-        format!("{}/set", self.topic.trim_matches('/'))
-    }
-
-    fn active_get_topic(&self) -> String {
-        format!("{}/get", self.topic.trim_matches('/'))
-    }
-}
-
-impl std::fmt::Display for Z2mTopic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.topic)
+            .map(|topic| topic.trim_matches('/'))
+            .filter(|topic| !topic.is_empty())
+            .and_then(Z2mTopic::from_topic)
     }
 }
 

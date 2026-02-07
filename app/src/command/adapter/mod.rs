@@ -1,7 +1,7 @@
 pub mod db;
-pub mod z2m;
 mod homeassistant;
 mod tasmota;
+pub mod z2m;
 
 use crate::command::Command;
 

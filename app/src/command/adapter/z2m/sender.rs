@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::Z2mTopic;
 use crate::core::resilience::ExponentialBackoff;
-use crate::core::time::{DateTime, Duration};
+use crate::core::time::Duration;
 use crate::observability::system_metric_set;
 use infrastructure::{Mqtt, MqttSender, MqttSubscription, TraceContext};
 use serde_json::Value;
@@ -33,7 +33,6 @@ struct DeviceTracker {
     device_id: String,
     payloads: Vec<Value>,
     last_payload_sent: Option<Value>,
-    last_payload_sent_at: Option<DateTime>,
     last_state: Value,
     backoff: ExponentialBackoff,
 }
@@ -52,7 +51,6 @@ impl DeviceTracker {
             device_id: device_id.to_string(),
             payloads: Vec::new(),
             last_payload_sent: None,
-            last_payload_sent_at: None,
             last_state: empty_state(),
             backoff: ExponentialBackoff::new(resend_delay(), max_backoff_delay()),
         }
@@ -61,7 +59,6 @@ impl DeviceTracker {
     fn reset_for_payloads(&mut self, payloads: Vec<Value>) {
         self.payloads = payloads;
         self.last_payload_sent = None;
-        self.last_payload_sent_at = None;
         self.reset_backoff();
     }
 
@@ -81,7 +78,6 @@ impl DeviceTracker {
 
     fn record_send(&mut self, payload: Value) -> Value {
         self.last_payload_sent = Some(payload.clone());
-        self.last_payload_sent_at = Some(DateTime::now());
         payload
     }
 
@@ -95,19 +91,12 @@ impl DeviceTracker {
         self.record_metric();
     }
 
-    fn should_delay_resend(&self, payload: &Value) -> Option<Duration> {
-        let last_sent_at = self.last_payload_sent_at?;
+    fn should_delay_resend(&self, payload: &Value) -> bool {
         if !self.last_payload_matches(payload) {
-            return None;
+            return false;
         }
 
-        let delay = self.backoff.next_delay();
-        let elapsed = DateTime::now().elapsed_since(last_sent_at);
-        if elapsed < delay {
-            return Some(delay);
-        }
-
-        None
+        !self.backoff.may_retry()
     }
 
     fn next_payload_to_send(&mut self) -> Option<Value> {
@@ -122,12 +111,11 @@ impl DeviceTracker {
             self.reset_backoff();
         }
 
-        if let Some(delay) = self.should_delay_resend(&next_payload) {
+        if self.should_delay_resend(&next_payload) {
             tracing::info!(
                 command = %next_payload,
                 state = %self.last_state,
-                "Z2M sync: payload resend delayed by backoff of {}",
-                delay
+                "Z2M sync: payload resend delayed",
             );
             return None;
         }
@@ -143,12 +131,6 @@ impl DeviceTracker {
         system_metric_set(
             "z2m_command_resend_attempts",
             self.backoff.attempts() as f64,
-            &[("device_id", &self.device_id)],
-        );
-
-        system_metric_set(
-            "z2m_command_resend_delay_seconds",
-            self.backoff.next_delay().as_secs_f64(),
             &[("device_id", &self.device_id)],
         );
     }

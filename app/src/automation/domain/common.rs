@@ -107,8 +107,8 @@ impl Radiator {
         }
     }
 
-    pub fn set_point(&self) -> SetPoint {
-        SetPoint::Radiator(*self)
+    pub fn target_set_point(&self) -> SetPoint {
+        SetPoint::Target(*self)
     }
 
     pub fn surface_temperature(&self) -> Temperature {

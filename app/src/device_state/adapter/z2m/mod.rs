@@ -8,7 +8,9 @@ use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceAvailability, DeviceStateValue, PowerAvailable, Temperature};
+use crate::device_state::{
+    DeviceAvailability, DeviceStateValue, HeatingDemandLimit, PowerAvailable, SetPoint, Temperature,
+};
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::device_state::{CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, TotalEnergyConsumption};
@@ -18,7 +20,7 @@ pub enum Z2mChannel {
     ClimateSensor(Temperature, RelativeHumidity),
     ContactSensor(Opened),
     PowerPlug(CurrentPowerUsage, TotalEnergyConsumption, KiloWattHours, Option<PowerAvailable>),
-    SonoffThermostat(Radiator, HeatingDemand),
+    SonoffThermostat(Radiator),
 }
 
 pub struct Z2mIncomingDataSource {
@@ -97,7 +99,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
             }
 
             //Sonoff thermostats
-            Z2mChannel::SonoffThermostat(thermostat, demand) => {
+            Z2mChannel::SonoffThermostat(thermostat) => {
                 let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
 
                 let mut result = vec![
@@ -112,25 +114,101 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ];
 
-                //Check consistency => update was not fully applied
-                // if payload.is_consitent_demand() {
+                let (setpoint_upper, setpoint_lower, demand_upper, demand_lower, demand) = match thermostat {
+                    Radiator::LivingRoomBig => (
+                        SetPoint::LivingRoomBigLower,
+                        SetPoint::LivingRoomBig,
+                        HeatingDemandLimit::LivingRoomBigUpper,
+                        HeatingDemandLimit::LivingRoomBigLower,
+                        HeatingDemand::LivingRoomBig,
+                    ),
+                    Radiator::LivingRoomSmall => (
+                        SetPoint::LivingRoomSmallLower,
+                        SetPoint::LivingRoomSmall,
+                        HeatingDemandLimit::LivingRoomSmallUpper,
+                        HeatingDemandLimit::LivingRoomSmallLower,
+                        HeatingDemand::LivingRoomSmall,
+                    ),
+                    Radiator::Bedroom => (
+                        SetPoint::BedroomLower,
+                        SetPoint::Bedroom,
+                        HeatingDemandLimit::BedroomUpper,
+                        HeatingDemandLimit::BedroomLower,
+                        HeatingDemand::Bedroom,
+                    ),
+                    Radiator::Kitchen => (
+                        SetPoint::KitchenLower,
+                        SetPoint::Kitchen,
+                        HeatingDemandLimit::KitchenUpper,
+                        HeatingDemandLimit::KitchenLower,
+                        HeatingDemand::Kitchen,
+                    ),
+                    Radiator::RoomOfRequirements => (
+                        SetPoint::RoomOfRequirementsLower,
+                        SetPoint::RoomOfRequirements,
+                        HeatingDemandLimit::RoomOfRequirementsUpper,
+                        HeatingDemandLimit::RoomOfRequirementsLower,
+                        HeatingDemand::RoomOfRequirements,
+                    ),
+                    Radiator::Bathroom => (
+                        SetPoint::BathroomLower,
+                        SetPoint::Bathroom,
+                        HeatingDemandLimit::BathroomUpper,
+                        HeatingDemandLimit::BathroomLower,
+                        HeatingDemand::Bathroom,
+                    ),
+                };
+
                 result.push(
                     DataPoint::new(
-                        DeviceStateValue::HeatingDemand(*demand, Percent(payload.valve_opening_degree)),
+                        DeviceStateValue::SetPoint(setpoint_upper, DegreeCelsius(payload.occupied_heating_setpoint)),
                         payload.last_seen,
                     )
                     .into(),
                 );
-                // } else {
-                // tracing::warn!(
-                //     %device_id,
-                //     "Inconsistent Sonoff thermostat state for device {}: {}% / {} / {}°C. Skipping demand update.",
-                //     device_id,
-                //     payload.valve_opening_degree,
-                //     payload.system_mode,
-                //     payload.occupied_heating_setpoint,
-                // );
-                //}
+
+                result.push(
+                    DataPoint::new(
+                        DeviceStateValue::SetPoint(
+                            setpoint_lower,
+                            DegreeCelsius(payload.occupied_heating_setpoint - payload.temperature_accuracy),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                );
+
+                result.push(
+                    DataPoint::new(
+                        DeviceStateValue::HeatingDemandLimit(
+                            demand_upper,
+                            Percent(payload.valve_opening_degree).clamp(),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                );
+
+                result.push(
+                    DataPoint::new(
+                        DeviceStateValue::HeatingDemandLimit(
+                            demand_lower,
+                            Percent(100.0 - payload.valve_closing_degree).clamp(),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
+                );
+
+                //TODO not necessarily the case, as it just exposes the limit. Can it be combined to
+                //reveal the actual demand?
+                result.push(
+                    DataPoint::new(
+                        DeviceStateValue::HeatingDemand(demand, Percent(payload.valve_opening_degree)),
+                        payload.last_seen,
+                    )
+                    .into(),
+                );
 
                 result
             }
@@ -216,11 +294,13 @@ struct PowerPlug {
 #[derive(Debug, Clone, serde::Deserialize)]
 struct SonoffThermostatPayload {
     valve_opening_degree: f64,
+    valve_closing_degree: f64,
+    occupied_heating_setpoint: f64,
+    temperature_accuracy: f64, //negative
     local_temperature: f64,
     last_seen: DateTime,
     //for debugging purposes
     system_mode: String,
-    occupied_heating_setpoint: f64,
 }
 
 impl SonoffThermostatPayload {

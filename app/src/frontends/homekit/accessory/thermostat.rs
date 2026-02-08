@@ -31,31 +31,31 @@ impl Thermostat {
             //TODO handle multiple radiators properly
             HeatingZone::LivingRoom => (
                 zone.inside_temperature(),
-                SetPoint::Radiator(Radiator::LivingRoomBig),
+                SetPoint::Current(Radiator::LivingRoomBig),
                 TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom),
                 HeatingDemand::Radiator(Radiator::LivingRoomBig),
             ),
             HeatingZone::Bedroom => (
                 zone.inside_temperature(),
-                SetPoint::Radiator(Radiator::Bedroom),
+                SetPoint::Current(Radiator::Bedroom),
                 TargetHeatingMode::HeatingZone(HeatingZone::Bedroom),
                 HeatingDemand::Radiator(Radiator::Bedroom),
             ),
             HeatingZone::Kitchen => (
                 zone.inside_temperature(),
-                SetPoint::Radiator(Radiator::Kitchen),
+                SetPoint::Current(Radiator::Kitchen),
                 TargetHeatingMode::HeatingZone(HeatingZone::Kitchen),
                 HeatingDemand::Radiator(Radiator::Kitchen),
             ),
             HeatingZone::RoomOfRequirements => (
                 zone.inside_temperature(),
-                SetPoint::Radiator(Radiator::RoomOfRequirements),
+                SetPoint::Current(Radiator::RoomOfRequirements),
                 TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements),
                 HeatingDemand::Radiator(Radiator::RoomOfRequirements),
             ),
             HeatingZone::Bathroom => (
                 zone.inside_temperature(),
-                SetPoint::Radiator(Radiator::Bathroom),
+                SetPoint::Current(Radiator::Bathroom),
                 TargetHeatingMode::HeatingZone(HeatingZone::Bathroom),
                 HeatingDemand::Radiator(Radiator::Bathroom),
             ),
@@ -99,9 +99,9 @@ impl Thermostat {
                 events.push(self.event(HomekitCharacteristic::CurrentTemperature, serde_json::json!(value.0)));
             }
             HomeStateValue::SetPoint(set_point, value) if *set_point == self.set_point => {
-                self.status.set_point = Some(*value);
+                self.status.set_point = Some(*value.to());
 
-                events.push(self.event(HomekitCharacteristic::TargetTemperature, serde_json::json!(value.0)));
+                events.push(self.event(HomekitCharacteristic::TargetTemperature, serde_json::json!(value.to().0)));
                 if let Some(event) = self.target_state_event() {
                     events.push(event);
                 }

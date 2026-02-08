@@ -6,6 +6,7 @@ mod current_power_usage;
 mod energy_saving;
 mod fan_activity;
 mod heating_demand;
+mod heating_demand_limit;
 mod light_level;
 mod opened;
 mod power_available;
@@ -21,6 +22,7 @@ pub use current_power_usage::CurrentPowerUsage;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::FanActivity;
 pub use heating_demand::HeatingDemand;
+pub use heating_demand_limit::HeatingDemandLimit;
 pub use light_level::LightLevel;
 pub use opened::Opened;
 pub use power_available::PowerAvailable;
@@ -38,6 +40,7 @@ pub enum DeviceStateValue {
     CurrentPowerUsage(current_power_usage::CurrentPowerUsage, Watt),
     FanActivity(fan_activity::FanActivity, FanAirflow),
     HeatingDemand(heating_demand::HeatingDemand, Percent),
+    HeatingDemandLimit(heating_demand_limit::HeatingDemandLimit, Percent),
     LightLevel(light_level::LightLevel, Lux),
     Opened(opened::Opened, bool),
     PowerAvailable(power_available::PowerAvailable, bool),
@@ -56,6 +59,7 @@ impl From<&DeviceStateValue> for f64 {
             DeviceStateValue::CurrentPowerUsage(_, v) => v.into(),
             DeviceStateValue::FanActivity(_, v) => v.into(),
             DeviceStateValue::HeatingDemand(_, v) => v.into(),
+            DeviceStateValue::HeatingDemandLimit(_, v) => v.into(),
             DeviceStateValue::LightLevel(_, v) => v.into(),
             DeviceStateValue::RelativeHumidity(_, v) => v.into(),
             DeviceStateValue::SetPoint(_, v) => v.into(),

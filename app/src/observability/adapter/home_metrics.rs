@@ -34,10 +34,37 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::EnergySaving(_, v) => default_with(v.into()),
             HomeStateValue::FanActivity(_, v) => default_with(f64::from(&v)),
             HomeStateValue::HeatingDemand(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::HeatingDemandLimit(_, v) => {
+                vec![
+                    Metric {
+                        id: metric_id(&home_state_id, "min", vec![]),
+                        timestamp,
+                        value: f64::from(v.from()),
+                    },
+                    Metric {
+                        id: metric_id(&home_state_id, "max", vec![]),
+                        timestamp,
+                        value: f64::from(v.to()),
+                    },
+                ]
+            }
             HomeStateValue::PowerAvailable(_, v) => default_with(v.into()),
             HomeStateValue::Presence(_, v) => default_with(v.into()),
             HomeStateValue::RelativeHumidity(_, v) => default_with(f64::from(&v)),
-            HomeStateValue::SetPoint(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::SetPoint(_, v) => {
+                vec![
+                    Metric {
+                        id: metric_id(&home_state_id, "min", vec![]),
+                        timestamp,
+                        value: f64::from(v.from()),
+                    },
+                    Metric {
+                        id: metric_id(&home_state_id, "max", vec![]),
+                        timestamp,
+                        value: f64::from(v.to()),
+                    },
+                ]
+            }
             HomeStateValue::Temperature(_, v) => default_with(f64::from(&v)),
             HomeStateValue::TemperatureChange(_, v) => [
                 ("1m", t!(1 minutes)),

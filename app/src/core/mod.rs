@@ -1,5 +1,6 @@
 pub mod id;
 pub mod math;
+pub mod range;
 pub mod resilience;
 pub mod time;
 pub mod timeseries;

@@ -79,4 +79,5 @@ mockito = "1"
 linfa = "0.8"
 linfa-logistic = "0.8"
 linfa-linear = "0.8"
-ndarray = "0.17"
+#Needs to be aligned with linfa and linfa-linear
+ndarray = "0.16.1"

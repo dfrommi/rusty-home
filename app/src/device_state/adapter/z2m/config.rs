@@ -87,27 +87,27 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
         //
         (
             "living_room/radiator_thermostat_big_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::LivingRoomBig, HeatingDemand::LivingRoomBig),
+            Z2mChannel::SonoffThermostat(Radiator::LivingRoomBig),
         ),
         (
             "living_room/radiator_thermostat_small_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::LivingRoomSmall, HeatingDemand::LivingRoomSmall),
+            Z2mChannel::SonoffThermostat(Radiator::LivingRoomSmall),
         ),
         (
             "kitchen/radiator_thermostat_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::Kitchen, HeatingDemand::Kitchen),
+            Z2mChannel::SonoffThermostat(Radiator::Kitchen),
         ),
         (
             "bedroom/radiator_thermostat_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::Bedroom, HeatingDemand::Bedroom),
+            Z2mChannel::SonoffThermostat(Radiator::Bedroom),
         ),
         (
             "room_of_requirements/radiator_thermostat_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::RoomOfRequirements, HeatingDemand::RoomOfRequirements),
+            Z2mChannel::SonoffThermostat(Radiator::RoomOfRequirements),
         ),
         (
             "bathroom/radiator_thermostat_sonoff",
-            Z2mChannel::SonoffThermostat(Radiator::Bathroom, HeatingDemand::Bathroom),
+            Z2mChannel::SonoffThermostat(Radiator::Bathroom),
         ),
         //
         // WINDOW CONTACTS

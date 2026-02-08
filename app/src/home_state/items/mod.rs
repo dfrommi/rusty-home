@@ -5,6 +5,7 @@ mod energy_saving;
 mod fan_activity;
 mod felt_temperature;
 mod heating_demand;
+mod heating_demand_limit;
 mod is_running;
 mod occupancy;
 mod opened;
@@ -30,6 +31,7 @@ pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
 pub use felt_temperature::FeltTemperature;
 pub use heating_demand::HeatingDemand;
+pub use heating_demand_limit::HeatingDemandLimit;
 pub use is_running::IsRunning;
 pub use occupancy::Occupancy;
 pub use opened::Opened;
@@ -46,6 +48,7 @@ pub use temperature::Temperature;
 pub use temperature_change::TemperatureChange;
 pub use ventilation::Ventilation;
 
+use crate::core::range::Range;
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
 use crate::home_state::calc::StateCalculationContext;
@@ -71,10 +74,11 @@ pub enum HomeStateValue {
     EnergySaving(EnergySaving, bool),
     FanActivity(FanActivity, FanAirflow),
     HeatingDemand(HeatingDemand, Percent),
+    HeatingDemandLimit(HeatingDemandLimit, Range<Percent>),
     PowerAvailable(PowerAvailable, bool),
     Presence(Presence, bool),
     RelativeHumidity(RelativeHumidity, Percent),
-    SetPoint(SetPoint, DegreeCelsius),
+    SetPoint(SetPoint, Range<DegreeCelsius>),
     Temperature(Temperature, DegreeCelsius),
     TemperatureChange(TemperatureChange, RateOfChange<DegreeCelsius>),
 }
@@ -134,6 +138,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::HeatingDemand(id) => heating_demand::HeatingDemandStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::HeatingDemand(id, value)),
+            HomeStateId::HeatingDemandLimit(id) => heating_demand_limit::HeatingDemandLimitStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::HeatingDemandLimit(id, value)),
             HomeStateId::PowerAvailable(id) => power_available::PowerAvailableStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::PowerAvailable(id, value)),

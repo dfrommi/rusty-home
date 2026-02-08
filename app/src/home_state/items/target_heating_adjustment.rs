@@ -2,7 +2,10 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::Radiator,
-    core::unit::{DegreeCelsius, RateOfChange},
+    core::{
+        range::Range,
+        unit::{DegreeCelsius, RateOfChange},
+    },
     home_state::{
         HeatingMode, TargetHeatingMode, Temperature, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
@@ -75,7 +78,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::Setpoint(radiator) => {
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
-                let setpoint = ctx.get(radiator.set_point())?.value;
+                let setpoint = ctx.get(radiator.target_set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
@@ -85,7 +88,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
                 //Assume current ROC still active in 15 minutes
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
-                let setpoint = ctx.get(radiator.set_point())?.value;
+                let setpoint = ctx.get(radiator.target_set_point())?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
@@ -147,11 +150,11 @@ fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode)
     )
 }
 
-fn setpoint_strategy(setpoint: DegreeCelsius, mode: HeatingMode) -> HeatingAdjustmentStrategy {
+fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> HeatingAdjustmentStrategy {
     macro_rules! new {
         ($min:literal - $max:literal, min_heatup = $min_heatup:literal / h, max_overshoot = $max_overshoot:expr) => {
             HeatingAdjustmentStrategy::new(
-                (setpoint + DegreeCelsius($min), setpoint + DegreeCelsius($max)),
+                setpoint.into(),
                 RateOfChange::new(DegreeCelsius($min_heatup), t!(1 hours)).into(),
                 DegreeCelsius($max_overshoot),
             )

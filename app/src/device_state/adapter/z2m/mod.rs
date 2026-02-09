@@ -114,47 +114,47 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ];
 
-                let (setpoint_upper, setpoint_lower, demand_upper, demand_lower, demand) = match thermostat {
+                let (setpoint_lower, setpoint_upper, demand_lower, demand_upper, demand) = match thermostat {
                     Radiator::LivingRoomBig => (
                         SetPoint::LivingRoomBigLower,
                         SetPoint::LivingRoomBig,
-                        HeatingDemandLimit::LivingRoomBigUpper,
                         HeatingDemandLimit::LivingRoomBigLower,
+                        HeatingDemandLimit::LivingRoomBigUpper,
                         HeatingDemand::LivingRoomBig,
                     ),
                     Radiator::LivingRoomSmall => (
                         SetPoint::LivingRoomSmallLower,
                         SetPoint::LivingRoomSmall,
-                        HeatingDemandLimit::LivingRoomSmallUpper,
                         HeatingDemandLimit::LivingRoomSmallLower,
+                        HeatingDemandLimit::LivingRoomSmallUpper,
                         HeatingDemand::LivingRoomSmall,
                     ),
                     Radiator::Bedroom => (
                         SetPoint::BedroomLower,
                         SetPoint::Bedroom,
-                        HeatingDemandLimit::BedroomUpper,
                         HeatingDemandLimit::BedroomLower,
+                        HeatingDemandLimit::BedroomUpper,
                         HeatingDemand::Bedroom,
                     ),
                     Radiator::Kitchen => (
                         SetPoint::KitchenLower,
                         SetPoint::Kitchen,
-                        HeatingDemandLimit::KitchenUpper,
                         HeatingDemandLimit::KitchenLower,
+                        HeatingDemandLimit::KitchenUpper,
                         HeatingDemand::Kitchen,
                     ),
                     Radiator::RoomOfRequirements => (
                         SetPoint::RoomOfRequirementsLower,
                         SetPoint::RoomOfRequirements,
-                        HeatingDemandLimit::RoomOfRequirementsUpper,
                         HeatingDemandLimit::RoomOfRequirementsLower,
+                        HeatingDemandLimit::RoomOfRequirementsUpper,
                         HeatingDemand::RoomOfRequirements,
                     ),
                     Radiator::Bathroom => (
                         SetPoint::BathroomLower,
                         SetPoint::Bathroom,
-                        HeatingDemandLimit::BathroomUpper,
                         HeatingDemandLimit::BathroomLower,
+                        HeatingDemandLimit::BathroomUpper,
                         HeatingDemand::Bathroom,
                     ),
                 };
@@ -171,7 +171,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     DataPoint::new(
                         DeviceStateValue::SetPoint(
                             setpoint_lower,
-                            DegreeCelsius(payload.occupied_heating_setpoint - payload.temperature_accuracy),
+                            DegreeCelsius(payload.occupied_heating_setpoint + payload.temperature_accuracy),
                         ),
                         payload.last_seen,
                     )
@@ -202,9 +202,14 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 //TODO not necessarily the case, as it just exposes the limit. Can it be combined to
                 //reveal the actual demand?
+                let current_demand_value = match payload.running_state.as_str() {
+                    "heat" => payload.valve_opening_degree,
+                    //should be idle
+                    _ => 100.0 - payload.valve_closing_degree,
+                };
                 result.push(
                     DataPoint::new(
-                        DeviceStateValue::HeatingDemand(demand, Percent(payload.valve_opening_degree)),
+                        DeviceStateValue::HeatingDemand(demand, Percent(current_demand_value).clamp()),
                         payload.last_seen,
                     )
                     .into(),
@@ -299,8 +304,7 @@ struct SonoffThermostatPayload {
     temperature_accuracy: f64, //negative
     local_temperature: f64,
     last_seen: DateTime,
-    //for debugging purposes
-    system_mode: String,
+    running_state: String,
 }
 
 impl SonoffThermostatPayload {

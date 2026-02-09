@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Range<T> {
     from: T,
     to: T,
@@ -41,8 +41,8 @@ where
     }
 }
 
-impl<T> Into<(T, T)> for Range<T> {
-    fn into(self) -> (T, T) {
-        (self.from, self.to)
+impl<T> From<Range<T>> for (T, T) {
+    fn from(val: Range<T>) -> Self {
+        (val.from, val.to)
     }
 }

@@ -3,7 +3,7 @@ pub mod sender;
 
 use super::metrics::*;
 use crate::{
-    command::{Command, CommandTarget, adapter::CommandExecutor},
+    command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
     core::unit::Percent,
 };
 use sender::Z2mSender;
@@ -93,17 +93,20 @@ impl CommandExecutor for Z2mCommandExecutor {
             .iter()
             .find_map(|(cmd, z2m)| if cmd == &cmd_target { Some(z2m) } else { None });
 
-        if z2m_target.is_none() {
+        let Some(z2m_target) = z2m_target else {
             return Ok(false);
-        }
+        };
 
-        match (command, z2m_target.unwrap()) {
+        match (command, z2m_target) {
             (
                 Command::SetThermostatValveOpeningPosition { value, .. },
                 Z2mCommandTarget::SonoffThermostat(device_id),
             ) => self.set_valve_opening_position_sonoff(device_id, *value).await,
             (Command::SetPower { power_on, .. }, Z2mCommandTarget::PowerPlug(device_id)) => {
                 self.set_power_state(device_id, *power_on).await
+            }
+            (Command::SetHeating { target_state, .. }, Z2mCommandTarget::SonoffThermostat(device_id)) => {
+                self.set_sonoff_heating(device_id, target_state.clone()).await
             }
             (_, z2m_target) => {
                 anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
@@ -113,6 +116,50 @@ impl CommandExecutor for Z2mCommandExecutor {
 }
 
 impl Z2mCommandExecutor {
+    pub async fn set_sonoff_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<bool> {
+        match state {
+            HeatingTargetState::Off => {
+                self.send_message(
+                    device_id,
+                    vec![json!({
+                        "system_mode": "off",
+                        "occupied_heating_setpoint": 7,
+                        "valve_opening_degree": 0,
+                        "valve_closing_degree": 100,
+                        "temperature_accuracy": -1,
+                    })],
+                    false,
+                )
+                .await?;
+
+                Ok(true)
+            }
+            HeatingTargetState::Heat {
+                target_temperature,
+                demand_limit,
+            } => {
+                let temperature_accuracy = round_to_one_decimal_place(
+                    (target_temperature.to().0 - target_temperature.from().0).clamp(0.2, 1.0),
+                );
+
+                self.send_message(
+                    device_id,
+                    vec![json!({
+                        "system_mode": "heat",
+                        "occupied_heating_setpoint": json_no_fraction_if_zero(target_temperature.to().0),
+                        "valve_opening_degree": demand_limit.to().0.round() as i64,
+                        "valve_closing_degree": (100 - demand_limit.from().0.round() as i64),
+                        "temperature_accuracy": json_no_fraction_if_zero(-temperature_accuracy),
+                    })],
+                    false,
+                )
+                .await?;
+
+                Ok(true)
+            }
+        }
+    }
+
     pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
         let opened_percentage = (value.0.round() as i64).clamp(0, 100);
         let closing_percentage = 100 - opened_percentage;
@@ -179,9 +226,21 @@ impl Z2mCommandExecutor {
     }
 }
 
+fn json_no_fraction_if_zero(value: f64) -> serde_json::Value {
+    if value.fract() == 0.0 {
+        serde_json::json!(value as i64)
+    } else {
+        serde_json::json!(value)
+    }
+}
+
+fn round_to_one_decimal_place(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Z2mTopic;
+    use super::*;
 
     #[test]
     fn z2m_topic_command_topic_uses_device_id_only() {
@@ -217,5 +276,17 @@ mod tests {
     fn z2m_topic_is_state_update_is_static() {
         assert!(Z2mTopic::is_state_update("living_room/sensor"));
         assert!(!Z2mTopic::is_state_update("living_room/sensor/set"));
+    }
+
+    #[test]
+    fn test_round_to_one_decimal_place() {
+        assert_eq!(round_to_one_decimal_place(1.234), 1.2);
+        assert_eq!(round_to_one_decimal_place(1.25), 1.3);
+        assert_eq!(round_to_one_decimal_place(1.0), 1.0);
+
+        //0.3999999999999986
+        let rounding_error = 19.0 - 18.6;
+        assert!(rounding_error != 0.4);
+        assert_eq!(round_to_one_decimal_place(rounding_error), 0.4);
     }
 }

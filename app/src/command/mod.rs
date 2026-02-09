@@ -12,7 +12,9 @@ use service::CommandService;
 use sqlx::PgPool;
 
 use crate::{
+    command::adapter::z2m::sender::Z2mSender,
     core::{id::ExternalId, time::DateTime},
+    home_state::HomeStateEvent,
     trigger::UserTriggerId,
 };
 
@@ -33,20 +35,22 @@ pub struct CommandClient {
 }
 
 impl CommandModule {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
+        event_bus: EventBus<CommandEvent>,
         pool: PgPool,
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,
         ha_url: &str,
         ha_token: &str,
+        home_state_listener: EventListener<HomeStateEvent>,
     ) -> Self {
         let repo = CommandRepository::new(pool);
-        let event_bus = EventBus::new(64);
 
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
 
-        let (z2m_sender, z2m_sender_runner) = adapter::z2m::sender::Z2mSender::new(mqtt_client, z2m_event_topic)
+        let (z2m_sender, z2m_sender_runner) = Z2mSender::new(mqtt_client, z2m_event_topic, home_state_listener)
             .await
             .expect("Failed to initialize Z2M sender");
         let z2m_executor = adapter::Z2mCommandExecutor::new(z2m_sender);
@@ -73,9 +77,9 @@ impl CommandModule {
         }
     }
 
-    pub fn subscribe(&self) -> EventListener<CommandEvent> {
-        self.event_bus.subscribe()
-    }
+    // pub fn subscribe(&self) -> EventListener<CommandEvent> {
+    //     self.event_bus.subscribe()
+    // }
 
     pub async fn run(self) {
         self.z2m_sender_runner.run().await;

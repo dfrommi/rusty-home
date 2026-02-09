@@ -1,7 +1,8 @@
-use crate::command::CommandClient;
+use crate::command::{CommandClient, HeatingTargetState};
+use crate::core::range::Range;
 use crate::core::time::Duration;
-use crate::core::unit::{FanAirflow, Percent};
-use crate::home_state::{FanActivity, PowerAvailable, StateSnapshot};
+use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
+use crate::home_state::{FanActivity, HeatingDemandLimit, PowerAvailable, StateSnapshot};
 use crate::t;
 use anyhow::Result;
 
@@ -23,6 +24,23 @@ impl Command {
             Command::SetThermostatValveOpeningPosition { device, value } => {
                 is_set_thermostat_valve_opening_position_reflected_in_state(device, value, snapshot)
             }
+            Command::SetHeating {
+                device,
+                target_state: HeatingTargetState::Off,
+            } => is_set_heating_reflected_in_state(
+                device,
+                &Range::new(DegreeCelsius(0.0), DegreeCelsius(0.0)),
+                &Range::new(Percent(0.0), Percent(0.0)),
+                snapshot,
+            ),
+            Command::SetHeating {
+                device,
+                target_state:
+                    HeatingTargetState::Heat {
+                        target_temperature,
+                        demand_limit,
+                    },
+            } => is_set_heating_reflected_in_state(device, target_temperature, demand_limit, snapshot),
             Command::PushNotify {
                 recipient,
                 notification,
@@ -38,6 +56,7 @@ impl Command {
     pub fn min_wait_duration_between_executions(&self) -> Option<Duration> {
         match self {
             Command::SetThermostatValveOpeningPosition { .. } => Some(t!(2 minutes)),
+            Command::SetHeating { .. } => Some(t!(2 minutes)),
             Command::SetPower { .. } => Some(t!(1 minutes)),
             Command::SetEnergySaving { .. } => Some(t!(2 minutes)),
             Command::ControlFan { .. } => Some(t!(3 minutes)),
@@ -53,6 +72,29 @@ fn is_set_thermostat_valve_opening_position_reflected_in_state(
 ) -> Result<bool> {
     let heating_demand = snapshot.try_get(device.heating_demand())?.value;
     Ok(heating_demand.0 as i32 == value.0 as i32)
+}
+
+fn is_set_heating_reflected_in_state(
+    device: &Radiator,
+    target_temperature: &Range<DegreeCelsius>,
+    demand_limit: &Range<Percent>,
+    snapshot: &StateSnapshot,
+) -> Result<bool> {
+    let current_setpoint_range = snapshot.try_get(device.current_set_point())?.value;
+    let current_demand_limit = snapshot.try_get(HeatingDemandLimit::Current(*device))?.value;
+    let is_reflected = current_setpoint_range == *target_temperature && current_demand_limit == *demand_limit;
+
+    tracing::debug!(
+        "Checking if SetHeating command for device {:?} is reflected in state: current setpoint range: {:?}, target setpoint range: {:?}, current demand limit: {:?}, target demand limit: {:?}, is_reflected: {}",
+        device,
+        current_setpoint_range,
+        target_temperature,
+        current_demand_limit,
+        demand_limit,
+        is_reflected
+    );
+
+    Ok(is_reflected)
 }
 
 fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapshot: &StateSnapshot) -> Result<bool> {

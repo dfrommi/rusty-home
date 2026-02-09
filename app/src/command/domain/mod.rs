@@ -1,6 +1,7 @@
 mod command_state;
 
 use crate::automation::Radiator;
+use crate::core::range::Range;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::trigger::UserTriggerId;
@@ -19,6 +20,11 @@ pub enum Command {
         device: Radiator,
         value: Percent,
     },
+    SetHeating {
+        device: Radiator,
+        target_state: HeatingTargetState,
+    },
+
     PushNotify {
         action: NotificationAction,
         notification: Notification,
@@ -42,6 +48,9 @@ pub enum CommandTarget {
 
     #[display("SetThermostatValveOpeningPosition[{}]", device)]
     SetThermostatValveOpeningPosition { device: Radiator },
+
+    #[display("SetHeating[{}]", device)]
+    SetHeating { device: Radiator },
 
     #[display("PushNotify[{} - {}]", notification, recipient)]
     PushNotify {
@@ -69,6 +78,7 @@ impl From<&Command> for CommandTarget {
             Command::SetThermostatValveOpeningPosition { device, .. } => {
                 CommandTarget::SetThermostatValveOpeningPosition { device: device.clone() }
             }
+            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
             Command::PushNotify {
                 recipient,
                 notification,
@@ -127,12 +137,22 @@ pub enum PowerToggle {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum HeatingTargetState {
     Off,
-    WindowOpen,
     Heat {
-        temperature: DegreeCelsius,
-        #[serde(default)]
-        low_priority: bool,
+        target_temperature: Range<DegreeCelsius>,
+        demand_limit: Range<Percent>,
     },
+}
+
+impl std::fmt::Display for HeatingTargetState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeatingTargetState::Off => write!(f, "Off"),
+            HeatingTargetState::Heat {
+                target_temperature,
+                demand_limit,
+            } => write!(f, "Heat {} ({})", target_temperature, demand_limit),
+        }
+    }
 }
 
 //

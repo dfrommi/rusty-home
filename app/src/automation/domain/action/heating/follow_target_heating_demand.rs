@@ -1,7 +1,8 @@
 use crate::{
     automation::HeatingZone,
-    command::Command,
-    home_state::{HeatingMode, TargetHeatingDemand, TargetHeatingMode},
+    command::{Command, HeatingTargetState},
+    core::unit::DegreeCelsius,
+    home_state::{HeatingDemandLimit, HeatingMode, SetPoint, TargetHeatingMode},
 };
 use r#macro::Id;
 
@@ -25,10 +26,20 @@ impl Rule for FollowTargetHeatingDemand {
         let commands = radiators
             .into_iter()
             .map(|radiator| {
-                let demand = ctx.current(TargetHeatingDemand::ControlAndObserve(radiator))?;
-                Ok(Command::SetThermostatValveOpeningPosition {
+                let setpoints = ctx.current(SetPoint::Target(radiator))?;
+                let demand_limit = ctx.current(HeatingDemandLimit::Target(radiator))?;
+                let target_state = if setpoints.contains(&DegreeCelsius(0.0)) {
+                    HeatingTargetState::Off
+                } else {
+                    HeatingTargetState::Heat {
+                        target_temperature: setpoints,
+                        demand_limit,
+                    }
+                };
+
+                Ok(Command::SetHeating {
                     device: radiator,
-                    value: demand,
+                    target_state,
                 })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;

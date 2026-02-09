@@ -70,6 +70,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
         Command::SetThermostatValveOpeningPosition { device, value } => {
             ("SetThermostatValveOpeningPosition", device.to_string(), value.to_string())
         }
+        Command::SetHeating { device, target_state } => ("SetHeating", device.to_string(), target_state.to_string()),
         Command::PushNotify {
             action,
             notification,

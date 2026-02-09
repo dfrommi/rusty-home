@@ -38,6 +38,10 @@ impl Rule for FollowDefaultSetting {
                 device,
                 value: Percent(0.0),
             },
+            CommandTarget::SetHeating { device } => Command::SetHeating {
+                device,
+                target_state: crate::command::HeatingTargetState::Off,
+            },
         };
 
         Ok(RuleResult::Execute(vec![command]))

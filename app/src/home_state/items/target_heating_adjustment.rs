@@ -7,7 +7,7 @@ use crate::{
         unit::{DegreeCelsius, RateOfChange},
     },
     home_state::{
-        HeatingMode, TargetHeatingMode, Temperature, TemperatureChange,
+        HeatingMode, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -78,7 +78,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::Setpoint(radiator) => {
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
-                let setpoint = ctx.get(radiator.target_set_point())?.value;
+                let setpoint = ctx.get(SetPoint::Target(radiator))?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
@@ -88,7 +88,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
                 //Assume current ROC still active in 15 minutes
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
-                let setpoint = ctx.get(radiator.target_set_point())?.value;
+                let setpoint = ctx.get(SetPoint::Target(radiator))?.value;
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 

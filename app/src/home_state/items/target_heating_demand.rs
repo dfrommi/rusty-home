@@ -51,6 +51,8 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
 struct ControlLimits {
     barely_warm: Percent,
     step: Percent,
+    cold_start_should_factor: f64,
+    cold_start_must_factor: f64,
     min_output: Percent,
     max_output: Percent,
 }
@@ -68,6 +70,14 @@ fn combined_demand(
     let limits = ControlLimits {
         barely_warm: barely_warm_output,
         step: Percent(5.0),
+        cold_start_should_factor: match &mode.value {
+            HeatingMode::Comfort | HeatingMode::Manual(_, _) => 1.0,
+            _ => 0.0,
+        },
+        cold_start_must_factor: match &mode.value {
+            HeatingMode::Comfort | HeatingMode::Manual(_, _) => 2.0,
+            _ => 0.0,
+        },
         min_output: Percent(8.0),
         max_output: match &mode.value {
             HeatingMode::Ventilation => Percent(0.0),
@@ -108,6 +118,7 @@ fn combined_demand(
     }
 
     let mut output = current_demand.value;
+    let is_coldstart = output <= Percent(0.0);
 
     match adjustment {
         AdjustmentDirection::MustOff => {
@@ -117,15 +128,15 @@ fn combined_demand(
             output = output - limits.step;
         }
         AdjustmentDirection::MustIncrease => {
-            output = if output <= Percent(0.0) {
-                limits.barely_warm + 2.0 * limits.step
+            output = if is_coldstart {
+                limits.barely_warm + limits.cold_start_must_factor * limits.step
             } else {
                 output + limits.step
             };
         }
         AdjustmentDirection::ShouldIncrease => {
-            output = if output <= Percent(0.0) {
-                limits.barely_warm + limits.step
+            output = if is_coldstart {
+                limits.barely_warm + limits.cold_start_should_factor * limits.step
             } else {
                 output + limits.step
             };

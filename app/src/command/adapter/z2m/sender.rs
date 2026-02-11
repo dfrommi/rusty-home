@@ -9,6 +9,7 @@ use crate::{automation::Radiator, core::resilience::ExponentialBackoff};
 use infrastructure::{EventListener, Mqtt, MqttSender, MqttSubscription, TraceContext};
 use serde_json::Value;
 use tokio::sync::mpsc;
+use tracing::Level;
 
 #[derive(Clone)]
 pub struct Z2mSender {
@@ -241,7 +242,7 @@ impl SonoffThermostatCoreSync {
         }
     }
 
-    #[tracing::instrument(name = "sonoff_set_temperature", skip(self, event), fields(device_id = %self.device_id))]
+    #[tracing::instrument(level = Level::TRACE, name = "sonoff_set_temperature", skip(self, event), fields(device_id = %self.device_id))]
     async fn handle_home_state_event(&self, event: &HomeStateEvent) {
         match event {
             HomeStateEvent::Changed(DataPoint {

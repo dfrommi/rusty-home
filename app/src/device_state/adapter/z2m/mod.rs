@@ -307,13 +307,6 @@ struct SonoffThermostatPayload {
     running_state: String,
 }
 
-impl SonoffThermostatPayload {
-    fn is_consitent_demand(&self) -> bool {
-        (self.valve_opening_degree == 0.0 && self.system_mode == "off" && self.occupied_heating_setpoint <= 7.0)
-            || (self.valve_opening_degree > 0.0 && self.system_mode == "heat" && self.occupied_heating_setpoint >= 30.0)
-    }
-}
-
 fn emit_debug_metrics(device_id: &str, payload: &str) {
     let parsed: HashMap<String, serde_json::Value> = match serde_json::from_str(payload) {
         Ok(p) => p,

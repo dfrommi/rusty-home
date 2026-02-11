@@ -2,7 +2,7 @@ use crate::command::{CommandClient, HeatingTargetState};
 use crate::core::range::Range;
 use crate::core::time::Duration;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
-use crate::home_state::{FanActivity, HeatingDemandLimit, PowerAvailable, StateSnapshot};
+use crate::home_state::{FanActivity, HeatingDemandLimit, PowerAvailable, SetPoint, StateSnapshot};
 use crate::t;
 use anyhow::Result;
 
@@ -80,7 +80,7 @@ fn is_set_heating_reflected_in_state(
     demand_limit: &Range<Percent>,
     snapshot: &StateSnapshot,
 ) -> Result<bool> {
-    let current_setpoint_range = snapshot.try_get(device.current_set_point())?.value;
+    let current_setpoint_range = snapshot.try_get(SetPoint::Current(*device))?.value;
     let current_demand_limit = snapshot.try_get(HeatingDemandLimit::Current(*device))?.value;
     let is_reflected = current_setpoint_range == *target_temperature && current_demand_limit == *demand_limit;
 

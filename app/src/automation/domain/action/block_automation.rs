@@ -2,13 +2,13 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::{
-        HeatingZone, Room, RuleEvaluationContext,
+        Room, RuleEvaluationContext,
         domain::action::{FollowDefaultSetting, Rule, RuleResult, UserTriggerAction},
     },
     command::{CommandTarget, Fan, PowerToggle},
     core::unit::DegreeCelsius,
     frontends::homekit::HomekitCommandTarget::{self},
-    home_state::{TargetHeatingMode, Temperature},
+    home_state::{Resident, Temperature},
     t,
     trigger::UserTriggerTarget,
 };
@@ -23,12 +23,8 @@ pub enum BlockAutomation {
 impl Rule for BlockAutomation {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
         let sleeping_start = {
-            let mode = ctx.current_dp(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))?;
-            if mode.value == crate::home_state::HeatingMode::Sleep {
-                Some(mode.timestamp)
-            } else {
-                None
-            }
+            let sleeping = ctx.current_dp(Resident::AnyoneSleeping)?;
+            if sleeping.value { Some(sleeping.timestamp) } else { None }
         };
 
         //None -> not blocked

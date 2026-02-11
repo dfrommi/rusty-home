@@ -130,6 +130,11 @@ impl DateTime {
         *self < Self::now()
     }
 
+    pub fn is_today(&self) -> bool {
+        let now = Self::now();
+        self.delegate.date_naive() == now.delegate.date_naive()
+    }
+
     pub fn into_db(&self) -> chrono::DateTime<chrono::Local> {
         self.delegate
     }

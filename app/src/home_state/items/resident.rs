@@ -1,9 +1,10 @@
 use crate::core::time::DateTimeRange;
-use crate::core::timeseries::DataFrame;
+use crate::home_state::IsRunning;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
+use crate::home_state::items::ventilation::Ventilation;
 use crate::t;
 use crate::{core::timeseries::DataPoint, home_state::Presence};
-use anyhow::{Result, bail};
+use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
@@ -18,16 +19,10 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
     fn calculate_current(&self, id: Resident, ctx: &StateCalculationContext) -> Option<bool> {
         match id {
             Resident::AnyoneSleeping => {
-                let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(t!(now));
-                let in_bed_df = ctx.all_since(Presence::BedroomBed, *in_bed_full_range.start())?;
+                let ventilation = ctx.get(Ventilation::AcrossAllRooms)?;
+                let tv_on = ctx.get(IsRunning::LivingRoomTv)?;
 
-                match sleeping(in_bed_full_range, in_bed_df) {
-                    Ok(dp) => Some(dp.value),
-                    Err(e) => {
-                        tracing::error!("Error calculating AnyoneSleeping: {:?}", e);
-                        None
-                    }
-                }
+                sleeping(tv_on, ventilation)
             }
 
             Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch).map(|dp| dp.value),
@@ -35,59 +30,54 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
     }
 }
 
-fn sleeping(in_bed_full_range: DateTimeRange, in_bed_since_range_start: DataFrame<bool>) -> Result<DataPoint<bool>> {
+fn sleeping(tv_on: DataPoint<bool>, ventilation: DataPoint<bool>) -> Option<bool> {
     //let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(now);
+
+    let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(t!(now));
+    let in_bed_start_range = DateTimeRange::new(*in_bed_full_range.start(), in_bed_full_range.end().at(t!(3:00)));
+    let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(6:00)), *in_bed_full_range.end());
 
     if !in_bed_full_range.is_active() {
         tracing::trace!("Not sleeping, because out of bedtime range");
-        return Ok(DataPoint::new(false, *in_bed_full_range.end()));
+        return Some(false);
     }
 
-    //TODO TimeSeries with date in future?
-    let ts = in_bed_since_range_start.with_duration_until_next_dp();
+    //TODO improve by incorporating more hints
+    //like dimmer switch
 
-    let in_bed_start_range = DateTimeRange::new(*in_bed_full_range.start(), in_bed_full_range.end().at(t!(3:00)));
+    if in_bed_start_range.is_active() {
+        tracing::trace!("In bed start range active");
 
-    let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(6:00)), *in_bed_full_range.end());
-
-    //Some has always true value
-    let sleeping_started = ts
-        .iter()
-        .find(|dp| in_bed_start_range.contains(&dp.timestamp) && dp.value.0 && dp.value.1 > t!(30 seconds))
-        .map(|dp| dp.map_value(|v| v.1.clone()));
-
-    //Some has always true value
-    let sleeping_stopped = sleeping_started
-        .as_ref()
-        .and_then(|started_dp| {
-            ts.iter().find(|dp| {
-                in_bed_stop_range.contains(&dp.timestamp)
-                    && !dp.value.0
-                    && dp.value.1 > t!(5 minutes)
-                    && started_dp.timestamp < dp.timestamp
-            })
-        })
-        .map(|dp| dp.map_value(|v| v.1.clone()));
-
-    match (sleeping_started, sleeping_stopped) {
-        (Some(_started), Some(stopped)) => {
-            tracing::trace!("Not sleeping, because out of bed for more than 5 minutes");
-            Ok(DataPoint::new(false, stopped.timestamp))
+        if tv_on.value {
+            tracing::trace!("Not sleeping, because TV is still on");
+            return Some(false);
         }
 
-        //started but not stopped
-        (Some(started_dp), None) => {
-            tracing::trace!("Sleeping, because in bed for more than 30 seconds");
-            Ok(DataPoint::new(true, started_dp.timestamp))
+        //tv off
+        if tv_on.timestamp < *in_bed_start_range.start() {
+            tracing::trace!("Not sleeping, because TV turned off before bed time range");
+            return Some(false);
         }
 
-        (None, None) => {
-            tracing::trace!("Not sleeping, because in time range, but no in bed for more than 30 seconds");
-            Ok(DataPoint::new(false, t!(now)))
-        }
-
-        (None, Some(stopped_dp)) => {
-            bail!("Internal error: sleeping stopped, but not started: {:?}", stopped_dp);
+        if tv_on.timestamp.elapsed() <= t!(10 minutes) {
+            tracing::trace!("Not sleeping, because TV turned off less than 10 minutes ago");
+            return Some(false);
         }
     }
+
+    tracing::trace!("Sleeping started");
+
+    if in_bed_stop_range.is_active() {
+        tracing::trace!("In bed stop range active");
+
+        if in_bed_stop_range.contains(&ventilation.timestamp) {
+            tracing::trace!("Not sleeping, because ventilation not yet done");
+            return Some(false);
+        }
+    }
+
+    tracing::trace!("Sleeping stopped");
+
+    //started but not stopped yet, so sleeping
+    Some(true)
 }

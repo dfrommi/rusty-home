@@ -4,10 +4,10 @@ use crate::{
     automation::Radiator,
     core::{
         range::Range,
-        unit::{DegreeCelsius, RateOfChange},
+        unit::{DegreeCelsius, Percent, RateOfChange},
     },
     home_state::{
-        HeatingMode, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
+        HeatingDemand, HeatingMode, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -62,52 +62,46 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
+                let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode.value);
-                Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
+                Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc, is_heating))
             }
             TargetHeatingAdjustment::RadiatorIn15Minutes(radiator) => {
                 let radiator_temperature = ctx.get(Temperature::RadiatorIn15Minutes(radiator))?.value;
                 //Assume current ROC still active in 15 minutes
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
                 let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
+                let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode.value);
-                Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc))
+                Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc, is_heating))
             }
             TargetHeatingAdjustment::Setpoint(radiator) => {
                 let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(SetPoint::Target(radiator))?.value;
+                let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
-                Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
+                Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc, is_heating))
             }
             TargetHeatingAdjustment::SetpointIn15Minutes(radiator) => {
                 let room_temperature = ctx.get(Temperature::RoomIn15Minutes(heating_zone.room()))?.value;
                 //Assume current ROC still active in 15 minutes
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(SetPoint::Target(radiator))?.value;
+                let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);
 
                 let setpoint_strategy = setpoint_strategy(setpoint, mode.value);
 
-                Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc))
+                Some(setpoint_strategy.adjustment_direction(room_temperature, room_roc, is_heating))
             }
             TargetHeatingAdjustment::HeatingDemand(radiator) => {
                 use AdjustmentDirection::*;
 
-                let radiator_now = ctx.get(TargetHeatingAdjustment::Radiator(radiator))?.value;
-                let radiator_in_15 = ctx.get(TargetHeatingAdjustment::RadiatorIn15Minutes(radiator))?.value;
-
-                //Stop radiator from overheating
-                let radiator_adjustment = match (radiator_now, radiator_in_15) {
-                    (MustOff, _) => MustOff,
-                    (MustDecrease, _) => MustDecrease,
-                    (_, MustOff) | (_, MustDecrease) => MustDecrease,
-                    (_, ShouldDecrease) => ShouldDecrease,
-                    _ => Hold,
-                };
+                let radiator_adjustment = ctx.get(TargetHeatingAdjustment::Radiator(radiator))?.value;
 
                 let setpoint_now = ctx.get(TargetHeatingAdjustment::Setpoint(radiator))?.value;
                 let setpoint_in_15 = ctx.get(TargetHeatingAdjustment::SetpointIn15Minutes(radiator))?.value;
@@ -146,30 +140,27 @@ fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode)
             current_room_temperature + DegreeCelsius(max_temp),
         ),
         None,
-        DegreeCelsius(3.0),
+        //don't force it off due to radiator unless very hot
+        DegreeCelsius(10.0),
     )
 }
 
 fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> HeatingAdjustmentStrategy {
-    macro_rules! new {
-        ($min:literal - $max:literal, min_heatup = $min_heatup:literal / h, max_overshoot = $max_overshoot:expr) => {
-            HeatingAdjustmentStrategy::new(
-                setpoint.into(),
-                RateOfChange::new(DegreeCelsius($min_heatup), t!(1 hours)).into(),
-                DegreeCelsius($max_overshoot),
-            )
-        };
-    }
+    let min_heatup_per_hour = match mode {
+        HeatingMode::Manual(_, _) => 2.0,
+        HeatingMode::Comfort => 1.5,
+        HeatingMode::EnergySaving => 1.0,
+        HeatingMode::Sleep => 0.75,
+        HeatingMode::Ventilation => 0.2,
+        HeatingMode::PostVentilation => 0.4,
+        HeatingMode::Away => 0.4,
+    };
 
-    match mode {
-        HeatingMode::Manual(_, _) => new!(-0.2 - 0.2, min_heatup = 2.0 / h, max_overshoot = 0.4),
-        HeatingMode::Comfort => new!(-0.4 - 0.0, min_heatup = 1.5 / h, max_overshoot = 0.2),
-        HeatingMode::EnergySaving => new!(-0.6 - 0.0, min_heatup = 1.0 / h, max_overshoot = 0.1),
-        HeatingMode::Sleep => new!(-0.8 - 0.0, min_heatup = 0.75 / h, max_overshoot = 0.0),
-        HeatingMode::Ventilation => new!(-5.0 - 0.0, min_heatup = 0.2 / h, max_overshoot = 0.0),
-        HeatingMode::PostVentilation => new!(-1.5 - 0.0, min_heatup = 0.4 / h, max_overshoot = 0.0),
-        HeatingMode::Away => new!(-1.0 - 0.0, min_heatup = 0.4 / h, max_overshoot = 0.0),
-    }
+    HeatingAdjustmentStrategy::new(
+        setpoint.into(),
+        RateOfChange::new(DegreeCelsius(min_heatup_per_hour), t!(1 hours)).into(),
+        DegreeCelsius(1.0),
+    )
 }
 
 impl AdjustmentDirection {
@@ -242,39 +233,41 @@ impl HeatingAdjustmentStrategy {
 
     fn adjustment_direction(
         &self,
-        current: DegreeCelsius,
+        current_temp: DegreeCelsius,
         current_change: RateOfChange<DegreeCelsius>,
+        is_heating: bool,
     ) -> AdjustmentDirection {
-        let increasing = current_change > DegreeCelsius(0.1) / t!(1 hours);
-        let decreasing = current_change < DegreeCelsius(0.1) / t!(1 hours);
+        //TODO is_heating to drive some decisions. Temperature much reach limits in order to work
 
-        //Too low -> increase if not heating up fast enough already
+        //Too low -> increase if not heating up fast enough already until upper bound is reached
         if let Some(ref min_heatup) = self.min_heatup
-            && current < self.min
             && &current_change < min_heatup
+            && current_temp < self.max
+            && is_heating
         {
             return AdjustmentDirection::MustIncrease;
         }
 
+        //=> not relevant anymore as heating is off until below min
         //In lower band -> increase to avoid undershoot
-        if current >= self.min && current <= self.min + self.band && decreasing {
-            return AdjustmentDirection::ShouldIncrease;
-        }
+        // if current_temp >= self.min && current_temp <= self.min + self.band && !is_heating {
+        //     return AdjustmentDirection::ShouldIncrease;
+        // }
 
         //no rule for center area -> hold
 
         //In upper band -> decrease to avoid overshoot
-        if current >= self.max - self.band && current <= self.max && increasing {
+        if current_temp >= self.max - self.band && current_temp <= self.max && is_heating {
             return AdjustmentDirection::ShouldDecrease;
         }
 
         //Too high -> decrease
-        if current > self.max && current <= self.max + self.max_overshoot {
+        if current_temp > self.max && current_temp <= self.max + self.max_overshoot {
             return AdjustmentDirection::MustDecrease;
         }
 
         //Too much overshoot -> turn off for cooldown
-        if current > self.max + self.max_overshoot {
+        if current_temp > self.max + self.max_overshoot {
             return AdjustmentDirection::MustOff;
         }
 

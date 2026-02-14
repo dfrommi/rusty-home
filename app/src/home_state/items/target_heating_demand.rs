@@ -1,12 +1,13 @@
 use crate::{
     automation::Radiator,
     core::{
-        time::Duration,
+        time::{DateTime, Duration},
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Percent, RateOfChange},
     },
     home_state::{
-        AdjustmentDirection, HeatingDemand, HeatingMode, TargetHeatingAdjustment, TargetHeatingMode, TemperatureChange,
+        AdjustmentDirection, HeatingDemand, HeatingDemandLimit, HeatingMode, TargetHeatingAdjustment,
+        TargetHeatingMode, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -25,10 +26,13 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         let TargetHeatingDemand::ControlAndObserve(radiator) = id;
 
         let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
-        let current_demand = ctx.get(radiator.heating_demand())?;
+        let reference_demand = ctx
+            .get(HeatingDemandLimit::Current(radiator))
+            .map(|limit| DataPoint::new(*limit.value.to(), limit.timestamp))?;
+        let last_change_time = reference_demand.timestamp;
         let adjustments = ctx.all_since(
             TargetHeatingAdjustment::HeatingDemand(radiator),
-            current_demand.timestamp.max(t!(30 minutes ago)),
+            last_change_time.max(t!(30 minutes ago)),
         )?;
         let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(radiator))?.value;
         let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
@@ -37,13 +41,20 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             _ => None,
         };
 
+        let is_heating_now = ctx
+            .get(radiator.heating_demand())
+            .map(|d| d.value > Percent(0.0))
+            .unwrap_or(false);
+
         combined_demand(
+            radiator,
             mode,
             adjustments,
-            current_demand,
+            is_heating_now,
             barely_warm_output,
             radiator_roc,
             coldstart_delay,
+            reference_demand,
         )
     }
 }
@@ -57,120 +68,169 @@ struct ControlLimits {
     max_output: Percent,
 }
 
-fn combined_demand(
-    mode: DataPoint<HeatingMode>,
-    adjustments: DataFrame<AdjustmentDirection>,
-    current_demand: DataPoint<Percent>,
-    barely_warm_output: Percent,
-    radiator_roc: RateOfChange<DegreeCelsius>,
-    coldstart_delay: Option<Duration>,
-) -> Option<Percent> {
-    let adjustment = adjustments.last()?.value.clone();
+impl ControlLimits {
+    fn new(radiator: &Radiator, mode: &HeatingMode, barely_warm_output: Percent) -> Self {
+        let min_output = match radiator {
+            Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => Percent(12.0),
+            Radiator::Bedroom | Radiator::Kitchen => Percent(6.0),
+            Radiator::Bathroom => Percent(10.0),
+        };
 
-    let limits = ControlLimits {
-        barely_warm: barely_warm_output,
-        step: Percent(5.0),
-        cold_start_should_factor: match &mode.value {
-            HeatingMode::Comfort | HeatingMode::Manual(_, _) => 1.0,
-            _ => 0.0,
-        },
-        cold_start_must_factor: match &mode.value {
-            HeatingMode::Comfort | HeatingMode::Manual(_, _) => 2.0,
-            _ => 0.0,
-        },
-        min_output: Percent(8.0),
-        max_output: match &mode.value {
-            HeatingMode::Ventilation => Percent(0.0),
-            HeatingMode::PostVentilation => Percent(20.0),
-            HeatingMode::EnergySaving => Percent(40.0),
-            HeatingMode::Comfort => Percent(50.0),
-            HeatingMode::Manual(_, _) => Percent(60.0),
-            HeatingMode::Sleep => Percent(40.0),
-            HeatingMode::Away => Percent(30.0),
-        },
-    };
-
-    if limits.max_output <= Percent(0.0) {
-        return Some(Percent(0.0));
-    }
-
-    //Not heating currently, but heat is requested. Wait until delay passed
-    if let Some(coldstart_delay) = coldstart_delay {
-        let heat_requested_since = adjustments
-            .fulfilled_since(|dp| dp.value > AdjustmentDirection::Hold)
-            .map(|dp| dp.timestamp);
-        if current_demand.value <= Percent(0.0)
-            && heat_requested_since.is_some_and(|since| since.elapsed() < coldstart_delay)
-        {
-            return Some(Percent(0.0));
+        Self {
+            barely_warm: barely_warm_output,
+            step: Percent(5.0),
+            cold_start_should_factor: match mode {
+                HeatingMode::Comfort | HeatingMode::Manual(_, _) => 1.0,
+                _ => 0.0,
+            },
+            cold_start_must_factor: match mode {
+                HeatingMode::Comfort | HeatingMode::Manual(_, _) => 2.0,
+                _ => 0.0,
+            },
+            min_output,
+            max_output: match mode {
+                HeatingMode::Ventilation => Percent(0.0),
+                HeatingMode::PostVentilation => Percent(20.0),
+                HeatingMode::EnergySaving => Percent(40.0),
+                HeatingMode::Comfort => Percent(50.0),
+                HeatingMode::Manual(_, _) => Percent(60.0),
+                HeatingMode::Sleep => Percent(40.0),
+                HeatingMode::Away => Percent(30.0),
+            }
+            .max(min_output),
         }
     }
 
-    //Heating present, but temperature on radiator still dropping -> not enough open to release heat
-    //Turn off if cooldown intended, but not if anyway in heatup phase already to not interrupt it
-    if heating_but_no_effect(&current_demand, &radiator_roc) && adjustment <= AdjustmentDirection::Hold {
-        return Some(Percent(0.0));
+    fn clamp(&self, output: Percent) -> Percent {
+        let output = output.round();
+        if output < self.min_output {
+            self.min_output
+        } else if output > self.max_output {
+            self.max_output
+        } else {
+            output
+        }
+        .clamp()
     }
+}
+
+fn combined_demand(
+    radiator: Radiator,
+    mode: DataPoint<HeatingMode>,
+    adjustments: DataFrame<AdjustmentDirection>,
+    is_heating_now: bool,
+    barely_warm_output: Percent,
+    radiator_roc: RateOfChange<DegreeCelsius>,
+    coldstart_delay: Option<Duration>,
+    reference_demand: DataPoint<Percent>,
+) -> Option<Percent> {
+    let adjustment = adjustments.last()?.value.clone();
+
+    let limits = ControlLimits::new(&radiator, &mode.value, barely_warm_output);
+
+    if !is_heating_now && adjustment <= AdjustmentDirection::Hold {
+        tracing::debug!(
+            %radiator, 
+            "Radiator {} already not heating currently and adjustment is down ({:?}) -> resetting output to barely warm {}", radiator, adjustment, limits.barely_warm);
+        return Some(limits.barely_warm);
+    }
+
+    //Not heating currently, but heat is requested. Wait until delay passed
+    //Used for rooms with 2 radiators to not always turn on both at the same time
+    //TODO this will not work now with setpoint-based control
+    // if let Some(coldstart_delay) = coldstart_delay {
+    //     let heat_requested_since = adjustments
+    //         .fulfilled_since(|dp| dp.value > AdjustmentDirection::Hold)
+    //         .map(|dp| dp.timestamp);
+    //     if !is_heating_now && heat_requested_since.is_some_and(|since| since.elapsed() < coldstart_delay) {
+    //         return Some(Percent(0.0));
+    //     }
+    // }
+
+    //Heating present, but temperature on radiator still dropping -> not enough open to release heat
+    //Heat up to produce heat again
+    //TODO triggers during post_ventilation due to significant temperature drop
+    // if heating_but_no_effect(is_heating_now, &radiator_roc) && adjustment <= AdjustmentDirection::Hold {
+    //     return Some(limits.clamp(reference_demand.value + limits.step));
+    // }
 
     //Don't skip on mode change
-    if !adjustment_needed(&adjustments, &current_demand, &mode) {
-        return Some(current_demand.value);
+    if !adjustment_needed(&adjustments, &reference_demand.timestamp, &mode) {
+        tracing::debug!(
+            %radiator, 
+            last_changed_at = reference_demand.timestamp.elapsed().to_iso_string(),
+            "No adjustment needed for {:?}", radiator);
+        return Some(reference_demand.value);
     }
 
-    let mut output = current_demand.value;
-    let is_coldstart = output <= Percent(0.0);
+    let mut output = reference_demand.value;
+    let is_coldstart = !is_heating_now;
 
     match adjustment {
         AdjustmentDirection::MustOff => {
             output = Percent(0.0);
+            tracing::debug!(%radiator, "Radiator {} forced off setting output to 0%", radiator);
         }
         AdjustmentDirection::MustDecrease | AdjustmentDirection::ShouldDecrease => {
             output = output - limits.step;
+            tracing::debug!(
+                %radiator, 
+                "Radiator {} decreasing output by {} to {}", radiator, limits.step, output);
         }
         AdjustmentDirection::MustIncrease => {
-            output = if is_coldstart {
-                limits.barely_warm + limits.cold_start_must_factor * limits.step
+            if is_coldstart {
+                output = limits.barely_warm + limits.cold_start_must_factor * limits.step;
+                tracing::debug!(
+                    %radiator, 
+                    "Radiator {} forced cold-start starting at {} (barely warm {} + factor {} * step {})", 
+                    radiator, output, limits.barely_warm, limits.cold_start_must_factor, limits.step);
             } else {
-                output + limits.step
+                tracing::debug!(
+                    %radiator, 
+                    "Radiator {} must increasing output by {} to {}", radiator, limits.step, output + limits.step);
+                output = output + limits.step;
             };
         }
         AdjustmentDirection::ShouldIncrease => {
-            output = if is_coldstart {
-                limits.barely_warm + limits.cold_start_should_factor * limits.step
+            if is_coldstart {
+                output = limits.barely_warm + limits.cold_start_should_factor * limits.step;
+                tracing::debug!(
+                    %radiator, 
+                    "Radiator {} gentle cold-start starting at {} (barely warm {} + factor {} * step {})", 
+                    radiator, output, limits.barely_warm, limits.cold_start_should_factor, limits.step);
             } else {
-                output + limits.step
+                tracing::debug!(
+                    %radiator, 
+                    "Radiator {} should increasing output by {} to {}", radiator, limits.step, output + limits.step);
+                output = output + limits.step;
             };
         }
         AdjustmentDirection::Hold => {
+            tracing::debug!(%radiator, "Radiator {} hold at {}", radiator, output);
             //no change
         }
     }
 
-    let output = Percent(output.0.clamp(0.0, limits.max_output.0)).round();
-    if output < limits.min_output {
-        return Some(Percent(0.0));
-    }
-
-    Some(output.clamp())
+    Some(limits.clamp(output))
 }
 
 //Gap: current_demand is not necessarily updated when adjustment was applied (keeps same value)
 //Maybe that belongs to the automation?
 fn adjustment_needed(
     adjustments: &DataFrame<AdjustmentDirection>,
-    current_demand: &DataPoint<Percent>,
+    demand_last_changed: &DateTime,
     mode: &DataPoint<HeatingMode>,
 ) -> bool {
     //Avoid flood of adjustments
-    if current_demand.timestamp.elapsed() < t!(30 seconds) {
+    if demand_last_changed.elapsed() < t!(30 seconds) {
         return false;
     }
 
     //Mode change since last adjustment?
-    let new_mode_after_last_change = mode.timestamp > current_demand.timestamp;
+    let new_mode_started_after_last_change = mode.timestamp > *demand_last_changed;
 
     //Adjust every 10 minutes at least
-    let min_adjustment_time_reached = current_demand.timestamp.elapsed() > t!(10 minutes);
+    let min_adjustment_time_reached = demand_last_changed.elapsed() > t!(10 minutes);
 
     //Same direction already applied?
     let mut new_adjustment_after_last_change = false;
@@ -178,7 +238,7 @@ fn adjustment_needed(
     if let Some((previous, latest)) = adjustments.last2() {
         use AdjustmentDirection::*;
 
-        new_adjustment_after_last_change = latest.timestamp > current_demand.timestamp;
+        new_adjustment_after_last_change = latest.timestamp > *demand_last_changed;
 
         if matches!(previous.value, MustIncrease | ShouldIncrease | Hold)
             && matches!(latest.value, MustIncrease | ShouldIncrease | Hold)
@@ -197,11 +257,13 @@ fn adjustment_needed(
         }
     }
 
-    new_mode_after_last_change
+    new_mode_started_after_last_change
         || min_adjustment_time_reached
         || (new_adjustment_after_last_change && !new_adjustment_in_same_direction)
 }
 
-fn heating_but_no_effect(current_demand: &DataPoint<Percent>, radiator_roc: &RateOfChange<DegreeCelsius>) -> bool {
-    current_demand.value > Percent(0.0) && radiator_roc.per_hour() < DegreeCelsius(-2.0)
+//TODO min elapsed
+//TODO clamp to last mode change to avoid issue in post-ventilation
+fn heating_but_no_effect(is_heating_now: bool, radiator_roc: &RateOfChange<DegreeCelsius>) -> bool {
+    is_heating_now && radiator_roc.per_hour() < DegreeCelsius(-2.0)
 }

@@ -13,7 +13,7 @@ use crate::device_state::{
 };
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
-use crate::device_state::{CurrentPowerUsage, HeatingDemand, Opened, RelativeHumidity, TotalEnergyConsumption};
+use crate::device_state::{CurrentPowerUsage, Opened, RelativeHumidity, TotalEnergyConsumption};
 
 #[derive(Debug, Clone)]
 pub enum Z2mChannel {
@@ -114,48 +114,42 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     availability(device_id, payload.last_seen),
                 ];
 
-                let (setpoint_lower, setpoint_upper, demand_lower, demand_upper, demand) = match thermostat {
+                let (setpoint_lower, setpoint_upper, demand_lower, demand_upper) = match thermostat {
                     Radiator::LivingRoomBig => (
                         SetPoint::LivingRoomBigLower,
                         SetPoint::LivingRoomBig,
                         HeatingDemandLimit::LivingRoomBigLower,
                         HeatingDemandLimit::LivingRoomBigUpper,
-                        HeatingDemand::LivingRoomBig,
                     ),
                     Radiator::LivingRoomSmall => (
                         SetPoint::LivingRoomSmallLower,
                         SetPoint::LivingRoomSmall,
                         HeatingDemandLimit::LivingRoomSmallLower,
                         HeatingDemandLimit::LivingRoomSmallUpper,
-                        HeatingDemand::LivingRoomSmall,
                     ),
                     Radiator::Bedroom => (
                         SetPoint::BedroomLower,
                         SetPoint::Bedroom,
                         HeatingDemandLimit::BedroomLower,
                         HeatingDemandLimit::BedroomUpper,
-                        HeatingDemand::Bedroom,
                     ),
                     Radiator::Kitchen => (
                         SetPoint::KitchenLower,
                         SetPoint::Kitchen,
                         HeatingDemandLimit::KitchenLower,
                         HeatingDemandLimit::KitchenUpper,
-                        HeatingDemand::Kitchen,
                     ),
                     Radiator::RoomOfRequirements => (
                         SetPoint::RoomOfRequirementsLower,
                         SetPoint::RoomOfRequirements,
                         HeatingDemandLimit::RoomOfRequirementsLower,
                         HeatingDemandLimit::RoomOfRequirementsUpper,
-                        HeatingDemand::RoomOfRequirements,
                     ),
                     Radiator::Bathroom => (
                         SetPoint::BathroomLower,
                         SetPoint::Bathroom,
                         HeatingDemandLimit::BathroomLower,
                         HeatingDemandLimit::BathroomUpper,
-                        HeatingDemand::Bathroom,
                     ),
                 };
 
@@ -200,20 +194,8 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     .into(),
                 );
 
-                //TODO not necessarily the case, as it just exposes the limit. Can it be combined to
-                //reveal the actual demand?
-                let current_demand_value = match payload.running_state.as_str() {
-                    "heat" => payload.valve_opening_degree,
-                    //should be idle
-                    _ => 100.0 - payload.valve_closing_degree,
-                };
-                result.push(
-                    DataPoint::new(
-                        DeviceStateValue::HeatingDemand(demand, Percent(current_demand_value).clamp()),
-                        payload.last_seen,
-                    )
-                    .into(),
-                );
+                //Current demand not exposed directly at running state is not reliable and no other
+                //way of reading the current demand exists.
 
                 result
             }
@@ -304,7 +286,6 @@ struct SonoffThermostatPayload {
     temperature_accuracy: f64, //negative
     local_temperature: f64,
     last_seen: DateTime,
-    running_state: String,
 }
 
 fn emit_debug_metrics(device_id: &str, payload: &str) {

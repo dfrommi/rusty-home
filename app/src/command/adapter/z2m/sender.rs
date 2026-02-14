@@ -64,7 +64,6 @@ impl DeviceTracker {
     fn reset_for_payloads(&mut self, payloads: Vec<Value>) {
         self.payloads = payloads;
         self.last_payload_sent = None;
-        self.reset_backoff();
     }
 
     fn update_state(&mut self, state: Value) {

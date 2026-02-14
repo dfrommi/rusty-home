@@ -49,6 +49,7 @@ pub use temperature_change::TemperatureChange;
 pub use ventilation::Ventilation;
 
 use crate::core::range::Range;
+use crate::core::time::DateTime;
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
 use crate::home_state::calc::StateCalculationContext;
@@ -167,4 +168,8 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
                 .map(|value| HomeStateValue::TargetHeatingAdjustment(id, value)),
         }
     }
+}
+
+fn from_iso(s: &'static str) -> DateTime {
+    DateTime::from_iso(s).expect("Invalid ISO datetime")
 }

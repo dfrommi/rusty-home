@@ -1,11 +1,16 @@
 use crate::{
     automation::Radiator,
     core::{
+        range::Range,
         time::DateTime,
-        timeseries::{DataFrame, interpolate::LinearInterpolator},
+        timeseries::{DataFrame, DataPoint, interpolate::LinearInterpolator},
         unit::{DegreeCelsius, Percent, RateOfChange},
     },
-    home_state::calc::{DerivedStateProvider, StateCalculationContext},
+    home_state::{
+        HeatingDemandLimit, SetPoint,
+        calc::{DerivedStateProvider, StateCalculationContext},
+        items::from_iso,
+    },
     t,
 };
 use r#macro::{EnumVariants, Id};
@@ -20,17 +25,23 @@ pub struct HeatingDemandStateProvider;
 
 impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider {
     fn calculate_current(&self, id: HeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
-        use crate::device_state::HeatingDemand as DeviceHeatingDemand;
-
         match id {
-            HeatingDemand::Radiator(radiator) => match radiator {
-                Radiator::LivingRoomBig => ctx.device_state(DeviceHeatingDemand::LivingRoomBig)?.value,
-                Radiator::LivingRoomSmall => ctx.device_state(DeviceHeatingDemand::LivingRoomSmall)?.value,
-                Radiator::Bedroom => ctx.device_state(DeviceHeatingDemand::Bedroom)?.value,
-                Radiator::Kitchen => ctx.device_state(DeviceHeatingDemand::Kitchen)?.value,
-                Radiator::RoomOfRequirements => ctx.device_state(DeviceHeatingDemand::RoomOfRequirements)?.value,
-                Radiator::Bathroom => ctx.device_state(DeviceHeatingDemand::Bathroom)?.value,
-            },
+            HeatingDemand::Radiator(radiator) if from_iso("2026-02-08T16:08:00+01:00").is_passed() => {
+                let setpoint_range = ctx.get(SetPoint::Current(radiator))?;
+                let is_heating = guess_is_heating_from_hyserisis(
+                    ctx.get(SetPoint::Current(radiator))?,
+                    ctx.all_since(radiator.room_temperature(), setpoint_range.timestamp)?,
+                );
+                let current_demand_limit = ctx.get(HeatingDemandLimit::Current(radiator))?.value;
+                if is_heating {
+                    *current_demand_limit.to()
+                } else {
+                    *current_demand_limit.from()
+                }
+            }
+
+            HeatingDemand::Radiator(radiator) => trust_device_reading(radiator, ctx)?,
+
             HeatingDemand::BarelyWarmSurface(radiator) => {
                 let radiator_temperatures = ctx.all_since(radiator.surface_temperature(), t!(3 hours ago))?;
                 let room_temperatures = ctx.all_since(radiator.room_temperature(), t!(3 hours ago))?;
@@ -39,6 +50,50 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
             }
         }
         .into()
+    }
+}
+
+fn trust_device_reading(radiator: Radiator, ctx: &StateCalculationContext) -> Option<Percent> {
+    use crate::device_state::HeatingDemand as DeviceHeatingDemand;
+
+    match radiator {
+        Radiator::LivingRoomBig => ctx.device_state(DeviceHeatingDemand::LivingRoomBig),
+        Radiator::LivingRoomSmall => ctx.device_state(DeviceHeatingDemand::LivingRoomSmall),
+        Radiator::Bedroom => ctx.device_state(DeviceHeatingDemand::Bedroom),
+        Radiator::Kitchen => ctx.device_state(DeviceHeatingDemand::Kitchen),
+        Radiator::RoomOfRequirements => ctx.device_state(DeviceHeatingDemand::RoomOfRequirements),
+        Radiator::Bathroom => ctx.device_state(DeviceHeatingDemand::Bathroom),
+    }
+    .map(|d| d.value)
+}
+
+fn guess_is_heating_from_hyserisis(
+    setpoints: DataPoint<Range<DegreeCelsius>>,
+    room_temperatures: DataFrame<DegreeCelsius>,
+) -> bool {
+    let Some(current_room_temp) = &room_temperatures.last().map(|temp| temp.value) else {
+        return false;
+    };
+
+    let min = setpoints.value.from();
+    let max = setpoints.value.to();
+
+    if current_room_temp <= min {
+        true
+    } else if current_room_temp >= max {
+        false
+    } else {
+        //in-range. Check if range left in any direction
+        let latest = room_temperatures
+            .latest_where(|temp| temp.value >= *max || temp.value <= *min)
+            .take_if(|temp| temp.timestamp >= setpoints.timestamp);
+
+        match latest {
+            Some(temp) if (temp.value >= *max) => false,
+            Some(temp) if (temp.value <= *min) => true,
+            //Seems to heat if range is around current temp on setpoint change
+            _ => true,
+        }
     }
 }
 
@@ -127,11 +182,8 @@ fn estimate_barely_warm_surface(
 
     //TODO should take outside temperature into account, as overall heating availability changes with it
     match radiator {
-        Radiator::LivingRoomBig => Percent(16.0),
-        Radiator::LivingRoomSmall => Percent(18.0),
-        Radiator::Bedroom => Percent(16.0),
-        Radiator::Kitchen => Percent(18.0),
-        Radiator::RoomOfRequirements => Percent(14.0),
+        Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => Percent(20.0),
+        Radiator::Bedroom | Radiator::Kitchen => Percent(8.0),
         Radiator::Bathroom => Percent(20.0),
     }
 }

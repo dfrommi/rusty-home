@@ -28,6 +28,14 @@ impl Percent {
     pub fn round(self) -> Self {
         Self(self.0.round())
     }
+
+    pub fn min(self, other: Self) -> Self {
+        Self(self.0.min(other.0))
+    }
+
+    pub fn max(self, other: Self) -> Self {
+        Self(self.0.max(other.0))
+    }
 }
 
 impl From<&Percent> for f64 {

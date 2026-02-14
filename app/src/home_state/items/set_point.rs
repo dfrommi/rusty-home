@@ -3,7 +3,7 @@ use r#macro::{EnumVariants, Id};
 use crate::{
     automation::{HeatingZone, Radiator},
     core::{range::Range, time::DateTime, unit::DegreeCelsius},
-    home_state::HeatingMode,
+    home_state::{HeatingMode, items::from_iso},
 };
 
 use crate::home_state::{
@@ -15,10 +15,6 @@ use crate::home_state::{
 pub enum SetPoint {
     Target(Radiator),
     Current(Radiator),
-}
-
-fn from_iso(s: &str) -> DateTime {
-    DateTime::from_iso(s).expect("Invalid ISO datetime")
 }
 
 pub struct SetPointStateProvider;

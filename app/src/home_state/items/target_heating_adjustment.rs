@@ -111,6 +111,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
 
                 //Combine both adjustments, radiator has priority in stopping
                 match (&radiator_adjustment, &setpoint_adjustment) {
+                    (_, MustIncrease) => MustIncrease,
                     (MustOff, _) | (_, MustOff) => MustOff,
                     (MustDecrease, _) => MustDecrease,
                     _ => setpoint_adjustment

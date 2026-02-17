@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::Z2mTopic;
+use crate::core::math::round_to_one_decimal;
 use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::home_state::{HomeStateEvent, HomeStateValue};
@@ -248,9 +249,11 @@ impl SonoffThermostatCoreSync {
                 value: HomeStateValue::Temperature(id, temp),
                 ..
             }) if *id == self.radiator.room_temperature() => {
+                let temp = round_to_one_decimal(temp.0);
+
                 tracing::debug!(device_id = %self.device_id, "External temperature update for {}: temperature {}", self.device_id, temp);
                 let payload = serde_json::json!({
-                    "external_temperature_input": temp.0,
+                    "external_temperature_input": temp,
                     "temperature_sensor_select": "external"
                 });
 

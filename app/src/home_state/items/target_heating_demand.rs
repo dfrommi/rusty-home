@@ -70,15 +70,15 @@ struct ControlLimits {
 
 impl ControlLimits {
     fn new(radiator: &Radiator, mode: &HeatingMode, barely_warm_output: Percent) -> Self {
-        let min_output = match radiator {
-            Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => Percent(12.0),
-            Radiator::Bedroom | Radiator::Kitchen => Percent(6.0),
-            Radiator::Bathroom => Percent(10.0),
+        let (min_output, step) = match radiator { 
+            Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => (Percent(12.0), Percent(5.0)),
+            Radiator::Bedroom | Radiator::Kitchen => (Percent(6.0), Percent(3.0)),
+            Radiator::Bathroom => (Percent(10.0), Percent(7.0)),
         };
 
         Self {
             barely_warm: barely_warm_output,
-            step: Percent(5.0),
+            step,
             cold_start_should_factor: match mode {
                 HeatingMode::Comfort | HeatingMode::Manual(_, _) => 1.0,
                 _ => 0.0,

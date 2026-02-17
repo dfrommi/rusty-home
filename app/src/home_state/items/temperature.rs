@@ -11,6 +11,7 @@ pub enum Temperature {
     Outside,
     Room(Room),
     Radiator(Radiator),
+    RadiatorExternalTempSensor(Radiator),
     RadiatorIn15Minutes(Radiator),
     RoomIn15Minutes(Room),
 }
@@ -43,6 +44,10 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
                 }
             },
             Temperature::Radiator(thermostat) => ctx.device_state(DeviceTemperature::Radiator(thermostat))?.value,
+            Temperature::RadiatorExternalTempSensor(radiator) => {
+                ctx.device_state(DeviceTemperature::ThermostatExternalInput(radiator))?
+                    .value
+            }
             Temperature::RadiatorIn15Minutes(thermostat) => {
                 let current = ctx.device_state(DeviceTemperature::Radiator(thermostat))?.value;
                 let change = ctx.get(TemperatureChange::Radiator(thermostat))?.value;

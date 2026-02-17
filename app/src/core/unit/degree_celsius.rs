@@ -14,15 +14,15 @@ impl From<&DegreeCelsius> for f64 {
     }
 }
 
-impl From<f64> for DegreeCelsius {
-    fn from(value: f64) -> Self {
-        Self(value)
-    }
-}
-
 impl From<DegreeCelsius> for f64 {
     fn from(value: DegreeCelsius) -> Self {
         value.0
+    }
+}
+
+impl From<f64> for DegreeCelsius {
+    fn from(value: f64) -> Self {
+        Self(value)
     }
 }
 

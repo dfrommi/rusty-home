@@ -111,6 +111,14 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                         payload.last_seen,
                     )
                     .into(),
+                    DataPoint::new(
+                        DeviceStateValue::Temperature(
+                            Temperature::ThermostatExternalInput(*thermostat),
+                            DegreeCelsius(payload.external_temperature_input),
+                        ),
+                        payload.last_seen,
+                    )
+                    .into(),
                     availability(device_id, payload.last_seen),
                 ];
 
@@ -285,6 +293,7 @@ struct SonoffThermostatPayload {
     occupied_heating_setpoint: f64,
     temperature_accuracy: f64, //negative
     local_temperature: f64,
+    external_temperature_input: f64,
     last_seen: DateTime,
 }
 

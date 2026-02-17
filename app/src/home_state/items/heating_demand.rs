@@ -1,13 +1,14 @@
 use crate::{
     automation::Radiator,
     core::{
+        math::round_to_one_decimal,
         range::Range,
         time::DateTime,
         timeseries::{DataFrame, DataPoint, interpolate::LinearInterpolator},
         unit::{DegreeCelsius, Percent, RateOfChange},
     },
     home_state::{
-        HeatingDemandLimit, SetPoint,
+        HeatingDemandLimit, SetPoint, Temperature,
         calc::{DerivedStateProvider, StateCalculationContext},
         items::from_iso,
     },
@@ -30,7 +31,7 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
                 let setpoint_range = ctx.get(SetPoint::Current(radiator))?;
                 let is_heating = guess_is_heating_from_hyserisis(
                     ctx.get(SetPoint::Current(radiator))?,
-                    ctx.all_since(radiator.room_temperature(), setpoint_range.timestamp)?,
+                    ctx.all_since(Temperature::RadiatorExternalTempSensor(radiator), setpoint_range.timestamp)?,
                 );
                 let current_demand_limit = ctx.get(HeatingDemandLimit::Current(radiator))?.value;
                 if is_heating {
@@ -71,12 +72,12 @@ fn guess_is_heating_from_hyserisis(
     setpoints: DataPoint<Range<DegreeCelsius>>,
     room_temperatures: DataFrame<DegreeCelsius>,
 ) -> bool {
-    let Some(current_room_temp) = &room_temperatures.last().map(|temp| temp.value) else {
+    let Some(current_room_temp) = room_temperatures.last().map(|temp| temp.value) else {
         return false;
     };
 
-    let min = setpoints.value.from();
-    let max = setpoints.value.to();
+    let min = *setpoints.value.from();
+    let max = *setpoints.value.to();
 
     if current_room_temp <= min {
         true
@@ -85,12 +86,13 @@ fn guess_is_heating_from_hyserisis(
     } else {
         //in-range. Check if range left in any direction
         let latest = room_temperatures
-            .latest_where(|temp| temp.value >= *max || temp.value <= *min)
-            .take_if(|temp| temp.timestamp >= setpoints.timestamp);
+            .latest_where(|temp| temp.value >= max || temp.value <= min)
+            .take_if(|temp| temp.timestamp >= setpoints.timestamp)
+            .map(|temp| temp.value);
 
         match latest {
-            Some(temp) if (temp.value >= *max) => false,
-            Some(temp) if (temp.value <= *min) => true,
+            Some(temp) if (temp >= max) => false,
+            Some(temp) if (temp <= min) => true,
             //Seems to heat if range is around current temp on setpoint change
             _ => true,
         }

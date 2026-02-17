@@ -4,7 +4,7 @@ pub mod sender;
 use super::metrics::*;
 use crate::{
     command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
-    core::unit::Percent,
+    core::{math::round_to_one_decimal, unit::Percent},
 };
 use sender::Z2mSender;
 use serde_json::json;
@@ -138,9 +138,8 @@ impl Z2mCommandExecutor {
                 target_temperature,
                 demand_limit,
             } => {
-                let temperature_accuracy = round_to_one_decimal_place(
-                    (target_temperature.to().0 - target_temperature.from().0).clamp(0.2, 1.0),
-                );
+                let temperature_accuracy =
+                    round_to_one_decimal((target_temperature.to().0 - target_temperature.from().0).clamp(0.2, 1.0));
 
                 self.send_message(
                     device_id,
@@ -234,10 +233,6 @@ fn json_no_fraction_if_zero(value: f64) -> serde_json::Value {
     }
 }
 
-fn round_to_one_decimal_place(value: f64) -> f64 {
-    (value * 10.0).round() / 10.0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,17 +271,5 @@ mod tests {
     fn z2m_topic_is_state_update_is_static() {
         assert!(Z2mTopic::is_state_update("living_room/sensor"));
         assert!(!Z2mTopic::is_state_update("living_room/sensor/set"));
-    }
-
-    #[test]
-    fn test_round_to_one_decimal_place() {
-        assert_eq!(round_to_one_decimal_place(1.234), 1.2);
-        assert_eq!(round_to_one_decimal_place(1.25), 1.3);
-        assert_eq!(round_to_one_decimal_place(1.0), 1.0);
-
-        //0.3999999999999986
-        let rounding_error = 19.0 - 18.6;
-        assert!(rounding_error != 0.4);
-        assert_eq!(round_to_one_decimal_place(rounding_error), 0.4);
     }
 }

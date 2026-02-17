@@ -13,9 +13,10 @@ pub enum Temperature {
     KitchenOuterWall,
     BathroomShower,
     Dehumidifier,
-    ThermostatOnDevice(Radiator),
     LivingRoomTado,
     RoomOfRequirementsTado,
     BedroomTado,
     Radiator(Radiator),
+    ThermostatOnDevice(Radiator),
+    ThermostatExternalInput(Radiator),
 }

@@ -1,11 +1,11 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::automation::{HeatingZone, Radiator, Room, RoomWithWindow};
+use crate::automation::{Radiator, Room, RoomWithWindow};
 use crate::command::{Command, Fan};
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed};
-use crate::home_state::{FanActivity, HeatingMode, TargetHeatingMode, Temperature};
+use crate::home_state::{FanActivity, Temperature};
 use crate::t;
 
 use super::Opened;
@@ -41,10 +41,7 @@ impl Rule for SupportWithFan {
             ),
             SupportWithFan::LivingRoomHeating => {
                 let room_temp_now = ctx.current(Temperature::Room(Room::Bedroom))?;
-                let speed = match ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom))? {
-                    HeatingMode::Comfort => FanSpeed::Silent,
-                    _ => FanSpeed::Low,
-                };
+                let speed = FanSpeed::Silent;
 
                 let small = heating(
                     Fan::LivingRoomCeilingFan,

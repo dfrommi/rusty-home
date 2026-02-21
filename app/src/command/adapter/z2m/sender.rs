@@ -221,27 +221,6 @@ impl SonoffThermostatCoreSync {
         }
     }
 
-    #[tracing::instrument(name = "sonoff_thermostat_hack", skip(self), fields(device_id = %self.device_id))]
-    async fn sonoff_keep_alive(&self) {
-        tracing::debug!(device_id = %self.device_id, "Waking up Sonoff thermostat {} actively", self.device_id);
-
-        // Placeholder for any device-specific hacks or adjustments
-        let payload = serde_json::json!({
-            "valve_opening_degree": "",
-            "valve_closing_degree": "",
-            "system_mode": "",
-            "occupied_heating_setpoint": "",
-        });
-
-        if let Err(e) = self
-            .mqtt_sender
-            .send_transient(self.topic.active_get_topic(), payload.to_string())
-            .await
-        {
-            tracing::error!(device_id = %self.device_id, "Failed to publish active get for Sonoff thermostat {}: {}", self.device_id, e);
-        }
-    }
-
     #[tracing::instrument(level = Level::TRACE, name = "sonoff_set_temperature", skip(self, event), fields(device_id = %self.device_id))]
     async fn handle_home_state_event(&self, event: &HomeStateEvent) {
         match event {
@@ -268,8 +247,6 @@ impl SonoffThermostatCoreSync {
 
 impl Z2mSenderRunner {
     pub async fn run(mut self) {
-        let mut schedule = tokio::time::interval(tokio::time::Duration::from_secs(600));
-
         loop {
             tokio::select! {
                 cmd = self.cmd_rx.recv() => {
@@ -294,11 +271,6 @@ impl Z2mSenderRunner {
 
                     for sonoff_device in &self.sonoff_devices {
                         sonoff_device.handle_home_state_event(&event).await;
-                    }
-                }
-                _ = schedule.tick() => {
-                    for sonoff_device in &self.sonoff_devices {
-                        sonoff_device.sonoff_keep_alive().await;
                     }
                 }
             }

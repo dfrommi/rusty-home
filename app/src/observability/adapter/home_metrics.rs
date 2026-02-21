@@ -100,7 +100,6 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
                     ("comfort", v == HeatingMode::Comfort),
                     ("sleep", v == HeatingMode::Sleep),
                     ("ventilation", v == HeatingMode::Ventilation),
-                    ("post_ventilation", v == HeatingMode::PostVentilation),
                     ("away", v == HeatingMode::Away),
                     ("manual", matches!(v, HeatingMode::Manual(_, _))),
                 ];

@@ -25,7 +25,15 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
     fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
         let TargetHeatingDemand::ControlAndObserve(radiator) = id;
 
-        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
+        let Some(modes) = ctx.all_since(TargetHeatingMode::from_radiator(radiator), t!(3 hours ago)) else {
+            tracing::warn!(%radiator, "No mode found for radiator {} in the last 3 hours, cannot calculate target heating demand", radiator);
+            return None;
+        };
+        let Some(mode) = modes.last() else {
+            tracing::warn!(%radiator, "No mode found for radiator {} in the last 3 hours, cannot calculate target heating demand", radiator);
+            return None;
+        };
+
         let reference_demand = ctx
             .get(HeatingDemandLimit::Current(radiator))
             .map(|limit| DataPoint::new(*limit.value.to(), limit.timestamp))?;
@@ -45,12 +53,14 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             .get(radiator.heating_demand())
             .map(|d| d.value > Percent(0.0))
             .unwrap_or(false);
+        let recent_ventilation_finished = modes.fulfilled_since(|dp| dp.value != HeatingMode::Ventilation);
 
         combined_demand(
             radiator,
-            mode,
+            mode.clone(),
             adjustments,
             is_heating_now,
+            recent_ventilation_finished,
             barely_warm_output,
             radiator_roc,
             coldstart_delay,
@@ -90,7 +100,6 @@ impl ControlLimits {
             min_output,
             max_output: match mode {
                 HeatingMode::Ventilation => Percent(0.0),
-                HeatingMode::PostVentilation => Percent(20.0),
                 HeatingMode::EnergySaving => Percent(40.0),
                 HeatingMode::Comfort => Percent(50.0),
                 HeatingMode::Manual(_, _) => Percent(60.0),
@@ -119,6 +128,7 @@ fn combined_demand(
     mode: DataPoint<HeatingMode>,
     adjustments: DataFrame<AdjustmentDirection>,
     is_heating_now: bool,
+    recent_ventilation_finished: Option<DateTime>,
     barely_warm_output: Percent,
     radiator_roc: RateOfChange<DegreeCelsius>,
     coldstart_delay: Option<Duration>,
@@ -128,11 +138,29 @@ fn combined_demand(
 
     let limits = ControlLimits::new(&radiator, &mode.value, barely_warm_output);
 
+    if adjustment == AdjustmentDirection::MustOff {
+        tracing::debug!(%radiator, "Radiator {} must off -> setting output to 0%", radiator);
+        return Some(Percent(0.0));
+    }
+
     if !is_heating_now && adjustment <= AdjustmentDirection::Hold {
         tracing::debug!(
             %radiator, 
             "Radiator {} already not heating currently and adjustment is down ({:?}) -> resetting output to barely warm {}", radiator, adjustment, limits.barely_warm);
         return Some(limits.barely_warm);
+    }
+
+    if let Some(ventilation_finished) = recent_ventilation_finished {
+        let heat_request_after_vent = adjustments.latest_where(|dp| dp.value >= AdjustmentDirection::Hold)
+            .take_if(|dp| dp.timestamp >= ventilation_finished)
+            .is_some();
+
+        if !is_heating_now && !heat_request_after_vent {
+            tracing::debug!(
+                %radiator, 
+                "Radiator {} recently finished ventilation, no heat request since then -> forcing zero output", radiator);
+            return Some(Percent(0.0));
+        }
     }
 
     //Not heating currently, but heat is requested. Wait until delay passed
@@ -168,8 +196,7 @@ fn combined_demand(
 
     match adjustment {
         AdjustmentDirection::MustOff => {
-            output = Percent(0.0);
-            tracing::debug!(%radiator, "Radiator {} forced off setting output to 0%", radiator);
+            unreachable!("MustOff state handled already")
         }
         AdjustmentDirection::MustDecrease | AdjustmentDirection::ShouldDecrease => {
             output = output - limits.step;
@@ -223,14 +250,24 @@ fn adjustment_needed(
 ) -> bool {
     //Avoid flood of adjustments
     if demand_last_changed.elapsed() < t!(30 seconds) {
+        tracing::debug!(
+            "Last demand change was {} ago, skipping adjustment",
+            demand_last_changed.elapsed()
+        );
         return false;
     }
 
     //Mode change since last adjustment?
-    let new_mode_started_after_last_change = mode.timestamp > *demand_last_changed;
+    if mode.timestamp > *demand_last_changed {
+        tracing::debug!("New heating mode since last change. Adjustment needed.");
+        return true;
+    }
 
     //Adjust every 10 minutes at least
-    let min_adjustment_time_reached = demand_last_changed.elapsed() > t!(10 minutes);
+    if demand_last_changed.elapsed() > t!(10 minutes) {
+        tracing::debug!("Last demand change was more than 10 minutes ago. Adjustment needed.");
+        return true;
+    }
 
     //Same direction already applied?
     let mut new_adjustment_after_last_change = false;
@@ -257,10 +294,16 @@ fn adjustment_needed(
         }
     }
 
-    new_mode_started_after_last_change
-        || min_adjustment_time_reached
-        || (new_adjustment_after_last_change && !new_adjustment_in_same_direction)
+    if new_adjustment_after_last_change && !new_adjustment_in_same_direction {
+        tracing::debug!("New adjustment in different direction since last change. Adjustment needed.");
+        return true;
+    }
+
+    tracing::debug!("No new adjustment needed since last change.");
+
+    false
 }
+
 
 //TODO min elapsed
 //TODO clamp to last mode change to avoid issue in post-ventilation

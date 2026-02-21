@@ -1,7 +1,6 @@
 use crate::{
     automation::Radiator,
     core::{
-        math::round_to_one_decimal,
         range::Range,
         time::DateTime,
         timeseries::{DataFrame, DataPoint, interpolate::LinearInterpolator},

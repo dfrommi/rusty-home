@@ -48,15 +48,24 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::HeatingDemand(radiator) => radiator,
         };
         let heating_zone = radiator.heating_zone();
-        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
+        let Some(modes) = ctx.all_since(TargetHeatingMode::from_radiator(radiator), t!(3 hours ago)) else {
+            tracing::warn!(
+                "No heating mode data available for radiator {:?}, cannot calculate TargetHeatingAdjustment",
+                radiator
+            );
+            return None;
+        };
+        let mode = modes.last()?.clone();
+        let last_ventilation_finished_within_5_min = modes
+            .fulfilled_since(|dp| dp.value != HeatingMode::Ventilation)
+            .map(|ts| ts.elapsed() < t!(5 minutes))
+            .unwrap_or(false);
 
         match id {
             //Force ventilation always into full off
             _ if mode.value == HeatingMode::Ventilation => Some(AdjustmentDirection::MustOff),
             //give post-ventilation some time to settle
-            _ if mode.value == HeatingMode::PostVentilation && mode.timestamp.elapsed() < t!(5 minutes) => {
-                Some(AdjustmentDirection::MustOff)
-            }
+            _ if last_ventilation_finished_within_5_min => Some(AdjustmentDirection::MustOff),
 
             TargetHeatingAdjustment::Radiator(radiator) => {
                 let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
@@ -131,7 +140,6 @@ fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode)
         HeatingMode::EnergySaving => 8.0,
         HeatingMode::Sleep => 8.0,
         HeatingMode::Ventilation => 3.0,
-        HeatingMode::PostVentilation => 6.0,
         HeatingMode::Away => 6.0,
     };
 
@@ -153,7 +161,6 @@ fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> Heati
         HeatingMode::EnergySaving => 1.0,
         HeatingMode::Sleep => 0.75,
         HeatingMode::Ventilation => 0.2,
-        HeatingMode::PostVentilation => 0.4,
         HeatingMode::Away => 0.4,
     };
 

@@ -25,7 +25,6 @@ pub enum HeatingMode {
     Sleep,
 
     Ventilation,
-    PostVentilation,
 
     Away,
 
@@ -174,16 +173,6 @@ fn calculate_heating_mode(
         }
     }
 
-    //TODO take more factors like cold air coming in after ventilation into account
-    //possible improvement: compare room temperature with setpoint and stop post-ventilation
-    //mode when setpoint is reached, but make sure it won't toggle on/off.
-    //Maybe use a hysteresis for that and don't enter mode unless room is below
-    //default-temperature of thermostat
-    if !ventilation.value && ventilation.timestamp.elapsed() < t!(30 minutes) {
-        tracing::trace!("Heating in post-ventilation mode as cold air is coming in after ventilation");
-        return HeatingMode::PostVentilation;
-    }
-
     //sleeping preserved until ventilation in that room
     if let Some(morning_timerange) = t!(5:20 - 12:30).active() {
         //some tampering with window, but not in morning hours
@@ -224,7 +213,7 @@ fn calculate_heating_mode(
     //Starting sleep mode if no higher-prio, like comfort, applies. Overrides in-bed detection in
     //some zones
     //TODO "last ventilation of the day" concept for RoR
-    if (id == &TargetHeatingMode::HeatingZone(HeatingZone::Bedroom) && t!(22:00 - 5:30).is_now())
+    if (id == &TargetHeatingMode::HeatingZone(HeatingZone::Bedroom) && t!(21:00 - 5:30).is_now())
         || (id == &TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) && t!(22:00 - 5:30).is_now())
         || (id == &TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) && t!(20:00 - 5:30).is_now())
     {

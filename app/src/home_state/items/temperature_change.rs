@@ -25,6 +25,9 @@ impl DerivedStateProvider<TemperatureChange, RateOfChange<DegreeCelsius>> for Te
             TemperatureChange::Room(room) => Temperature::Room(room),
         };
         let temperatures = ctx.all_since(temp_item, t!(2 hours ago))?;
-        temperatures.last_change(t!(5 minutes))
+        temperatures.last_change(t!(5 minutes)).or_else(|| {
+            // If there was no change in the last 5 minutes, we can assume the temperature is stable and return a change of 0
+            Some(RateOfChange::new(DegreeCelsius(0.0), t!(1 hours)))
+        })
     }
 }

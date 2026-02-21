@@ -120,7 +120,7 @@ impl StateCalculationContext {
 
                 let span = tracing::trace_span!("calculate_home_state_type", otel.name = ext_id_type.as_str());
                 root_span.make_parent_of(&span);
-                trace_contexts.insert(ext_id_type.to_string(), TraceContext::for_span(span));
+                trace_contexts.insert(ext_id_type.to_string(), TraceContext::for_span(&span));
             }
         }
 
@@ -260,12 +260,8 @@ impl StateCalculationContext {
 
         //TODO maybe enter root?
         let span = if let Some(root_ctx) = self.trace_contexts.get(ext_id.type_name()) {
-            let span = tracing::trace_span!(
-                "calculate_home_state",
-                otel.name = tracing::field::Empty,
-                home_state_id = id.ext_id().to_string(),
-                cached = false
-            );
+            let span =
+                tracing::trace_span!("calculate_home_state", home_state_id = id.ext_id().to_string(), cached = false);
             root_ctx.make_parent_of(&span);
             span
         } else {
@@ -278,9 +274,10 @@ impl StateCalculationContext {
 
         if let Some(ref value) = calculated_value {
             //TODO display
-            TraceContext::set_current_span_name(format!("{} - {:?}", ext_id.variant_name(), value));
+            TraceContext::for_span(&span).set_span_name(format!("{} - {:?}", ext_id.variant_name(), value));
         } else {
-            TraceContext::set_current_span_name(format!("{} - none", ext_id.variant_name()));
+            tracing::warn!("Calculated home state value for {:?} is None", id);
+            TraceContext::for_span(&span).set_span_name(format!("{} - none", ext_id.variant_name()));
         }
 
         calculated_value

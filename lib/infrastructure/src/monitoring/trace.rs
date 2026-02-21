@@ -34,7 +34,7 @@ impl TraceContext {
         Self { otel_ctx }
     }
 
-    pub fn for_span(span: tracing::Span) -> Self {
+    pub fn for_span(span: &tracing::Span) -> Self {
         let ctx: opentelemetry::Context = span.context();
         Self { otel_ctx: ctx }
     }
@@ -74,8 +74,14 @@ impl TraceContext {
         self.otel_ctx.span().span_context().span_id().to_string()
     }
 
+    pub fn set_span_name(&self, name: String) {
+        self.otel_ctx.span().update_name(name);
+    }
+
     pub fn set_current_span_name(name: String) {
-        tracing::Span::current().record("otel.name", name.to_string());
+        if let Some(ctx) = Self::current() {
+            ctx.set_span_name(name);
+        }
     }
 
     pub fn record(key: &str, value: impl Into<String>) {

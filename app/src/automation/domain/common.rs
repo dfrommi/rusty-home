@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::home_state::{HeatingDemand, Opened, SetPoint, Temperature};
+use crate::home_state::{HeatingDemand, Temperature};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Id, EnumVariants, derive_more::Display)]
 #[allow(clippy::enum_variant_names)]
@@ -80,7 +80,7 @@ impl HeatingZone {
         }
     }
 
-    pub fn inside_temperature(&self) -> Temperature {
+    pub fn room_temperature(&self) -> Temperature {
         Temperature::Room(self.room())
     }
 }
@@ -112,10 +112,10 @@ impl Radiator {
     }
 
     pub fn room_temperature(&self) -> Temperature {
-        Temperature::Room(self.heating_zone().room())
+        self.heating_zone().room_temperature()
     }
 
-    pub fn heating_demand(&self) -> HeatingDemand {
+    pub fn current_heating_demand(&self) -> HeatingDemand {
         HeatingDemand::Radiator(*self)
     }
 }

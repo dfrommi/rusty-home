@@ -30,31 +30,31 @@ impl Thermostat {
         let (temperature, set_point, target_heating_mode, heating_demand) = match zone {
             //TODO handle multiple radiators properly
             HeatingZone::LivingRoom => (
-                zone.inside_temperature(),
+                zone.room_temperature(),
                 SetPoint::Current(Radiator::LivingRoomBig),
                 TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom),
                 HeatingDemand::Radiator(Radiator::LivingRoomBig),
             ),
             HeatingZone::Bedroom => (
-                zone.inside_temperature(),
+                zone.room_temperature(),
                 SetPoint::Current(Radiator::Bedroom),
                 TargetHeatingMode::HeatingZone(HeatingZone::Bedroom),
                 HeatingDemand::Radiator(Radiator::Bedroom),
             ),
             HeatingZone::Kitchen => (
-                zone.inside_temperature(),
+                zone.room_temperature(),
                 SetPoint::Current(Radiator::Kitchen),
                 TargetHeatingMode::HeatingZone(HeatingZone::Kitchen),
                 HeatingDemand::Radiator(Radiator::Kitchen),
             ),
             HeatingZone::RoomOfRequirements => (
-                zone.inside_temperature(),
+                zone.room_temperature(),
                 SetPoint::Current(Radiator::RoomOfRequirements),
                 TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements),
                 HeatingDemand::Radiator(Radiator::RoomOfRequirements),
             ),
             HeatingZone::Bathroom => (
-                zone.inside_temperature(),
+                zone.room_temperature(),
                 SetPoint::Current(Radiator::Bathroom),
                 TargetHeatingMode::HeatingZone(HeatingZone::Bathroom),
                 HeatingDemand::Radiator(Radiator::Bathroom),

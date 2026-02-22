@@ -50,7 +50,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
         };
 
         let is_heating_now = ctx
-            .get(radiator.heating_demand())
+            .get(radiator.current_heating_demand())
             .map(|d| d.value > Percent(0.0))
             .unwrap_or(false);
         let recent_ventilation_finished = modes.fulfilled_since(|dp| dp.value != HeatingMode::Ventilation);

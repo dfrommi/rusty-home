@@ -70,7 +70,7 @@ fn is_set_thermostat_valve_opening_position_reflected_in_state(
     value: &Percent,
     snapshot: &StateSnapshot,
 ) -> Result<bool> {
-    let heating_demand = snapshot.try_get(device.heating_demand())?.value;
+    let heating_demand = snapshot.try_get(device.current_heating_demand())?.value;
     Ok(heating_demand.0 as i32 == value.0 as i32)
 }
 

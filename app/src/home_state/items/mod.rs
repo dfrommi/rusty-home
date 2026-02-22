@@ -4,8 +4,7 @@ mod dewpoint;
 mod energy_saving;
 mod fan_activity;
 mod felt_temperature;
-mod heating_demand;
-mod heating_demand_limit;
+mod heating;
 mod is_running;
 mod occupancy;
 mod opened;
@@ -14,10 +13,6 @@ mod presence;
 mod relative_humidity;
 mod resident;
 mod risk_of_mould;
-mod set_point;
-mod target_heating_adjustment;
-mod target_heating_demand;
-mod target_heating_mode;
 mod temperature;
 mod temperature_change;
 mod ventilation;
@@ -30,8 +25,7 @@ pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
 pub use felt_temperature::FeltTemperature;
-pub use heating_demand::HeatingDemand;
-pub use heating_demand_limit::HeatingDemandLimit;
+pub use heating::*;
 pub use is_running::IsRunning;
 pub use occupancy::Occupancy;
 pub use opened::Opened;
@@ -40,10 +34,6 @@ pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
 pub use resident::Resident;
 pub use risk_of_mould::RiskOfMould;
-pub use set_point::SetPoint;
-pub use target_heating_adjustment::{AdjustmentDirection, TargetHeatingAdjustment};
-pub use target_heating_demand::TargetHeatingDemand;
-pub use target_heating_mode::*;
 pub use temperature::Temperature;
 pub use temperature_change::TemperatureChange;
 pub use ventilation::Ventilation;
@@ -127,7 +117,7 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::RiskOfMould(id) => risk_of_mould::RiskOfMouldStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::RiskOfMould(id, value)),
-            HomeStateId::TargetHeatingMode(id) => target_heating_mode::TargetHeatingModeStateProvider
+            HomeStateId::TargetHeatingMode(id) => heating::target_heating_mode::TargetHeatingModeStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::TargetHeatingMode(id, value)),
             HomeStateId::EnergySaving(id) => energy_saving::EnergySavingStateProvider
@@ -136,10 +126,10 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::FanActivity(id) => fan_activity::FanActivityStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::FanActivity(id, value)),
-            HomeStateId::HeatingDemand(id) => heating_demand::HeatingDemandStateProvider
+            HomeStateId::HeatingDemand(id) => heating::heating_demand::HeatingDemandStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::HeatingDemand(id, value)),
-            HomeStateId::HeatingDemandLimit(id) => heating_demand_limit::HeatingDemandLimitStateProvider
+            HomeStateId::HeatingDemandLimit(id) => heating::heating_demand_limit::HeatingDemandLimitStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::HeatingDemandLimit(id, value)),
             HomeStateId::PowerAvailable(id) => power_available::PowerAvailableStateProvider
@@ -151,7 +141,7 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::RelativeHumidity(id) => relative_humidity::RelativeHumidityStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::RelativeHumidity(id, value)),
-            HomeStateId::SetPoint(id) => set_point::SetPointStateProvider
+            HomeStateId::SetPoint(id) => heating::set_point::SetPointStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::SetPoint(id, value)),
             HomeStateId::Temperature(id) => temperature::TemperatureStateProvider
@@ -160,12 +150,14 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::TemperatureChange(id) => temperature_change::TemperatureChangeStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::TemperatureChange(id, value)),
-            HomeStateId::TargetHeatingDemand(id) => target_heating_demand::HeatingDemandStateProvider
+            HomeStateId::TargetHeatingDemand(id) => heating::target_heating_demand::HeatingDemandStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::TargetHeatingDemand(id, value)),
-            HomeStateId::TargetHeatingAdjustment(id) => target_heating_adjustment::TargetHeatingAdjustmentStateProvider
+            HomeStateId::TargetHeatingAdjustment(id) => {
+                heating::target_heating_adjustment::TargetHeatingAdjustmentStateProvider
                 .calculate_current(id, ctx)
-                .map(|value| HomeStateValue::TargetHeatingAdjustment(id, value)),
+                .map(|value| HomeStateValue::TargetHeatingAdjustment(id, value))
+            }
         }
     }
 }

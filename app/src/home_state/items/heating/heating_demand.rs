@@ -45,7 +45,7 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
             HeatingDemand::BarelyWarmSurface(radiator) => {
                 let radiator_temperatures = ctx.all_since(radiator.surface_temperature(), t!(3 hours ago))?;
                 let room_temperatures = ctx.all_since(radiator.room_temperature(), t!(3 hours ago))?;
-                let demands = ctx.all_since(radiator.heating_demand(), t!(3 hours ago))?;
+                let demands = ctx.all_since(radiator.current_heating_demand(), t!(3 hours ago))?;
                 estimate_barely_warm_surface(&radiator, radiator_temperatures, room_temperatures, demands)
             }
         }

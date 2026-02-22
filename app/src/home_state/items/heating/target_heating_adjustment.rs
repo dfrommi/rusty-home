@@ -70,7 +70,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::Radiator(radiator) => {
                 let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
-                let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
+                let room_temperature = ctx.get(heating_zone.room_temperature())?.value;
                 let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);
 
                 let radiator_strategy = radiator_strategy(room_temperature, mode.value);
@@ -87,7 +87,7 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
                 Some(radiator_strategy.adjustment_direction(radiator_temperature, radiator_roc, is_heating))
             }
             TargetHeatingAdjustment::Setpoint(radiator) => {
-                let room_temperature = ctx.get(heating_zone.inside_temperature())?.value;
+                let room_temperature = ctx.get(heating_zone.room_temperature())?.value;
                 let room_roc = ctx.get(TemperatureChange::Room(heating_zone.room()))?.value;
                 let setpoint = ctx.get(SetPoint::Target(radiator))?.value;
                 let is_heating = ctx.get(HeatingDemand::Radiator(radiator))?.value > Percent(0.0);

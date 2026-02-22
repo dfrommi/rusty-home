@@ -34,7 +34,7 @@ impl HeatingDemandAccessory {
         Self {
             name,
             radiator,
-            demand: radiator.heating_demand(),
+            demand: radiator.current_heating_demand(),
             status: HeatingDemandStatus::default(),
         }
     }

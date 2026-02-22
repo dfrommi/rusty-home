@@ -2,14 +2,16 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::{HeatingZone, Radiator},
-    core::{range::Range, time::DateTime, unit::DegreeCelsius},
-    home_state::{HeatingMode, items::from_iso},
+    core::{range::Range, unit::DegreeCelsius},
+    home_state::items::from_iso,
 };
 
 use crate::home_state::{
     TargetHeatingMode,
     calc::{DerivedStateProvider, StateCalculationContext},
 };
+
+use super::setpoint_for_mode;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum SetPoint {
@@ -49,42 +51,6 @@ impl DerivedStateProvider<SetPoint, Range<DegreeCelsius>> for SetPointStateProvi
             SetPoint::Target(radiator) | SetPoint::Current(radiator) => setpoint_for_device_reading(radiator, ctx),
         }
     }
-}
-
-fn setpoint_for_mode(radiator: Radiator, mode: &HeatingMode) -> Range<DegreeCelsius> {
-    let t = match (radiator, mode) {
-        (_, HeatingMode::Manual(t, _)) => t.0,
-        (_, HeatingMode::Ventilation) => 0.0,
-        (Radiator::LivingRoomBig, HeatingMode::EnergySaving) => 19.0,
-        (Radiator::LivingRoomBig, HeatingMode::Sleep) => 18.5,
-        (Radiator::LivingRoomBig, HeatingMode::Comfort) => 19.5,
-        (Radiator::LivingRoomBig, HeatingMode::Away) => 17.0,
-        (Radiator::LivingRoomSmall, HeatingMode::EnergySaving) => 19.0,
-        (Radiator::LivingRoomSmall, HeatingMode::Sleep) => 18.5,
-        (Radiator::LivingRoomSmall, HeatingMode::Comfort) => 19.5,
-        (Radiator::LivingRoomSmall, HeatingMode::Away) => 17.0,
-        (Radiator::RoomOfRequirements, HeatingMode::EnergySaving) => 18.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Sleep) => 17.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Comfort) => 19.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Away) => 16.0,
-        (Radiator::Bedroom, HeatingMode::EnergySaving) => 17.5,
-        (Radiator::Bedroom, HeatingMode::Sleep) => 18.5,
-        (Radiator::Bedroom, HeatingMode::Comfort) => 19.0,
-        (Radiator::Bedroom, HeatingMode::Away) => 16.5,
-        (Radiator::Kitchen, HeatingMode::EnergySaving) => 17.0,
-        (Radiator::Kitchen, HeatingMode::Sleep) => 16.5,
-        (Radiator::Kitchen, HeatingMode::Comfort) => 18.0,
-        (Radiator::Kitchen, HeatingMode::Away) => 16.0,
-        (Radiator::Bathroom, _) => 15.0,
-    };
-
-    //range: 0.2 - 1.0 with 0.2 increments
-    let offset = match mode {
-        HeatingMode::Comfort | HeatingMode::Manual(_, _) => 0.4,
-        HeatingMode::EnergySaving | HeatingMode::Ventilation | HeatingMode::Sleep | HeatingMode::Away => 1.0,
-    };
-
-    Range::new(DegreeCelsius(t), DegreeCelsius(t - offset))
 }
 
 fn setpoint_for_device_reading(radiator: Radiator, ctx: &StateCalculationContext) -> Option<Range<DegreeCelsius>> {

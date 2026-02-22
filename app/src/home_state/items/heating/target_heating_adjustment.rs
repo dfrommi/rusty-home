@@ -2,16 +2,15 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::Radiator,
-    core::{
-        range::Range,
-        unit::{DegreeCelsius, Percent, RateOfChange},
-    },
+    core::unit::{DegreeCelsius, Percent, RateOfChange},
     home_state::{
         HeatingDemand, HeatingMode, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
 };
+
+use super::{radiator_strategy, setpoint_strategy};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingAdjustment {
@@ -133,44 +132,6 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
     }
 }
 
-fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode) -> HeatingAdjustmentStrategy {
-    let max_temp = match mode {
-        HeatingMode::Manual(_, _) => 14.0,
-        HeatingMode::Comfort => 11.0,
-        HeatingMode::EnergySaving => 8.0,
-        HeatingMode::Sleep => 8.0,
-        HeatingMode::Ventilation => 3.0,
-        HeatingMode::Away => 6.0,
-    };
-
-    HeatingAdjustmentStrategy::new(
-        (
-            DegreeCelsius(0.0), //no forced heating caused by radiator temp
-            current_room_temperature + DegreeCelsius(max_temp),
-        ),
-        None,
-        //don't force it off due to radiator unless very hot
-        DegreeCelsius(10.0),
-    )
-}
-
-fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> HeatingAdjustmentStrategy {
-    let min_heatup_per_hour = match mode {
-        HeatingMode::Manual(_, _) => 2.0,
-        HeatingMode::Comfort => 1.5,
-        HeatingMode::EnergySaving => 1.0,
-        HeatingMode::Sleep => 0.75,
-        HeatingMode::Ventilation => 0.2,
-        HeatingMode::Away => 0.4,
-    };
-
-    HeatingAdjustmentStrategy::new(
-        setpoint.into(),
-        RateOfChange::new(DegreeCelsius(min_heatup_per_hour), t!(1 hours)).into(),
-        DegreeCelsius(1.0),
-    )
-}
-
 impl AdjustmentDirection {
     fn merge(&self, other: &AdjustmentDirection) -> Option<AdjustmentDirection> {
         use AdjustmentDirection::*;
@@ -216,29 +177,7 @@ impl AdjustmentDirection {
     }
 }
 
-struct HeatingAdjustmentStrategy {
-    min: DegreeCelsius,
-    max: DegreeCelsius,
-    min_heatup: Option<RateOfChange<DegreeCelsius>>,
-    band: DegreeCelsius,
-    max_overshoot: DegreeCelsius,
-}
-
-impl HeatingAdjustmentStrategy {
-    fn new(
-        range: (DegreeCelsius, DegreeCelsius),
-        min_heatup: Option<RateOfChange<DegreeCelsius>>,
-        max_overshoot: DegreeCelsius,
-    ) -> Self {
-        Self {
-            min: range.0,
-            max: range.1,
-            band: (range.1 - range.0) * 1.0 / 3.0,
-            min_heatup,
-            max_overshoot,
-        }
-    }
-
+impl super::HeatingAdjustmentStrategy {
     fn adjustment_direction(
         &self,
         current_temp: DegreeCelsius,

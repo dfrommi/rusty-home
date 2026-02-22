@@ -14,6 +14,8 @@ use crate::{
 };
 use r#macro::{EnumVariants, Id};
 
+use super::ControlLimits;
+
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum TargetHeatingDemand {
     ControlAndObserve(Radiator),
@@ -69,60 +71,6 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
     }
 }
 
-struct ControlLimits {
-    barely_warm: Percent,
-    step: Percent,
-    cold_start_should_factor: f64,
-    cold_start_must_factor: f64,
-    min_output: Percent,
-    max_output: Percent,
-}
-
-impl ControlLimits {
-    fn new(radiator: &Radiator, mode: &HeatingMode, barely_warm_output: Percent) -> Self {
-        let (min_output, step) = match radiator { 
-            Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => (Percent(12.0), Percent(5.0)),
-            Radiator::Bedroom | Radiator::Kitchen => (Percent(6.0), Percent(3.0)),
-            Radiator::Bathroom => (Percent(10.0), Percent(7.0)),
-        };
-
-        Self {
-            barely_warm: barely_warm_output,
-            step,
-            cold_start_should_factor: match mode {
-                HeatingMode::Comfort | HeatingMode::Manual(_, _) => 1.0,
-                _ => 0.0,
-            },
-            cold_start_must_factor: match mode {
-                HeatingMode::Comfort | HeatingMode::Manual(_, _) => 2.0,
-                _ => 0.0,
-            },
-            min_output,
-            max_output: match mode {
-                HeatingMode::Ventilation => Percent(0.0),
-                HeatingMode::EnergySaving => Percent(40.0),
-                HeatingMode::Comfort => Percent(50.0),
-                HeatingMode::Manual(_, _) => Percent(60.0),
-                HeatingMode::Sleep => Percent(40.0),
-                HeatingMode::Away => Percent(30.0),
-            }
-            .max(min_output),
-        }
-    }
-
-    fn clamp(&self, output: Percent) -> Percent {
-        let output = output.round();
-        if output < self.min_output {
-            self.min_output
-        } else if output > self.max_output {
-            self.max_output
-        } else {
-            output
-        }
-        .clamp()
-    }
-}
-
 fn combined_demand(
     radiator: Radiator,
     mode: DataPoint<HeatingMode>,
@@ -151,7 +99,8 @@ fn combined_demand(
     }
 
     if let Some(ventilation_finished) = recent_ventilation_finished {
-        let heat_request_after_vent = adjustments.latest_where(|dp| dp.value >= AdjustmentDirection::Hold)
+        let heat_request_after_vent = adjustments
+            .latest_where(|dp| dp.value >= AdjustmentDirection::Hold)
             .take_if(|dp| dp.timestamp >= ventilation_finished)
             .is_some();
 
@@ -303,7 +252,6 @@ fn adjustment_needed(
 
     false
 }
-
 
 //TODO min elapsed
 //TODO clamp to last mode change to avoid issue in post-ventilation

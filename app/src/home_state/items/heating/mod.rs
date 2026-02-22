@@ -138,36 +138,36 @@ fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> Heati
 }
 
 fn setpoint_for_mode(radiator: Radiator, mode: &HeatingMode) -> Range<DegreeCelsius> {
+    use HeatingMode::*;
+    use Radiator::*;
+
     let t = match (radiator, mode) {
-        (_, HeatingMode::Manual(t, _)) => t.0,
-        (_, HeatingMode::Ventilation) => 0.0,
-        (Radiator::LivingRoomBig, HeatingMode::EnergySaving) => 19.0,
-        (Radiator::LivingRoomBig, HeatingMode::Sleep) => 18.5,
-        (Radiator::LivingRoomBig, HeatingMode::Comfort) => 19.5,
-        (Radiator::LivingRoomBig, HeatingMode::Away) => 17.0,
-        (Radiator::LivingRoomSmall, HeatingMode::EnergySaving) => 19.0,
-        (Radiator::LivingRoomSmall, HeatingMode::Sleep) => 18.5,
-        (Radiator::LivingRoomSmall, HeatingMode::Comfort) => 19.5,
-        (Radiator::LivingRoomSmall, HeatingMode::Away) => 17.0,
-        (Radiator::RoomOfRequirements, HeatingMode::EnergySaving) => 18.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Sleep) => 17.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Comfort) => 19.0,
-        (Radiator::RoomOfRequirements, HeatingMode::Away) => 16.0,
-        (Radiator::Bedroom, HeatingMode::EnergySaving) => 17.5,
-        (Radiator::Bedroom, HeatingMode::Sleep) => 18.5,
-        (Radiator::Bedroom, HeatingMode::Comfort) => 19.0,
-        (Radiator::Bedroom, HeatingMode::Away) => 16.5,
-        (Radiator::Kitchen, HeatingMode::EnergySaving) => 17.0,
-        (Radiator::Kitchen, HeatingMode::Sleep) => 16.5,
-        (Radiator::Kitchen, HeatingMode::Comfort) => 18.0,
-        (Radiator::Kitchen, HeatingMode::Away) => 16.0,
-        (Radiator::Bathroom, _) => 15.0,
+        (_, Manual(t, _)) => t.0,
+        (_, Ventilation) => 0.0,
+        (LivingRoomBig, EnergySaving) | (LivingRoomSmall, EnergySaving) => 19.0,
+        (LivingRoomBig, Sleep) | (LivingRoomSmall, Sleep) => 18.5,
+        (LivingRoomBig, Comfort) | (LivingRoomSmall, Comfort) => 19.5,
+        (LivingRoomBig, Away) | (LivingRoomSmall, Away) => 17.0,
+        (RoomOfRequirements, EnergySaving) => 18.0,
+        (RoomOfRequirements, Sleep) => 17.0,
+        (RoomOfRequirements, Comfort) => 19.0,
+        (RoomOfRequirements, Away) => 16.0,
+        (Bedroom, EnergySaving) => 17.5,
+        (Bedroom, Sleep) => 18.0,
+        (Bedroom, Comfort) => 19.0,
+        (Bedroom, Away) => 16.5,
+        (Kitchen, EnergySaving) => 17.0,
+        (Kitchen, Sleep) => 16.5,
+        (Kitchen, Comfort) => 18.0,
+        (Kitchen, Away) => 16.0,
+        (Bathroom, _) => 15.0,
     };
 
     //range: 0.2 - 1.0 with 0.2 increments
-    let offset = match mode {
-        HeatingMode::Comfort | HeatingMode::Manual(_, _) => 0.4,
-        HeatingMode::EnergySaving | HeatingMode::Ventilation | HeatingMode::Sleep | HeatingMode::Away => 1.0,
+    let offset = match (radiator, mode) {
+        (Bedroom, Sleep) => 0.6,
+        (_, Comfort) | (_, Manual(_, _)) => 0.4,
+        (_, EnergySaving) | (_, Ventilation) | (_, Sleep) | (_, Away) => 1.0,
     };
 
     Range::new(DegreeCelsius(t), DegreeCelsius(t - offset))

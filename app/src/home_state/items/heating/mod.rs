@@ -124,12 +124,10 @@ fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode)
 
 fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> HeatingAdjustmentStrategy {
     let min_heatup_per_hour = match mode {
-        HeatingMode::Manual(_, _) => 2.0,
-        HeatingMode::Comfort => 1.5,
-        HeatingMode::EnergySaving => 1.0,
-        HeatingMode::Sleep => 0.75,
+        HeatingMode::Manual(_, _) | HeatingMode::Comfort => 0.75,
+        HeatingMode::EnergySaving | HeatingMode::Sleep => 0.5,
         HeatingMode::Ventilation => 0.2,
-        HeatingMode::Away => 0.4,
+        HeatingMode::Away => 0.2,
     };
 
     HeatingAdjustmentStrategy::new(

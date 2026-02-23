@@ -1,8 +1,7 @@
 use crate::{
-    frontends::homekit::{
-        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
-    },
+    frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{HomeStateValue, RelativeHumidity, Temperature},
+    trigger::HomekitCommand,
 };
 
 pub struct ClimateSensor {

@@ -7,10 +7,9 @@ use crate::{
     },
     command::{CommandTarget, Fan, PowerToggle},
     core::unit::DegreeCelsius,
-    frontends::homekit::HomekitCommandTarget::{self},
     home_state::{Resident, Temperature},
     t,
-    trigger::UserTriggerTarget,
+    trigger::{HomekitCommandTarget, UserTriggerTarget},
 };
 
 #[derive(Debug, Clone, Id, EnumVariants)]

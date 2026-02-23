@@ -1,9 +1,8 @@
 use crate::{
     core::unit::{FanAirflow, FanSpeed},
-    frontends::homekit::{
-        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
-    },
+    frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{FanActivity, HomeStateValue},
+    trigger::HomekitCommand,
 };
 
 const ALL_SPEEDS: [FanSpeed; 5] = [

@@ -6,6 +6,7 @@ use crate::{
         Occupancy, Presence, Ventilation,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
+    trigger::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
 };
 use crate::{
     core::{
@@ -13,7 +14,6 @@ use crate::{
         timeseries::{DataFrame, DataPoint},
         unit::{DegreeCelsius, Probability, p},
     },
-    frontends::homekit::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
     t,
     trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
 };

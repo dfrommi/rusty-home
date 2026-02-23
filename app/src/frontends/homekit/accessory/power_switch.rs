@@ -1,9 +1,8 @@
 use crate::home_state::{HomeStateValue, PowerAvailable};
+use crate::trigger::HomekitCommand;
 use crate::{
     command::PowerToggle,
-    frontends::homekit::{
-        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
-    },
+    frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
 };
 
 pub struct PowerSwitch {

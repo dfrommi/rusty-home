@@ -1,8 +1,7 @@
 use crate::{
-    frontends::homekit::{
-        HomekitCharacteristic, HomekitCommand, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
-    },
+    frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{EnergySaving, HomeStateValue},
+    trigger::HomekitCommand,
 };
 
 pub struct EnergySavingSwitch {

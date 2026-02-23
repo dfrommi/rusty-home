@@ -62,47 +62,6 @@ pub(crate) struct HomekitEvent {
     pub(crate) value: serde_json::Value,
 }
 
-//Don't forget to add to action planning config
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "command", content = "data", rename_all = "snake_case")]
-pub enum HomekitCommand {
-    InfraredHeaterPower(bool),
-    DehumidifierPower(bool),
-    LivingRoomTvEnergySaving(bool),
-    LivingRoomCeilingFanSpeed(FanAirflow),
-    BedroomCeilingFanSpeed(FanAirflow),
-    BedroomDehumidifierFanSpeed(FanAirflow),
-    LivingRoomHeatingState(HomekitHeatingState),
-    BedroomHeatingState(HomekitHeatingState),
-    KitchenHeatingState(HomekitHeatingState),
-    RoomOfRequirementsHeatingState(HomekitHeatingState),
-    BathroomHeatingState(HomekitHeatingState),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
-#[serde(tag = "command", rename_all = "snake_case")]
-#[display("Homekit[{}]", _variant)]
-pub enum HomekitCommandTarget {
-    InfraredHeaterPower,
-    DehumidifierPower,
-    LivingRoomTvEnergySaving,
-    LivingRoomCeilingFanSpeed,
-    BedroomCeilingFanSpeed,
-    BedroomDehumidifierFanSpeed,
-    LivingRoomHeatingState,
-    BedroomHeatingState,
-    KitchenHeatingState,
-    RoomOfRequirementsHeatingState,
-    BathroomHeatingState,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum HomekitHeatingState {
-    Off,
-    Heat(DegreeCelsius),
-    Auto,
-}
-
 #[derive(Clone, Deserialize, Debug)]
 pub struct Homekit {
     pub base_topic: String,

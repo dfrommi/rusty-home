@@ -1,13 +1,11 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::automation::Radiator;
 use crate::command::Command;
 use crate::core::time::Duration;
-use crate::frontends::homekit::{HomekitCommand, HomekitCommandTarget};
 use crate::home_state::PowerAvailable;
 use crate::t;
-use crate::trigger::{UserTrigger, UserTriggerTarget};
+use crate::trigger::*;
 
 #[derive(Debug, Clone, Id)]
 pub struct UserTriggerAction {

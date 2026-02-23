@@ -1,7 +1,7 @@
 use crate::automation::domain::action::BlockAutomation;
 use crate::automation::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
-use crate::frontends::homekit::HomekitCommandTarget;
+use crate::trigger::HomekitCommandTarget;
 
 use super::action::{
     AutoTurnOff, FollowDefaultSetting, FollowTargetHeatingDemand, InformWindowOpen, SupportWithFan, UserTriggerAction,

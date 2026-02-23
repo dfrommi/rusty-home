@@ -59,8 +59,8 @@ fn sleeping(tv_on: DataPoint<bool>, ventilation: DataPoint<bool>) -> Option<bool
             return Some(false);
         }
 
-        if tv_on.timestamp.elapsed() <= t!(10 minutes) {
-            tracing::trace!("Not sleeping, because TV turned off less than 10 minutes ago");
+        if tv_on.timestamp.elapsed() <= t!(5 minutes) {
+            tracing::trace!("Not sleeping, because TV turned off less than 5 minutes ago");
             return Some(false);
         }
     }

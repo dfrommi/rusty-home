@@ -1,6 +1,8 @@
 mod homekit;
+mod remote;
 
 pub use homekit::*;
+pub use remote::*;
 
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
@@ -15,6 +17,7 @@ pub struct UserTriggerId(i64);
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTrigger {
     Homekit(HomekitCommand),
+    Remote(RemoteTrigger),
 }
 
 #[derive(
@@ -23,12 +26,14 @@ pub enum UserTrigger {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
     Homekit(HomekitCommandTarget),
+    Remote(RemoteTriggerTarget),
 }
 
 impl UserTrigger {
     pub fn target(&self) -> UserTriggerTarget {
         match self {
             UserTrigger::Homekit(command) => UserTriggerTarget::Homekit(command.into()),
+            UserTrigger::Remote(command) => UserTriggerTarget::Remote(command.into()),
         }
     }
 }

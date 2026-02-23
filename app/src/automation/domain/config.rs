@@ -1,7 +1,7 @@
 use crate::automation::domain::action::BlockAutomation;
 use crate::automation::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
-use crate::trigger::HomekitCommandTarget;
+use crate::trigger::{HomekitCommandTarget, RemoteTriggerTarget};
 
 use super::action::{
     AutoTurnOff, FollowDefaultSetting, FollowTargetHeatingDemand, InformWindowOpen, SupportWithFan, UserTriggerAction,
@@ -18,6 +18,7 @@ pub fn default_config() -> Vec<(HomeGoal, Vec<HomeAction>)> {
             BlockAutomation::BathroomDehumidifier.into(),
             BlockAutomation::BedroomDehumidifier.into(),
             BlockAutomation::BedroomCeilingFan.into(),
+            UserTriggerAction::new(RemoteTriggerTarget::BedroomDoorRemote.into()).into(),
         ],
     ),
     (

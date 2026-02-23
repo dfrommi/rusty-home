@@ -3,6 +3,7 @@ use settings::Settings;
 
 use crate::automation::AutomationModule;
 use crate::command::CommandModule;
+use crate::frontends::remote::RemoteModule;
 use crate::home_state::HomeStateModule;
 
 mod automation;
@@ -74,6 +75,13 @@ pub async fn main() {
         .new_runner(&mut infrastructure, trigger_module.client(), home_state_module.subscribe())
         .await;
 
+    let remote_module = RemoteModule::new(
+        &mut infrastructure.mqtt_client,
+        &settings.z2m.event_topic,
+        trigger_module.client(),
+    )
+    .await;
+
     let observability_module = observability::ObservabilityModule::new(
         settings.metrics.victoria_url.clone(),
         device_state_module.subscribe(),
@@ -130,6 +138,11 @@ pub async fn main() {
     tokio::spawn(async move {
         tracing::info!("Starting HomeKit runner");
         homekit_module.run().await;
+    });
+
+    tokio::spawn(async move {
+        tracing::info!("Starting remote runner");
+        remote_module.run().await;
     });
 
     infrastructure.mqtt_client.run().await;

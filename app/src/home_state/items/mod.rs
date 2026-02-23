@@ -155,8 +155,8 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
                 .map(|value| HomeStateValue::TargetHeatingDemand(id, value)),
             HomeStateId::TargetHeatingAdjustment(id) => {
                 heating::target_heating_adjustment::TargetHeatingAdjustmentStateProvider
-                .calculate_current(id, ctx)
-                .map(|value| HomeStateValue::TargetHeatingAdjustment(id, value))
+                    .calculate_current(id, ctx)
+                    .map(|value| HomeStateValue::TargetHeatingAdjustment(id, value))
             }
         }
     }

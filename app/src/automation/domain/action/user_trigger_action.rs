@@ -3,6 +3,7 @@ use r#macro::Id;
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::Command;
 use crate::core::time::Duration;
+use crate::core::unit::FanAirflow;
 use crate::home_state::PowerAvailable;
 use crate::t;
 use crate::trigger::*;
@@ -74,6 +75,7 @@ impl UserTriggerAction {
             | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => None,
             UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
+            UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote) => Some(t!(60 minutes)),
         }
     }
 }
@@ -114,5 +116,20 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
             vec![]
         }
+        UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(DualButtonPress::SingleOff)) => vec![
+            Command::SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: false,
+            },
+            Command::ControlFan {
+                device: Fan::BedroomDehumidifier,
+                speed: FanAirflow::Off,
+            },
+            Command::ControlFan {
+                device: Fan::BedroomCeilingFan,
+                speed: FanAirflow::Off,
+            },
+        ],
+        UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => vec![],
     }
 }

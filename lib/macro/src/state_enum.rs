@@ -18,14 +18,46 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let item_trait_name = format_ident!("{}Item", base_name);
 
     let id_enum = generate_id_enum(&enum_name, &id_enum_name, &variants);
+    let enum_impl = generate_enum_impl(&enum_name, &variants);
     let item_trait = generate_item_trait(&enum_name, &item_trait_name);
     let item_impls = generate_item_impls(&enum_name, &item_trait_name, &variants, &base_name);
 
     TokenStream::from(quote! {
         #item_trait
         #id_enum
+        #enum_impl
         #(#item_impls)*
     })
+}
+
+fn generate_enum_impl(enum_name: &syn::Ident, variants: &[syn::Variant]) -> TokenStream2 {
+    let to_value_string_matches = variants.iter().map(|variant| {
+        let variant_name = &variant.ident;
+        quote! { #enum_name::#variant_name(_, v) => v.to_string() }
+    });
+    let value_types = variants.iter().map(|variant| {
+        if let Fields::Unnamed(fields) = &variant.fields {
+            if fields.unnamed.len() != 2 {
+                panic!("StateEnumDerive expects tuple variants with exactly two fields");
+            }
+            &fields.unnamed[1].ty
+        } else {
+            panic!("StateEnumDerive expects tuple variants");
+        }
+    });
+
+    quote! {
+        impl #enum_name {
+            pub fn to_value_string(&self) -> String
+            where
+                #(#value_types: ToString),*
+            {
+                match self {
+                    #(#to_value_string_matches),*
+                }
+            }
+        }
+    }
 }
 
 fn generate_id_enum(enum_name: &syn::Ident, id_enum_name: &syn::Ident, variants: &[syn::Variant]) -> TokenStream2 {

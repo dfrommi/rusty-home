@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use opentelemetry::{propagation::TextMapPropagator, trace::TraceContextExt};
+use opentelemetry::{KeyValue, propagation::TextMapPropagator, trace::TraceContextExt};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -84,8 +84,22 @@ impl TraceContext {
         }
     }
 
-    pub fn record(key: &str, value: impl Into<String>) {
-        tracing::Span::current().record(key, value.into());
+    pub fn set_error(&self, error: impl Into<String>) {
+        self.otel_ctx.span().set_status(opentelemetry::trace::Status::Error {
+            description: error.into().into(),
+        });
+    }
+
+    pub fn record(&self, key: impl Into<String>, value: impl Into<String>) {
+        self.otel_ctx
+            .span()
+            .set_attribute(KeyValue::new(key.into(), value.into()));
+    }
+
+    pub fn record_in_current(key: impl Into<String>, value: impl Into<String>) {
+        if let Some(ctx) = Self::current() {
+            ctx.record(key, value);
+        }
     }
 
     pub fn record_json(key: &str, value: &serde_json::Value) {

@@ -76,3 +76,12 @@ where
         self.per_minute().partial_cmp(&other.per_minute())
     }
 }
+
+impl<T> std::fmt::Display for RateOfChange<T>
+where
+    T: Clone + std::fmt::Display + std::ops::Mul<f64, Output = T>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/h", self.per_hour())
+    }
+}

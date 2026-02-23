@@ -320,7 +320,7 @@ impl Z2mSenderRunner {
         };
 
         let device_id = topic.device_id().to_string();
-        TraceContext::record("device_id", &device_id);
+        TraceContext::record_in_current("device_id", &device_id);
 
         let state = match serde_json::from_str::<Value>(payload) {
             Ok(state) => {
@@ -328,7 +328,7 @@ impl Z2mSenderRunner {
                 state
             }
             Err(e) => {
-                TraceContext::record("state", payload);
+                TraceContext::record_in_current("state", payload);
                 tracing::error!("Z2M sync: failed to parse Z2M state payload for device {}: {}", device_id, e);
                 return;
             }

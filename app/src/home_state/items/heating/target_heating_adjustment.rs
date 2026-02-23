@@ -21,13 +21,19 @@ pub enum TargetHeatingAdjustment {
     HeatingDemand(Radiator),
 }
 
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, derive_more::Display)]
 pub enum AdjustmentDirection {
+    #[display("must increase")]
     MustIncrease = 2,
+    #[display("should increase")]
     ShouldIncrease = 1,
+    #[display("hold")]
     Hold = 0,
+    #[display("should decrease")]
     ShouldDecrease = -1,
+    #[display("must decrease")]
     MustDecrease = -2,
+    #[display("must off")]
     MustOff = -3,
 }
 

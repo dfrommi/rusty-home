@@ -260,24 +260,28 @@ impl StateCalculationContext {
 
         //TODO maybe enter root?
         let span = if let Some(root_ctx) = self.trace_contexts.get(ext_id.type_name()) {
-            let span =
-                tracing::trace_span!("calculate_home_state", home_state_id = id.ext_id().to_string(), cached = false);
+            let span = tracing::trace_span!(
+                "calculate_home_state",
+                otel.name = ext_id.variant_name(),
+                home_state_id = id.ext_id().to_string(),
+                cached = false,
+            );
             root_ctx.make_parent_of(&span);
             span
         } else {
             tracing::Span::none()
         };
-
+        let ctx = TraceContext::for_span(&span);
         let _enter = span.enter();
 
         let calculated_value = HomeStateDerivedStateProvider.calculate_current(id, self);
 
         if let Some(ref value) = calculated_value {
-            //TODO display
-            TraceContext::for_span(&span).set_span_name(format!("{} - {:?}", ext_id.variant_name(), value));
+            ctx.record("value", value.to_value_string());
         } else {
             tracing::warn!("Calculated home state value for {:?} is None", id);
-            TraceContext::for_span(&span).set_span_name(format!("{} - none", ext_id.variant_name()));
+            ctx.set_error("Calculated value is None");
+            ctx.record("value", "None");
         }
 
         calculated_value

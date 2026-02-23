@@ -50,11 +50,12 @@ impl CommandModule {
 
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
 
+        let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_client.sender(z2m_event_topic));
+        let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token);
+
         let (z2m_sender, z2m_sender_runner) = Z2mSender::new(mqtt_client, z2m_event_topic, home_state_listener)
             .await
             .expect("Failed to initialize Z2M sender");
-        let z2m_executor = adapter::Z2mCommandExecutor::new(z2m_sender);
-        let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token);
 
         let service = Arc::new(CommandService::new(
             repo,

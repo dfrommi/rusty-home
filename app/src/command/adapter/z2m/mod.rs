@@ -1,12 +1,11 @@
 mod config;
 pub mod sender;
 
-use super::metrics::*;
 use crate::{
     command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
-    core::{math::round_to_one_decimal, unit::Percent},
+    core::math::round_to_one_decimal,
 };
-use sender::Z2mSender;
+use infrastructure::MqttSender;
 use serde_json::json;
 
 #[derive(Debug, Clone)]
@@ -17,11 +16,11 @@ pub enum Z2mCommandTarget {
 
 pub struct Z2mCommandExecutor {
     config: Vec<(CommandTarget, Z2mCommandTarget)>,
-    sender: Z2mSender,
+    sender: MqttSender,
 }
 
 impl Z2mCommandExecutor {
-    pub fn new(mqtt_sender: Z2mSender) -> Self {
+    pub fn new(mqtt_sender: MqttSender) -> Self {
         let config = config::default_z2m_command_config();
         Self {
             config,
@@ -113,20 +112,23 @@ impl CommandExecutor for Z2mCommandExecutor {
 
 impl Z2mCommandExecutor {
     pub async fn set_sonoff_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<bool> {
+        let set_topic = format!("{}/set", device_id);
+
         match state {
             HeatingTargetState::Off => {
-                self.send_message(
-                    device_id,
-                    vec![json!({
-                        "system_mode": "off",
-                        "occupied_heating_setpoint": 7,
-                        "valve_opening_degree": 0,
-                        "valve_closing_degree": 100,
-                        "temperature_accuracy": -1,
-                    })],
-                    false,
-                )
-                .await?;
+                self.sender
+                    .send_transient(
+                        set_topic,
+                        json!({
+                            "system_mode": "off",
+                            "occupied_heating_setpoint": 7,
+                            "valve_opening_degree": 0,
+                            "valve_closing_degree": 100,
+                            "temperature_accuracy": -1,
+                        })
+                        .to_string(),
+                    )
+                    .await?;
 
                 Ok(true)
             }
@@ -137,18 +139,19 @@ impl Z2mCommandExecutor {
                 let temperature_accuracy =
                     round_to_one_decimal((target_temperature.to().0 - target_temperature.from().0).clamp(0.2, 1.0));
 
-                self.send_message(
-                    device_id,
-                    vec![json!({
-                        "system_mode": "heat",
-                        "occupied_heating_setpoint": json_no_fraction_if_zero(target_temperature.to().0),
-                        "valve_opening_degree": demand_limit.to().0.round() as i64,
-                        "valve_closing_degree": (100 - demand_limit.from().0.round() as i64),
-                        "temperature_accuracy": json_no_fraction_if_zero(-temperature_accuracy),
-                    })],
-                    false,
-                )
-                .await?;
+                self.sender
+                    .send_transient(
+                        set_topic,
+                        json!({
+                            "system_mode": "heat",
+                            "occupied_heating_setpoint": json_no_fraction_if_zero(target_temperature.to().0),
+                            "valve_opening_degree": demand_limit.to().0.round() as i64,
+                            "valve_closing_degree": (100 - demand_limit.from().0.round() as i64),
+                            "temperature_accuracy": json_no_fraction_if_zero(-temperature_accuracy),
+                        })
+                        .to_string(),
+                    )
+                    .await?;
 
                 Ok(true)
             }
@@ -156,35 +159,20 @@ impl Z2mCommandExecutor {
     }
 
     pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<bool> {
+        let set_topic = format!("{}/set", device_id);
         let power_state = if power_on { "ON" } else { "OFF" };
 
-        self.send_message(
-            device_id,
-            vec![json!({
-                "state": power_state,
-            })],
-            true,
-        )
-        .await?;
+        self.sender
+            .send_transient(
+                set_topic,
+                json!({
+                     "state": power_state,
+                })
+                .to_string(),
+            )
+            .await?;
 
         Ok(true)
-    }
-
-    async fn send_message(
-        &self,
-        device_id: &str,
-        payloads: Vec<serde_json::Value>,
-        optimistic: bool,
-    ) -> anyhow::Result<()> {
-        self.sender.send(device_id, payloads, optimistic).await?;
-
-        CommandMetric::Executed {
-            device_id: device_id.to_string(),
-            system: CommandTargetSystem::Z2M,
-        }
-        .record();
-
-        Ok(())
     }
 }
 

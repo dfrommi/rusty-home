@@ -76,12 +76,6 @@ impl UserTriggerAction {
             | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
             | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => None,
             UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomBigHeatingDemand)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomSmallHeatingDemand)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingDemand)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingDemand)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingDemand)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingDemand) => Some(t!(15 minutes)),
         }
     }
 }
@@ -121,42 +115,6 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
         | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(_)) => {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
             vec![]
-        }
-        UserTrigger::Homekit(HomekitCommand::LivingRoomBigHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::LivingRoomBig,
-                value: demand,
-            }]
-        }
-        UserTrigger::Homekit(HomekitCommand::LivingRoomSmallHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::LivingRoomSmall,
-                value: demand,
-            }]
-        }
-        UserTrigger::Homekit(HomekitCommand::BedroomHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::Bedroom,
-                value: demand,
-            }]
-        }
-        UserTrigger::Homekit(HomekitCommand::KitchenHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::Kitchen,
-                value: demand,
-            }]
-        }
-        UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::RoomOfRequirements,
-                value: demand,
-            }]
-        }
-        UserTrigger::Homekit(HomekitCommand::BathroomHeatingDemand(demand)) => {
-            vec![Command::SetThermostatValveOpeningPosition {
-                device: Radiator::Bathroom,
-                value: demand,
-            }]
         }
     }
 }

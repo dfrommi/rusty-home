@@ -98,10 +98,6 @@ impl CommandExecutor for Z2mCommandExecutor {
         };
 
         match (command, z2m_target) {
-            (
-                Command::SetThermostatValveOpeningPosition { value, .. },
-                Z2mCommandTarget::SonoffThermostat(device_id),
-            ) => self.set_valve_opening_position_sonoff(device_id, *value).await,
             (Command::SetPower { power_on, .. }, Z2mCommandTarget::PowerPlug(device_id)) => {
                 self.set_power_state(device_id, *power_on).await
             }
@@ -157,39 +153,6 @@ impl Z2mCommandExecutor {
                 Ok(true)
             }
         }
-    }
-
-    pub async fn set_valve_opening_position_sonoff(&self, device_id: &str, value: Percent) -> anyhow::Result<bool> {
-        let opened_percentage = (value.0.round() as i64).clamp(0, 100);
-        let closing_percentage = 100 - opened_percentage;
-
-        let payloads = if opened_percentage > 0 {
-            vec![
-                json!({
-                    "valve_opening_degree": opened_percentage,
-                    "valve_closing_degree": closing_percentage,
-                }),
-                json!({
-                    "system_mode": "heat",
-                    "occupied_heating_setpoint": 25,
-                }),
-            ]
-        } else {
-            vec![
-                json!({
-                    "valve_opening_degree": opened_percentage,
-                    "valve_closing_degree": closing_percentage,
-                }),
-                json!({
-                    "system_mode": "heat",
-                    "occupied_heating_setpoint": 7,
-                }),
-            ]
-        };
-
-        self.send_message(device_id, payloads, false).await?;
-
-        Ok(true)
     }
 
     pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<bool> {

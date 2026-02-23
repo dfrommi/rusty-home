@@ -16,10 +16,6 @@ pub enum Command {
         device: PowerToggle,
         power_on: bool,
     },
-    SetThermostatValveOpeningPosition {
-        device: Radiator,
-        value: Percent,
-    },
     SetHeating {
         device: Radiator,
         target_state: HeatingTargetState,
@@ -45,9 +41,6 @@ pub enum Command {
 pub enum CommandTarget {
     #[display("SetPower[{}]", device)]
     SetPower { device: PowerToggle },
-
-    #[display("SetThermostatValveOpeningPosition[{}]", device)]
-    SetThermostatValveOpeningPosition { device: Radiator },
 
     #[display("SetHeating[{}]", device)]
     SetHeating { device: Radiator },
@@ -75,9 +68,6 @@ impl From<&Command> for CommandTarget {
     fn from(val: &Command) -> Self {
         match val {
             Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
-            Command::SetThermostatValveOpeningPosition { device, .. } => {
-                CommandTarget::SetThermostatValveOpeningPosition { device: device.clone() }
-            }
             Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
             Command::PushNotify {
                 recipient,

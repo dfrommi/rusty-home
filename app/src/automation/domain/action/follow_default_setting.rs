@@ -34,10 +34,6 @@ impl Rule for FollowDefaultSetting {
                 device,
                 speed: FanAirflow::Off,
             },
-            CommandTarget::SetThermostatValveOpeningPosition { device } => Command::SetThermostatValveOpeningPosition {
-                device,
-                value: Percent(0.0),
-            },
             CommandTarget::SetHeating { device } => Command::SetHeating {
                 device,
                 target_state: crate::command::HeatingTargetState::Off,

@@ -21,9 +21,6 @@ impl Command {
     ) -> Result<bool> {
         match self {
             Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, snapshot),
-            Command::SetThermostatValveOpeningPosition { device, value } => {
-                is_set_thermostat_valve_opening_position_reflected_in_state(device, value, snapshot)
-            }
             Command::SetHeating {
                 device,
                 target_state: HeatingTargetState::Off,
@@ -55,7 +52,6 @@ impl Command {
 
     pub fn min_wait_duration_between_executions(&self) -> Option<Duration> {
         match self {
-            Command::SetThermostatValveOpeningPosition { .. } => Some(t!(2 minutes)),
             Command::SetHeating { .. } => Some(t!(2 minutes)),
             Command::SetPower { .. } => Some(t!(1 minutes)),
             Command::SetEnergySaving { .. } => Some(t!(2 minutes)),
@@ -63,15 +59,6 @@ impl Command {
             Command::PushNotify { .. } => None,
         }
     }
-}
-
-fn is_set_thermostat_valve_opening_position_reflected_in_state(
-    device: &Radiator,
-    value: &Percent,
-    snapshot: &StateSnapshot,
-) -> Result<bool> {
-    let heating_demand = snapshot.try_get(device.current_heating_demand())?.value;
-    Ok(heating_demand.0 as i32 == value.0 as i32)
 }
 
 fn is_set_heating_reflected_in_state(

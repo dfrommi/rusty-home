@@ -3,7 +3,7 @@ use std::sync::Arc;
 use actix_web::web;
 use infrastructure::TraceContext;
 
-use crate::command::{Command, CommandClient, HeatingTargetState};
+use crate::command::{Command, CommandClient};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
 use crate::observability::adapter::api::grafana::{GrafanaApiError, GrafanaResponse, TimeRangeQuery, csv_response};
 
@@ -66,9 +66,6 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
     match command {
         Command::SetPower { device, power_on } => {
             ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
-        }
-        Command::SetThermostatValveOpeningPosition { device, value } => {
-            ("SetThermostatValveOpeningPosition", device.to_string(), value.to_string())
         }
         Command::SetHeating { device, target_state } => ("SetHeating", device.to_string(), target_state.to_string()),
         Command::PushNotify {

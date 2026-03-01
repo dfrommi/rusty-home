@@ -18,14 +18,14 @@ use super::{ActionEvaluationResult, PlanningTrace, action::Action, context::Cont
 
 pub async fn plan_and_execute<G, A>(
     active_goals: &[G],
-    config: &[(G, Vec<A>)],
+    actions_for_goal: impl Fn(&G) -> Vec<A>,
     snapshot: StateSnapshot,
     command_client: &CommandClient,
     trigger_client: &TriggerClient,
 ) -> Result<PlanningTrace>
 where
-    G: Eq + Display,
-    A: Action + Clone + Send + Sync + 'static,
+    G: Display,
+    A: Action + Send + Sync + 'static,
 {
     let planning_data_timestamp = snapshot.timestamp();
     let rule_ctx = RuleEvaluationContext::new(snapshot);
@@ -33,8 +33,9 @@ where
     let (first_tx, mut prev_rx) = oneshot::channel();
     let mut handles = Vec::new();
 
-    for (goal, actions) in config.iter() {
-        let is_goal_active = active_goals.contains(goal);
+    for goal in active_goals {
+        let actions = actions_for_goal(goal);
+        let is_goal_active = true;
         let goal_name = goal.to_string();
         let goal_span =
             tracing::info_span!("planning goal", %goal_name, otel.name = %goal_name, goal_active = is_goal_active);
@@ -42,7 +43,7 @@ where
 
         for action in actions {
             let (tx, rx) = oneshot::channel();
-            let context = Context::new(goal, action.clone(), is_goal_active, prev_rx, tx);
+            let context = Context::new(goal, action, is_goal_active, prev_rx, tx);
             prev_rx = rx;
 
             let command_client = command_client.clone();

@@ -1,10 +1,6 @@
-use std::sync::OnceLock;
-
-use action::HomeAction;
 use goal::HomeGoal;
 
 mod action;
-mod config;
 mod goal;
 
 pub use action::RuleEvaluationContext;
@@ -17,10 +13,5 @@ pub struct HomePlanning;
 impl HomePlanning {
     pub fn active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
         get_active_goals(snapshot)
-    }
-
-    pub fn config() -> &'static Vec<(HomeGoal, Vec<HomeAction>)> {
-        static CONFIG: OnceLock<Vec<(HomeGoal, Vec<HomeAction>)>> = OnceLock::new();
-        CONFIG.get_or_init(config::default_config)
     }
 }

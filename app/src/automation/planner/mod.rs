@@ -15,10 +15,14 @@ pub use trace::PlanningTrace;
 pub async fn plan_for_home(snapshot: &StateSnapshot, command_client: &CommandClient, trigger_client: &TriggerClient) {
     tracing::info!("Start planning");
     let active_goals = HomePlanning::active_goals(snapshot.clone());
-    let config = HomePlanning::config();
-
-    let res =
-        processor::plan_and_execute(&active_goals, config, snapshot.clone(), command_client, trigger_client).await;
+    let res = processor::plan_and_execute(
+        &active_goals,
+        |goal| goal.rules(),
+        snapshot.clone(),
+        command_client,
+        trigger_client,
+    )
+    .await;
 
     match res {
         Ok(res) => {

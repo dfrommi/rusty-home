@@ -1,3 +1,4 @@
+pub mod domain;
 pub mod id;
 pub mod math;
 pub mod range;

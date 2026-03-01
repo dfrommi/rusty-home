@@ -1,7 +1,7 @@
 use actix_web::web;
 
 use crate::{
-    automation::Room,
+    core::domain::Room,
     observability::adapter::api::grafana::{GrafanaResponse, csv_response},
 };
 

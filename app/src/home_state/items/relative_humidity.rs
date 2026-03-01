@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::Room,
+    core::domain::Room,
     core::unit::Percent,
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };

@@ -2,11 +2,11 @@ use r#macro::{EnumVariants, Id};
 
 use crate::{
     automation::{
-        Room, RuleEvaluationContext,
+        RuleEvaluationContext,
         domain::action::{FollowDefaultSetting, Rule, RuleResult, UserTriggerAction},
     },
     command::{CommandTarget, Fan, PowerToggle},
-    core::unit::DegreeCelsius,
+    core::{domain::Room, unit::DegreeCelsius},
     home_state::{Resident, Temperature},
     t,
     trigger::{HomekitCommandTarget, UserTriggerTarget},

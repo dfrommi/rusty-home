@@ -1,4 +1,4 @@
-use crate::automation::RoomWithWindow;
+use crate::core::domain::RoomWithWindow;
 use crate::core::timeseries::DataPoint;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use anyhow::Result;

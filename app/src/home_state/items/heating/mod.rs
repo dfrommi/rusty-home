@@ -13,7 +13,7 @@ pub use target_heating_demand::TargetHeatingDemand;
 pub use target_heating_mode::*;
 
 use crate::{
-    automation::Radiator,
+    core::domain::Radiator,
     core::{
         range::Range,
         unit::{DegreeCelsius, Percent, RateOfChange},

@@ -1,4 +1,4 @@
-use crate::automation::RoomWithWindow;
+use crate::core::domain::RoomWithWindow;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
 use r#macro::{EnumVariants, Id};

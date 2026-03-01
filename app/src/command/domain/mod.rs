@@ -1,6 +1,6 @@
 mod command_state;
 
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 use crate::core::range::Range;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::core::{id::ExternalId, time::DateTime};

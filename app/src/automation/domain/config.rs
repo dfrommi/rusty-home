@@ -1,5 +1,5 @@
 use crate::automation::domain::action::BlockAutomation;
-use crate::automation::{HeatingZone, Room};
+use crate::core::domain::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::trigger::{HomekitCommandTarget, RemoteTriggerTarget};
 

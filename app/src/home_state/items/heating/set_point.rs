@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::{HeatingZone, Radiator},
+    core::domain::{HeatingZone, Radiator},
     core::{range::Range, unit::DegreeCelsius},
     home_state::items::from_iso,
 };

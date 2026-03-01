@@ -1,8 +1,8 @@
-use crate::automation::RoomWithWindow;
+use crate::core::domain::RoomWithWindow;
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
 use crate::trigger::HomekitCommand;
 use crate::{
-    automation::{HeatingZone, Room},
+    core::domain::{HeatingZone, Room},
     command::PowerToggle,
     frontends::homekit::{
         HomekitEvent, HomekitTargetConfig,

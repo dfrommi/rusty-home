@@ -1,4 +1,4 @@
-use crate::automation::{HeatingZone, Room};
+use crate::core::domain::{HeatingZone, Room};
 use crate::home_state::StateSnapshot;
 
 //Refactor to variants() and is_active() method

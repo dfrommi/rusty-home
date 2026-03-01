@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::{HeatingZone, Radiator, RoomWithWindow},
+    core::domain::{HeatingZone, Radiator, RoomWithWindow},
     home_state::{
         Occupancy, Presence, Ventilation,
         calc::{DerivedStateProvider, StateCalculationContext},

@@ -1,5 +1,5 @@
 use crate::{
-    automation::Radiator,
+    core::domain::Radiator,
     core::{
         time::{DateTime, Duration},
         timeseries::{DataFrame, DataPoint},

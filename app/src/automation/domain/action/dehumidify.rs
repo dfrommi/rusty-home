@@ -1,6 +1,6 @@
 use super::{RuleEvaluationContext, SimpleRule};
 use crate::{
-    automation::{HeatingZone, Room, RoomWithWindow},
+    core::domain::{HeatingZone, Room, RoomWithWindow},
     command::{Command, Fan, PowerToggle},
     core::unit::{
         DegreeCelsius,

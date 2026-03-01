@@ -1,4 +1,4 @@
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 use r#macro::{EnumVariants, Id};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]

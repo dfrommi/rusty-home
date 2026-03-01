@@ -1,5 +1,5 @@
 use crate::{
-    automation::HeatingZone,
+    core::domain::HeatingZone,
     command::{Command, HeatingTargetState},
     core::unit::DegreeCelsius,
     home_state::{HeatingDemandLimit, HeatingMode, SetPoint, TargetHeatingMode},

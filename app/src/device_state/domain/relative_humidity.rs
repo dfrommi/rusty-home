@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum RelativeHumidity {

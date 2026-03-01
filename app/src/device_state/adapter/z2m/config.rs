@@ -1,5 +1,5 @@
 use super::Z2mChannel;
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 use crate::core::unit::KiloWattHours;
 use crate::device_state::*;
 

@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    automation::Room,
+    core::domain::Room,
     core::{
         math::{Sigmoid, Tanh},
         unit::{DegreeCelsius, GramPerCubicMeter},

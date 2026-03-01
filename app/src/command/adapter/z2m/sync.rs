@@ -1,4 +1,4 @@
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 use crate::core::math::round_to_one_decimal;
 use crate::core::timeseries::DataPoint;
 use crate::home_state::{HomeStateEvent, HomeStateValue};

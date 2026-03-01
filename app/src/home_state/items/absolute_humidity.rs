@@ -1,7 +1,7 @@
 use super::*;
 use anyhow::Result;
 
-use crate::automation::Room;
+use crate::core::domain::Room;
 use crate::core::unit::{DegreeCelsius, Percent};
 use r#macro::{EnumVariants, Id};
 

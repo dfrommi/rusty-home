@@ -1,4 +1,4 @@
-use crate::automation::Room;
+use crate::core::domain::Room;
 use crate::core::math::DataFrameStatsExt;
 use crate::core::time::DateTimeRange;
 use crate::core::timeseries::interpolate::LinearInterpolator;

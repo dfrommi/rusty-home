@@ -1,6 +1,6 @@
 use r#macro::{EnumVariants, Id};
 
-use crate::automation::{Radiator, Room};
+use crate::core::domain::{Radiator, Room};
 use crate::core::unit::{DegreeCelsius, RateOfChange};
 use crate::home_state::Temperature;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};

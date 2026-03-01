@@ -2,7 +2,7 @@ mod config;
 
 use std::collections::HashMap;
 
-use crate::automation::Radiator;
+use crate::core::domain::Radiator;
 use crate::core::DeviceConfig;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;

@@ -1,4 +1,4 @@
-use crate::automation::RoomWithWindow;
+use crate::core::domain::RoomWithWindow;
 use crate::core::unit::DegreeCelsius;
 use crate::home_state::Temperature;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};

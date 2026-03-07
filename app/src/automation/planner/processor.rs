@@ -70,17 +70,23 @@ where
         .iter()
         .filter_map(|c| c.user_trigger_id.clone())
         .collect::<Vec<UserTriggerId>>();
-    cancel_unused_triggers(planning_data_timestamp, used_triggers, trigger_client).await?;
+    handle_trigger_updates(planning_data_timestamp, used_triggers, trigger_client).await?;
 
     let steps = results.into_iter().map(|r| r.trace).collect();
     Ok(PlanningTrace::current(steps))
 }
 
-async fn cancel_unused_triggers(
+async fn handle_trigger_updates(
     planning_data_timestamp: DateTime,
     used_triggers: Vec<UserTriggerId>,
     trigger_client: &TriggerClient,
 ) -> anyhow::Result<()> {
+    if !used_triggers.is_empty() {
+        trigger_client
+            .set_triggers_active_from_if_unset(&used_triggers)
+            .await?;
+    }
+
     trigger_client
         .disable_triggers_before_except(planning_data_timestamp, &used_triggers)
         .await

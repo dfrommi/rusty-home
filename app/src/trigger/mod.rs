@@ -24,6 +24,7 @@ pub struct UserTriggerExecution {
     pub id: UserTriggerId,
     pub trigger: UserTrigger,
     pub timestamp: DateTime,
+    pub active_from: Option<DateTime>,
     pub active_until: Option<DateTime>,
     pub correlation_id: Option<String>,
 }
@@ -74,6 +75,10 @@ impl TriggerClient {
         excluded_ids: &[UserTriggerId],
     ) -> anyhow::Result<u64> {
         self.service.disable_triggers_before_except(before, excluded_ids).await
+    }
+
+    pub async fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
+        self.service.set_triggers_active_from_if_unset(trigger_ids).await
     }
 }
 

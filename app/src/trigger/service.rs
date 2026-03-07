@@ -44,4 +44,8 @@ impl TriggerService {
     ) -> anyhow::Result<u64> {
         self.repo.cancel_triggers_before_excluding(before, excluded_ids).await
     }
+
+    pub async fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
+        self.repo.set_triggers_active_from_if_unset(trigger_ids).await
+    }
 }

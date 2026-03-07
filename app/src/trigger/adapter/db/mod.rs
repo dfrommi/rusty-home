@@ -52,12 +52,29 @@ impl TriggerRepository {
         .context("Error adding user trigger")
     }
 
+    #[tracing::instrument(skip(self))]
+    pub async fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
+        let result = sqlx::query!(
+            r#"UPDATE user_trigger
+               SET active_from = $2
+               WHERE id = ANY($1)
+               AND active_from IS NULL"#,
+            trigger_ids as &[UserTriggerId],
+            t!(now).into_db(),
+        )
+        .execute(&self.pool)
+        .await
+        .context("Error setting user trigger active_from")?;
+
+        Ok(result.rows_affected())
+    }
+
     pub async fn get_all_triggers_active_anytime_in_range(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let records = sqlx::query!(
-            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_until as "active_until", correlation_id
+            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_from as "active_from", active_until as "active_until", correlation_id
                     FROM user_trigger
                     WHERE (timestamp >= $1 AND timestamp <= $2)
                     OR (active_until IS NOT NULL AND active_until >= $1 AND active_until <= $2) 
@@ -74,12 +91,14 @@ impl TriggerRepository {
         for row in records {
             let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
             let timestamp = row.timestamp.into();
+            let active_from = row.active_from.map(|dt| dt.into());
             let active_until = row.active_until.map(|dt| dt.into());
 
             result.push(UserTriggerExecution {
                 id: row.id.into(),
                 trigger,
                 timestamp,
+                active_from,
                 active_until,
                 correlation_id: row.correlation_id,
             });
@@ -92,7 +111,7 @@ impl TriggerRepository {
         let now = t!(now);
 
         let records = sqlx::query!(
-            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_until as "active_until", correlation_id
+            r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_from as "active_from", active_until as "active_until", correlation_id
                     FROM user_trigger
                     WHERE timestamp >= $1
                     AND timestamp <= $2
@@ -111,6 +130,7 @@ impl TriggerRepository {
         for row in records {
             let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
             let timestamp = row.timestamp.into();
+            let active_from = row.active_from.map(|dt| dt.into());
             let active_until = row.active_until.map(|dt| dt.into());
 
             let target = trigger.target();
@@ -123,6 +143,7 @@ impl TriggerRepository {
                 id: row.id.into(),
                 trigger,
                 timestamp,
+                active_from,
                 active_until,
                 correlation_id: row.correlation_id,
             });

@@ -1,19 +1,20 @@
 use crate::core::domain::RoomWithWindow;
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
-use crate::trigger::UserTrigger;
+use crate::trigger::{Door, UserTrigger};
 use crate::{
     core::domain::{HeatingZone, Room},
     command::PowerToggle,
     frontends::homekit::{
         HomekitEvent, HomekitTargetConfig,
         accessory::{
-            climate_sensor::ClimateSensor, energy_saving_switch::EnergySavingSwitch, fan::Fan,
+            climate_sensor::ClimateSensor, door_lock::DoorLock, energy_saving_switch::EnergySavingSwitch, fan::Fan,
             power_switch::PowerSwitch, thermostat::Thermostat, window_sensor::WindowSensor,
         },
     },
 };
 
 mod climate_sensor;
+mod door_lock;
 mod energy_saving_switch;
 mod fan;
 mod power_switch;
@@ -22,6 +23,7 @@ mod window_sensor;
 
 enum HomekitAccessory {
     ClimateSensor(ClimateSensor),
+    DoorLock(DoorLock),
     EnergySavingSwitch(EnergySavingSwitch),
     Fan(Fan),
     PowerSwitch(PowerSwitch),
@@ -43,6 +45,7 @@ impl HomekitRegistry {
             .iter()
             .flat_map(|accessory| match accessory {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.get_all_targets(),
+                HomekitAccessory::DoorLock(lock) => lock.get_all_targets(),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.get_all_targets(),
                 HomekitAccessory::Fan(fan) => fan.get_all_targets(),
                 HomekitAccessory::Thermostat(sensor) => sensor.get_all_targets(),
@@ -57,6 +60,7 @@ impl HomekitRegistry {
             .iter_mut()
             .flat_map(|accessory| match accessory {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.export_state(state),
+                HomekitAccessory::DoorLock(lock) => lock.export_state(state),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.export_state(state),
                 HomekitAccessory::Fan(fan) => fan.export_state(state),
                 HomekitAccessory::Thermostat(sensor) => sensor.export_state(state),
@@ -70,6 +74,7 @@ impl HomekitRegistry {
         for accessory in &mut self.accessories {
             let command = match accessory {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
+                HomekitAccessory::DoorLock(lock) => lock.process_trigger(trigger),
                 HomekitAccessory::EnergySavingSwitch(switch) => switch.process_trigger(trigger),
                 HomekitAccessory::Fan(fan) => fan.process_trigger(trigger),
                 HomekitAccessory::Thermostat(sensor) => sensor.process_trigger(trigger),
@@ -137,6 +142,7 @@ fn config() -> Vec<HomekitAccessory> {
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Arbeitszimmer", HeatingZone::RoomOfRequirements)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
         HomekitAccessory::Thermostat(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
+        HomekitAccessory::DoorLock(DoorLock::new("Haustür", Door::Building)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
         HomekitAccessory::PowerSwitch(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
         HomekitAccessory::EnergySavingSwitch(EnergySavingSwitch::new(

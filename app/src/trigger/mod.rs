@@ -37,9 +37,22 @@ impl UserTriggerExecution {
     pub fn is_active(&self) -> bool {
         let now = t!(now);
         match self.active_until {
-            Some(active_until) => self.timestamp >= now && now < active_until,
-            None => self.timestamp >= now,
+            Some(active_until) => self.is_created_in_the_past(now) && now < active_until,
+            None => self.is_created_in_the_past(now),
         }
+    }
+
+    pub fn execution_started(&self) -> bool {
+        let now = t!(now);
+        match self.active_from {
+            Some(active_from) => self.is_created_in_the_past(now) && now >= active_from,
+            None => false,
+        }
+    }
+
+    //Trigger in DB but timeshift is stil before is was created
+    fn is_created_in_the_past(&self, now: DateTime) -> bool {
+        self.timestamp <= now
     }
 }
 

@@ -79,6 +79,7 @@ fn command_as_string(command: &Command) -> (&str, String, String) {
             if *on { "on" } else { "off" }.to_string(),
         ),
         Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
+        Command::OpenDoor { device } => ("Open", device.to_string(), "open".to_string()),
     }
 }
 

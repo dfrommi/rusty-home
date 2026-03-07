@@ -34,6 +34,9 @@ pub enum Command {
         device: Fan,
         speed: FanAirflow,
     },
+    OpenDoor {
+        device: Lock,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id)]
@@ -56,6 +59,9 @@ pub enum CommandTarget {
 
     #[display("ControlFan[{}]", device)]
     ControlFan { device: Fan },
+
+    #[display("OpenDoor[{}]", device)]
+    OpenDoor { device: Lock },
 }
 
 impl From<Command> for CommandTarget {
@@ -79,6 +85,7 @@ impl From<&Command> for CommandTarget {
             },
             Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving { device: device.clone() },
             Command::ControlFan { device, .. } => CommandTarget::ControlFan { device: device.clone() },
+            Command::OpenDoor { device } => CommandTarget::OpenDoor { device: device.clone() },
         }
     }
 }
@@ -201,6 +208,15 @@ pub enum Fan {
     LivingRoomCeilingFan,
     BedroomCeilingFan,
     BedroomDehumidifier,
+}
+
+//
+// OPEN DOOR
+//
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
+#[serde(rename_all = "snake_case")]
+pub enum Lock {
+    BuildingEntrance,
 }
 
 #[cfg(test)]

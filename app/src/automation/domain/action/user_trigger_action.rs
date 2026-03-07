@@ -39,6 +39,11 @@ impl Rule for UserTriggerAction {
             return Ok(RuleResult::Skip);
         }
 
+        if self.is_one_shot() && latest_trigger.execution_started() {
+            tracing::info!("One-shot trigger already executed, skipping");
+            return Ok(RuleResult::Skip);
+        }
+
         let commands = into_command(&latest_trigger.trigger);
 
         if commands.is_empty() {
@@ -76,6 +81,14 @@ impl UserTriggerAction {
             | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => None,
             UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
             UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote) => Some(t!(60 minutes)),
+            UserTriggerTarget::LockDoorOpen(_) => Some(t!(30 seconds)),
+        }
+    }
+
+    fn is_one_shot(&self) -> bool {
+        match self.target {
+            UserTriggerTarget::LockDoorOpen(_) => true,
+            _ => false,
         }
     }
 }
@@ -131,5 +144,8 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
             },
         ],
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => vec![],
+        UserTrigger::LockDoorOpen(Door::Building) => vec![Command::OpenDoor {
+            device: Lock::BuildingEntrance,
+        }],
     }
 }

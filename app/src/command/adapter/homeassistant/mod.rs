@@ -20,6 +20,7 @@ enum HaServiceTarget {
         humidifier_id: &'static str,
         fan_id: &'static str,
     },
+    NukiLock(&'static str),
 }
 
 pub struct HomeAssistantCommandExecutor {
@@ -94,6 +95,20 @@ impl HomeAssistantCommandExecutor {
             }
             (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
                 self.comfee_fan_speed(humidifier_id, fan_id, speed).await
+            }
+            (NukiLock(id), Command::OpenDoor { .. }) => {
+                tracing::info!("Opening door with lock id {}", id);
+                // self.client
+                //     .call_service(
+                //         "lock",
+                //         "open",
+                //         json!({
+                //             "entity_id": vec![id.to_string()]
+                //         }),
+                //     )
+                //     .await?;
+                // record_executed(id);
+                Ok(())
             }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }

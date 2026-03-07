@@ -2,10 +2,10 @@ use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
     InformWindowOpen, SupportWithFan, UserTriggerAction,
 };
-use crate::core::domain::{HeatingZone, Room};
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::core::domain::{HeatingZone, Room};
 use crate::home_state::StateSnapshot;
-use crate::trigger::{HomekitCommandTarget, RemoteTriggerTarget};
+use crate::trigger::{Door, HomekitCommandTarget, RemoteTriggerTarget};
 
 //Refactor to variants() and is_active() method
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
@@ -18,32 +18,28 @@ pub enum HomeGoal {
     #[display("BetterRoomClimate[{}]", _0)]
     BetterRoomClimate(Room),
     TvControl,
+    ReactToUserRequests,
     ResetToDefaltSettings,
 }
 
-const ALL_GOALS: [HomeGoal; 12] = [
-    HomeGoal::PreventNoise,
-    HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
-    HomeGoal::SmarterHeating(HeatingZone::Bedroom),
-    HomeGoal::SmarterHeating(HeatingZone::Kitchen),
-    HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
-    HomeGoal::SmarterHeating(HeatingZone::Bathroom),
-    HomeGoal::BetterRoomClimate(Room::LivingRoom),
-    HomeGoal::BetterRoomClimate(Room::Bedroom),
-    HomeGoal::StayInformed,
-    HomeGoal::PreventMould,
-    HomeGoal::TvControl,
-    HomeGoal::ResetToDefaltSettings,
-];
-
 //TODO select goals based on current state
 pub fn get_active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
-    //TODO determine active goals
-    all_goals()
-}
-
-pub fn all_goals() -> Vec<HomeGoal> {
-    ALL_GOALS.to_vec()
+    //Prioritized high to low
+    vec![
+        HomeGoal::PreventNoise,
+        HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
+        HomeGoal::SmarterHeating(HeatingZone::Bedroom),
+        HomeGoal::SmarterHeating(HeatingZone::Kitchen),
+        HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
+        HomeGoal::SmarterHeating(HeatingZone::Bathroom),
+        HomeGoal::BetterRoomClimate(Room::LivingRoom),
+        HomeGoal::BetterRoomClimate(Room::Bedroom),
+        HomeGoal::StayInformed,
+        HomeGoal::PreventMould,
+        HomeGoal::TvControl,
+        HomeGoal::ReactToUserRequests,
+        HomeGoal::ResetToDefaltSettings,
+    ]
 }
 
 impl HomeGoal {
@@ -105,6 +101,9 @@ impl HomeGoal {
                 })
                 .into(),
             ],
+            HomeGoal::ReactToUserRequests => {
+                vec![UserTriggerAction::new(crate::trigger::UserTriggerTarget::LockDoorOpen(Door::Building)).into()]
+            }
             HomeGoal::ResetToDefaltSettings => vec![
                 FollowDefaultSetting::new(CommandTarget::SetPower {
                     device: PowerToggle::Dehumidifier,

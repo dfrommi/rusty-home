@@ -2,7 +2,7 @@ use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::{Command, CommandTarget, NotificationAction};
-use crate::core::unit::{FanAirflow, Percent};
+use crate::core::unit::FanAirflow;
 
 #[derive(Debug, Clone, Id)]
 pub struct FollowDefaultSetting(CommandTarget);
@@ -38,6 +38,10 @@ impl Rule for FollowDefaultSetting {
                 device,
                 target_state: crate::command::HeatingTargetState::Off,
             },
+            CommandTarget::OpenDoor { .. } => {
+                tracing::warn!("No default setting defined for OpenDoor, skipping");
+                return Ok(RuleResult::Skip);
+            }
         };
 
         Ok(RuleResult::Execute(vec![command]))

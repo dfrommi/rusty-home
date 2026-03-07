@@ -1,4 +1,4 @@
-use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::command::{CommandTarget, EnergySavingDevice, Fan, Lock, Notification, NotificationRecipient, PowerToggle};
 
 use super::HaServiceTarget;
 
@@ -50,6 +50,12 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
                 humidifier_id: "humidifier.dehumidifier_34e8",
                 fan_id: "fan.dehumidifier_34e8_fan",
             },
+        ),
+        (
+            CommandTarget::OpenDoor {
+                device: Lock::BuildingEntrance,
+            },
+            HaServiceTarget::NukiLock("lock.nuki_nuki_lock"),
         ),
     ]
 }

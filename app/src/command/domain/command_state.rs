@@ -47,6 +47,10 @@ impl Command {
                 is_set_energy_saving_reflected_in_state(device, *on, command_client, snapshot).await
             }
             Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
+            Command::OpenDoor { .. } => {
+                //Only a short trigger, no permanent state change
+                Ok(false)
+            }
         }
     }
 
@@ -57,6 +61,7 @@ impl Command {
             Command::SetEnergySaving { .. } => Some(t!(2 minutes)),
             Command::ControlFan { .. } => Some(t!(3 minutes)),
             Command::PushNotify { .. } => None,
+            Command::OpenDoor { .. } => None,
         }
     }
 }

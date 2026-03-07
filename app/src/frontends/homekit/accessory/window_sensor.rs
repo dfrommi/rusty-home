@@ -1,7 +1,7 @@
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{HomeStateValue, Opened},
-    trigger::HomekitCommand,
+    trigger::UserTrigger,
 };
 
 pub struct WindowSensor {
@@ -43,7 +43,7 @@ impl WindowSensor {
         }
     }
 
-    pub fn process_trigger(&self, _trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    pub fn process_trigger(&self, _trigger: &HomekitEvent) -> Option<UserTrigger> {
         None
     }
 }

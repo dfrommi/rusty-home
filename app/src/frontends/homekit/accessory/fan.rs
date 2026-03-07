@@ -2,7 +2,7 @@ use crate::{
     core::unit::{FanAirflow, FanSpeed},
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{FanActivity, HomeStateValue},
-    trigger::HomekitCommand,
+    trigger::{HomekitCommand, UserTrigger},
 };
 
 const ALL_SPEEDS: [FanSpeed; 5] = [
@@ -261,7 +261,7 @@ impl Fan {
         }
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
         if trigger.target == self.target(HomekitCharacteristic::Active) {
             if let Some(is_on) = value_to_bool(&trigger.value) {
                 let new_airflow = if is_on {
@@ -276,7 +276,7 @@ impl Fan {
                     FanAirflow::Off
                 };
 
-                return self.command_with_state(new_airflow);
+                return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
             }
 
             tracing::warn!("Fan {} received invalid Active payload: {}", self.name, trigger.value);
@@ -299,7 +299,7 @@ impl Fan {
                     direction.with_speed(speed)
                 };
 
-                return self.command_with_state(new_airflow);
+                return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
             }
 
             tracing::warn!("Fan {} received invalid RotationSpeed payload: {}", self.name, trigger.value);
@@ -321,7 +321,7 @@ impl Fan {
                 if self.status.is_active() {
                     let speed = self.status.current_speed();
                     let new_airflow = direction.with_speed(speed);
-                    return self.command_with_state(new_airflow);
+                    return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
                 }
 
                 return None;

@@ -11,7 +11,7 @@ use super::{
 use crate::{
     core::timeseries::DataPoint,
     home_state::{HomeStateEvent, HomeStateValue},
-    trigger::{TriggerClient, UserTrigger},
+    trigger::TriggerClient,
 };
 
 pub struct HomekitRunner {
@@ -129,7 +129,7 @@ impl HomekitRunner {
 
         tracing::debug!("Processing Homekit MQTT event: {:?}", state);
 
-        if let Some(command) = self.registry.process_trigger(&state) {
+        if let Some(trigger) = self.registry.process_trigger(&state) {
             if let Some(handle) = self.trigger_debounce.get(&state.target) {
                 handle.abort();
             }
@@ -140,9 +140,9 @@ impl HomekitRunner {
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
 
-                tracing::info!("Received Homekit command: {:?}", command);
-                if let Err(e) = trigger_client.add_trigger(UserTrigger::Homekit(command.clone())).await {
-                    tracing::error!("Error processing Homekit command {:?}: {:?}", command, e);
+                tracing::info!("Received Homekit trigger: {:?}", trigger);
+                if let Err(e) = trigger_client.add_trigger(trigger.clone()).await {
+                    tracing::error!("Error processing Homekit trigger {:?}: {:?}", trigger, e);
                 }
             });
 

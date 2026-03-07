@@ -1,5 +1,5 @@
 use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
-use crate::trigger::{HomekitCommand, HomekitHeatingState};
+use crate::trigger::{HomekitCommand, HomekitHeatingState, UserTrigger};
 use crate::{
     core::domain::{HeatingZone, Radiator},
     core::unit::DegreeCelsius,
@@ -122,7 +122,7 @@ impl Thermostat {
         events
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<UserTrigger> {
         if trigger.target == self.target(HomekitCharacteristic::TargetTemperature) {
             let target_temp = trigger
                 .value
@@ -132,7 +132,7 @@ impl Thermostat {
             if let Some(target_temp) = target_temp {
                 //rounded to 0.5 degree celsius steps
                 let temperature = DegreeCelsius((target_temp * 2.0).round() / 2.0);
-                return Some(self.zone_command(HomekitHeatingState::Heat(temperature)));
+                return Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Heat(temperature))));
             }
 
             tracing::warn!(
@@ -152,12 +152,12 @@ impl Thermostat {
 
             if let Some(state) = state {
                 return match state {
-                    0 => Some(self.zone_command(HomekitHeatingState::Off)),
+                    0 => Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Off))),
                     1 => self
                         .status
                         .set_point
-                        .map(|temperature| self.zone_command(HomekitHeatingState::Heat(temperature))),
-                    3 => Some(self.zone_command(HomekitHeatingState::Auto)),
+                        .map(|temperature| UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Heat(temperature)))),
+                    3 => Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Auto))),
                     unsupported => {
                         tracing::warn!(
                             "Thermostat {} received unsupported TargetHeatingCoolingState value: {}",

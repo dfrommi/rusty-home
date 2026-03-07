@@ -1,6 +1,6 @@
 use crate::core::domain::RoomWithWindow;
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
-use crate::trigger::HomekitCommand;
+use crate::trigger::UserTrigger;
 use crate::{
     core::domain::{HeatingZone, Room},
     command::PowerToggle,
@@ -66,7 +66,7 @@ impl HomekitRegistry {
             .collect()
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
         for accessory in &mut self.accessories {
             let command = match accessory {
                 HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),

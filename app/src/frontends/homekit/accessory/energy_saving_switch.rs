@@ -1,7 +1,7 @@
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{EnergySaving, HomeStateValue},
-    trigger::HomekitCommand,
+    trigger::{HomekitCommand, UserTrigger},
 };
 
 pub struct EnergySavingSwitch {
@@ -28,11 +28,11 @@ impl EnergySavingSwitch {
         }
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<UserTrigger> {
         if trigger.target == self.homekit_target() {
             if let Some(is_on) = trigger.value.as_bool() {
                 let energy_saving = !is_on;
-                return Some(HomekitCommand::LivingRoomTvEnergySaving(energy_saving));
+                return Some(UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(energy_saving)));
             }
 
             tracing::warn!("EnergySavingSwitch {} received invalid payload: {}", self.name, trigger.value);

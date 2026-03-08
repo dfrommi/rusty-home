@@ -120,7 +120,7 @@ impl DeviceStateRepository {
                         timestamp: row.timestamp.into(),
                     }),
                     Err(e) => {
-                        tracing::warn!("Received unsupported channel {}/{}: {:?}", row.channel, row.name, e);
+                        tracing::trace!("Received no longer supported channel {}/{}: {:?}", row.channel, row.name, e);
                         None
                     }
                 }

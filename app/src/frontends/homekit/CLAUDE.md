@@ -64,10 +64,11 @@ pub fn export_state(&self/&mut self, state: &HomeStateValue) -> Vec<HomekitEvent
 pub fn process_trigger(&self/&mut self, trigger: &HomekitEvent) -> Option<UserTrigger>
 ```
 
-`process_trigger` returns `Option<UserTrigger>` directly — not `HomekitCommand`.
-Wrap homekit-specific commands as `UserTrigger::Homekit(HomekitCommand::...)`.
-Use other `UserTrigger` variants (e.g. `UserTrigger::LockDoorOpen(Door::...)`) when
-the action is not homekit-specific.
+`process_trigger` returns `Option<UserTrigger>` directly using the flat domain variants:
+- `UserTrigger::DevicePower { device: OnOffDevice::X, on: bool }`
+- `UserTrigger::FanSpeed { fan: FanActivity::X, airflow: FanAirflow::X }`
+- `UserTrigger::Heating { zone: HeatingZone::X, request: HeatingRequest::X }`
+- `UserTrigger::OpenDoor(Door::X)`
 
 ## Adding a new accessory — checklist
 
@@ -86,8 +87,8 @@ the action is not homekit-specific.
    - Add arm to all three match blocks (`get_device_config`, `export_state`, `process_trigger`)
    - Add instance to `fn config()`
 
-4. **`trigger/domain/homekit.rs`** — if the action is homekit-specific, add a variant to
-   `HomekitCommand` and `HomekitCommandTarget`, and extend the `From<&HomekitCommand>` impl.
+4. **`trigger/domain/mod.rs`** — if the new action doesn't map to an existing flat `UserTrigger`
+   variant, add a new variant there and update all match sites.
 
 ## Runtime behaviour notes
 

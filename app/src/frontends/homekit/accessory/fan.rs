@@ -2,7 +2,7 @@ use crate::{
     core::unit::{FanAirflow, FanSpeed},
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{FanActivity, HomeStateValue},
-    trigger::{HomekitCommand, UserTrigger},
+    trigger::UserTrigger,
 };
 
 const ALL_SPEEDS: [FanSpeed; 5] = [
@@ -276,7 +276,7 @@ impl Fan {
                     FanAirflow::Off
                 };
 
-                return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
+                return self.command_with_state(new_airflow);
             }
 
             tracing::warn!("Fan {} received invalid Active payload: {}", self.name, trigger.value);
@@ -299,7 +299,7 @@ impl Fan {
                     direction.with_speed(speed)
                 };
 
-                return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
+                return self.command_with_state(new_airflow);
             }
 
             tracing::warn!("Fan {} received invalid RotationSpeed payload: {}", self.name, trigger.value);
@@ -321,7 +321,7 @@ impl Fan {
                 if self.status.is_active() {
                     let speed = self.status.current_speed();
                     let new_airflow = direction.with_speed(speed);
-                    return self.command_with_state(new_airflow).map(UserTrigger::Homekit);
+                    return self.command_with_state(new_airflow);
                 }
 
                 return None;
@@ -348,7 +348,7 @@ impl Fan {
         }
     }
 
-    fn command_with_state(&mut self, airflow: FanAirflow) -> Option<HomekitCommand> {
+    fn command_with_state(&mut self, airflow: FanAirflow) -> Option<UserTrigger> {
         let airflow = self.config.normalize_airflow(&airflow);
 
         if airflow == self.status.airflow() {
@@ -357,11 +357,7 @@ impl Fan {
 
         self.status.apply_state(airflow.clone(), &self.config);
 
-        match self.activity {
-            FanActivity::LivingRoomCeilingFan => Some(HomekitCommand::LivingRoomCeilingFanSpeed(airflow)),
-            FanActivity::BedroomCeilingFan => Some(HomekitCommand::BedroomCeilingFanSpeed(airflow)),
-            FanActivity::BedroomDehumidifier => Some(HomekitCommand::BedroomDehumidifierFanSpeed(airflow)),
-        }
+        Some(UserTrigger::FanSpeed { fan: self.activity, airflow })
     }
 }
 

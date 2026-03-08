@@ -5,7 +5,8 @@ use crate::{
     home_state::calc::{DerivedStateProvider, StateCalculationContext},
 };
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize, derive_more::Display, Id, EnumVariants)]
+#[serde(rename_all = "snake_case")]
 pub enum FanActivity {
     LivingRoomCeilingFan,
     BedroomCeilingFan,

@@ -2,9 +2,10 @@ use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::Command;
+use crate::core::domain::HeatingZone;
 use crate::core::time::Duration;
 use crate::core::unit::FanAirflow;
-use crate::home_state::PowerAvailable;
+use crate::home_state::{FanActivity, PowerAvailable};
 use crate::t;
 use crate::trigger::*;
 
@@ -60,9 +61,9 @@ impl Rule for UserTriggerAction {
 impl UserTriggerAction {
     fn default_duration(&self, ctx: &RuleEvaluationContext) -> Option<Duration> {
         match self.target {
-            UserTriggerTarget::Homekit(HomekitCommandTarget::InfraredHeaterPower) => Some(t!(30 minutes)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower) => Some(t!(15 minutes)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomTvEnergySaving) => {
+            UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater) => Some(t!(30 minutes)),
+            UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier) => Some(t!(15 minutes)),
+            UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving) => {
                 match ctx.current_dp(PowerAvailable::LivingRoomTv) {
                     Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
                     Ok(_) => None,
@@ -72,24 +73,21 @@ impl UserTriggerAction {
                     }
                 }
             }
-            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomCeilingFanSpeed)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed) => Some(t!(10 hours)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomDehumidifierFanSpeed) => Some(t!(1 hours)),
-            UserTriggerTarget::Homekit(HomekitCommandTarget::LivingRoomHeatingState)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomHeatingState)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::KitchenHeatingState)
-            | UserTriggerTarget::Homekit(HomekitCommandTarget::RoomOfRequirementsHeatingState) => None,
-            UserTriggerTarget::Homekit(HomekitCommandTarget::BathroomHeatingState) => Some(t!(30 minutes)),
+            UserTriggerTarget::FanSpeed(FanActivity::LivingRoomCeilingFan)
+            | UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan) => Some(t!(10 hours)),
+            UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier) => Some(t!(1 hours)),
+            UserTriggerTarget::Heating(HeatingZone::LivingRoom)
+            | UserTriggerTarget::Heating(HeatingZone::Bedroom)
+            | UserTriggerTarget::Heating(HeatingZone::Kitchen)
+            | UserTriggerTarget::Heating(HeatingZone::RoomOfRequirements) => None,
+            UserTriggerTarget::Heating(HeatingZone::Bathroom) => Some(t!(30 minutes)),
             UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote) => Some(t!(60 minutes)),
-            UserTriggerTarget::LockDoorOpen(_) => Some(t!(30 seconds)),
+            UserTriggerTarget::OpenDoor(_) => Some(t!(30 seconds)),
         }
     }
 
     fn is_one_shot(&self) -> bool {
-        match self.target {
-            UserTriggerTarget::LockDoorOpen(_) => true,
-            _ => false,
-        }
+        matches!(self.target, UserTriggerTarget::OpenDoor(_))
     }
 }
 
@@ -97,35 +95,51 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
     use crate::command::*;
 
     match trigger.clone() {
-        UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(on)) => vec![Command::SetPower {
+        UserTrigger::DevicePower {
+            device: OnOffDevice::InfraredHeater,
+            on,
+        } => vec![Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: on,
         }],
-        UserTrigger::Homekit(HomekitCommand::DehumidifierPower(on)) => vec![Command::SetPower {
+        UserTrigger::DevicePower {
+            device: OnOffDevice::Dehumidifier,
+            on,
+        } => vec![Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: on,
         }],
-        UserTrigger::Homekit(HomekitCommand::LivingRoomTvEnergySaving(on)) => vec![Command::SetEnergySaving {
-            device: EnergySavingDevice::LivingRoomTv,
+        UserTrigger::DevicePower {
+            device: OnOffDevice::LivingRoomTvEnergySaving,
             on,
-        }],
-        UserTrigger::Homekit(HomekitCommand::LivingRoomCeilingFanSpeed(speed)) => vec![Command::ControlFan {
+        } => {
+            vec![Command::SetEnergySaving {
+                device: EnergySavingDevice::LivingRoomTv,
+                on,
+            }]
+        }
+        UserTrigger::FanSpeed {
+            fan: FanActivity::LivingRoomCeilingFan,
+            airflow,
+        } => vec![Command::ControlFan {
             device: Fan::LivingRoomCeilingFan,
-            speed,
+            speed: airflow,
         }],
-        UserTrigger::Homekit(HomekitCommand::BedroomCeilingFanSpeed(speed)) => vec![Command::ControlFan {
+        UserTrigger::FanSpeed {
+            fan: FanActivity::BedroomCeilingFan,
+            airflow,
+        } => vec![Command::ControlFan {
             device: Fan::BedroomCeilingFan,
-            speed,
+            speed: airflow,
         }],
-        UserTrigger::Homekit(HomekitCommand::BedroomDehumidifierFanSpeed(speed)) => vec![Command::ControlFan {
+        UserTrigger::FanSpeed {
+            fan: FanActivity::BedroomDehumidifier,
+            airflow,
+        } => vec![Command::ControlFan {
             device: Fan::BedroomDehumidifier,
-            speed,
+            speed: airflow,
         }],
-        UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(_))
-        | UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(_))
-        | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(_))
-        | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(_))
-        | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(_)) => {
+        UserTrigger::Heating { .. } => {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
             vec![]
         }
@@ -144,7 +158,7 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
             },
         ],
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => vec![],
-        UserTrigger::LockDoorOpen(Door::Building) => vec![Command::OpenDoor {
+        UserTrigger::OpenDoor { door: Door::Building } => vec![Command::OpenDoor {
             device: Lock::BuildingEntrance,
         }],
     }

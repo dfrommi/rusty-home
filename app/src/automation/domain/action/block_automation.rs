@@ -9,7 +9,8 @@ use crate::{
     core::{domain::Room, unit::DegreeCelsius},
     home_state::{Resident, Temperature},
     t,
-    trigger::{HomekitCommandTarget, UserTriggerTarget},
+    home_state::FanActivity,
+    trigger::{OnOffDevice, UserTriggerTarget},
 };
 
 #[derive(Debug, Clone, Id, EnumVariants)]
@@ -65,19 +66,19 @@ impl Rule for BlockAutomation {
 
         let (trigger_target, command_target) = match self {
             BlockAutomation::BathroomDehumidifier => (
-                UserTriggerTarget::Homekit(HomekitCommandTarget::DehumidifierPower),
+                UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier),
                 CommandTarget::SetPower {
                     device: PowerToggle::Dehumidifier,
                 },
             ),
             BlockAutomation::BedroomDehumidifier => (
-                UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomDehumidifierFanSpeed),
+                UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier),
                 CommandTarget::ControlFan {
                     device: Fan::BedroomDehumidifier,
                 },
             ),
             BlockAutomation::BedroomCeilingFan => (
-                UserTriggerTarget::Homekit(HomekitCommandTarget::BedroomCeilingFanSpeed),
+                UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan),
                 CommandTarget::ControlFan {
                     device: Fan::BedroomCeilingFan,
                 },

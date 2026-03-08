@@ -5,7 +5,8 @@ use crate::automation::domain::action::{
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::core::domain::{HeatingZone, Room};
 use crate::home_state::StateSnapshot;
-use crate::trigger::{Door, HomekitCommandTarget, RemoteTriggerTarget};
+use crate::home_state::FanActivity;
+use crate::trigger::{Door, OnOffDevice, RemoteTriggerTarget, UserTriggerTarget};
 
 //Refactor to variants() and is_active() method
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::Display)]
@@ -58,7 +59,7 @@ impl HomeGoal {
                 ]
             }
             HomeGoal::SmarterHeating(HeatingZone::Bedroom) => vec![
-                UserTriggerAction::new(HomekitCommandTarget::InfraredHeaterPower.into()).into(),
+                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater)).into(),
                 AutoTurnOff::IrHeater.into(),
                 FollowTargetHeatingDemand::new(HeatingZone::Bedroom).into(),
                 SupportWithFan::BedroomVentilation.into(),
@@ -75,11 +76,11 @@ impl HomeGoal {
             }
             HomeGoal::BetterRoomClimate(Room::LivingRoom) => vec![
                 SupportWithFan::LivingRoomVentilation.into(),
-                UserTriggerAction::new(HomekitCommandTarget::LivingRoomCeilingFanSpeed.into()).into(),
+                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomCeilingFan)).into(),
             ],
             HomeGoal::BetterRoomClimate(Room::Bedroom) => vec![
-                UserTriggerAction::new(HomekitCommandTarget::BedroomCeilingFanSpeed.into()).into(),
-                UserTriggerAction::new(HomekitCommandTarget::BedroomDehumidifierFanSpeed.into()).into(),
+                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan)).into(),
+                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier)).into(),
                 SupportWithFan::BedroomVentilation.into(),
                 Dehumidify::Bedroom.into(),
                 SupportWithFan::BedroomDehumidification.into(),
@@ -91,18 +92,18 @@ impl HomeGoal {
                 InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into(),
             ],
             HomeGoal::PreventMould => vec![
-                UserTriggerAction::new(HomekitCommandTarget::DehumidifierPower.into()).into(),
+                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier)).into(),
                 Dehumidify::Bathroom.into(),
             ],
             HomeGoal::TvControl => vec![
-                UserTriggerAction::new(HomekitCommandTarget::LivingRoomTvEnergySaving.into()).into(),
+                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving)).into(),
                 FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
                     device: EnergySavingDevice::LivingRoomTv,
                 })
                 .into(),
             ],
             HomeGoal::ReactToUserRequests => {
-                vec![UserTriggerAction::new(crate::trigger::UserTriggerTarget::LockDoorOpen(Door::Building)).into()]
+                vec![UserTriggerAction::new(UserTriggerTarget::OpenDoor(Door::Building)).into()]
             }
             HomeGoal::ResetToDefaltSettings => vec![
                 FollowDefaultSetting::new(CommandTarget::SetPower {

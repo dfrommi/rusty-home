@@ -1,5 +1,5 @@
 use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
-use crate::trigger::{HomekitCommand, HomekitHeatingState, UserTrigger};
+use crate::trigger::{HeatingRequest, UserTrigger};
 use crate::{
     core::domain::{HeatingZone, Radiator},
     core::unit::DegreeCelsius,
@@ -132,7 +132,7 @@ impl Thermostat {
             if let Some(target_temp) = target_temp {
                 //rounded to 0.5 degree celsius steps
                 let temperature = DegreeCelsius((target_temp * 2.0).round() / 2.0);
-                return Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Heat(temperature))));
+                return Some(self.zone_trigger(HeatingRequest::Heat(temperature)));
             }
 
             tracing::warn!(
@@ -152,12 +152,12 @@ impl Thermostat {
 
             if let Some(state) = state {
                 return match state {
-                    0 => Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Off))),
+                    0 => Some(self.zone_trigger(HeatingRequest::Off)),
                     1 => self
                         .status
                         .set_point
-                        .map(|temperature| UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Heat(temperature)))),
-                    3 => Some(UserTrigger::Homekit(self.zone_command(HomekitHeatingState::Auto))),
+                        .map(|temperature| self.zone_trigger(HeatingRequest::Heat(temperature))),
+                    3 => Some(self.zone_trigger(HeatingRequest::Auto)),
                     unsupported => {
                         tracing::warn!(
                             "Thermostat {} received unsupported TargetHeatingCoolingState value: {}",
@@ -190,14 +190,8 @@ impl Thermostat {
         HomekitTarget::new(self.name.to_string(), HomekitService::Thermostat, characteristic)
     }
 
-    fn zone_command(&self, heating_state: HomekitHeatingState) -> HomekitCommand {
-        match self.zone {
-            HeatingZone::LivingRoom => HomekitCommand::LivingRoomHeatingState(heating_state),
-            HeatingZone::Bedroom => HomekitCommand::BedroomHeatingState(heating_state),
-            HeatingZone::Kitchen => HomekitCommand::KitchenHeatingState(heating_state),
-            HeatingZone::RoomOfRequirements => HomekitCommand::RoomOfRequirementsHeatingState(heating_state),
-            HeatingZone::Bathroom => HomekitCommand::BathroomHeatingState(heating_state),
-        }
+    fn zone_trigger(&self, request: HeatingRequest) -> UserTrigger {
+        UserTrigger::Heating { zone: self.zone, request }
     }
 
     fn target_state_event(&self) -> Option<HomekitEvent> {

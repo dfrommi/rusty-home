@@ -1,5 +1,5 @@
 use crate::home_state::{HomeStateValue, PowerAvailable};
-use crate::trigger::{HomekitCommand, UserTrigger};
+use crate::trigger::{OnOffDevice, UserTrigger};
 use crate::{
     command::PowerToggle,
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
@@ -40,14 +40,15 @@ impl PowerSwitch {
             == HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On)
             && let Some(is_on) = trigger.value.as_bool()
         {
-            return match self.power_toggle {
-                PowerToggle::Dehumidifier => Some(UserTrigger::Homekit(HomekitCommand::DehumidifierPower(is_on))),
-                PowerToggle::InfraredHeater => Some(UserTrigger::Homekit(HomekitCommand::InfraredHeaterPower(is_on))),
+            let on_off_device = match &self.power_toggle {
+                PowerToggle::Dehumidifier => OnOffDevice::Dehumidifier,
+                PowerToggle::InfraredHeater => OnOffDevice::InfraredHeater,
                 PowerToggle::LivingRoomNotificationLight => {
                     tracing::error!("LivingRoomNotificationLight power toggle is not implemented in Homekit adapter");
-                    None
+                    return None;
                 }
             };
+            return Some(UserTrigger::DevicePower { device: on_off_device, on: is_on });
         }
 
         None

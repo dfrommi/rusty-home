@@ -6,7 +6,6 @@ use crate::{
         Occupancy, Presence, Ventilation,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
-    trigger::{HomekitCommand, HomekitCommandTarget, HomekitHeatingState},
 };
 use crate::{
     core::{
@@ -15,7 +14,7 @@ use crate::{
         unit::{DegreeCelsius, Probability, p},
     },
     t,
-    trigger::{UserTrigger, UserTriggerId, UserTriggerTarget},
+    trigger::{HeatingRequest, UserTrigger, UserTriggerId, UserTriggerTarget},
 };
 
 #[derive(Debug, Clone, PartialEq, derive_more::Display)]
@@ -104,25 +103,14 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
 
 impl TargetHeatingModeStateProvider {
     fn get_user_override(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<UserHeatingOverride> {
-        let user_trigger = ctx.user_trigger(UserTriggerTarget::Homekit(match id {
-            TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom) => HomekitCommandTarget::LivingRoomHeatingState,
-            TargetHeatingMode::HeatingZone(HeatingZone::Bedroom) => HomekitCommandTarget::BedroomHeatingState,
-            TargetHeatingMode::HeatingZone(HeatingZone::Kitchen) => HomekitCommandTarget::KitchenHeatingState,
-            TargetHeatingMode::HeatingZone(HeatingZone::RoomOfRequirements) => {
-                HomekitCommandTarget::RoomOfRequirementsHeatingState
-            }
-            TargetHeatingMode::HeatingZone(HeatingZone::Bathroom) => HomekitCommandTarget::BathroomHeatingState,
-        }))?;
+        let TargetHeatingMode::HeatingZone(zone) = id;
+        let user_trigger = ctx.user_trigger(UserTriggerTarget::Heating(zone))?;
 
         let target_temperature = match &user_trigger.trigger {
-            UserTrigger::Homekit(HomekitCommand::LivingRoomHeatingState(state))
-            | UserTrigger::Homekit(HomekitCommand::BedroomHeatingState(state))
-            | UserTrigger::Homekit(HomekitCommand::KitchenHeatingState(state))
-            | UserTrigger::Homekit(HomekitCommand::RoomOfRequirementsHeatingState(state))
-            | UserTrigger::Homekit(HomekitCommand::BathroomHeatingState(state)) => match state {
-                HomekitHeatingState::Off => Some(DegreeCelsius(0.0)),
-                HomekitHeatingState::Heat(target_temperature) => Some(*target_temperature),
-                HomekitHeatingState::Auto => None,
+            UserTrigger::Heating { request, .. } => match request {
+                HeatingRequest::Off => Some(DegreeCelsius(0.0)),
+                HeatingRequest::Heat(target_temperature) => Some(*target_temperature),
+                HeatingRequest::Auto => None,
             },
             _ => None,
         };

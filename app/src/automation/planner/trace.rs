@@ -1,13 +1,9 @@
 use std::{fmt::Display, sync::Mutex};
 
-use crate::core::time::DateTime;
-use crate::t;
-use infrastructure::TraceContext;
+use infrastructure::CorrelationId;
 
 #[derive(Clone, Debug)]
 pub struct PlanningTrace {
-    pub timestamp: DateTime,
-    pub trace_id: Option<String>,
     pub steps: Vec<PlanningTraceStep>,
 }
 
@@ -21,7 +17,7 @@ pub struct PlanningTraceStep {
     pub fulfilled: Option<bool>,
     pub triggered: Option<bool>,
 
-    pub correlation_id: Option<String>,
+    pub correlation_id: Option<CorrelationId>,
 }
 
 //Ignore correlation_id
@@ -37,17 +33,12 @@ impl PartialEq for PlanningTraceStep {
 }
 
 impl PlanningTrace {
-    pub fn new(timestamp: DateTime, trace_id: Option<String>, steps: Vec<PlanningTraceStep>) -> Self {
-        Self {
-            timestamp,
-            trace_id,
-            steps,
-        }
+    pub fn new(steps: Vec<PlanningTraceStep>) -> Self {
+        Self { steps }
     }
 
     pub fn current(steps: Vec<PlanningTraceStep>) -> Self {
-        let trace_id = TraceContext::current().map(|c| c.trace_id().to_string());
-        Self::new(t!(now), trace_id, steps)
+        Self::new(steps)
     }
 }
 

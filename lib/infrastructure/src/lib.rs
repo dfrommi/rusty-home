@@ -5,7 +5,7 @@ mod monitoring;
 mod mqtt;
 
 pub use monitoring::MonitoringConfig;
-pub use monitoring::TraceContext;
+pub use monitoring::{CorrelationId, TraceContext};
 
 pub use bus::{EventBus, EventEmitter, EventListener};
 pub use db::DatabaseConfig;

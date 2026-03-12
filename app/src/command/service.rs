@@ -1,4 +1,4 @@
-use infrastructure::EventEmitter;
+use infrastructure::{CorrelationId, EventEmitter};
 
 use crate::{
     command::{
@@ -45,7 +45,7 @@ impl CommandService {
         command: Command,
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-        correlation_id: Option<String>,
+        correlation_id: Option<CorrelationId>,
     ) -> anyhow::Result<CommandExecution> {
         let mut command_exec = self
             .repo

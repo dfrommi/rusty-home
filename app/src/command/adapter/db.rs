@@ -5,6 +5,7 @@ use crate::{
     trigger::UserTriggerId,
 };
 use anyhow::Result;
+use infrastructure::CorrelationId;
 use sqlx::PgPool;
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ impl CommandRepository {
         command: &Command,
         source: &ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-        correlation_id: Option<String>,
+        correlation_id: Option<CorrelationId>,
     ) -> Result<CommandExecution> {
         self.insert_command(command, source, user_trigger_id, correlation_id, DbCommandState::InProgress)
             .await
@@ -33,7 +34,7 @@ impl CommandRepository {
         command: &Command,
         source: &ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-        correlation_id: Option<String>,
+        correlation_id: Option<CorrelationId>,
         state: DbCommandState,
     ) -> Result<CommandExecution> {
         let db_command = serde_json::json!(command);
@@ -47,7 +48,7 @@ impl CommandRepository {
             state as DbCommandState,
             source.type_name(),
             source.variant_name(),
-            correlation_id,
+            correlation_id.as_ref().map(|id| id.to_string()),
             user_trigger_id.clone() as Option<UserTriggerId>
         )
         .fetch_one(&self.pool)
@@ -131,7 +132,7 @@ impl CommandRepository {
                         created: row.created.unwrap().into(),
                         source,
                         user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
-                        correlation_id: row.correlation_id,
+                        correlation_id: row.correlation_id.map(|id| id.into()),
                     }),
                     Err(e) => {
                         tracing::warn!("Error mapping command with id {} from database, ignoring: {}", row.id, e);

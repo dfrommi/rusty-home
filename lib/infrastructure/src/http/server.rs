@@ -26,9 +26,7 @@ impl HttpServerConfig {
                     async {
                         let mut res = fut.await?;
 
-                        if let Some(ctx) = TraceContext::current()
-                            && let Ok(trace_id) = HeaderValue::from_str(ctx.trace_id().as_str())
-                        {
+                        if let Ok(trace_id) = HeaderValue::from_str(TraceContext::current().trace_id().as_str()) {
                             res.headers_mut().insert(HeaderName::from_static("trace-id"), trace_id);
                         }
 

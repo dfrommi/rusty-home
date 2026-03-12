@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
-use infrastructure::TraceContext;
+use infrastructure::{CorrelationId, TraceContext};
 
 use crate::command::{Command, CommandClient};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
@@ -44,9 +44,7 @@ async fn get_commands(
         let source = cmd.source.to_string();
         let icon = if cmd.is_user_generated() { "USER" } else { "SYSTEM" };
 
-        let trace_id = cmd
-            .correlation_id
-            .map(|id| TraceContext::from_correlation_id(&id).trace_id());
+        let trace_id = cmd.correlation_id.map(|id| CorrelationId::parse(id).trace_id());
 
         Row {
             icon: icon.to_string(),

@@ -82,9 +82,7 @@ async fn handle_trigger_updates(
     trigger_client: &TriggerClient,
 ) -> anyhow::Result<()> {
     if !used_triggers.is_empty() {
-        trigger_client
-            .set_triggers_active_from_if_unset(&used_triggers)
-            .await?;
+        trigger_client.set_triggers_active_from_if_unset(&used_triggers).await?;
     }
 
     trigger_client
@@ -102,7 +100,7 @@ async fn process_action<A: Action>(
     ctx: RuleEvaluationContext,
     command_client: CommandClient,
 ) -> Result<Context<A>> {
-    context.trace.correlation_id = TraceContext::current_correlation_id();
+    context.trace.correlation_id = TraceContext::current().correlation_id();
 
     //EVALUATION
     let evaluation_result = evaluate_action(&mut context, &ctx).await;
@@ -140,13 +138,13 @@ async fn process_action<A: Action>(
     }
 
     if context.trace.locked {
-        TraceContext::set_current_span_name(format!("⏸ {}", context.action));
+        TraceContext::current().set_span_name(format!("⏸ {}", context.action));
     } else if context.trace.triggered == Some(true) {
-        TraceContext::set_current_span_name(format!("▶ {}", context.action));
+        TraceContext::current().set_span_name(format!("▶ {}", context.action));
     } else if context.trace.fulfilled == Some(true) {
-        TraceContext::set_current_span_name(format!("▷ {}", context.action));
+        TraceContext::current().set_span_name(format!("▷ {}", context.action));
     } else {
-        TraceContext::set_current_span_name(format!("{}", context.action));
+        TraceContext::current().set_span_name(format!("{}", context.action));
     }
 
     Ok(context)

@@ -1,3 +1,4 @@
+mod correlation_id;
 pub mod meter;
 mod trace;
 
@@ -17,6 +18,7 @@ use std::error::Error;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
 
+pub use correlation_id::CorrelationId;
 pub use trace::TraceContext;
 
 //KNOWN ISSUES:

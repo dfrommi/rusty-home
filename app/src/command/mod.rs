@@ -86,7 +86,7 @@ impl CommandClient {
         user_trigger_id: Option<UserTriggerId>,
     ) -> anyhow::Result<CommandExecution> {
         self.service
-            .execute_command(command, source, user_trigger_id, TraceContext::current_correlation_id())
+            .execute_command(command, source, user_trigger_id, TraceContext::current().correlation_id())
             .await
     }
 

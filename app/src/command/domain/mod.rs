@@ -6,6 +6,7 @@ use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::trigger::UserTriggerId;
 use derive_more::derive::{Display, From};
+use infrastructure::CorrelationId;
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
@@ -98,7 +99,7 @@ pub struct CommandExecution {
     pub created: DateTime,
     pub source: ExternalId,
     pub user_trigger_id: Option<UserTriggerId>,
-    pub correlation_id: Option<String>,
+    pub correlation_id: Option<CorrelationId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -44,7 +44,9 @@ impl TriggerRepository {
             r#"INSERT INTO user_trigger (trigger, timestamp, correlation_id) VALUES ($1, $2, $3)"#,
             trigger,
             t!(now).into_db(),
-            infrastructure::TraceContext::current_correlation_id(),
+            infrastructure::TraceContext::current()
+                .correlation_id()
+                .map(|id| id.to_string()),
         )
         .execute(&self.pool)
         .await

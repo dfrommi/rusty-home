@@ -230,19 +230,19 @@ async fn get_or_insert_tag_id_from_db(db_pool: &PgPool, id: &DeviceStateId) -> R
 
     let tag_id = sqlx::query_scalar!(
         r#"WITH thing_value_tag_ins AS (
-                INSERT INTO thing_value_tag (channel, name)
-                VALUES ($1, $2)
-                ON CONFLICT (channel, name)
-                DO NOTHING
-                RETURNING id
-            )
-            SELECT id as "id!"
-            FROM thing_value_tag_ins
-            UNION ALL
-            SELECT id FROM thing_value_tag
-                WHERE channel IS NOT DISTINCT FROM $1
-                AND name IS NOT DISTINCT FROM $2
-                LIMIT 1"#,
+                    INSERT INTO thing_value_tag (channel, name)
+                    VALUES ($1, $2)
+                    ON CONFLICT (channel, name)
+                    DO NOTHING
+                    RETURNING id
+                )
+                SELECT id as "id!"
+                FROM thing_value_tag_ins
+                UNION ALL
+                SELECT id FROM thing_value_tag
+                    WHERE channel IS NOT DISTINCT FROM $1
+                    AND name IS NOT DISTINCT FROM $2
+                    LIMIT 1"#,
         id.type_name(),
         id.variant_name()
     )

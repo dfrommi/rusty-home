@@ -111,7 +111,9 @@ impl StateCalculationContext {
         previous.truncate_to(cutoff);
 
         let mut trace_contexts: HashMap<String, TraceContext> = HashMap::new();
-        if enable_tracing && let Some(root_span) = TraceContext::current() {
+        if enable_tracing {
+            let root_span = TraceContext::current();
+
             for home_state_id in HomeStateId::variants().iter() {
                 let ext_id_type = home_state_id.ext_id().type_name().to_string();
                 if trace_contexts.contains_key(&ext_id_type) {

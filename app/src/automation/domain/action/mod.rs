@@ -23,6 +23,8 @@ pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
 pub use user_trigger_action::UserTriggerAction;
 
+use infrastructure::TraceContext;
+
 use crate::automation::planner::{Action, ActionEvaluationResult};
 use crate::home_state::*;
 
@@ -73,8 +75,10 @@ impl RuleEvaluationContext {
             span.record("dp.value", dp.value.to_string());
             span.record("dp.timestamp", dp.timestamp.to_iso_string());
             span.record("dp.elapsed", dp.timestamp.elapsed().to_iso_string());
+            TraceContext::for_span(&span).set_ok();
         } else {
-            span.record("otel.name", format!("{} - error", ext_id));
+            span.record("otel.name", ext_id.to_string());
+            TraceContext::for_span(&span).set_error(format!("{} not found", ext_id));
         }
 
         result
@@ -101,13 +105,12 @@ impl RuleEvaluationContext {
 
         let result = self.snapshot.user_trigger(target.clone());
 
+        span.record("otel.name", target.to_string());
         if let Some(trigger) = result {
-            span.record("otel.name", format!("✓ {}", target));
             span.record("trigger_id", trigger.id.to_string());
             span.record("trigger_timestamp", trigger.timestamp.to_iso_string());
             span.record("trigger_elapsed", trigger.timestamp.elapsed().to_iso_string());
-        } else {
-            span.record("otel.name", format!("𐄂 {}", target));
+            TraceContext::for_span(&span).set_ok();
         }
 
         result

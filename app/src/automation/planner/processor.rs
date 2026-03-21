@@ -93,7 +93,7 @@ async fn handle_trigger_updates(
 
 #[tracing::instrument(
     skip_all,
-    fields(action = %context.action, otel.name),
+    fields(action = %context.action, otel.name, locked = tracing::field::Empty),
 )]
 async fn process_action<A: Action>(
     mut context: Context<A>,
@@ -103,7 +103,13 @@ async fn process_action<A: Action>(
     context.trace.correlation_id = TraceContext::current().correlation_id();
 
     //EVALUATION
-    let evaluation_result = evaluate_action(&mut context, &ctx).await;
+    let evaluation_result = match evaluate_action(&mut context, &ctx).await {
+        Ok(result) => result,
+        Err(e) => {
+            TraceContext::current().set_error(e.to_string());
+            return Ok(context);
+        }
+    };
     // Yield so other actions can start evaluating before we attempt to acquire the lock.
     yield_now().await;
 
@@ -111,6 +117,11 @@ async fn process_action<A: Action>(
     let mut resource_lock = context.get_lock().await?;
     let evaluation_result = check_locked(&mut context, evaluation_result, &mut resource_lock);
     context.release_lock(resource_lock).await?;
+
+    tracing::Span::current().record("locked", context.trace.locked);
+    if context.trace.locked {
+        tracing::debug!("Action {} skipped due to resource lock contention", context.action);
+    }
     // Allow the next action to pick up the lock before we start executing commands.
     yield_now().await;
 
@@ -137,26 +148,18 @@ async fn process_action<A: Action>(
         ActionEvaluationResult::Skip => {}
     }
 
-    if context.trace.locked {
-        TraceContext::current().set_span_name(format!("⏸ {}", context.action));
-    } else if context.trace.triggered == Some(true) {
-        TraceContext::current().set_span_name(format!("▶ {}", context.action));
-    } else if context.trace.fulfilled == Some(true) {
-        TraceContext::current().set_span_name(format!("▷ {}", context.action));
-    } else {
-        TraceContext::current().set_span_name(format!("{}", context.action));
+    TraceContext::current().set_span_name(context.action.to_string());
+    if context.trace.triggered == Some(true) {
+        TraceContext::current().set_ok();
     }
 
     Ok(context)
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: &RuleEvaluationContext) -> ActionEvaluationResult {
+async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
     let mut result = if context.goal_active {
-        context.action.evaluate(ctx).unwrap_or_else(|e| {
-            tracing::warn!("Error evaluating action {}, assuming not fulfilled: {:?}", context.action, e);
-            ActionEvaluationResult::Skip
-        })
+        context.action.evaluate(ctx)?
     } else {
         tracing::trace!("Goal {} not active, skipping action {}", context.trace.goal, context.action);
         ActionEvaluationResult::Skip
@@ -175,7 +178,7 @@ async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: &RuleEvaluati
 
     context.trace.fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
 
-    result
+    Ok(result)
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]

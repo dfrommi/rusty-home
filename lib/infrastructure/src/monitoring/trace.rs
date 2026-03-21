@@ -38,6 +38,10 @@ impl TraceContext {
         self.otel_ctx().span().update_name(name);
     }
 
+    pub fn set_ok(&self) {
+        self.otel_ctx().span().set_status(opentelemetry::trace::Status::Ok);
+    }
+
     pub fn set_error(&self, error: impl Into<String>) {
         self.otel_ctx().span().set_status(opentelemetry::trace::Status::Error {
             description: error.into().into(),

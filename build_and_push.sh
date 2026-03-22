@@ -6,10 +6,10 @@ source ./.env
 cargo sqlx migrate run
 cargo sqlx prepare --workspace
 
-cleanup() {
-  colima stop -p x86 || true
-}
-trap cleanup EXIT INT TERM
+# cleanup() {
+#   colima stop -p x86 || true
+# }
+# trap cleanup EXIT INT TERM
 
 colima start -p x86 || true
 

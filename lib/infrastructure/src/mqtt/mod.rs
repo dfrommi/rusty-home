@@ -1,6 +1,7 @@
 mod client;
 mod receiver;
 mod sender;
+mod topic;
 
 pub use client::Mqtt;
 pub use receiver::{MqttInMessage, MqttSubscription};

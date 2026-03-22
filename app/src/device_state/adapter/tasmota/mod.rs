@@ -20,8 +20,6 @@ pub enum TasmotaChannel {
 }
 
 pub struct TasmotaIncomingDataSource {
-    tele_base_topic: String,
-    stat_base_topic: String,
     device_config: DeviceConfig<TasmotaChannel>,
     mqtt_receiver: MqttSubscription,
 }
@@ -30,25 +28,12 @@ impl TasmotaIncomingDataSource {
     #[allow(clippy::expect_used)]
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let config = DeviceConfig::new(&config::default_tasmota_state_config());
-        let tele_base_topic = format!("{}/tele", event_topic);
-        let stat_base_topic = format!("{}/stat", event_topic);
         let rx = mqtt_client
-            .subscribe_all(
-                vec![
-                    format!("{}/+/SENSOR", tele_base_topic),
-                    format!("{}/+/POWER", stat_base_topic),
-                ]
-                .as_slice(),
-            )
+            .subscribe_all(event_topic, &["tele/+/SENSOR", "stat/+/POWER"])
             .await
             .expect("Error subscribing to MQTT topic");
 
-        let tele_base_topic = tele_base_topic.trim_matches('/').to_string();
-        let stat_base_topic = stat_base_topic.trim_matches('/').to_string();
-
         Self {
-            tele_base_topic,
-            stat_base_topic,
             device_config: config,
             mqtt_receiver: rx,
         }
@@ -65,20 +50,14 @@ impl IncomingDataSource<MqttInMessage, TasmotaChannel> for TasmotaIncomingDataSo
     }
 
     fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
-        let topic = &msg.topic;
-
-        if topic.starts_with(self.tele_base_topic.as_str()) {
-            topic
-                .strip_prefix(&self.tele_base_topic)
-                .and_then(|topic| topic.strip_suffix("/SENSOR"))
-        } else if topic.starts_with(self.stat_base_topic.as_str()) {
-            topic
-                .strip_prefix(&self.stat_base_topic)
-                .and_then(|topic| topic.strip_suffix("/POWER"))
+        if let Some(rest) = msg.topic.strip_prefix("tele/") {
+            rest.strip_suffix("/SENSOR")
+        } else if let Some(rest) = msg.topic.strip_prefix("stat/") {
+            rest.strip_suffix("/POWER")
         } else {
             None
         }
-        .map(|topic| topic.trim_matches('/').to_owned())
+        .map(|s| s.to_owned())
     }
 
     fn get_channels(&self, device_id: &str) -> &[TasmotaChannel] {

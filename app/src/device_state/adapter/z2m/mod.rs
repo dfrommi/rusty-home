@@ -24,7 +24,6 @@ pub enum Z2mChannel {
 }
 
 pub struct Z2mIncomingDataSource {
-    base_topic: String,
     device_config: DeviceConfig<Z2mChannel>,
     mqtt_receiver: MqttSubscription,
 }
@@ -34,12 +33,11 @@ impl Z2mIncomingDataSource {
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let config = DeviceConfig::new(&config::default_z2m_state_config());
         let rx = mqtt_client
-            .subscribe(format!("{}/#", event_topic))
+            .subscribe(event_topic, "#")
             .await
             .expect("Error subscribing to MQTT topic");
 
         Self {
-            base_topic: event_topic.trim_matches('/').to_owned(),
             device_config: config,
             mqtt_receiver: rx,
         }
@@ -56,16 +54,12 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
     }
 
     fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
-        let topic = &msg.topic;
-
         //Command topics end with /set and should be ignored. State not yet applied
-        if topic.ends_with("/set") {
+        if msg.topic.ends_with("/set") {
             return None;
         }
 
-        topic
-            .strip_prefix(&self.base_topic)
-            .map(|topic| topic.trim_matches('/').to_owned())
+        Some(msg.topic.clone())
     }
 
     fn get_channels(&self, device_id: &str) -> &[Z2mChannel] {

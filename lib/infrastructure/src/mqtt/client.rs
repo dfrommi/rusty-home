@@ -20,7 +20,8 @@ pub struct Mqtt {
 }
 
 struct MqttSubscriptionHandle {
-    topic: String,
+    subscribed_topic: String,
+    base_topic: String,
     txs: Vec<mpsc::Sender<MqttInMessage>>,
 }
 
@@ -44,16 +45,32 @@ impl Mqtt {
         }
     }
 
-    pub async fn subscribe(&mut self, topic: impl Into<String>) -> anyhow::Result<MqttSubscription> {
-        self.subscribe_all(&[topic.into()]).await
+    pub async fn subscribe(
+        &mut self,
+        base_topic: impl Into<String>,
+        relative_pattern: impl Into<String>,
+    ) -> anyhow::Result<MqttSubscription> {
+        let base_topic = base_topic.into();
+        let relative: String = relative_pattern.into();
+        self.subscribe_all(base_topic, &[relative.as_str()]).await
     }
 
-    pub async fn subscribe_all(&mut self, topic: &[String]) -> anyhow::Result<MqttSubscription> {
+    pub async fn subscribe_all(
+        &mut self,
+        base_topic: impl Into<String>,
+        relative_patterns: &[&str],
+    ) -> anyhow::Result<MqttSubscription> {
+        let base_topic: String = base_topic.into();
+        let full_topics: Vec<String> = relative_patterns
+            .iter()
+            .map(|p| super::topic::join_topic(&base_topic, p))
+            .collect();
+
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
 
-        for topic in topic {
-            if let Some(subscription) = self.subsciptions.iter_mut().find(|s| s.topic == *topic) {
-                tracing::info!("Adding subscription to already exsinging subscription: {:?}", &topic);
+        for topic in &full_topics {
+            if let Some(subscription) = self.subsciptions.iter_mut().find(|s| s.subscribed_topic == *topic) {
+                tracing::info!("Adding subscription to already existing subscription: {:?}", &topic);
 
                 subscription.txs.push(tx.clone());
                 continue;
@@ -62,7 +79,8 @@ impl Mqtt {
             tracing::info!("Creating new subscription for topic: {:?}", &topic);
 
             let subscription = MqttSubscriptionHandle {
-                topic: topic.clone(),
+                subscribed_topic: topic.clone(),
+                base_topic: base_topic.clone(),
                 txs: vec![tx.clone()],
             };
 
@@ -124,18 +142,40 @@ impl Mqtt {
         for id in subscription_ids {
             match self.subsciptions.get(id - 1) {
                 Some(sub) => {
+                    let relative_topic = match super::topic::strip_topic(&sub.base_topic, &mqtt_in_message.topic) {
+                        Some(t) => t.to_string(),
+                        None => {
+                            tracing::warn!(
+                                "Received message on topic '{}' that doesn't match base '{}' for subscription '{}'",
+                                mqtt_in_message.topic,
+                                sub.base_topic,
+                                sub.subscribed_topic
+                            );
+                            continue;
+                        }
+                    };
+
+                    let forwarded_message = MqttInMessage {
+                        topic: relative_topic,
+                        payload: mqtt_in_message.payload.clone(),
+                    };
+
                     for tx in sub.txs.iter() {
                         tracing::trace!(
                             "Forwarding MQTT message to subscriber {} (closed={}): {:?}",
-                            sub.topic,
+                            sub.subscribed_topic,
                             tx.is_closed(),
-                            mqtt_in_message
+                            forwarded_message
                         );
                         if let Err(e) = tx
-                            .send_timeout(mqtt_in_message.clone(), tokio::time::Duration::from_secs(5))
+                            .send_timeout(forwarded_message.clone(), tokio::time::Duration::from_secs(5))
                             .await
                         {
-                            tracing::error!("Failed to forward MQTT message to subscriber {}: {}", sub.topic, e);
+                            tracing::error!(
+                                "Failed to forward MQTT message to subscriber {}: {}",
+                                sub.subscribed_topic,
+                                e
+                            );
                         }
                     }
                 }

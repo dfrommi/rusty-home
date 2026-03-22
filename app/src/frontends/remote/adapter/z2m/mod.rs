@@ -8,7 +8,6 @@ use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 use serde::Deserialize;
 
 pub struct Z2mRemoteIncomingDataSource {
-    base_topic: String,
     device_config: DeviceConfig<RemoteTriggerTarget>,
     mqtt_receiver: MqttSubscription,
 }
@@ -17,12 +16,11 @@ impl Z2mRemoteIncomingDataSource {
     #[allow(clippy::expect_used)]
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let mqtt_receiver = mqtt_client
-            .subscribe(format!("{}/#", event_topic))
+            .subscribe(event_topic, "#")
             .await
             .expect("Error subscribing to MQTT topic");
 
         Self {
-            base_topic: event_topic.trim_matches('/').to_owned(),
             device_config: DeviceConfig::new(&config::default_z2m_remote_config()),
             mqtt_receiver,
         }
@@ -56,9 +54,7 @@ impl Z2mRemoteIncomingDataSource {
             return None;
         }
 
-        msg.topic
-            .strip_prefix(&self.base_topic)
-            .map(|topic| topic.trim_matches('/').to_owned())
+        Some(msg.topic.clone())
     }
 
     fn parse_triggers(

@@ -71,7 +71,7 @@ impl Homekit {
     ) -> HomekitRunner {
         let mqtt_receiver = infrastructure
             .mqtt_client
-            .subscribe(format!("{}/from/set", &self.base_topic))
+            .subscribe(&self.base_topic, "from/set")
             .await
             .expect("Error subscribing to MQTT topic");
 

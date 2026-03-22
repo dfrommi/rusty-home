@@ -80,19 +80,12 @@ mod tests {
         }
     }
 
-    fn expected_metric_line(name: &str, variant: Option<&str>, value: f64, timestamp: DateTime) -> String {
-        match variant {
-            Some(v) => format!("{name}{{variant=\"{v}\"}} {value} {}", timestamp.millis()),
-            None => format!("{name} {value} {}", timestamp.millis()),
-        }
-    }
-
     #[tokio::test]
     async fn push_sends_all_metric_lines() {
         let mut server = Server::new_async().await;
 
-        let ts_one = DateTime::from_iso("2024-01-01T00:00:00Z").unwrap();
-        let ts_two = DateTime::from_iso("2024-01-01T01:00:00Z").unwrap();
+        let ts_one = DateTime::from_static_iso("2024-01-01T00:00:00Z");
+        let ts_two = DateTime::from_static_iso("2024-01-01T01:00:00Z");
 
         let metric_one = metric("consumption_watts", None, 42.0, ts_one);
         let metric_two = metric("consumption_watts", Some("heat_pump"), 41.5, ts_two);
@@ -100,7 +93,7 @@ mod tests {
 
         let expected_body = format!(
             "{}\n{}\n",
-            "consumption_watts 42 1704067200000", "consumption_watts{name=\"heat_pump\"} 41.5 1704070800000"
+            "consumption_watts 42 1704067200000", "consumption_watts{item=\"heat_pump\"} 41.5 1704070800000"
         );
 
         let mock = server

@@ -258,7 +258,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_spring_forward_range_in_gap() {
         // Spring forward: 2:00 AM jumps to 3:00 AM, so 2:15-2:45 doesn't exist
-        let reference = DateTime::from_iso("2025-03-30T12:30:00+02:00").unwrap();
+        let reference = DateTime::from_static_iso("2025-03-30T12:30:00+02:00");
         let range = t!(02:15 - 02:45).active_or_previous_at(reference);
 
         // Both 2:15 and 2:45 get adjusted to 3:00
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_spring_forward_range_ends_in_gap() {
         // Range starts before gap, ends in gap: 1:30-2:30
-        let reference = DateTime::from_iso("2025-03-30T12:30:00+02:00").unwrap();
+        let reference = DateTime::from_static_iso("2025-03-30T12:30:00+02:00");
         let range = t!(01:30 - 02:30).active_or_previous_at(reference);
 
         // Start: 1:30 (exists), End: 2:30 -> 3:00 (adjusted)
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_spring_forward_cross_midnight_ends_in_gap() {
         // Cross-midnight range ending in DST gap: 23:30-2:30
-        let reference = DateTime::from_iso("2025-03-30T12:30:00+02:00").unwrap();
+        let reference = DateTime::from_static_iso("2025-03-30T12:30:00+02:00");
         let range = t!(23:30 - 02:30).active_or_previous_at(reference);
 
         // DST handling should produce a valid range where start < end
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_fall_back_range_in_ambiguous() {
         // Fall back: 3:00 AM falls back to 2:00 AM, so 2:15-2:45 exists twice
-        let reference = DateTime::from_iso("2024-10-27T12:30:00+01:00").unwrap();
+        let reference = DateTime::from_static_iso("2024-10-27T12:30:00+01:00");
         let range = t!(02:15 - 02:45).active_or_previous_at(reference);
 
         // Should choose earlier occurrence (before the clock falls back)
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_fall_back_range_ends_in_ambiguous() {
         // Range starts before ambiguous time, ends in it: 1:30-2:30
-        let reference = DateTime::from_iso("2024-10-27T12:30:00+01:00").unwrap();
+        let reference = DateTime::from_static_iso("2024-10-27T12:30:00+01:00");
         let range = t!(01:30 - 02:30).active_or_previous_at(reference);
 
         // Start: 1:30 (unambiguous), End: 2:30 (ambiguous, should pick earlier)
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_fall_back_cross_midnight_ends_in_ambiguous() {
         // Cross-midnight range ending in ambiguous time: 23:30-2:30
-        let reference = DateTime::from_iso("2024-10-27T12:30:00+01:00").unwrap();
+        let reference = DateTime::from_static_iso("2024-10-27T12:30:00+01:00");
         let range = t!(23:30 - 02:30).active_or_previous_at(reference);
 
         // DST handling should produce a valid range where start < end
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_normal_day_with_230() {
         // Normal day (no DST) with 2:30 end time for comparison
-        let reference = DateTime::from_iso("2024-06-15T12:30:00+02:00").unwrap();
+        let reference = DateTime::from_static_iso("2024-06-15T12:30:00+02:00");
         let range = t!(01:30 - 02:30).active_or_previous_at(reference);
 
         // Should work normally without any DST adjustments
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_spring_forward_during_range() {
         // Reference time is DURING the cross-midnight range (1 AM)
-        let reference = DateTime::from_iso("2025-03-30T01:00:00+01:00").unwrap();
+        let reference = DateTime::from_static_iso("2025-03-30T01:00:00+01:00");
         let range = t!(23:30 - 02:30).active_or_previous_at(reference);
 
         // Should get a valid range that covers the reference time
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn test_active_or_previous_dst_fall_back_during_range() {
         // Reference time is DURING the cross-midnight range (1 AM)
-        let reference = DateTime::from_iso("2024-10-27T01:00:00+02:00").unwrap();
+        let reference = DateTime::from_static_iso("2024-10-27T01:00:00+02:00");
         let range = t!(23:30 - 02:30).active_or_previous_at(reference);
 
         // Should get a valid range that covers the reference time
@@ -386,17 +386,17 @@ mod tests {
     #[test]
     fn test_chunked() {
         let range = DateTimeRange::new(
-            DateTime::from_iso("2024-01-01T10:00:00Z").unwrap(),
-            DateTime::from_iso("2024-01-01T12:30:00Z").unwrap(),
+            DateTime::from_static_iso("2024-01-01T10:00:00Z"),
+            DateTime::from_static_iso("2024-01-01T12:30:00Z"),
         );
         let chunks = range.chunked(t!(60 minutes));
 
         assert_eq!(chunks.len(), 3);
-        assert_eq!(chunks[0].start(), &DateTime::from_iso("2024-01-01T10:00:00Z").unwrap());
-        assert_eq!(chunks[0].end(), &DateTime::from_iso("2024-01-01T11:00:00Z").unwrap());
-        assert_eq!(chunks[1].start(), &DateTime::from_iso("2024-01-01T11:00:00Z").unwrap());
-        assert_eq!(chunks[1].end(), &DateTime::from_iso("2024-01-01T12:00:00Z").unwrap());
-        assert_eq!(chunks[2].start(), &DateTime::from_iso("2024-01-01T12:00:00Z").unwrap());
-        assert_eq!(chunks[2].end(), &DateTime::from_iso("2024-01-01T12:30:00Z").unwrap());
+        assert_eq!(chunks[0].start(), &DateTime::from_static_iso("2024-01-01T10:00:00Z"));
+        assert_eq!(chunks[0].end(), &DateTime::from_static_iso("2024-01-01T11:00:00Z"));
+        assert_eq!(chunks[1].start(), &DateTime::from_static_iso("2024-01-01T11:00:00Z"));
+        assert_eq!(chunks[1].end(), &DateTime::from_static_iso("2024-01-01T12:00:00Z"));
+        assert_eq!(chunks[2].start(), &DateTime::from_static_iso("2024-01-01T12:00:00Z"));
+        assert_eq!(chunks[2].end(), &DateTime::from_static_iso("2024-01-01T12:30:00Z"));
     }
 }

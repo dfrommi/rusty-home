@@ -51,39 +51,3 @@ pub struct Zigbee2MqttSettings {
 pub struct MetricsExportSettings {
     pub victoria_url: String,
 }
-
-#[cfg(test)]
-pub mod test {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[derive(Debug, Deserialize)]
-    pub struct TestSettings {
-        pub live_database: DatabaseConfig,
-    }
-
-    impl TestSettings {
-        pub fn load() -> Result<Self, ConfigError> {
-            let source = match find_file_upwards("test.toml") {
-                Some(p) => File::from(p),
-                None => return Err(ConfigError::NotFound("test.toml".to_owned())),
-            };
-
-            Config::builder().add_source(source).build()?.try_deserialize()
-        }
-    }
-
-    fn find_file_upwards(file_name: &str) -> Option<PathBuf> {
-        let current_dir = std::env::current_dir().ok()?;
-
-        // Iterate over ancestors, starting from the current directory
-        for dir in current_dir.ancestors() {
-            let file_path = dir.join(file_name);
-            if file_path.exists() {
-                return Some(file_path);
-            }
-        }
-
-        None
-    }
-}

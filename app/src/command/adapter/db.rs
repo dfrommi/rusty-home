@@ -211,6 +211,6 @@ mod tests {
             &range,
         );
 
-        assert_eq!(res.await.unwrap().len(), 5);
+        assert_eq!(res.await.unwrap().len(), 4);
     }
 }

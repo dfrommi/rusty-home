@@ -32,7 +32,10 @@ impl EnergySavingSwitch {
         if trigger.target == self.homekit_target() {
             if let Some(is_on) = trigger.value.as_bool() {
                 let energy_saving = !is_on;
-                return Some(UserTrigger::DevicePower { device: OnOffDevice::LivingRoomTvEnergySaving, on: energy_saving });
+                return Some(UserTrigger::DevicePower {
+                    device: OnOffDevice::LivingRoomTvEnergySaving,
+                    on: energy_saving,
+                });
             }
 
             tracing::warn!("EnergySavingSwitch {} received invalid payload: {}", self.name, trigger.value);

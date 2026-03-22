@@ -157,7 +157,10 @@ async fn process_action<A: Action>(
 }
 
 #[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<A: Action>(context: &mut Context<A>, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
+async fn evaluate_action<A: Action>(
+    context: &mut Context<A>,
+    ctx: &RuleEvaluationContext,
+) -> Result<ActionEvaluationResult> {
     let mut result = if context.goal_active {
         context.action.evaluate(ctx)?
     } else {

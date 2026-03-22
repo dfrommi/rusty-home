@@ -11,11 +11,7 @@ use self::{
     hap::{HomekitCharacteristic, HomekitService},
     runtime::HomekitRunner,
 };
-use crate::{
-    Infrastructure,
-    home_state::HomeStateEvent,
-    trigger::TriggerClient,
-};
+use crate::{Infrastructure, home_state::HomeStateEvent, trigger::TriggerClient};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct HomekitTarget {

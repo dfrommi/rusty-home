@@ -1,6 +1,6 @@
 use crate::{
-    core::domain::HeatingZone,
     command::{Command, HeatingTargetState},
+    core::domain::HeatingZone,
     core::unit::DegreeCelsius,
     home_state::{HeatingDemandLimit, HeatingMode, SetPoint, TargetHeatingMode},
 };

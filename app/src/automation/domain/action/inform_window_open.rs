@@ -1,8 +1,8 @@
 use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::core::domain::RoomWithWindow;
 use crate::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
+use crate::core::domain::RoomWithWindow;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::home_state::Presence;

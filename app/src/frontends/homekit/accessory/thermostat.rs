@@ -191,7 +191,10 @@ impl Thermostat {
     }
 
     fn zone_trigger(&self, request: HeatingRequest) -> UserTrigger {
-        UserTrigger::Heating { zone: self.zone, request }
+        UserTrigger::Heating {
+            zone: self.zone,
+            request,
+        }
     }
 
     fn target_state_event(&self) -> Option<HomekitEvent> {

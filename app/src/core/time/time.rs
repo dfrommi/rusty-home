@@ -62,7 +62,10 @@ impl Time {
         let minutes = (wrapped_seconds % 3600) / 60;
         let secs = wrapped_seconds % 60;
 
-        Self::new(chrono::NaiveTime::from_hms_opt(hours, minutes, secs).expect("h/m/s values derived from modular arithmetic are always valid"))
+        Self::new(
+            chrono::NaiveTime::from_hms_opt(hours, minutes, secs)
+                .expect("h/m/s values derived from modular arithmetic are always valid"),
+        )
     }
 }
 

@@ -1,8 +1,8 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::core::domain::{Radiator, Room, RoomWithWindow};
 use crate::command::{Command, Fan};
+use crate::core::domain::{Radiator, Room, RoomWithWindow};
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed};
 use crate::home_state::{FanActivity, Temperature};

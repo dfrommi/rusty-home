@@ -7,9 +7,9 @@ use crate::{
     },
     command::{CommandTarget, Fan, PowerToggle},
     core::{domain::Room, unit::DegreeCelsius},
+    home_state::FanActivity,
     home_state::{Resident, Temperature},
     t,
-    home_state::FanActivity,
     trigger::{OnOffDevice, UserTriggerTarget},
 };
 

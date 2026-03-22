@@ -357,7 +357,10 @@ impl Fan {
 
         self.status.apply_state(airflow.clone(), &self.config);
 
-        Some(UserTrigger::FanSpeed { fan: self.activity, airflow })
+        Some(UserTrigger::FanSpeed {
+            fan: self.activity,
+            airflow,
+        })
     }
 }
 

@@ -48,7 +48,10 @@ impl PowerSwitch {
                     return None;
                 }
             };
-            return Some(UserTrigger::DevicePower { device: on_off_device, on: is_on });
+            return Some(UserTrigger::DevicePower {
+                device: on_off_device,
+                on: is_on,
+            });
         }
 
         None

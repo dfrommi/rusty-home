@@ -2,8 +2,8 @@ mod config;
 
 use std::collections::HashMap;
 
-use crate::core::domain::Radiator;
 use crate::core::DeviceConfig;
+use crate::core::domain::Radiator;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};

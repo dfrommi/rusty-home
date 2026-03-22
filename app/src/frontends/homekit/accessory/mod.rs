@@ -2,8 +2,8 @@ use crate::core::domain::RoomWithWindow;
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
 use crate::trigger::{Door, UserTrigger};
 use crate::{
-    core::domain::{HeatingZone, Room},
     command::PowerToggle,
+    core::domain::{HeatingZone, Room},
     frontends::homekit::{
         HomekitEvent, HomekitTargetConfig,
         accessory::{

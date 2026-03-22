@@ -1,7 +1,7 @@
 use super::{RuleEvaluationContext, SimpleRule};
 use crate::{
-    core::domain::{HeatingZone, Room, RoomWithWindow},
     command::{Command, Fan, PowerToggle},
+    core::domain::{HeatingZone, Room, RoomWithWindow},
     core::unit::{
         DegreeCelsius,
         FanAirflow::Forward,

@@ -1,6 +1,6 @@
 use super::Z2mCommandTarget;
-use crate::core::domain::Radiator;
 use crate::command::{CommandTarget, PowerToggle};
+use crate::core::domain::Radiator;
 
 pub fn default_z2m_command_config() -> Vec<(CommandTarget, Z2mCommandTarget)> {
     vec![

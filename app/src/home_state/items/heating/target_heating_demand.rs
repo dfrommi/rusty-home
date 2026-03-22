@@ -1,13 +1,13 @@
 use crate::{
     core::domain::Radiator,
     core::{
-        time::{DateTime, Duration},
+        time::DateTime,
         timeseries::{DataFrame, DataPoint},
-        unit::{DegreeCelsius, Percent, RateOfChange},
+        unit::Percent,
     },
     home_state::{
         AdjustmentDirection, HeatingDemand, HeatingDemandLimit, HeatingMode, TargetHeatingAdjustment,
-        TargetHeatingMode, TemperatureChange,
+        TargetHeatingMode,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
     t,
@@ -45,11 +45,6 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             last_change_time.max(t!(30 minutes ago)),
         )?;
         let barely_warm_output = ctx.get(HeatingDemand::BarelyWarmSurface(radiator))?.value;
-        let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;
-        let coldstart_delay = match (&mode.value, &radiator) {
-            (_, Radiator::LivingRoomSmall) => Some(t!(20 minutes)),
-            _ => None,
-        };
 
         let is_heating_now = ctx
             .get(radiator.current_heating_demand())
@@ -64,8 +59,6 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             is_heating_now,
             recent_ventilation_finished,
             barely_warm_output,
-            radiator_roc,
-            coldstart_delay,
             reference_demand,
         )
     }
@@ -78,8 +71,6 @@ fn combined_demand(
     is_heating_now: bool,
     recent_ventilation_finished: Option<DateTime>,
     barely_warm_output: Percent,
-    radiator_roc: RateOfChange<DegreeCelsius>,
-    coldstart_delay: Option<Duration>,
     reference_demand: DataPoint<Percent>,
 ) -> Option<Percent> {
     let adjustment = adjustments.last()?.value.clone();
@@ -111,25 +102,6 @@ fn combined_demand(
             return Some(Percent(0.0));
         }
     }
-
-    //Not heating currently, but heat is requested. Wait until delay passed
-    //Used for rooms with 2 radiators to not always turn on both at the same time
-    //TODO this will not work now with setpoint-based control
-    // if let Some(coldstart_delay) = coldstart_delay {
-    //     let heat_requested_since = adjustments
-    //         .fulfilled_since(|dp| dp.value > AdjustmentDirection::Hold)
-    //         .map(|dp| dp.timestamp);
-    //     if !is_heating_now && heat_requested_since.is_some_and(|since| since.elapsed() < coldstart_delay) {
-    //         return Some(Percent(0.0));
-    //     }
-    // }
-
-    //Heating present, but temperature on radiator still dropping -> not enough open to release heat
-    //Heat up to produce heat again
-    //TODO triggers during post_ventilation due to significant temperature drop
-    // if heating_but_no_effect(is_heating_now, &radiator_roc) && adjustment <= AdjustmentDirection::Hold {
-    //     return Some(limits.clamp(reference_demand.value + limits.step));
-    // }
 
     //Don't skip on mode change
     if !adjustment_needed(&adjustments, &reference_demand.timestamp, &mode) {
@@ -251,10 +223,4 @@ fn adjustment_needed(
     tracing::debug!("No new adjustment needed since last change.");
 
     false
-}
-
-//TODO min elapsed
-//TODO clamp to last mode change to avoid issue in post-ventilation
-fn heating_but_no_effect(is_heating_now: bool, radiator_roc: &RateOfChange<DegreeCelsius>) -> bool {
-    is_heating_now && radiator_roc.per_hour() < DegreeCelsius(-2.0)
 }

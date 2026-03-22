@@ -90,14 +90,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // FAN SPEED
         //
         (
-            "fan.ceiling_fan_living_room",
-            HaChannel::WindcalmFanSpeed(FanActivity::LivingRoomCeilingFan),
-        ),
-        (
-            "fan.ceiling_fan_bedroom",
-            HaChannel::WindcalmFanSpeed(FanActivity::BedroomCeilingFan),
-        ),
-        (
             "fan.dehumidifier_34e8_fan",
             HaChannel::ComfeeDehumidifierFanSpeed(FanActivity::BedroomDehumidifier),
         ),

@@ -27,6 +27,7 @@ pub struct TasmotaIncomingDataSource {
 }
 
 impl TasmotaIncomingDataSource {
+    #[allow(clippy::expect_used)]
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let config = DeviceConfig::new(&config::default_tasmota_state_config());
         let tele_base_topic = format!("{}/tele", event_topic);

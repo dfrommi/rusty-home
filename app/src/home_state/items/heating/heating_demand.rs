@@ -9,7 +9,6 @@ use crate::{
     home_state::{
         HeatingDemandLimit, SetPoint, Temperature,
         calc::{DerivedStateProvider, StateCalculationContext},
-        items::from_iso,
     },
     t,
 };
@@ -26,7 +25,7 @@ pub struct HeatingDemandStateProvider;
 impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider {
     fn calculate_current(&self, id: HeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
         match id {
-            HeatingDemand::Radiator(radiator) if from_iso("2026-02-08T16:08:00+01:00").is_passed() => {
+            HeatingDemand::Radiator(radiator) if DateTime::from_static_iso("2026-02-08T16:08:00+01:00").is_passed() => {
                 let setpoint_range = ctx.get(SetPoint::Current(radiator))?;
                 let is_heating = guess_is_heating_from_hyserisis(
                     ctx.get(SetPoint::Current(radiator))?,

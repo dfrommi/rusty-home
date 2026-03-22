@@ -75,7 +75,7 @@ impl From<&Command> for CommandTarget {
     fn from(val: &Command) -> Self {
         match val {
             Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
-            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: device.clone() },
+            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: *device },
             Command::PushNotify {
                 recipient,
                 notification,

@@ -6,7 +6,6 @@ use infrastructure::{EventListener, MqttSender};
 use tracing::Level;
 
 pub struct Z2mSensorSyncRunner {
-    sender: MqttSender,
     sonoff_devices: Vec<SonoffThermostatExtTempSync>,
     home_state_events: EventListener<HomeStateEvent>,
 }
@@ -19,7 +18,6 @@ impl Z2mSensorSyncRunner {
         }
 
         Self {
-            sender: mqtt_sender,
             sonoff_devices,
             home_state_events,
         }

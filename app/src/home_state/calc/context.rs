@@ -136,10 +136,6 @@ impl StateCalculationContext {
         }
     }
 
-    pub fn timestamp(&self) -> DateTime {
-        self.start_time
-    }
-
     #[tracing::instrument(name = "load_all_home_states", skip(self))]
     pub fn load_all(&self) {
         for id in HomeStateId::variants().iter() {
@@ -180,6 +176,7 @@ impl StateCalculationContext {
         }
     }
 
+    #[allow(clippy::expect_used)]
     pub fn all_since<S>(&self, id: S, since: DateTime) -> Option<DataFrame<S::Type>>
     where
         S: Into<HomeStateId> + HomeStateItem + Clone,

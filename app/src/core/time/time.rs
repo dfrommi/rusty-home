@@ -41,13 +41,15 @@ impl Time {
         self.delegate.minute()
     }
 
+    #[allow(clippy::expect_used)]
     pub fn add_minutes(&self, minutes: u32) -> Self {
         let total_minutes = (self.delegate.hour() * 60 + self.delegate.minute() + minutes) % (24 * 60);
         let new_hour = total_minutes / 60;
         let new_minute = total_minutes % 60;
-        Self::at(new_hour, new_minute).unwrap()
+        Self::at(new_hour, new_minute).expect("Time values derived from modular arithmetic are always valid")
     }
 
+    #[allow(clippy::expect_used)]
     fn add_seconds(&self, seconds: i64) -> Self {
         let current_seconds = self.delegate.num_seconds_from_midnight() as i64;
         let total_seconds = current_seconds + seconds;
@@ -60,7 +62,7 @@ impl Time {
         let minutes = (wrapped_seconds % 3600) / 60;
         let secs = wrapped_seconds % 60;
 
-        Self::new(chrono::NaiveTime::from_hms_opt(hours, minutes, secs).unwrap())
+        Self::new(chrono::NaiveTime::from_hms_opt(hours, minutes, secs).expect("h/m/s values derived from modular arithmetic are always valid"))
     }
 }
 

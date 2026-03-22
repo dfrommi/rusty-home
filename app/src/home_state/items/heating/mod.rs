@@ -22,6 +22,7 @@ use crate::{
 };
 
 struct HeatingAdjustmentStrategy {
+    #[allow(dead_code)] //offloaded for now to the device, but keep it for now as algos will change
     min: DegreeCelsius,
     max: DegreeCelsius,
     min_heatup: Option<RateOfChange<DegreeCelsius>>,

@@ -23,18 +23,6 @@ pub use probability::Probability;
 pub use probability::p;
 pub use watt::Watt;
 
-macro_rules! v {
-    ($x:literal C) => {
-        DegreeCelsius($x as f64)
-    };
-    ($x:literal %) => {
-        Percent($x as f64)
-    };
-}
-
-const C: DegreeCelsius = DegreeCelsius(1.0);
-const PCT: Percent = Percent(1.0);
-
 impl std::ops::Mul<DegreeCelsius> for usize {
     type Output = DegreeCelsius;
 
@@ -54,6 +42,18 @@ impl std::ops::Mul<Percent> for usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! v {
+        ($x:literal C) => {
+            DegreeCelsius($x as f64)
+        };
+        ($x:literal %) => {
+            Percent($x as f64)
+        };
+    }
+
+    const C: DegreeCelsius = DegreeCelsius(1.0);
+    const PCT: Percent = Percent(1.0);
 
     #[test]
     fn test_degree_celsius() {

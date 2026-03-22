@@ -87,8 +87,8 @@ impl EnergyReadingRepository {
 fn try_into_reading(type_: &str, name: &str, value: f64) -> anyhow::Result<EnergyReading> {
     match type_ {
         "heating" => Ok(EnergyReading::Heating(name.try_into()?, value)),
-        "cold_water" => Ok(EnergyReading::ColdWater(name.try_into().unwrap(), value)),
-        "hot_water" => Ok(EnergyReading::HotWater(name.try_into().unwrap(), value)),
+        "cold_water" => Ok(EnergyReading::ColdWater(name.try_into()?, value)),
+        "hot_water" => Ok(EnergyReading::HotWater(name.try_into()?, value)),
         _ => Err(anyhow::anyhow!("Received unsupported energy reading type {}", type_)),
     }
 }

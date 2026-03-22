@@ -188,6 +188,7 @@ impl HomekitRunner {
             })
     }
 
+    #[allow(clippy::expect_used)]
     fn service_registration_payload(
         name: String,
         service: HomekitService,

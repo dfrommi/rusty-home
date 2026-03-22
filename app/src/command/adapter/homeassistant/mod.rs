@@ -6,7 +6,7 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use super::metrics::*;
 use crate::command::adapter::CommandExecutor;
-use crate::command::{Command, CommandTarget, Fan};
+use crate::command::{Command, CommandTarget};
 use crate::core::unit::{FanAirflow, FanSpeed};
 use serde_json::json;
 
@@ -29,6 +29,7 @@ pub struct HomeAssistantCommandExecutor {
 }
 
 impl HomeAssistantCommandExecutor {
+    #[allow(clippy::expect_used)]
     pub fn new(url: &str, token: &str) -> Self {
         let http_client = HaHttpClient::new(url, token).expect("Error initializing Home Assistant REST client");
 
@@ -56,11 +57,9 @@ impl CommandExecutor for HomeAssistantCommandExecutor {
             .iter()
             .find_map(|(cmd, ha)| if cmd == &command_target { Some(ha) } else { None });
 
-        if ha_target.is_none() {
+        let Some(ha_target) = ha_target else {
             return Ok(false);
-        }
-
-        let ha_target = ha_target.unwrap();
+        };
 
         self.dispatch_service_call(command, ha_target).await.map(|_| true)
     }
@@ -90,9 +89,7 @@ impl HomeAssistantCommandExecutor {
                 },
             ) => self.dismiss_window_opened_notification(mobile_id).await,
             (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => self.lg_tv_energy_saving_mode(id, *on).await,
-            (WindcalmFanSpeed(id), Command::ControlFan { device, speed }) => {
-                self.windcalm_fan_speed(id, device, speed).await
-            }
+            (WindcalmFanSpeed(id), Command::ControlFan { speed, .. }) => self.windcalm_fan_speed(id, speed).await,
             (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
                 self.comfee_fan_speed(humidifier_id, fan_id, speed).await
             }
@@ -128,7 +125,7 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    async fn windcalm_fan_speed(&self, id: &str, fan: &Fan, airflow: &FanAirflow) -> anyhow::Result<()> {
+    async fn windcalm_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
         fn to_percent(fan_speed: &FanSpeed) -> usize {
             match fan_speed {
                 FanSpeed::Silent => 1,

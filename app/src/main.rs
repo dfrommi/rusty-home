@@ -22,6 +22,7 @@ struct Infrastructure {
 }
 
 #[tokio::main(flavor = "multi_thread")]
+#[allow(clippy::expect_used)]
 pub async fn main() {
     let settings = Settings::new().expect("Error reading configuration");
 
@@ -151,6 +152,7 @@ pub async fn main() {
 }
 
 impl Infrastructure {
+    #[allow(clippy::expect_used)]
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
         settings.monitoring.init().expect("Error initializing monitoring");
 

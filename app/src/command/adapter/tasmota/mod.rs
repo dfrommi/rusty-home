@@ -37,11 +37,11 @@ impl CommandExecutor for TasmotaCommandExecutor {
             .iter()
             .find_map(|(cmd, tasmota)| if cmd == &cmd_target { Some(tasmota) } else { None });
 
-        if tasmota_target.is_none() {
+        let Some(tasmota_target) = tasmota_target else {
             return Ok(false);
-        }
+        };
 
-        match (command, tasmota_target.unwrap()) {
+        match (command, tasmota_target) {
             (Command::SetPower { power_on, .. }, TasmotaCommandTarget::PowerSwitch(device_id)) => {
                 self.sender
                     .send_transient(

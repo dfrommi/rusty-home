@@ -4,7 +4,13 @@ mod sync;
 pub use sync::Z2mSensorSyncRunner;
 
 use crate::{
-    command::{Command, CommandTarget, HeatingTargetState, adapter::CommandExecutor},
+    command::{
+        Command, CommandTarget, HeatingTargetState,
+        adapter::{
+            CommandExecutor,
+            metrics::{CommandMetric, CommandTargetSystem},
+        },
+    },
     core::math::round_to_one_decimal,
 };
 use infrastructure::MqttSender;
@@ -44,22 +50,32 @@ impl CommandExecutor for Z2mCommandExecutor {
             return Ok(false);
         };
 
-        match (command, z2m_target) {
+        let device_id = match (command, z2m_target) {
             (Command::SetPower { power_on, .. }, Z2mCommandTarget::PowerPlug(device_id)) => {
-                self.set_power_state(device_id, *power_on).await
+                self.set_power_state(device_id, *power_on).await?;
+                device_id
             }
             (Command::SetHeating { target_state, .. }, Z2mCommandTarget::SonoffThermostat(device_id)) => {
-                self.set_sonoff_heating(device_id, target_state.clone()).await
+                self.set_sonoff_heating(device_id, target_state.clone()).await?;
+                device_id
             }
             (_, z2m_target) => {
                 anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
             }
+        };
+
+        CommandMetric::Executed {
+            device_id: device_id.to_string(),
+            system: CommandTargetSystem::Z2M,
         }
+        .record();
+
+        Ok(true)
     }
 }
 
 impl Z2mCommandExecutor {
-    pub async fn set_sonoff_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<bool> {
+    pub async fn set_sonoff_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<()> {
         let set_topic = format!("{}/set", device_id);
 
         match state {
@@ -78,7 +94,7 @@ impl Z2mCommandExecutor {
                     )
                     .await?;
 
-                Ok(true)
+                Ok(())
             }
             HeatingTargetState::Heat {
                 target_temperature,
@@ -101,12 +117,12 @@ impl Z2mCommandExecutor {
                     )
                     .await?;
 
-                Ok(true)
+                Ok(())
             }
         }
     }
 
-    pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<bool> {
+    pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<()> {
         let set_topic = format!("{}/set", device_id);
         let power_state = if power_on { "ON" } else { "OFF" };
 
@@ -120,7 +136,7 @@ impl Z2mCommandExecutor {
             )
             .await?;
 
-        Ok(true)
+        Ok(())
     }
 }
 

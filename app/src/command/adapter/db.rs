@@ -85,6 +85,7 @@ impl CommandRepository {
         .map_err(Into::into)
     }
 
+    #[allow(clippy::expect_used)]
     pub async fn query_all_commands(
         &self,
         target: Option<CommandTarget>,
@@ -129,7 +130,7 @@ impl CommandRepository {
                         id: row.id,
                         command,
                         state: CommandState::from((row.status, row.error)),
-                        created: row.created.unwrap().into(),
+                        created: row.created.expect("created timestamp is always set in the database").into(),
                         source,
                         user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
                         correlation_id: row.correlation_id.map(|id| id.into()),

@@ -141,11 +141,11 @@ impl DateTimeRange {
 
     pub fn chunked(&self, chunk_duration: Duration) -> Vec<DateTimeRange> {
         let mut chunks = Vec::new();
-        let mut current_start = self.start.clone();
+        let mut current_start = self.start;
 
         while current_start < self.end {
-            let current_end = (current_start.clone() + chunk_duration.clone()).min(self.end.clone());
-            chunks.push(DateTimeRange::new(current_start.clone(), current_end.clone()));
+            let current_end = (current_start + chunk_duration.clone()).min(self.end);
+            chunks.push(DateTimeRange::new(current_start, current_end));
             current_start = current_end;
         }
 

@@ -72,7 +72,7 @@ impl Duration {
         from_chrono_duration(&self.delegate).to_string()
     }
 
-    pub fn into_db(&self) -> chrono::Duration {
+    pub fn into_db(self) -> chrono::Duration {
         self.delegate
     }
 }

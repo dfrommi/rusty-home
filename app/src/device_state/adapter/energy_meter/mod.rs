@@ -54,7 +54,7 @@ impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingData
                     Ok(id) => Some(EnergyReadingAddedEvent { id }),
                     Err(e) => {
                         tracing::error!("Error saving Energy Reading: {:?}", e);
-                        return None;
+                        None
                     }
                 },
                 None => None,

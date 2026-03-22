@@ -30,6 +30,7 @@ pub struct Z2mIncomingDataSource {
 }
 
 impl Z2mIncomingDataSource {
+    #[allow(clippy::expect_used)]
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let config = DeviceConfig::new(&config::default_z2m_state_config());
         let rx = mqtt_client

@@ -55,7 +55,7 @@ impl InformWindowOpen {
 
         let cold_air_coming_in = ColdAirComingIn::variants()
             .iter()
-            .map(|item| ctx.current_dp(item.clone()))
+            .map(|item| ctx.current_dp(*item))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(should_send_push_notification(cold_air_coming_in, at_home))
@@ -65,7 +65,7 @@ impl InformWindowOpen {
         let cold_air_coming_in = ColdAirComingIn::variants()
             .iter()
             .filter(|&it| it != &ColdAirComingIn::Room(RoomWithWindow::LivingRoom))
-            .map(|item| ctx.current_dp(item.clone()))
+            .map(|item| ctx.current_dp(*item))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(should_turn_on_light(cold_air_coming_in))

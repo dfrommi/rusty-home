@@ -44,9 +44,6 @@ enum GrafanaApiError {
 
     #[display("Internal error")]
     InternalError(anyhow::Error),
-
-    #[display("Not found")]
-    NotFound,
 }
 
 impl ResponseError for GrafanaApiError {
@@ -56,8 +53,9 @@ impl ResponseError for GrafanaApiError {
         tracing::warn!("GrafanaApiError: {:?}", self);
 
         match self {
-            GrafanaApiError::NotFound => StatusCode::NOT_FOUND,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
+            GrafanaApiError::DataAccessError(_) | GrafanaApiError::InternalError(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 }
@@ -65,6 +63,7 @@ impl ResponseError for GrafanaApiError {
 /// To be used like this:
 /// `#[serde(deserialize_with = "empty_string_as_none")]`
 /// Relevant serde issue: <https://github.com/serde-rs/serde/issues/1425>
+#[allow(dead_code)]
 fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,

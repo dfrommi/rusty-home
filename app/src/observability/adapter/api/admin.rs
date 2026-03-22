@@ -44,8 +44,7 @@ struct BackfillTimeRangeQuery {
 
 impl BackfillTimeRangeQuery {
     fn to_range(&self) -> DateTimeRange {
-        //TODO find solution for const timestamps / check at compile time?
-        let absolute_min = DateTime::from_iso("2023-10-01T12:00:00+02:00").expect("Invalid ISO datetime in backfill");
+        let absolute_min = DateTime::from_static_iso("2023-10-01T12:00:00+02:00");
         let now = t!(now);
 
         let min_dt = self.start.unwrap_or(absolute_min).max(absolute_min);

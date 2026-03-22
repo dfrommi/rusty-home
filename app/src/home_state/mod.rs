@@ -76,6 +76,7 @@ impl HomeStateModule {
         }
     }
 
+    #[allow(clippy::expect_used)]
     pub async fn run(mut self) {
         use tokio::time::{self, Duration, Instant};
 

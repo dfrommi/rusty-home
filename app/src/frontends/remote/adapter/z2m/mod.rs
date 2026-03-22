@@ -14,6 +14,7 @@ pub struct Z2mRemoteIncomingDataSource {
 }
 
 impl Z2mRemoteIncomingDataSource {
+    #[allow(clippy::expect_used)]
     pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
         let mqtt_receiver = mqtt_client
             .subscribe(format!("{}/#", event_topic))

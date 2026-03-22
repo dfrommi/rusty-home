@@ -33,6 +33,7 @@ impl StateSnapshot {
         self.inner.timestamp()
     }
 
+    #[allow(clippy::expect_used)]
     pub fn get<S>(&self, id: S) -> Option<DataPoint<S::Type>>
     where
         S: Into<HomeStateId> + HomeStateItem + Clone,

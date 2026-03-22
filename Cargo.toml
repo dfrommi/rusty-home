@@ -6,6 +6,8 @@ resolver = "2"
 disallowed_methods = "deny"
 unwrap_used = "warn"
 expect_used = "warn"
+enum_variant_names = "allow"
+too_many_arguments = "allow"
 
 [workspace.dependencies]
 #Core dependencies

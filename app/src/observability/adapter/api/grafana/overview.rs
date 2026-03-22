@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
-use infrastructure::{CorrelationId, TraceContext};
+use infrastructure::CorrelationId;
 
 use crate::command::{Command, CommandClient};
 use crate::device_state::{DeviceStateClient, DeviceStateId};

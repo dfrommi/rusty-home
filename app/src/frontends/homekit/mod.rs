@@ -3,8 +3,7 @@ mod hap;
 mod runtime;
 
 use infrastructure::EventListener;
-use r#macro::{EnumVariants, Id};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 use self::{
@@ -14,7 +13,6 @@ use self::{
 };
 use crate::{
     Infrastructure,
-    core::unit::{DegreeCelsius, FanAirflow, Percent},
     home_state::HomeStateEvent,
     trigger::TriggerClient,
 };
@@ -68,6 +66,7 @@ pub struct Homekit {
 }
 
 impl Homekit {
+    #[allow(clippy::expect_used)]
     pub async fn new_runner(
         &self,
         infrastructure: &mut Infrastructure,

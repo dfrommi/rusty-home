@@ -130,6 +130,7 @@ impl DeviceStateRepository {
         Ok(dps)
     }
 
+    #[allow(clippy::expect_used)]
     pub async fn update_device_availability(
         &self,
         device_id: &str,
@@ -146,7 +147,7 @@ impl DeviceStateRepository {
             last_seen.into_db(),
             offline,
             //TODO should just work via chrono::Duration, but doesn't
-            PgInterval::try_from(t!(1 hours).into_db()).unwrap(),
+            PgInterval::try_from(t!(1 hours).into_db()).expect("PgInterval conversion of hardcoded 1-hour duration cannot fail"),
             t!(now).into_db(),
         )
         .execute(&self.pool)

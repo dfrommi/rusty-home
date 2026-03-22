@@ -35,28 +35,9 @@ where
 
     fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T> {
         match (df.prev_or_at(at), df.next(at)) {
-            (Some(prev), Some(next)) => Some(linear_dp(at, &prev, &next)),
-            _ => return None,
+            (Some(prev), Some(next)) => Some(linear_dp(at, prev, next)),
+            _ => None,
         }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct LinearOrLastSeenInterpolator;
-impl<T> Interpolator<T> for LinearOrLastSeenInterpolator
-where
-    T: From<f64> + Clone,
-    for<'a> &'a T: Into<f64>,
-{
-    fn interpolate(&self, at: DateTime, prev: &DataPoint<T>, next: &DataPoint<T>) -> Result<T> {
-        assert_params_consistent(at, prev, next)?;
-        LinearInterpolator.interpolate(at, prev, next)
-    }
-
-    fn interpolate_df(&self, at: DateTime, df: &DataFrame<T>) -> Option<T> {
-        LinearInterpolator
-            .interpolate_df(at, df)
-            .or_else(|| LastSeenInterpolator.interpolate_df(at, df))
     }
 }
 

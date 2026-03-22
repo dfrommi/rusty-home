@@ -29,6 +29,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum DeviceStateEvent {
     Updated(DataPoint<DeviceStateValue>),
+    #[allow(dead_code)] //event doesn't make sense without content
     Changed(DataPoint<DeviceStateValue>),
 }
 

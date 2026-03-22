@@ -79,11 +79,16 @@ impl DateTime {
         Ok(chrono::DateTime::parse_from_rfc3339(iso8601)?.into())
     }
 
-    pub fn to_iso_string(&self) -> String {
+    #[allow(clippy::expect_used)]
+    pub fn from_static_iso(iso8601: &'static str) -> Self {
+        DateTime::from_iso(iso8601).expect("Invalid static ISO datetime string")
+    }
+
+    pub fn to_iso_string(self) -> String {
         self.delegate.to_rfc3339()
     }
 
-    pub fn to_human_readable(&self) -> String {
+    pub fn to_human_readable(self) -> String {
         chrono_humanize::HumanTime::from(self.delegate).to_string()
     }
 
@@ -102,19 +107,19 @@ impl DateTime {
         }
     }
 
+    #[allow(clippy::expect_used)]
     pub fn on_next_day(&self) -> Self {
-        //failing only at the edges of what can be stored in a date-time
         self.delegate
             .checked_add_signed(chrono::Duration::days(1))
-            .unwrap()
+            .expect("DateTime overflow - only possible at the limits of representable dates")
             .into()
     }
 
+    #[allow(clippy::expect_used)]
     pub fn on_prev_day(&self) -> Self {
-        //failing only at the edges of what can be stored in a date-time
         self.delegate
             .checked_sub_signed(chrono::Duration::days(1))
-            .unwrap()
+            .expect("DateTime underflow - only possible at the limits of representable dates")
             .into()
     }
 
@@ -135,7 +140,7 @@ impl DateTime {
         self.delegate.date_naive() == now.delegate.date_naive()
     }
 
-    pub fn into_db(&self) -> chrono::DateTime<chrono::Local> {
+    pub fn into_db(self) -> chrono::DateTime<chrono::Local> {
         self.delegate
     }
 }

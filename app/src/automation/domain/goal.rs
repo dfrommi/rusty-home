@@ -4,8 +4,8 @@ use crate::automation::domain::action::{
 };
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::core::domain::{HeatingZone, Room};
-use crate::home_state::StateSnapshot;
 use crate::home_state::FanActivity;
+use crate::home_state::StateSnapshot;
 use crate::trigger::{Door, OnOffDevice, RemoteTriggerTarget, UserTriggerTarget};
 
 //Refactor to variants() and is_active() method
@@ -24,7 +24,7 @@ pub enum HomeGoal {
 }
 
 //TODO select goals based on current state
-pub fn get_active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
+pub fn get_active_goals(_snapshot: StateSnapshot) -> Vec<HomeGoal> {
     //Prioritized high to low
     vec![
         HomeGoal::PreventNoise,

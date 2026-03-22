@@ -94,7 +94,7 @@ impl ObservabilityModule {
             };
 
             for mut metric in metrics.into_iter() {
-                //ensure a consitent flow of datapoints
+                //ensure a consistent flow of datapoints
                 metric.timestamp = t!(now);
                 buffer.push(metric);
             }

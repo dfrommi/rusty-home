@@ -24,7 +24,7 @@ pub fn get_common_tags(external_id: &ExternalId) -> Vec<MetricLabel> {
 }
 
 fn room(ext_id: &ExternalId) -> Option<&'static str> {
-    let variant_name = ext_id.variant_name().to_owned();
+    let variant_name = ext_id.variant_name();
 
     if variant_name.contains("living_room") {
         Some("Wohnzimmer")

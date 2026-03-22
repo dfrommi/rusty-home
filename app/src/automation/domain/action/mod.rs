@@ -157,45 +157,37 @@ impl Display for HomeAction {
     }
 }
 
-impl Action for HomeAction {
-    fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
-        let ext_id = self.ext_id();
-
+impl HomeAction {
+    fn as_rule(&self) -> (&dyn Rule, ExternalId) {
         match self {
-            HomeAction::Dehumidify(dehumidify) => evaluate_rule(dehumidify, ext_id, ctx),
-            HomeAction::InformWindowOpen(inform_window_open) => evaluate_rule(inform_window_open, ext_id, ctx),
-            HomeAction::AutoTurnOff(auto_turn_off) => evaluate_rule(auto_turn_off, ext_id, ctx),
-            HomeAction::FollowDefaultSetting(follow_default_setting) => {
-                evaluate_rule(follow_default_setting, ext_id, ctx)
-            }
-            HomeAction::UserTriggerAction(user_trigger_action) => evaluate_rule(user_trigger_action, ext_id, ctx),
-            HomeAction::SupportWithFan(support_ventilation_with_fan) => {
-                evaluate_rule(support_ventilation_with_fan, ext_id, ctx)
-            }
-            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
-                evaluate_rule(follow_target_heating_demand, ext_id, ctx)
-            }
-            HomeAction::BlockAutomation(block_automation) => evaluate_rule(block_automation, ext_id, ctx),
-        }
-    }
-
-    fn ext_id(&self) -> ExternalId {
-        match self {
-            HomeAction::Dehumidify(dehumidify) => dehumidify.ext_id(),
-            HomeAction::InformWindowOpen(inform_window_open) => inform_window_open.ext_id(),
-            HomeAction::AutoTurnOff(auto_turn_off) => auto_turn_off.ext_id(),
-            HomeAction::FollowDefaultSetting(follow_default_setting) => follow_default_setting.ext_id(),
-            HomeAction::UserTriggerAction(user_trigger_action) => user_trigger_action.ext_id(),
-            HomeAction::SupportWithFan(support_ventilation_with_fan) => support_ventilation_with_fan.ext_id(),
-            HomeAction::FollowTargetHeatingDemand(follow_target_heating_demand) => {
-                follow_target_heating_demand.ext_id()
-            }
-            HomeAction::BlockAutomation(block_automation) => block_automation.ext_id(),
+            HomeAction::Dehumidify(r) => (r, r.ext_id()),
+            HomeAction::InformWindowOpen(r) => (r, r.ext_id()),
+            HomeAction::AutoTurnOff(r) => (r, r.ext_id()),
+            HomeAction::FollowDefaultSetting(r) => (r, r.ext_id()),
+            HomeAction::UserTriggerAction(r) => (r, r.ext_id()),
+            HomeAction::SupportWithFan(r) => (r, r.ext_id()),
+            HomeAction::FollowTargetHeatingDemand(r) => (r, r.ext_id()),
+            HomeAction::BlockAutomation(r) => (r, r.ext_id()),
         }
     }
 }
 
-fn evaluate_rule(rule: &impl Rule, ext_id: ExternalId, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
+impl Action for HomeAction {
+    fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
+        let (rule, ext_id) = self.as_rule();
+        evaluate_rule(rule, ext_id, ctx)
+    }
+
+    fn ext_id(&self) -> ExternalId {
+        self.as_rule().1
+    }
+}
+
+fn evaluate_rule(
+    rule: &(impl Rule + ?Sized),
+    ext_id: ExternalId,
+    ctx: &RuleEvaluationContext,
+) -> Result<ActionEvaluationResult> {
     match rule.evaluate(ctx)? {
         RuleResult::Execute(commands) => Ok(ActionEvaluationResult::Execute(commands, ext_id)),
         RuleResult::ExecuteTrigger(commands, user_trigger_id) => {

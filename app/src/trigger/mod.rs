@@ -50,7 +50,7 @@ impl UserTriggerExecution {
         }
     }
 
-    //Trigger in DB but timeshift is stil before is was created
+    //Trigger in DB but timeshift is still before it was created
     fn is_created_in_the_past(&self, now: DateTime) -> bool {
         self.timestamp <= now
     }

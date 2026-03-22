@@ -359,14 +359,14 @@ impl HaMqttClient {
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "event_type", content = "event_data")]
-#[allow(dead_code)]
 pub enum HaEvent {
     #[serde(rename = "state_changed")]
     StateChanged {
+        #[allow(dead_code)]
         entity_id: String,
         new_state: StateChangedEvent,
     },
 
     #[serde(untagged)]
-    Unknown(serde_json::Value),
+    Unknown(#[allow(dead_code)] serde_json::Value),
 }

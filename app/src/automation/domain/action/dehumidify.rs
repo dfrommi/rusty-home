@@ -82,7 +82,7 @@ impl SimpleRule for Dehumidify {
                     return Ok(false);
                 }
 
-                let above_dewpoint = hysterisis_above(
+                let above_dewpoint = hysteresis_above(
                     current_fan_state.value.is_on(),
                     current_dewpoint,
                     (DegreeCelsius(10.0), DegreeCelsius(10.5)),
@@ -100,7 +100,7 @@ impl SimpleRule for Dehumidify {
     }
 }
 
-fn hysterisis_above<T>(is_active: bool, current: T, range: (T, T)) -> bool
+fn hysteresis_above<T>(is_active: bool, current: T, range: (T, T)) -> bool
 where
     T: PartialOrd + std::fmt::Display,
 {

@@ -71,14 +71,11 @@ mod user_trigger {
     impl CurrentUserTriggerProvider {
         //TODO filter for inactive triggers
         fn new(active_triggers: Vec<UserTriggerExecution>) -> Self {
-            let mut trigger_map = HashMap::new();
-
-            for trigger in active_triggers {
-                trigger_map.insert(trigger.target(), trigger);
-            }
-
             Self {
-                active_triggers: trigger_map,
+                active_triggers: active_triggers
+                    .into_iter()
+                    .map(|trigger| (trigger.target(), trigger))
+                    .collect(),
             }
         }
 

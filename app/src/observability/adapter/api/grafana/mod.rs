@@ -6,15 +6,13 @@ use std::sync::Arc;
 use crate::core::time::DateTime;
 use crate::core::time::DateTimeRange;
 
-use actix_web::{HttpResponse, http::header};
-use anyhow::Context;
-use serde::{Deserialize, Deserializer, de::IntoDeserializer};
-
 use crate::{command::CommandClient, device_state::DeviceStateClient};
+use actix_web::{HttpResponse, http::header};
 use actix_web::{
     ResponseError,
     web::{self},
 };
+use anyhow::Context;
 use derive_more::derive::{Display, Error};
 
 type GrafanaResponse = Result<HttpResponse, GrafanaApiError>;
@@ -57,22 +55,6 @@ impl ResponseError for GrafanaApiError {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         }
-    }
-}
-
-/// To be used like this:
-/// `#[serde(deserialize_with = "empty_string_as_none")]`
-/// Relevant serde issue: <https://github.com/serde-rs/serde/issues/1425>
-#[allow(dead_code)]
-fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    let opt = Option::<String>::deserialize(de)?;
-    match opt.as_deref() {
-        None | Some("") => Ok(None),
-        Some(s) => T::deserialize(s.into_deserializer()).map(Some),
     }
 }
 

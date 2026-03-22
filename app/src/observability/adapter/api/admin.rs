@@ -172,7 +172,7 @@ async fn backfill_handler_home(
     })? {
         for id in variants.iter() {
             if let Some(dp) = snapshot.get(*id) {
-                for metric in HomeMetricsAdapter.to_metrics(dp.clone()).into_iter() {
+                for metric in HomeMetricsAdapter.to_metrics(dp.clone()) {
                     batch.push(metric).await.map_err(|e| {
                         actix_web::error::ErrorInternalServerError(format!(
                             "Error buffering metrics for VictoriaMetrics: {}",

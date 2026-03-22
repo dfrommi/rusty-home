@@ -17,13 +17,9 @@ impl TriggerService {
     }
 
     pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        match self.repo.add_trigger(trigger).await {
-            Ok(_) => {
-                self.event_tx.send(TriggerEvent::TriggerAdded);
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        self.repo.add_trigger(trigger).await?;
+        self.event_tx.send(TriggerEvent::TriggerAdded);
+        Ok(())
     }
 
     pub async fn get_all_triggers_active_anytime_in_range(

@@ -56,12 +56,6 @@ impl StateSnapshot {
         self.get(id)
             .ok_or_else(|| anyhow::anyhow!("no data point found for state"))
     }
-
-    //Not yet needed
-    // pub fn data_frame(&self, id: HomeState, range: DateTimeRange) -> Option<DataFrame<StateValue>> {
-    //     self.data.get(&id)?.retain_range_with_context_before(&range)
-    // }
-
     pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
         self.inner.user_trigger(target)
     }

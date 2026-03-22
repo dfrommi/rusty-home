@@ -16,7 +16,7 @@ use super::*;
 pub struct Mqtt {
     client: Arc<AsyncClient>,
     event_loop: EventLoop,
-    subsciptions: Vec<MqttSubscriptionHandle>,
+    subscriptions: Vec<MqttSubscriptionHandle>,
 }
 
 struct MqttSubscriptionHandle {
@@ -41,7 +41,7 @@ impl Mqtt {
         Mqtt {
             client: Arc::new(client),
             event_loop,
-            subsciptions: vec![],
+            subscriptions: vec![],
         }
     }
 
@@ -69,7 +69,7 @@ impl Mqtt {
         let (tx, rx) = mpsc::channel::<MqttInMessage>(32);
 
         for topic in &full_topics {
-            if let Some(subscription) = self.subsciptions.iter_mut().find(|s| s.subscribed_topic == *topic) {
+            if let Some(subscription) = self.subscriptions.iter_mut().find(|s| s.subscribed_topic == *topic) {
                 tracing::info!("Adding subscription to already existing subscription: {:?}", &topic);
 
                 subscription.txs.push(tx.clone());
@@ -84,14 +84,14 @@ impl Mqtt {
                 txs: vec![tx.clone()],
             };
 
-            self.subsciptions.push(subscription);
+            self.subscriptions.push(subscription);
 
             self.client
                 .subscribe_with_properties(
                     topic,
                     QoS::AtLeastOnce,
                     SubscribeProperties {
-                        id: Some(self.subsciptions.len()), //must be > 0
+                        id: Some(self.subscriptions.len()), //must be > 0
                         user_properties: vec![],
                     },
                 )
@@ -140,7 +140,7 @@ impl Mqtt {
         };
 
         for id in subscription_ids {
-            match self.subsciptions.get(id - 1) {
+            match self.subscriptions.get(id - 1) {
                 Some(sub) => {
                     let relative_topic = match super::topic::strip_topic(&sub.base_topic, &mqtt_in_message.topic) {
                         Some(t) => t.to_string(),

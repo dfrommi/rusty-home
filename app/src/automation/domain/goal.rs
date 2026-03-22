@@ -20,7 +20,7 @@ pub enum HomeGoal {
     BetterRoomClimate(Room),
     TvControl,
     ReactToUserRequests,
-    ResetToDefaltSettings,
+    ResetToDefaultSettings,
 }
 
 //TODO select goals based on current state
@@ -39,7 +39,7 @@ pub fn get_active_goals(_snapshot: StateSnapshot) -> Vec<HomeGoal> {
         HomeGoal::PreventMould,
         HomeGoal::TvControl,
         HomeGoal::ReactToUserRequests,
-        HomeGoal::ResetToDefaltSettings,
+        HomeGoal::ResetToDefaultSettings,
     ]
 }
 
@@ -105,7 +105,7 @@ impl HomeGoal {
             HomeGoal::ReactToUserRequests => {
                 vec![UserTriggerAction::new(UserTriggerTarget::OpenDoor(Door::Building)).into()]
             }
-            HomeGoal::ResetToDefaltSettings => vec![
+            HomeGoal::ResetToDefaultSettings => vec![
                 FollowDefaultSetting::new(CommandTarget::SetPower {
                     device: PowerToggle::Dehumidifier,
                 })

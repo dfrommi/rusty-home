@@ -40,7 +40,7 @@ impl Rule for SupportWithFan {
                 ctx.current(Temperature::RadiatorIn15Minutes(Radiator::Bedroom))?,
             ),
             SupportWithFan::LivingRoomHeating => {
-                let room_temp_now = ctx.current(Temperature::Room(Room::Bedroom))?;
+                let room_temp_now = ctx.current(Temperature::Room(Room::LivingRoom))?;
                 let speed = FanSpeed::Silent;
 
                 let small = heating(

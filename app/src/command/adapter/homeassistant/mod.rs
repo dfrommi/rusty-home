@@ -33,15 +33,9 @@ impl HomeAssistantCommandExecutor {
     pub fn new(url: &str, token: &str) -> Self {
         let http_client = HaHttpClient::new(url, token).expect("Error initializing Home Assistant REST client");
 
-        let mut data: Vec<(CommandTarget, HaServiceTarget)> = Vec::new();
-
-        for (cmd, ha) in config::default_ha_command_config() {
-            data.push((cmd.clone(), ha.clone()));
-        }
-
         Self {
             client: http_client,
-            config: data,
+            config: config::default_ha_command_config(),
         }
     }
 }
@@ -51,7 +45,6 @@ impl CommandExecutor for HomeAssistantCommandExecutor {
     async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
         let command_target: CommandTarget = command.clone().into();
 
-        //could be more efficient, but would require eq and hash on CommandTarget
         let ha_target = self
             .config
             .iter()

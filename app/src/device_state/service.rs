@@ -51,7 +51,7 @@ impl DeviceStateService {
 
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
         if changed {
-            //Only when changed to preseve timestamps (new one not to be used unless value is new)
+            //Only when changed to preserve timestamps (new one not to be used unless value is new)
             self.current_cache.insert(id, dp.clone()).await;
             self.event_tx.send(DeviceStateEvent::Changed(dp.clone()));
         }
@@ -77,7 +77,6 @@ impl DeviceStateService {
     }
 
     pub async fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
-        //self.repo.get_latest_for_all_devices().await
         let mut res = HashMap::new();
 
         for id in DeviceStateId::variants() {

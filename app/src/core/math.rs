@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{
     core::{
         time::{DateTime, Duration},
@@ -12,6 +10,7 @@ use crate::{
 pub trait DataFrameStatsExt<T: Clone> {
     fn weighted_aged_sum(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
     fn weighted_aged_mean(&self, tau: Duration, interpolator: impl Interpolator<T>) -> f64;
+    #[allow(dead_code)]
     fn average(&self) -> f64;
 }
 
@@ -114,37 +113,6 @@ fn exp_decay_since(ts: DateTime, tau: Duration) -> f64 {
     (-dt / tau).exp()
 }
 
-// fn tau_from_half_life(t_half: f64) -> f64 {
-//     t_half / std::f64::consts::LN_2
-// }
-// fn exp_decay<T>(x: T, m: T, tau: f64) -> f64
-// where
-//     T: Into<f64>,
-// {
-//     let x: f64 = x.into();
-//     let m: f64 = m.into();
-//     (-(x - m) / tau).exp()
-// }
-
-// fn sigmoid<T>(x: T, m: T, tau: f64) -> f64
-// where
-//     T: Into<f64>,
-// {
-//     1.0 / (1.0 + exp_decay(x, m, tau))
-// }
-
-//
-//
-//
-// fn age_weighted_value<T>(dp: &DataPoint<T>, tau: Duration) -> f64
-// where
-//     T: Into<f64> + Clone,
-// {
-//     let age_factor = aging_factor(dp.timestamp, tau);
-//     let value: f64 = dp.value.clone().into();
-//     value * age_factor
-// }
-
 //higher values lead to higher probability
 #[derive(Debug)]
 pub struct Sigmoid<T>
@@ -156,6 +124,7 @@ where
     _marker: std::marker::PhantomData<T>,
 }
 
+#[allow(dead_code)]
 impl<T> Sigmoid<T>
 where
     T: Into<f64> + From<f64>,
@@ -207,41 +176,6 @@ where
             k: 1.0,
             _marker: std::marker::PhantomData,
         }
-    }
-}
-
-//values decresing the further they are from mu -> optimal value distribution
-pub struct Gauss<T>
-where
-    T: Into<f64> + From<f64> + Clone,
-{
-    mu: f64,
-    sigma: f64,
-    inverse: bool,
-    _marker: std::marker::PhantomData<T>,
-}
-
-impl<T> Gauss<T>
-where
-    T: Into<f64> + From<f64> + Clone,
-{
-    pub fn new(mu: T, sigma: f64) -> Self {
-        Self {
-            mu: mu.into(),
-            sigma,
-            inverse: false,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn inv(mut self) -> Self {
-        self.inverse = true;
-        self
-    }
-
-    pub fn eval(&self, x: T) -> Probability {
-        let x: f64 = x.into();
-        p((-0.5 * ((x - self.mu) / self.sigma).powi(2)).exp())
     }
 }
 
@@ -344,8 +278,7 @@ mod tests {
         ]);
 
         let avg = df.average();
-        println!("Average: {}", avg);
-        assert!(avg == 20.0);
+        assert_approx(avg, 20.0);
     }
 
     #[test]

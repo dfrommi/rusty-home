@@ -3,14 +3,13 @@ use infrastructure::{DatabaseConfig, HttpServerConfig, MonitoringConfig, MqttCon
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-#[allow(unused)]
 pub struct Settings {
     pub database: DatabaseConfig,
     pub mqtt: MqttConfig,
     pub http_server: HttpServerConfig,
     pub monitoring: MonitoringConfig,
     pub homebridge: crate::frontends::homekit::Homekit,
-    pub homeassistant: HomeAssitantSettings,
+    pub homeassistant: HomeAssistantSettings,
     pub z2m: Zigbee2MqttSettings,
     pub tasmota: TasmotaSettings,
     pub metrics: MetricsExportSettings,
@@ -28,8 +27,7 @@ impl Settings {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
-pub struct HomeAssitantSettings {
+pub struct HomeAssistantSettings {
     pub topic_event: String,
     pub url: String,
     pub token: String,
@@ -41,13 +39,11 @@ pub struct TasmotaSettings {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
 pub struct Zigbee2MqttSettings {
     pub event_topic: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(unused)]
 pub struct MetricsExportSettings {
     pub victoria_url: String,
 }

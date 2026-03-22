@@ -51,13 +51,7 @@ impl EnergyReadingRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut readings: Vec<i64> = vec![];
-
-        for row in rows {
-            readings.push(row.id);
-        }
-
-        Ok(readings)
+        Ok(rows.into_iter().map(|row| row.id).collect())
     }
 
     pub async fn get_total_reading_by_id(&self, id: i64) -> anyhow::Result<DataPoint<EnergyReading>> {

@@ -38,7 +38,7 @@ impl DerivedStateProvider<RiskOfMould, bool> for RiskOfMouldStateProvider {
         let risk = this_dp.value.0 - ref_dp.0 > 3.0;
 
         tracing::trace!(
-            "Risk is {}. Dewpoint is {}, reference dewpoint is {}, threashold is 3.0",
+            "Risk is {}. Dewpoint is {}, reference dewpoint is {}, threshold is 3.0",
             if risk { "high" } else { "low" },
             this_dp.value,
             ref_dp

@@ -29,8 +29,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum DeviceStateEvent {
     Updated(DataPoint<DeviceStateValue>),
-    #[allow(dead_code)] //event doesn't make sense without content
-    Changed(DataPoint<DeviceStateValue>),
+    Changed(#[allow(dead_code)] DataPoint<DeviceStateValue>),
 }
 
 //Trait would be better, but no dyn support for async fn makes it too cumbersome

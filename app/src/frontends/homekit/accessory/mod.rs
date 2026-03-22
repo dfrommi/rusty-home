@@ -71,23 +71,15 @@ impl HomekitRegistry {
     }
 
     pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
-        for accessory in &mut self.accessories {
-            let command = match accessory {
-                HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
-                HomekitAccessory::DoorLock(lock) => lock.process_trigger(trigger),
-                HomekitAccessory::EnergySavingSwitch(switch) => switch.process_trigger(trigger),
-                HomekitAccessory::Fan(fan) => fan.process_trigger(trigger),
-                HomekitAccessory::Thermostat(sensor) => sensor.process_trigger(trigger),
-                HomekitAccessory::WindowSensor(sensor) => sensor.process_trigger(trigger),
-                HomekitAccessory::PowerSwitch(power_switch) => power_switch.process_trigger(trigger),
-            };
-
-            if command.is_some() {
-                return command;
-            }
-        }
-
-        None
+        self.accessories.iter_mut().find_map(|accessory| match accessory {
+            HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
+            HomekitAccessory::DoorLock(lock) => lock.process_trigger(trigger),
+            HomekitAccessory::EnergySavingSwitch(switch) => switch.process_trigger(trigger),
+            HomekitAccessory::Fan(fan) => fan.process_trigger(trigger),
+            HomekitAccessory::Thermostat(sensor) => sensor.process_trigger(trigger),
+            HomekitAccessory::WindowSensor(sensor) => sensor.process_trigger(trigger),
+            HomekitAccessory::PowerSwitch(power_switch) => power_switch.process_trigger(trigger),
+        })
     }
 }
 

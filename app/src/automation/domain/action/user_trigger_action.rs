@@ -118,27 +118,14 @@ fn into_command(trigger: &UserTrigger) -> Vec<Command> {
                 on,
             }]
         }
-        UserTrigger::FanSpeed {
-            fan: FanActivity::LivingRoomCeilingFan,
-            airflow,
-        } => vec![Command::ControlFan {
-            device: Fan::LivingRoomCeilingFan,
-            speed: airflow,
-        }],
-        UserTrigger::FanSpeed {
-            fan: FanActivity::BedroomCeilingFan,
-            airflow,
-        } => vec![Command::ControlFan {
-            device: Fan::BedroomCeilingFan,
-            speed: airflow,
-        }],
-        UserTrigger::FanSpeed {
-            fan: FanActivity::BedroomDehumidifier,
-            airflow,
-        } => vec![Command::ControlFan {
-            device: Fan::BedroomDehumidifier,
-            speed: airflow,
-        }],
+        UserTrigger::FanSpeed { fan, airflow } => {
+            let device = match fan {
+                FanActivity::LivingRoomCeilingFan => Fan::LivingRoomCeilingFan,
+                FanActivity::BedroomCeilingFan => Fan::BedroomCeilingFan,
+                FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
+            };
+            vec![Command::ControlFan { device, speed: airflow }]
+        }
         UserTrigger::Heating { .. } => {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
             vec![]

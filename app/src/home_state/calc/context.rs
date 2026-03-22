@@ -170,7 +170,7 @@ impl StateCalculationContext {
         match id.try_downcast(state_value.value.clone()) {
             Ok(v) => Some(state_value.with(v)),
             Err(e) => {
-                tracing::error!("Error converting home state {:?} to exepceted type: {}", state_value.value, e);
+                tracing::error!("Error converting home state {:?} to expected type: {}", state_value.value, e);
                 None
             }
         }
@@ -202,7 +202,7 @@ impl StateCalculationContext {
         match id.try_downcast(dp.value.clone()) {
             Ok(v) => Some(DataPoint::new(v, dp.timestamp)),
             Err(e) => {
-                tracing::error!("Error converting device state {:?} to exepceted type: {}", dp.value, e);
+                tracing::error!("Error converting device state {:?} to expected type: {}", dp.value, e);
                 None
             }
         }

@@ -12,13 +12,11 @@ pub struct Z2mSensorSyncRunner {
 
 impl Z2mSensorSyncRunner {
     pub fn new(mqtt_sender: MqttSender, home_state_events: EventListener<HomeStateEvent>) -> Self {
-        let mut sonoff_devices = vec![];
-        for radiator in Radiator::variants() {
-            sonoff_devices.push(SonoffThermostatExtTempSync::new(*radiator, mqtt_sender.clone()));
-        }
-
         Self {
-            sonoff_devices,
+            sonoff_devices: Radiator::variants()
+                .iter()
+                .map(|r| SonoffThermostatExtTempSync::new(*r, mqtt_sender.clone()))
+                .collect(),
             home_state_events,
         }
     }

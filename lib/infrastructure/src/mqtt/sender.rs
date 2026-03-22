@@ -17,7 +17,7 @@ impl MqttSender {
     }
 
     pub async fn send_retained(&self, topic: impl Into<String>, payload: impl Into<String>) -> anyhow::Result<()> {
-        self.send(topic.into(), payload.into(), false).await
+        self.send(topic.into(), payload.into(), true).await
     }
 
     pub async fn send_transient(&self, topic: impl Into<String>, payload: impl Into<String>) -> anyhow::Result<()> {

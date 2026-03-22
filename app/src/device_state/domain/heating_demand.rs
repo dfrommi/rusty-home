@@ -12,14 +12,18 @@ pub enum HeatingDemand {
 }
 
 impl HeatingDemand {
-    pub fn scaling_factor(&self) -> f64 {
+    pub fn radiator(&self) -> Radiator {
         match self {
-            HeatingDemand::LivingRoomBig => Radiator::LivingRoomBig.heating_factor(),
-            HeatingDemand::LivingRoomSmall => Radiator::LivingRoomSmall.heating_factor(),
-            HeatingDemand::Bedroom => Radiator::Bedroom.heating_factor(),
-            HeatingDemand::Kitchen => Radiator::Kitchen.heating_factor(),
-            HeatingDemand::RoomOfRequirements => Radiator::RoomOfRequirements.heating_factor(),
-            HeatingDemand::Bathroom => Radiator::Bathroom.heating_factor(),
+            HeatingDemand::LivingRoomBig => Radiator::LivingRoomBig,
+            HeatingDemand::LivingRoomSmall => Radiator::LivingRoomSmall,
+            HeatingDemand::Bedroom => Radiator::Bedroom,
+            HeatingDemand::Kitchen => Radiator::Kitchen,
+            HeatingDemand::RoomOfRequirements => Radiator::RoomOfRequirements,
+            HeatingDemand::Bathroom => Radiator::Bathroom,
         }
+    }
+
+    pub fn scaling_factor(&self) -> f64 {
+        self.radiator().heating_factor()
     }
 }

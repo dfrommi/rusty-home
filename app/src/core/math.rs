@@ -271,14 +271,16 @@ mod tests {
 
     #[test]
     fn test_average() {
+        let now = t!(now);
         let df = DataFrame::new(vec![
-            DataPoint::new(10.0, t!(20 minutes ago)),
-            DataPoint::new(20.0, t!(10 minutes ago)),
-            DataPoint::new(30.0, t!(now)),
+            DataPoint::new(10.0, now - t!(20 minutes)),
+            DataPoint::new(20.0, now - t!(10 minutes)),
+            DataPoint::new(30.0, now - t!(15 seconds)),
         ]);
 
         let avg = df.average();
-        assert_approx(avg, 20.0);
+        //Last segment is expanded to now at the end of average calculation
+        assert!((20.0..20.1).contains(&avg), "Expected average to be around 20.0, got {}", avg);
     }
 
     #[test]

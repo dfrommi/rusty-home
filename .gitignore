@@ -4,6 +4,8 @@ target/
 
 .*
 !.gitignore
+!.claude/
+*.local.json
 
 Cargo.lock
 

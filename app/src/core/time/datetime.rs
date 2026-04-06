@@ -3,6 +3,7 @@ use std::{
     ops::{Add, Sub},
 };
 
+use chrono::Datelike as _;
 use tokio::task_local;
 
 use super::{Duration, Time};
@@ -32,6 +33,10 @@ impl DateTime {
 
     pub fn real_now() -> Self {
         chrono::Local::now().into()
+    }
+
+    pub fn month(&self) -> u32 {
+        self.delegate.month()
     }
 
     pub fn millis(&self) -> i64 {

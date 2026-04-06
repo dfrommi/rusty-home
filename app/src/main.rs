@@ -1,10 +1,10 @@
 use infrastructure::{EventBus, Mqtt};
-use settings::Settings;
 
 use crate::automation::AutomationModule;
 use crate::command::CommandModule;
 use crate::frontends::remote::RemoteModule;
 use crate::home_state::HomeStateModule;
+use crate::settings::Settings;
 
 mod automation;
 mod command;

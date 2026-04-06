@@ -26,6 +26,15 @@ impl Time {
         DateTime::now().at(*self).on_prev_day()
     }
 
+    pub fn is_between(&self, start: Time, end: Time) -> bool {
+        if start <= end {
+            *self >= start && *self < end
+        } else {
+            // Handle wrap-around case (e.g., 23:00 to 02:00)
+            *self >= start || *self < end
+        }
+    }
+
     pub fn at(hour: u32, minute: u32) -> anyhow::Result<Self> {
         Ok(Self {
             delegate: chrono::NaiveTime::from_hms_opt(hour, minute, 0)
@@ -177,5 +186,17 @@ mod tests {
         let time = Time::at(23, 59).unwrap();
         let result = time + Duration::minutes(1);
         assert_eq!(result, Time::at(0, 0).unwrap());
+    }
+
+    #[test]
+    fn test_is_between_same_day() {
+        let time = Time::at(10, 0).unwrap();
+        assert!(time.is_between(Time::at(9, 0).unwrap(), Time::at(11, 0).unwrap()));
+    }
+
+    #[test]
+    fn test_is_between_wrap_around() {
+        let time = Time::at(1, 0).unwrap();
+        assert!(time.is_between(Time::at(23, 0).unwrap(), Time::at(2, 0).unwrap()));
     }
 }

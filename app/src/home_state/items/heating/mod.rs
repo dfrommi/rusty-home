@@ -142,9 +142,14 @@ fn setpoint_for_mode(radiator: Radiator, mode: &HeatingMode) -> Range<DegreeCels
     use HeatingMode::*;
     use Radiator::*;
 
+    //TODO make more elaborate, detect need for heat better
+    let now = t!(now);
+    let is_warmish_outside = (3..=9).contains(&now.month()) && (now.time().is_between(t!(7:00), t!(21:00)));
+
     let t = match (radiator, mode) {
         (_, Manual(t, _)) => t.0,
         (_, Ventilation) => 0.0,
+        (_, _) if is_warmish_outside => 15.0,
         (LivingRoomBig, EnergySaving) | (LivingRoomSmall, EnergySaving) => 19.0,
         (LivingRoomBig, Sleep) | (LivingRoomSmall, Sleep) => 18.5,
         (LivingRoomBig, Comfort) | (LivingRoomSmall, Comfort) => 19.5,

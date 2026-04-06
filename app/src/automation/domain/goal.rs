@@ -28,13 +28,13 @@ pub fn get_active_goals(_snapshot: StateSnapshot) -> Vec<HomeGoal> {
     //Prioritized high to low
     vec![
         HomeGoal::PreventNoise,
+        HomeGoal::BetterRoomClimate(Room::LivingRoom),
+        HomeGoal::BetterRoomClimate(Room::Bedroom),
         HomeGoal::SmarterHeating(HeatingZone::LivingRoom),
         HomeGoal::SmarterHeating(HeatingZone::Bedroom),
         HomeGoal::SmarterHeating(HeatingZone::Kitchen),
         HomeGoal::SmarterHeating(HeatingZone::RoomOfRequirements),
         HomeGoal::SmarterHeating(HeatingZone::Bathroom),
-        HomeGoal::BetterRoomClimate(Room::LivingRoom),
-        HomeGoal::BetterRoomClimate(Room::Bedroom),
         HomeGoal::StayInformed,
         HomeGoal::PreventMould,
         HomeGoal::TvControl,

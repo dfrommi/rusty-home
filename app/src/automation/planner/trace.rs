@@ -10,23 +10,18 @@ pub struct PlanningTrace {
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PlanningTraceStep {
     pub action: String,
-    pub goal: String,
+    pub resource: String,
 
-    pub goal_active: bool,
-    pub locked: bool,
     pub fulfilled: Option<bool>,
     pub triggered: Option<bool>,
 
     pub correlation_id: Option<CorrelationId>,
 }
 
-//Ignore correlation_id
 impl PartialEq for PlanningTraceStep {
     fn eq(&self, other: &Self) -> bool {
         self.action == other.action
-            && self.goal == other.goal
-            && self.goal_active == other.goal_active
-            && self.locked == other.locked
+            && self.resource == other.resource
             && self.fulfilled == other.fulfilled
             && self.triggered == other.triggered
     }
@@ -36,19 +31,13 @@ impl PlanningTrace {
     pub fn new(steps: Vec<PlanningTraceStep>) -> Self {
         Self { steps }
     }
-
-    pub fn current(steps: Vec<PlanningTraceStep>) -> Self {
-        Self::new(steps)
-    }
 }
 
 impl PlanningTraceStep {
-    pub fn new(action: &impl Display, goal: &impl Display) -> Self {
+    pub fn new(action: &impl Display, resource: &impl Display) -> Self {
         Self {
             action: format!("{action}"),
-            goal: format!("{goal}"),
-            goal_active: false,
-            locked: false,
+            resource: format!("{resource}"),
             fulfilled: None,
             triggered: None,
             correlation_id: None,
@@ -56,18 +45,17 @@ impl PlanningTraceStep {
     }
 }
 
-pub async fn display_planning_trace(trace: &PlanningTrace) {
+pub fn display_planning_trace(trace: &PlanningTrace) {
     if planning_trace_has_changed(trace) {
-        //TODO less noisy logging
         tracing::info!("Planning result changed");
     } else {
         tracing::debug!("Planning result is unchanged");
     }
 }
 
-static PREVIOUS_ACTION: Mutex<Option<Vec<PlanningTraceStep>>> = Mutex::new(None);
+static PREVIOUS_TRACE: Mutex<Option<Vec<PlanningTraceStep>>> = Mutex::new(None);
 fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
-    match PREVIOUS_ACTION.lock() {
+    match PREVIOUS_TRACE.lock() {
         Ok(mut previous) => {
             let current = Some(current.steps.clone());
             if *previous != current {
@@ -79,7 +67,7 @@ fn planning_trace_has_changed(current: &PlanningTrace) -> bool {
         }
 
         Err(e) => {
-            tracing::error!("Error locking previous action result, logging impacted: {:?}", e);
+            tracing::error!("Error locking previous trace, logging impacted: {:?}", e);
             false
         }
     }

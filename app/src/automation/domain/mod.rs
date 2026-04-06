@@ -1,17 +1,5 @@
-use goal::HomeGoal;
-
 mod action;
-mod goal;
+mod resource_plan;
 
-pub use action::RuleEvaluationContext;
-pub use goal::get_active_goals;
-
-use crate::home_state::StateSnapshot;
-
-pub struct HomePlanning;
-
-impl HomePlanning {
-    pub fn active_goals(snapshot: StateSnapshot) -> Vec<HomeGoal> {
-        get_active_goals(snapshot)
-    }
-}
+pub use action::{HomeAction, RuleEvaluationContext};
+pub use resource_plan::resource_plans;

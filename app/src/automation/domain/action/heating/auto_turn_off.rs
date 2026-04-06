@@ -19,10 +19,10 @@ impl Rule for AutoTurnOff {
 
         if should_turn_off {
             tracing::info!("Infrared heater on for more than 1 hour; turning off");
-            Ok(RuleResult::Execute(vec![Command::SetPower {
+            Ok(RuleResult::Execute(Command::SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on: false,
-            }]))
+            }))
         } else {
             tracing::info!("Infrared heater not on for more than 1 hour; skipping");
             Ok(RuleResult::Skip)

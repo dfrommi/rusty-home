@@ -36,7 +36,7 @@ impl Rule for InformWindowOpen {
             _ => return Ok(RuleResult::Skip),
         };
 
-        Ok(RuleResult::Execute(vec![command]))
+        Ok(RuleResult::Execute(command))
     }
 }
 

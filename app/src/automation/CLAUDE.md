@@ -1,14 +1,12 @@
 # Automation
 
-Goal-driven action planning system. Reacts to `HomeStateEvent` changes and a 30-second timer.
+Resource-centric action planning system. Reacts to `HomeStateEvent` changes and a 30-second timer.
 
 ## Planner Pipeline
 
-`plan_and_execute()` processes all actions in three phases:
+`resource_plans()` defines all devices and their prioritized rules. `plan_and_execute()` evaluates each resource's rules sequentially — first non-Skip wins, its single command is executed. `should_execute()` applies cooldown (30s minimum wait, per-type cooldown) and state-reflection checks before firing via `CommandClient`.
 
-1. **Evaluate** — actions evaluate in parallel (tokio::spawn)
-2. **Lock** — sequential resource lock passed action-to-action via oneshot channels; if any `CommandTarget` is already locked, the action is skipped
-3. **Execute** — for each command: check `should_execute()` (30s minimum wait, per-type cooldown, state reflection), then fire via `CommandClient`. All commands in an action must acquire locks — partial execution is prevented.
+Each rule returns a single `Command` (not a vec). Rules are independent — they don't delegate to each other. Lower-priority rules win naturally when higher-priority ones return Skip.
 
 ## Adding or updating a rule
 

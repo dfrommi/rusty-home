@@ -44,6 +44,6 @@ impl Rule for FollowDefaultSetting {
             }
         };
 
-        Ok(RuleResult::Execute(vec![command]))
+        Ok(RuleResult::Execute(command))
     }
 }

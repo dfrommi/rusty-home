@@ -4,7 +4,6 @@ use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::Command;
 use crate::core::domain::HeatingZone;
 use crate::core::time::Duration;
-use crate::core::unit::FanAirflow;
 use crate::home_state::{FanActivity, PowerAvailable};
 use crate::t;
 use crate::trigger::*;
@@ -45,16 +44,16 @@ impl Rule for UserTriggerAction {
             return Ok(RuleResult::Skip);
         }
 
-        let commands = into_command(&latest_trigger.trigger);
+        let command = into_command(&latest_trigger.trigger);
 
-        if commands.is_empty() {
+        let Some(command) = command else {
             tracing::info!("Trigger not handled by this action, skipping");
             return Ok(RuleResult::Skip);
-        }
+        };
 
         tracing::info!("User-trigger accepted");
 
-        Ok(RuleResult::ExecuteTrigger(commands, latest_trigger.id.clone()))
+        Ok(RuleResult::ExecuteTrigger(command, latest_trigger.id.clone()))
     }
 }
 
@@ -91,62 +90,46 @@ impl UserTriggerAction {
     }
 }
 
-fn into_command(trigger: &UserTrigger) -> Vec<Command> {
+fn into_command(trigger: &UserTrigger) -> Option<Command> {
     use crate::command::*;
 
     match trigger.clone() {
         UserTrigger::DevicePower {
             device: OnOffDevice::InfraredHeater,
             on,
-        } => vec![Command::SetPower {
+        } => Some(Command::SetPower {
             device: PowerToggle::InfraredHeater,
             power_on: on,
-        }],
+        }),
         UserTrigger::DevicePower {
             device: OnOffDevice::Dehumidifier,
             on,
-        } => vec![Command::SetPower {
+        } => Some(Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: on,
-        }],
+        }),
         UserTrigger::DevicePower {
             device: OnOffDevice::LivingRoomTvEnergySaving,
             on,
-        } => {
-            vec![Command::SetEnergySaving {
-                device: EnergySavingDevice::LivingRoomTv,
-                on,
-            }]
-        }
+        } => Some(Command::SetEnergySaving {
+            device: EnergySavingDevice::LivingRoomTv,
+            on,
+        }),
         UserTrigger::FanSpeed { fan, airflow } => {
             let device = match fan {
                 FanActivity::LivingRoomCeilingFan => Fan::LivingRoomCeilingFan,
                 FanActivity::BedroomCeilingFan => Fan::BedroomCeilingFan,
                 FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
             };
-            vec![Command::ControlFan { device, speed: airflow }]
+            Some(Command::ControlFan { device, speed: airflow })
         }
         UserTrigger::Heating { .. } => {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
-            vec![]
+            None
         }
-        UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(DualButtonPress::SingleOff)) => vec![
-            Command::SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            },
-            Command::ControlFan {
-                device: Fan::BedroomDehumidifier,
-                speed: FanAirflow::Off,
-            },
-            Command::ControlFan {
-                device: Fan::BedroomCeilingFan,
-                speed: FanAirflow::Off,
-            },
-        ],
-        UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => vec![],
-        UserTrigger::OpenDoor { door: Door::Building } => vec![Command::OpenDoor {
+        UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => None,
+        UserTrigger::OpenDoor { door: Door::Building } => Some(Command::OpenDoor {
             device: Lock::BuildingEntrance,
-        }],
+        }),
     }
 }

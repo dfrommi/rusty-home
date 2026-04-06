@@ -1,16 +1,15 @@
 use r#macro::{EnumVariants, Id};
 
+use crate::automation::RuleEvaluationContext;
+use crate::core::unit::FanAirflow;
 use crate::{
-    automation::{
-        RuleEvaluationContext,
-        domain::action::{FollowDefaultSetting, Rule, RuleResult, UserTriggerAction},
-    },
-    command::{CommandTarget, Fan, PowerToggle},
+    automation::domain::action::{Rule, RuleResult},
+    command::{Command, Fan, PowerToggle},
     core::{domain::Room, unit::DegreeCelsius},
     home_state::FanActivity,
     home_state::{Resident, Temperature},
     t,
-    trigger::{OnOffDevice, UserTriggerTarget},
+    trigger::{OnOffDevice, RemoteTriggerTarget, UserTriggerTarget},
 };
 
 #[derive(Debug, Clone, Id, EnumVariants)]
@@ -27,17 +26,14 @@ impl Rule for BlockAutomation {
             if sleeping.value { Some(sleeping.timestamp) } else { None }
         };
 
-        //None -> not blocked
         let blocked_start = match self {
             BlockAutomation::BathroomDehumidifier | BlockAutomation::BedroomDehumidifier => {
-                //TODO and not sleeping
                 let night_time_start = t!(22:00 - 9:00).active().map(|r| *r.start());
                 if sleeping_start.is_some() || night_time_start.is_some() {
                     tracing::info!("Sleep mode or night time active; blocking dehumidifier");
                 } else {
                     tracing::info!("Not sleeping and not night time; not blocking dehumidifier");
                 }
-                //min of both
                 sleeping_start
                     .map(|s| s.min(night_time_start.unwrap_or(s)))
                     .or(night_time_start)
@@ -62,43 +58,50 @@ impl Rule for BlockAutomation {
             return Ok(RuleResult::Skip);
         };
 
-        //Execute trigger if started after block started. Then user intentionally want this.
-
-        let (trigger_target, command_target) = match self {
-            BlockAutomation::BathroomDehumidifier => (
-                UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier),
-                CommandTarget::SetPower {
-                    device: PowerToggle::Dehumidifier,
-                },
-            ),
-            BlockAutomation::BedroomDehumidifier => (
-                UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier),
-                CommandTarget::ControlFan {
-                    device: Fan::BedroomDehumidifier,
-                },
-            ),
-            BlockAutomation::BedroomCeilingFan => (
-                UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan),
-                CommandTarget::ControlFan {
-                    device: Fan::BedroomCeilingFan,
-                },
-            ),
+        // Check if user override exists after block started — if so, skip and let
+        // lower-priority rules (e.g. UserTriggerAction) handle the resource.
+        let trigger_target = match self {
+            BlockAutomation::BathroomDehumidifier => UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier),
+            BlockAutomation::BedroomDehumidifier => UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier),
+            BlockAutomation::BedroomCeilingFan => UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan),
         };
 
         let trigger = ctx.latest_trigger(trigger_target);
-
-        //User-trigger after night time starts -> user really wants to override
         if let Some(trigger) = trigger
             && trigger.timestamp > blocked_start
         {
-            tracing::info!("User override detected; delegating to user trigger");
-            let result = UserTriggerAction::new(trigger.target().clone()).evaluate(ctx);
-            if matches!(result, Ok(RuleResult::ExecuteTrigger(..))) {
-                return result;
+            tracing::info!("User override detected after block started; yielding to lower-priority rules");
+            return Ok(RuleResult::Skip);
+        }
+
+        // Also check remote trigger for bedroom devices
+        if matches!(self, BlockAutomation::BedroomDehumidifier | BlockAutomation::BedroomCeilingFan) {
+            let remote_trigger = ctx.latest_trigger(UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote));
+            if let Some(trigger) = remote_trigger
+                && trigger.timestamp > blocked_start
+            {
+                tracing::info!("Remote override detected after block started; yielding to lower-priority rules");
+                return Ok(RuleResult::Skip);
             }
         }
 
-        tracing::info!("No valid user override; applying default setting");
-        FollowDefaultSetting::new(command_target).evaluate(ctx)
+        // No override — produce the off command directly.
+        tracing::info!("No valid user override; turning off device");
+        let command = match self {
+            BlockAutomation::BathroomDehumidifier => Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: false,
+            },
+            BlockAutomation::BedroomDehumidifier => Command::ControlFan {
+                device: Fan::BedroomDehumidifier,
+                speed: FanAirflow::Off,
+            },
+            BlockAutomation::BedroomCeilingFan => Command::ControlFan {
+                device: Fan::BedroomCeilingFan,
+                speed: FanAirflow::Off,
+            },
+        };
+
+        Ok(RuleResult::Execute(command))
     }
 }

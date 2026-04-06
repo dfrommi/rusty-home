@@ -64,7 +64,7 @@ impl Rule for SupportWithFan {
         };
 
         Ok(match command {
-            Some(command) => RuleResult::Execute(vec![command]),
+            Some(command) => RuleResult::Execute(command),
             None => RuleResult::Skip,
         })
     }

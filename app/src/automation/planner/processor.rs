@@ -1,9 +1,5 @@
-use std::fmt::Display;
-
 use anyhow::Result;
 use infrastructure::TraceContext;
-use tokio::{sync::oneshot, task::yield_now};
-use tracing::Instrument;
 
 use crate::command::{Command, CommandClient, CommandTarget};
 use crate::core::id::ExternalId;
@@ -12,68 +8,90 @@ use crate::home_state::StateSnapshot;
 use crate::t;
 use crate::trigger::{TriggerClient, UserTriggerId};
 
-use crate::automation::RuleEvaluationContext;
+use crate::automation::{HomeAction, RuleEvaluationContext};
 
-use super::{ActionEvaluationResult, PlanningTrace, action::Action, context::Context, resource_lock::ResourceLock};
+use super::PlanningTrace;
+use super::action::ActionEvaluationResult;
+use super::trace::PlanningTraceStep;
 
-pub async fn plan_and_execute<G, A>(
-    active_goals: &[G],
-    actions_for_goal: impl Fn(&G) -> Vec<A>,
+pub async fn plan_and_execute(
+    resource_plans: &[(CommandTarget, Vec<HomeAction>)],
     snapshot: StateSnapshot,
     command_client: &CommandClient,
     trigger_client: &TriggerClient,
-) -> Result<PlanningTrace>
-where
-    G: Display,
-    A: Action + Send + Sync + 'static,
-{
+) -> Result<PlanningTrace> {
+    debug_assert_eq!(
+        resource_plans
+            .iter()
+            .map(|(k, _)| k)
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        resource_plans.len(),
+        "resource_plans contains duplicate CommandTarget keys"
+    );
+
     let planning_data_timestamp = snapshot.timestamp();
-    let rule_ctx = RuleEvaluationContext::new(snapshot);
+    let ctx = RuleEvaluationContext::new(snapshot);
 
-    let (first_tx, mut prev_rx) = oneshot::channel();
-    let mut handles = Vec::new();
+    let mut steps = Vec::new();
+    let mut used_triggers = Vec::new();
 
-    for goal in active_goals {
-        let actions = actions_for_goal(goal);
-        let is_goal_active = true;
-        let goal_name = goal.to_string();
-        let goal_span =
-            tracing::info_span!("planning goal", %goal_name, otel.name = %goal_name, goal_active = is_goal_active);
-        let _enter = goal_span.enter();
+    for (resource, rules) in resource_plans {
+        evaluate_resource_plan(resource, rules, &ctx, command_client, &mut steps, &mut used_triggers).await?;
+    }
 
-        for action in actions {
-            let (tx, rx) = oneshot::channel();
-            let context = Context::new(goal, action, is_goal_active, prev_rx, tx);
-            prev_rx = rx;
+    handle_trigger_updates(planning_data_timestamp, used_triggers, trigger_client).await?;
 
-            let command_client = command_client.clone();
-            let rule_ctx = rule_ctx.clone();
-            handles.push(tokio::spawn(
-                async move { process_action(context, rule_ctx, command_client).await }.instrument(goal_span.clone()),
-            ));
+    Ok(PlanningTrace::new(steps))
+}
+
+async fn evaluate_resource_plan(
+    resource: &CommandTarget,
+    rules: &[HomeAction],
+    ctx: &RuleEvaluationContext,
+    command_client: &CommandClient,
+    steps: &mut Vec<PlanningTraceStep>,
+    used_triggers: &mut Vec<UserTriggerId>,
+) -> Result<()> {
+    let resource_span = tracing::info_span!("resource", %resource);
+    let _enter = resource_span.enter();
+
+    for action in rules {
+        let mut trace = PlanningTraceStep::new(action, resource);
+        trace.correlation_id = TraceContext::current().correlation_id();
+
+        let result = {
+            let _span = tracing::info_span!("evaluate_action", %action).entered();
+            action.evaluate(ctx)
+        };
+
+        match result {
+            Ok(ActionEvaluationResult::Execute(command, source)) => {
+                trace.fulfilled = Some(true);
+                execute_command(&mut trace, command, source, None, command_client, ctx).await;
+                steps.push(trace);
+                return Ok(());
+            }
+            Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
+                trace.fulfilled = Some(true);
+                used_triggers.push(trigger_id.clone());
+                execute_command(&mut trace, command, source, Some(trigger_id), command_client, ctx).await;
+                steps.push(trace);
+                return Ok(());
+            }
+            Ok(ActionEvaluationResult::Skip) => {
+                trace.fulfilled = Some(false);
+                steps.push(trace);
+            }
+            Err(e) => {
+                tracing::error!("Error evaluating action {}: {:?}", action, e);
+                TraceContext::current().set_error(e.to_string());
+                steps.push(trace);
+            }
         }
     }
 
-    first_tx
-        .send(ResourceLock::new())
-        .map_err(|_| anyhow::anyhow!("Error sending first resource lock to planner"))?;
-
-    let mut results = Vec::with_capacity(handles.len());
-    for handle in handles {
-        let context = handle
-            .await
-            .map_err(|e| anyhow::anyhow!("Planning task failed: {:?}", e))??;
-        results.push(context);
-    }
-
-    let used_triggers = results
-        .iter()
-        .filter_map(|c| c.user_trigger_id.clone())
-        .collect::<Vec<UserTriggerId>>();
-    handle_trigger_updates(planning_data_timestamp, used_triggers, trigger_client).await?;
-
-    let steps = results.into_iter().map(|r| r.trace).collect();
-    Ok(PlanningTrace::current(steps))
+    Ok(())
 }
 
 async fn handle_trigger_updates(
@@ -89,129 +107,6 @@ async fn handle_trigger_updates(
         .disable_triggers_before_except(planning_data_timestamp, &used_triggers)
         .await
         .map(|_| ())
-}
-
-#[tracing::instrument(
-    skip_all,
-    fields(action = %context.action, otel.name, locked = tracing::field::Empty),
-)]
-async fn process_action<A: Action>(
-    mut context: Context<A>,
-    ctx: RuleEvaluationContext,
-    command_client: CommandClient,
-) -> Result<Context<A>> {
-    context.trace.correlation_id = TraceContext::current().correlation_id();
-
-    //EVALUATION
-    let evaluation_result = match evaluate_action(&mut context, &ctx).await {
-        Ok(result) => result,
-        Err(e) => {
-            TraceContext::current().set_error(e.to_string());
-            return Ok(context);
-        }
-    };
-    // Yield so other actions can start evaluating before we attempt to acquire the lock.
-    yield_now().await;
-
-    //LOCKING
-    let mut resource_lock = context.get_lock().await?;
-    let evaluation_result = check_locked(&mut context, evaluation_result, &mut resource_lock);
-    context.release_lock(resource_lock).await?;
-
-    tracing::Span::current().record("locked", context.trace.locked);
-    if context.trace.locked {
-        tracing::debug!("Action {} skipped due to resource lock contention", context.action);
-    }
-    // Allow the next action to pick up the lock before we start executing commands.
-    yield_now().await;
-
-    //EXECUTION
-    match evaluation_result {
-        ActionEvaluationResult::Execute(commands, source) => {
-            for command in commands {
-                execute_action(&mut context, command, source.clone(), None, &command_client, &ctx).await;
-            }
-        }
-        ActionEvaluationResult::ExecuteTrigger(commands, source, user_trigger_id) => {
-            for command in commands {
-                execute_action(
-                    &mut context,
-                    command,
-                    source.clone(),
-                    Some(user_trigger_id.clone()),
-                    &command_client,
-                    &ctx,
-                )
-                .await;
-            }
-        }
-        ActionEvaluationResult::Skip => {}
-    }
-
-    TraceContext::current().set_span_name(context.action.to_string());
-    if context.trace.triggered == Some(true) {
-        TraceContext::current().set_ok();
-    }
-
-    Ok(context)
-}
-
-#[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-async fn evaluate_action<A: Action>(
-    context: &mut Context<A>,
-    ctx: &RuleEvaluationContext,
-) -> Result<ActionEvaluationResult> {
-    let mut result = if context.goal_active {
-        context.action.evaluate(ctx)?
-    } else {
-        tracing::trace!("Goal {} not active, skipping action {}", context.trace.goal, context.action);
-        ActionEvaluationResult::Skip
-    };
-
-    //Treat empty result as skipped to prevent further checks for empty
-    match &result {
-        ActionEvaluationResult::Execute(commands, _) | ActionEvaluationResult::ExecuteTrigger(commands, _, _)
-            if commands.is_empty() =>
-        {
-            tracing::warn!("Received empty commands list from action {}. Skipping.", context.action);
-            result = ActionEvaluationResult::Skip
-        }
-        _ => {}
-    }
-
-    context.trace.fulfilled = Some(!matches!(result, ActionEvaluationResult::Skip));
-
-    Ok(result)
-}
-
-#[tracing::instrument(ret(level = tracing::Level::TRACE), skip_all)]
-fn check_locked<A>(
-    context: &mut Context<A>,
-    evaluation_result: ActionEvaluationResult,
-    resource_lock: &mut ResourceLock<CommandTarget>,
-) -> ActionEvaluationResult {
-    let locking_keys = match &evaluation_result {
-        ActionEvaluationResult::Execute(commands, _) | ActionEvaluationResult::ExecuteTrigger(commands, _, _) => {
-            commands
-                .iter()
-                .map(|command| CommandTarget::from(command.clone()))
-                .collect()
-        }
-        ActionEvaluationResult::Skip => vec![],
-    };
-
-    //only succeed if all commands can be locked. Partial execution will most likely lead to
-    //unwanted result
-    if locking_keys.iter().any(|key| resource_lock.is_locked(key)) {
-        context.trace.locked = true;
-        return ActionEvaluationResult::Skip;
-    }
-
-    for key in locking_keys {
-        resource_lock.lock(key);
-    }
-
-    evaluation_result
 }
 
 #[tracing::instrument(skip(command_client, ctx))]
@@ -260,9 +155,8 @@ async fn should_execute(
     Ok(true)
 }
 
-#[tracing::instrument(skip(context, command_client, ctx))]
-async fn execute_action<A: Action>(
-    context: &mut Context<A>,
+async fn execute_command(
+    trace: &mut PlanningTraceStep,
     command: Command,
     source: ExternalId,
     user_trigger_id: Option<UserTriggerId>,
@@ -271,25 +165,23 @@ async fn execute_action<A: Action>(
 ) {
     let target: CommandTarget = command.clone().into();
 
-    context.user_trigger_id = user_trigger_id.clone();
-
     match should_execute(&command, &source, command_client, ctx).await {
         Ok(true) => match command_client.execute(command, source, user_trigger_id).await {
             Ok(_) => {
-                tracing::info!("Command {} executed via action {}", target, context.action);
-                context.trace.triggered = Some(true);
+                tracing::info!("Command {} executed via action {}", target, trace.action);
+                trace.triggered = Some(true);
             }
             Err(e) => tracing::error!("Error executing command for {}: {:?}", target, e),
         },
         Ok(false) => {
-            tracing::trace!("Skipped execution command {} via action {}", target, context.action);
-            context.trace.triggered = Some(false);
+            tracing::trace!("Skipped execution command {} via action {}", target, trace.action);
+            trace.triggered = Some(false);
         }
         Err(e) => {
             tracing::error!(
                 "Error checking whether command for {} via action {} should be started: {:?}",
                 target,
-                context.action,
+                trace.action,
                 e
             );
         }

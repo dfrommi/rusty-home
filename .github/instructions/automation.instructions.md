@@ -1,3 +1,6 @@
+---
+applyTo: app/src/automation/**
+---
 # Automation
 
 Resource-centric action planning system. Reacts to `HomeStateEvent` changes and a 30-second timer.
@@ -11,3 +14,4 @@ Each rule returns a single `Command` (not a vec). Rules are independent — they
 ## Adding or updating a rule
 
 Use the `automation-rule` skill (structure/wiring) and `implement-rule` skill (decision logic).
+

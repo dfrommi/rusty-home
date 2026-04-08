@@ -1,3 +1,6 @@
+---
+applyTo: app/src/**
+---
 # Module Structure
 
 Composition root: `main.rs`. Each domain module lives in `<module>/`:
@@ -26,3 +29,4 @@ Composition root: `main.rs`. Each domain module lives in `<module>/`:
 
 Default to module + client + service unless it's a pure runner or stateless adapter.
 Keep wiring in `mod.rs`, logic in `service.rs`, types in `domain/`, IO in `adapter/`.
+

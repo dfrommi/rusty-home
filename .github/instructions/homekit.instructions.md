@@ -1,3 +1,6 @@
+---
+applyTo: app/src/frontends/homekit/**
+---
 # HomeKit Frontend
 
 Bridges the home automation system to Apple HomeKit via
@@ -30,3 +33,4 @@ HomekitRegistry (accessory/mod.rs)
 ## Adding a new accessory
 
 Use the `homekit-accessory` skill.
+

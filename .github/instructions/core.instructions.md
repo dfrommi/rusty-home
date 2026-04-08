@@ -1,3 +1,6 @@
+---
+applyTo: app/src/core/**
+---
 # Core
 
 Shared domain types, time abstractions, time-series data structures, and unit types.
@@ -18,3 +21,4 @@ t!(in 5 hours)            // DateTime
 - `DateTime::now()` uses a task-local override — set it in tests for deterministic time.
 - `DataFrame` deduplicates on insert: consecutive identical values are silently dropped.
 - Unit types (`DegreeCelsius`, `Percent`, etc.) divided by `Duration` produce `RateOfChange<T>`.
+

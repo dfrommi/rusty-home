@@ -1,3 +1,6 @@
+---
+applyTo: app/src/command/**
+---
 # Command
 
 Executes commands against external smart-home systems. Follows module + client + service pattern.
@@ -14,3 +17,4 @@ Before re-executing a command, the planner checks two things in `command_state.r
 ## Adding a new command
 
 Use the `command` skill.
+

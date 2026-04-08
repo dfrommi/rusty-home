@@ -23,3 +23,11 @@ Smart-home collection and automation software.
 ## System Workflow
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full data-flow and module responsibilities.
+
+## Important Commands
+
+- `cargo fmt` - format code
+- `cargo clippyl` - lint code
+- `cargo test` - run all tests
+
+At the end of each task, run `cargo fmt` and `cargo clippy` to ensure code quality.

@@ -1,3 +1,6 @@
+---
+applyTo: lib/macro/**
+---
 # Macro
 
 Procedural macro crate at `lib/macro/`.
@@ -14,3 +17,4 @@ Procedural macro crate at `lib/macro/`.
 ## StateEnumDerive naming convention
 
 The enum **must** be named `*Value` (e.g., `DeviceStateValue`). The macro strips the `Value` suffix to generate the ID enum name (e.g., `DeviceStateId`).
+

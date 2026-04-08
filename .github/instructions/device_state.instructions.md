@@ -1,3 +1,6 @@
+---
+applyTo: app/src/device_state/**
+---
 # Device State
 
 Collects raw device readings from multiple sources and stores them as time-series. Follows module + client + service pattern.

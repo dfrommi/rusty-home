@@ -1,3 +1,6 @@
+---
+applyTo: app/src/trigger/**
+---
 # Trigger
 
 Manages user-initiated triggers with time-windowed activation. Follows module + client + service pattern.
@@ -13,3 +16,4 @@ Manages user-initiated triggers with time-windowed activation. Follows module + 
 1. Add variant to `UserTrigger` in `domain/mod.rs`
 2. Add corresponding `UserTriggerTarget` variant
 3. Wire the trigger source (e.g., frontend, remote adapter)
+

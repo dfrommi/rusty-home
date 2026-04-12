@@ -57,6 +57,8 @@ impl SimpleRule for Dehumidify {
             Dehumidify::Bedroom => {
                 let current_fan_state = ctx.current_dp(FanActivity::BedroomDehumidifier)?;
                 let current_dewpoint = ctx.current(DewPoint::Room(Room::Bedroom))?;
+                let current_outside_dewpoint = ctx.current(DewPoint::Outside)?;
+                let current_dewpoint_diff = current_dewpoint - current_outside_dewpoint;
                 let last_ventilation = ctx.current_dp(Ventilation::Room(RoomWithWindow::Bedroom))?.timestamp;
                 let sleep_mode =
                     ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))? == HeatingMode::Sleep;
@@ -82,6 +84,14 @@ impl SimpleRule for Dehumidify {
                     return Ok(false);
                 }
 
+                if current_dewpoint_diff < DegreeCelsius(4.0) {
+                    tracing::info!(
+                        "Dewpoint close to outside (less than 4 degrees); skipping dehumidification. Diff: {current_dewpoint_diff}"
+                    );
+                    return Ok(false);
+                }
+
+                //TODO compare with room temperature. Value optimized for about 19 degrees
                 let above_dewpoint = hysteresis_above(
                     current_fan_state.value.is_on(),
                     current_dewpoint,

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use infrastructure::TraceContext;
+use tracing::Instrument;
 
 use crate::command::{Command, CommandClient, CommandTarget};
 use crate::core::id::ExternalId;
@@ -45,6 +46,7 @@ pub async fn plan_and_execute(
     Ok(PlanningTrace::new(steps))
 }
 
+#[tracing::instrument(skip_all, fields(resource = %resource, otel.name = %resource))]
 async fn evaluate_resource_plan(
     resource: &CommandTarget,
     rules: &[HomeAction],
@@ -53,29 +55,35 @@ async fn evaluate_resource_plan(
     steps: &mut Vec<PlanningTraceStep>,
     used_triggers: &mut Vec<UserTriggerId>,
 ) -> Result<()> {
-    let resource_span = tracing::info_span!("resource", %resource);
-    let _enter = resource_span.enter();
-
     for action in rules {
-        let mut trace = PlanningTraceStep::new(action, resource);
-        trace.correlation_id = TraceContext::current().correlation_id();
+        let action_span = tracing::info_span!("process_action", %action, otel.name = %action);
 
-        let result = {
-            let _span = tracing::info_span!("evaluate_action", %action).entered();
-            action.evaluate(ctx)
-        };
+        // Synchronous evaluation — span guard is safe here (no .await)
+        let (mut trace, result) = action_span.in_scope(|| {
+            let mut trace = PlanningTraceStep::new(action, resource);
+            trace.correlation_id = TraceContext::current().correlation_id();
+            let result = action.evaluate(ctx);
+            (trace, result)
+        });
 
         match result {
             Ok(ActionEvaluationResult::Execute(command, source)) => {
                 trace.fulfilled = Some(true);
-                execute_command(&mut trace, command, source, None, command_client, ctx).await;
+                // Async execution — use .instrument() to avoid holding span guard across .await
+                execute_command(&mut trace, command, source, None, command_client, ctx)
+                    .instrument(action_span.clone())
+                    .await;
+                finalize_action_span(&action_span, action, &trace);
                 steps.push(trace);
                 return Ok(());
             }
             Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
                 trace.fulfilled = Some(true);
                 used_triggers.push(trigger_id.clone());
-                execute_command(&mut trace, command, source, Some(trigger_id), command_client, ctx).await;
+                execute_command(&mut trace, command, source, Some(trigger_id), command_client, ctx)
+                    .instrument(action_span.clone())
+                    .await;
+                finalize_action_span(&action_span, action, &trace);
                 steps.push(trace);
                 return Ok(());
             }
@@ -84,14 +92,25 @@ async fn evaluate_resource_plan(
                 steps.push(trace);
             }
             Err(e) => {
-                tracing::error!("Error evaluating action {}: {:?}", action, e);
-                TraceContext::current().set_error(e.to_string());
+                action_span.in_scope(|| {
+                    tracing::error!("Error evaluating action {}: {:?}", action, e);
+                    TraceContext::current().set_error(e.to_string());
+                });
                 steps.push(trace);
             }
         }
     }
 
     Ok(())
+}
+
+fn finalize_action_span(span: &tracing::Span, action: &HomeAction, trace: &PlanningTraceStep) {
+    span.in_scope(|| {
+        TraceContext::current().set_span_name(action.to_string());
+        if trace.triggered == Some(true) {
+            TraceContext::current().set_ok();
+        }
+    });
 }
 
 async fn handle_trigger_updates(
@@ -155,6 +174,7 @@ async fn should_execute(
     Ok(true)
 }
 
+#[tracing::instrument(skip_all)]
 async fn execute_command(
     trace: &mut PlanningTraceStep,
     command: Command,

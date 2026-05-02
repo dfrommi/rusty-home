@@ -1,4 +1,8 @@
+use std::future::Future;
+
+use futures::future::select_all;
 use infrastructure::{EventBus, Mqtt};
+use tokio::task::{AbortHandle, JoinError, JoinHandle};
 
 use crate::automation::AutomationModule;
 use crate::command::CommandModule;
@@ -20,6 +24,8 @@ struct Infrastructure {
     db_pool: sqlx::PgPool,
     mqtt_client: Mqtt,
 }
+
+type AppTask = (&'static str, JoinHandle<()>);
 
 #[tokio::main(flavor = "multi_thread")]
 #[allow(clippy::expect_used)]
@@ -112,43 +118,50 @@ pub async fn main() {
 
     tracing::info!("Starting main loop");
 
-    tokio::spawn(async move {
-        device_state_module.run().await;
-    });
+    let mut tasks = vec![
+        spawn_app_task("device-state", async move {
+            device_state_module.run().await;
+        }),
+        spawn_app_task("automation", async move {
+            automation_module.run().await;
+        }),
+        spawn_app_task("home-state", async move {
+            home_state_module.run().await;
+        }),
+        spawn_app_task("observability", async move {
+            observability_module.run().await;
+        }),
+        spawn_app_task("http-server", async move {
+            http_server_exec.await;
+        }),
+        spawn_app_task("command", async move {
+            command_module.run().await;
+        }),
+        spawn_app_task("homekit", async move {
+            tracing::info!("Starting HomeKit runner");
+            homekit_module.run().await;
+        }),
+        spawn_app_task("remote", async move {
+            tracing::info!("Starting remote runner");
+            remote_module.run().await;
+        }),
+    ];
+    let task_abort_handles = tasks
+        .iter()
+        .map(|(_, task_handle)| task_handle.abort_handle())
+        .collect::<Vec<_>>();
 
-    tokio::spawn(async move {
-        automation_module.run().await;
-    });
+    tokio::select! {
+        (task_name, task_result) = wait_for_first_task_exit(&mut tasks) => {
+            abort_tasks(task_abort_handles);
+            handle_task_exit(task_name, task_result);
+        }
 
-    tokio::spawn(async move {
-        home_state_module.run().await;
-    });
-
-    tokio::spawn(async move {
-        observability_module.run().await;
-    });
-
-    tokio::spawn(async move {
-        http_server_exec.await;
-    });
-
-    tokio::spawn(async move {
-        command_module.run().await;
-    });
-
-    tokio::spawn(async move {
-        tracing::info!("Starting HomeKit runner");
-        homekit_module.run().await;
-    });
-
-    tokio::spawn(async move {
-        tracing::info!("Starting remote runner");
-        remote_module.run().await;
-    });
-
-    infrastructure.mqtt_client.run().await;
-
-    tracing::info!("Shutting down");
+        () = infrastructure.mqtt_client.run() => {
+            abort_tasks(task_abort_handles);
+            panic!("MQTT runner exited unexpectedly");
+        }
+    }
 }
 
 impl Infrastructure {
@@ -161,5 +174,37 @@ impl Infrastructure {
         let mqtt_client = settings.mqtt.new_client();
 
         Ok(Self { db_pool, mqtt_client })
+    }
+}
+
+fn spawn_app_task(name: &'static str, future: impl Future<Output = ()> + Send + 'static) -> AppTask {
+    (name, tokio::spawn(future))
+}
+
+async fn wait_for_first_task_exit(tasks: &mut [AppTask]) -> (&'static str, Result<(), JoinError>) {
+    let task_names = tasks.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+    let task_handles = tasks.iter_mut().map(|(_, task_handle)| task_handle).collect::<Vec<_>>();
+    let (task_result, task_index, _remaining_tasks) = select_all(task_handles).await;
+    let task_name = task_names[task_index];
+
+    (task_name, task_result)
+}
+
+fn abort_tasks(tasks: Vec<AbortHandle>) {
+    for task in tasks {
+        task.abort();
+    }
+}
+
+fn handle_task_exit(task_name: &'static str, task_result: Result<(), JoinError>) -> ! {
+    tracing::error!(task_name, "Application task exited; shutting down remaining tasks");
+
+    match task_result {
+        Ok(()) => panic!("Application task {task_name} exited unexpectedly"),
+        Err(err) if err.is_panic() => {
+            tracing::error!(task_name, "Application task panicked");
+            std::panic::resume_unwind(err.into_panic());
+        }
+        Err(err) => panic!("Application task {task_name} was cancelled unexpectedly: {err}"),
     }
 }

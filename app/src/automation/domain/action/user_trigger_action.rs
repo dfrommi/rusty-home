@@ -73,6 +73,7 @@ impl UserTriggerAction {
                 }
             }
             UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier) => Some(t!(1 hours)),
+            UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier) => None,
             UserTriggerTarget::Heating(HeatingZone::LivingRoom)
             | UserTriggerTarget::Heating(HeatingZone::Bedroom)
             | UserTriggerTarget::Heating(HeatingZone::Kitchen)
@@ -116,6 +117,10 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         UserTrigger::FanSpeed { fan, airflow } => {
             let device = match fan {
                 FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
+                FanActivity::LivingRoomAirPurifier => {
+                    tracing::info!("Living room air purifier trigger has no command target, skipping");
+                    return None;
+                }
             };
             Some(Command::ControlFan { device, speed: airflow })
         }

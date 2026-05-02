@@ -22,12 +22,14 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
 
         match dp.value {
             HomeStateValue::AbsoluteHumidity(_, v) => default_with(f64::from(&v)),
+            HomeStateValue::AllergenIndex(_, v) => default_with(f64::from(&v)),
             HomeStateValue::ColdAirComingIn(_, v) => default_with(v.into()),
             HomeStateValue::DewPoint(_, v) => default_with(f64::from(&v)),
             HomeStateValue::FeltTemperature(_, v) => default_with(f64::from(&v)),
             HomeStateValue::IsRunning(_, v) => default_with(v.into()),
             HomeStateValue::Occupancy(_, v) => default_with(f64::from(&v)),
             HomeStateValue::Opened(_, v) => default_with(v.into()),
+            HomeStateValue::ParticulateMatter(_, v) => default_with(f64::from(&v)),
             HomeStateValue::Resident(_, v) => default_with(v.into()),
             HomeStateValue::RiskOfMould(_, v) => default_with(v.into()),
             HomeStateValue::Ventilation(_, v) => default_with(v.into()),

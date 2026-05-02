@@ -213,8 +213,10 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
     }
 
     match id {
+        DeviceStateId::AllergenIndex(id) => DeviceStateValue::AllergenIndex(id, value.into()),
         DeviceStateId::EnergySaving(id) => DeviceStateValue::EnergySaving(id, bool_of(value)),
         DeviceStateId::Opened(id) => DeviceStateValue::Opened(id, bool_of(value)),
+        DeviceStateId::ParticulateMatter(id) => DeviceStateValue::ParticulateMatter(id, value.into()),
         DeviceStateId::PowerAvailable(id) => DeviceStateValue::PowerAvailable(id, bool_of(value)),
         DeviceStateId::Presence(id) => DeviceStateValue::Presence(id, bool_of(value)),
         DeviceStateId::CurrentPowerUsage(id) => DeviceStateValue::CurrentPowerUsage(id, value.into()),

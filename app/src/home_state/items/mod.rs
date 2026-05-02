@@ -1,4 +1,5 @@
 mod absolute_humidity;
+mod allergen_index;
 mod cold_air_coming_in;
 mod dewpoint;
 mod energy_saving;
@@ -8,6 +9,7 @@ mod heating;
 mod is_running;
 mod occupancy;
 mod opened;
+mod particulate_matter;
 mod power_available;
 mod presence;
 mod relative_humidity;
@@ -20,6 +22,7 @@ mod ventilation;
 use std::fmt::Debug;
 
 pub use absolute_humidity::AbsoluteHumidity;
+pub use allergen_index::AllergenIndex;
 pub use cold_air_coming_in::ColdAirComingIn;
 pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
@@ -29,6 +32,7 @@ pub use heating::*;
 pub use is_running::IsRunning;
 pub use occupancy::Occupancy;
 pub use opened::Opened;
+pub use particulate_matter::ParticulateMatter;
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
@@ -48,12 +52,14 @@ use r#macro::StateEnumDerive;
 #[derive(Debug, Clone, PartialEq, StateEnumDerive)]
 pub enum HomeStateValue {
     AbsoluteHumidity(AbsoluteHumidity, GramPerCubicMeter),
+    AllergenIndex(AllergenIndex, AllergenIndexValue),
     ColdAirComingIn(ColdAirComingIn, bool),
     DewPoint(DewPoint, DegreeCelsius),
     FeltTemperature(FeltTemperature, DegreeCelsius),
     IsRunning(IsRunning, bool),
     Occupancy(Occupancy, Probability),
     Opened(Opened, bool),
+    ParticulateMatter(ParticulateMatter, MicrogramsPerCubicMeter),
     Resident(Resident, bool),
     RiskOfMould(RiskOfMould, bool),
     Ventilation(Ventilation, bool),
@@ -89,6 +95,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::AbsoluteHumidity(id) => absolute_humidity::AbsoluteHumidityStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::AbsoluteHumidity(id, value)),
+            HomeStateId::AllergenIndex(id) => allergen_index::AllergenIndexStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::AllergenIndex(id, value)),
             HomeStateId::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::ColdAirComingIn(id, value)),
@@ -107,6 +116,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::Opened(id) => opened::OpenedStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Opened(id, value)),
+            HomeStateId::ParticulateMatter(id) => particulate_matter::ParticulateMatterStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::ParticulateMatter(id, value)),
             HomeStateId::Ventilation(id) => ventilation::VentilationStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::Ventilation(id, value)),

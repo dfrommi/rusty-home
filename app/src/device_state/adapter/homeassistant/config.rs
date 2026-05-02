@@ -1,9 +1,22 @@
-use crate::device_state::{FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature};
+use crate::device_state::{
+    AllergenIndex, FanActivity, LightLevel, ParticulateMatter, PowerAvailable, Presence, RelativeHumidity, Temperature,
+};
 
 use super::HaChannel;
 
 pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
     vec![
+        //
+        // AIR QUALITY
+        //
+        (
+            "sensor.wohnzimmer_indoor_allergen_index",
+            HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
+        ),
+        (
+            "sensor.wohnzimmer_pm2_5",
+            HaChannel::ParticulateMatter(ParticulateMatter::LivingRoomPM25),
+        ),
         //
         // TEMPERATURE
         //
@@ -96,6 +109,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "humidifier.dehumidifier_34e8",
             HaChannel::ComfeeDehumidifierFanPowerState(FanActivity::BedroomDehumidifier),
+        ),
+        (
+            "fan.wohnzimmer",
+            HaChannel::PhilipsAirPurifierFan(FanActivity::LivingRoomAirPurifier),
         ),
         //
         // LIGHT LEVEL

@@ -1,3 +1,4 @@
+mod air_quality;
 mod degree_celsius;
 mod density;
 mod derivative;
@@ -10,6 +11,7 @@ mod percent;
 mod probability;
 mod watt;
 
+pub use air_quality::{AllergenIndexValue, MicrogramsPerCubicMeter};
 pub use degree_celsius::DegreeCelsius;
 pub use density::GramPerCubicMeter;
 pub use derivative::RateOfChange;

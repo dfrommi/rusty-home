@@ -9,7 +9,8 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{
-    DeviceAvailability, FanActivity, LightLevel, PowerAvailable, Presence, RelativeHumidity, Temperature,
+    AllergenIndex, DeviceAvailability, FanActivity, LightLevel, ParticulateMatter, PowerAvailable, Presence,
+    RelativeHumidity, Temperature,
 };
 use std::collections::HashMap;
 
@@ -18,7 +19,9 @@ use serde::Deserializer;
 use serde_json::Value;
 
 use crate::core::timeseries::DataPoint;
-use crate::core::unit::{DegreeCelsius, FanAirflow, FanSpeed, Lux, Percent};
+use crate::core::unit::{
+    AllergenIndexValue, DegreeCelsius, FanAirflow, FanSpeed, Lux, MicrogramsPerCubicMeter, Percent,
+};
 use crate::device_state::DeviceStateValue;
 
 use crate::core::DeviceConfig;
@@ -32,6 +35,8 @@ struct ComfeeFanCache {
 
 #[derive(Debug, Clone)]
 pub enum HaChannel {
+    AllergenIndex(AllergenIndex),
+    ParticulateMatter(ParticulateMatter),
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Powered(PowerAvailable),
@@ -40,6 +45,7 @@ pub enum HaChannel {
     PresenceFromFP2(Presence),
     ComfeeDehumidifierFanPowerState(FanActivity),
     ComfeeDehumidifierFanSpeed(FanActivity),
+    PhilipsAirPurifierFan(FanActivity),
     LightLevel(LightLevel),
 }
 
@@ -179,6 +185,20 @@ fn to_persistent_data_point(
     comfee_cache: &Mutex<HashMap<FanActivity, ComfeeFanCache>>,
 ) -> anyhow::Result<Option<IncomingData>> {
     let dp: Option<IncomingData> = match channel {
+        HaChannel::AllergenIndex(channel) => Some(
+            DataPoint::new(
+                DeviceStateValue::AllergenIndex(channel, AllergenIndexValue(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
+        ),
+        HaChannel::ParticulateMatter(channel) => Some(
+            DataPoint::new(
+                DeviceStateValue::ParticulateMatter(channel, MicrogramsPerCubicMeter(ha_value.parse()?)),
+                timestamp,
+            )
+            .into(),
+        ),
         HaChannel::Temperature(channel) => Some(
             DataPoint::new(
                 DeviceStateValue::Temperature(channel, DegreeCelsius(ha_value.parse()?)),
@@ -224,9 +244,34 @@ fn to_persistent_data_point(
 
             update_comfee_state(comfee_cache, channel, ComfeeFanUpdate::Powered(on), timestamp)?
         }
+        HaChannel::PhilipsAirPurifierFan(channel) => Some(
+            DataPoint::new(
+                DeviceStateValue::FanActivity(
+                    channel,
+                    philips_air_purifier_airflow(ha_value, attributes.get("preset_mode").and_then(|v| v.as_str()))?,
+                ),
+                timestamp,
+            )
+            .into(),
+        ),
     };
 
     Ok(dp)
+}
+
+fn philips_air_purifier_airflow(ha_value: &str, preset_mode: Option<&str>) -> anyhow::Result<FanAirflow> {
+    if ha_value == "off" {
+        return Ok(FanAirflow::Off);
+    }
+
+    let fan_speed = match preset_mode {
+        Some("auto" | "allergen" | "bacteria" | "sleep" | "speed_1") => FanSpeed::Low,
+        Some("speed_2") => FanSpeed::Medium,
+        Some("speed_3" | "turbo") => FanSpeed::High,
+        _ => bail!("Unknown living room air purifier fan speed value: {:?}", preset_mode),
+    };
+
+    Ok(FanAirflow::Forward(fan_speed))
 }
 
 #[derive(Debug, Clone)]
@@ -369,4 +414,121 @@ pub enum HaEvent {
 
     #[serde(untagged)]
     Unknown(#[allow(dead_code)] serde_json::Value),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::unit::AllergenIndexValue;
+    use crate::t;
+    use serde_json::json;
+
+    fn extract_state_value(value: IncomingData) -> DeviceStateValue {
+        match value {
+            IncomingData::StateValue(dp) => dp.value,
+            IncomingData::ItemAvailability(_) => panic!("Expected state value"),
+        }
+    }
+
+    #[test]
+    fn parses_allergen_index() {
+        let value = to_persistent_data_point(
+            HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
+            "7",
+            &HashMap::new(),
+            t!(now),
+            &Mutex::new(HashMap::new()),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            extract_state_value(value),
+            DeviceStateValue::AllergenIndex(AllergenIndex::LivingRoom, AllergenIndexValue(7),)
+        );
+    }
+
+    #[test]
+    fn parses_pm25() {
+        let value = to_persistent_data_point(
+            HaChannel::ParticulateMatter(ParticulateMatter::LivingRoomPM25),
+            "3.25",
+            &HashMap::new(),
+            t!(now),
+            &Mutex::new(HashMap::new()),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            extract_state_value(value),
+            DeviceStateValue::ParticulateMatter(ParticulateMatter::LivingRoomPM25, MicrogramsPerCubicMeter(3.25),)
+        );
+    }
+
+    #[test]
+    fn maps_philips_air_purifier_presets() {
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("auto")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Low)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("allergen")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Low)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("bacteria")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Low)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("sleep")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Low)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("speed_1")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Low)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("speed_2")).unwrap(),
+            FanAirflow::Forward(FanSpeed::Medium)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("speed_3")).unwrap(),
+            FanAirflow::Forward(FanSpeed::High)
+        );
+        assert_eq!(
+            philips_air_purifier_airflow("on", Some("turbo")).unwrap(),
+            FanAirflow::Forward(FanSpeed::High)
+        );
+    }
+
+    #[test]
+    fn maps_philips_air_purifier_off_without_preset() {
+        assert_eq!(philips_air_purifier_airflow("off", None).unwrap(), FanAirflow::Off);
+    }
+
+    #[test]
+    fn rejects_unknown_philips_air_purifier_preset() {
+        assert!(philips_air_purifier_airflow("on", Some("unknown")).is_err());
+    }
+
+    #[test]
+    fn parses_philips_air_purifier_fan_state() {
+        let attributes = HashMap::from([("preset_mode".to_string(), json!("turbo"))]);
+
+        let value = to_persistent_data_point(
+            HaChannel::PhilipsAirPurifierFan(FanActivity::LivingRoomAirPurifier),
+            "on",
+            &attributes,
+            t!(now),
+            &Mutex::new(HashMap::new()),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            extract_state_value(value),
+            DeviceStateValue::FanActivity(FanActivity::LivingRoomAirPurifier, FanAirflow::Forward(FanSpeed::High),)
+        );
+    }
 }

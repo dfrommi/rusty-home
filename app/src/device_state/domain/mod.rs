@@ -2,6 +2,7 @@ use r#macro::StateEnumDerive;
 
 use crate::core::unit::*;
 
+mod allergen_index;
 mod current_power_usage;
 mod energy_saving;
 mod fan_activity;
@@ -9,6 +10,7 @@ mod heating_demand;
 mod heating_demand_limit;
 mod light_level;
 mod opened;
+mod particulate_matter;
 mod power_available;
 mod presence;
 mod relative_humidity;
@@ -18,6 +20,7 @@ mod total_energy_consumption;
 mod total_radiator_consumption;
 mod total_water_consumption;
 
+pub use allergen_index::AllergenIndex;
 pub use current_power_usage::CurrentPowerUsage;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::FanActivity;
@@ -25,6 +28,7 @@ pub use heating_demand::HeatingDemand;
 pub use heating_demand_limit::HeatingDemandLimit;
 pub use light_level::LightLevel;
 pub use opened::Opened;
+pub use particulate_matter::ParticulateMatter;
 pub use power_available::PowerAvailable;
 pub use presence::Presence;
 pub use relative_humidity::RelativeHumidity;
@@ -36,6 +40,7 @@ pub use total_water_consumption::TotalWaterConsumption;
 
 #[derive(Debug, Clone, PartialEq, StateEnumDerive)]
 pub enum DeviceStateValue {
+    AllergenIndex(allergen_index::AllergenIndex, AllergenIndexValue),
     EnergySaving(energy_saving::EnergySaving, bool),
     CurrentPowerUsage(current_power_usage::CurrentPowerUsage, Watt),
     FanActivity(fan_activity::FanActivity, FanAirflow),
@@ -43,6 +48,7 @@ pub enum DeviceStateValue {
     HeatingDemandLimit(heating_demand_limit::HeatingDemandLimit, Percent),
     LightLevel(light_level::LightLevel, Lux),
     Opened(opened::Opened, bool),
+    ParticulateMatter(particulate_matter::ParticulateMatter, MicrogramsPerCubicMeter),
     PowerAvailable(power_available::PowerAvailable, bool),
     Presence(presence::Presence, bool),
     RelativeHumidity(relative_humidity::RelativeHumidity, Percent),
@@ -56,11 +62,13 @@ pub enum DeviceStateValue {
 impl From<&DeviceStateValue> for f64 {
     fn from(value: &DeviceStateValue) -> Self {
         match value {
+            DeviceStateValue::AllergenIndex(_, v) => v.into(),
             DeviceStateValue::CurrentPowerUsage(_, v) => v.into(),
             DeviceStateValue::FanActivity(_, v) => v.into(),
             DeviceStateValue::HeatingDemand(_, v) => v.into(),
             DeviceStateValue::HeatingDemandLimit(_, v) => v.into(),
             DeviceStateValue::LightLevel(_, v) => v.into(),
+            DeviceStateValue::ParticulateMatter(_, v) => v.into(),
             DeviceStateValue::RelativeHumidity(_, v) => v.into(),
             DeviceStateValue::SetPoint(_, v) => v.into(),
             DeviceStateValue::Temperature(_, v) => v.into(),

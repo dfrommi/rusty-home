@@ -48,10 +48,11 @@ impl TraceContext {
         });
     }
 
-    pub fn record(&self, key: impl Into<String>, value: impl Into<String>) {
+    pub fn record(&self, key: impl Into<String>, value: impl Into<String>) -> &Self {
         self.otel_ctx()
             .span()
             .set_attribute(KeyValue::new(key.into(), value.into()));
+        self
     }
 
     pub fn record_json(&self, key: impl Into<String>, value: &serde_json::Value) {

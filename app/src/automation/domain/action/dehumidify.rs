@@ -11,6 +11,7 @@ use crate::{
     t,
 };
 use anyhow::Result;
+use infrastructure::TraceContext;
 use r#macro::{EnumVariants, Id};
 
 use crate::home_state::RiskOfMould;
@@ -62,6 +63,12 @@ impl SimpleRule for Dehumidify {
                 let last_ventilation = ctx.current_dp(Ventilation::Room(RoomWithWindow::Bedroom))?.timestamp;
                 let sleep_mode =
                     ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))? == HeatingMode::Sleep;
+
+                TraceContext::current()
+                    .record("dewpoint", current_dewpoint.to_string())
+                    .record("outside_dewpoint", current_outside_dewpoint.to_string())
+                    .record("dewpoint_diff", current_dewpoint_diff.to_string())
+                    .record("sleep_mode", sleep_mode.to_string());
 
                 //TODO move to central blocker
                 if sleep_mode {

@@ -68,6 +68,18 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 .into(),
             ],
         ),
+        (
+            CommandTarget::ControlFan {
+                device: Fan::LivingRoomAirPurifier,
+            },
+            vec![
+                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
+                FollowDefaultSetting::new(CommandTarget::ControlFan {
+                    device: Fan::LivingRoomAirPurifier,
+                })
+                .into(),
+            ],
+        ),
         // --- Heating devices (one per radiator) ---
         (
             CommandTarget::SetHeating {

@@ -142,5 +142,6 @@ fn config() -> Vec<HomekitAccessory> {
             EnergySaving::LivingRoomTv,
         )),
         HomekitAccessory::Fan(Fan::new("Entfeuchter Bad", FanActivity::BedroomDehumidifier)),
+        HomekitAccessory::Fan(Fan::new("Luftreiniger Wohnzimmer", FanActivity::LivingRoomAirPurifier)),
     ]
 }

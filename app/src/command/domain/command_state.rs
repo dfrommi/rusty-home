@@ -144,8 +144,13 @@ async fn is_set_energy_saving_reflected_in_state(
     Ok(recent_command && is_energy_saving == on)
 }
 
-fn is_fan_control_reflected_in_state(_: &Fan, airflow: &FanAirflow, snapshot: &StateSnapshot) -> Result<bool> {
-    let current_flow = snapshot.try_get(FanActivity::BedroomDehumidifier)?.value;
+fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, snapshot: &StateSnapshot) -> Result<bool> {
+    let state_device = match device {
+        Fan::BedroomDehumidifier => FanActivity::BedroomDehumidifier,
+        Fan::LivingRoomAirPurifier => FanActivity::LivingRoomAirPurifier,
+    };
+
+    let current_flow = snapshot.try_get(state_device)?.value;
 
     Ok(current_flow == *airflow)
 }

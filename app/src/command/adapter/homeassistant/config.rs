@@ -40,6 +40,12 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
             },
         ),
         (
+            CommandTarget::ControlFan {
+                device: Fan::LivingRoomAirPurifier,
+            },
+            HaServiceTarget::PhilipsAirPurifierFan("fan.wohnzimmer"),
+        ),
+        (
             CommandTarget::OpenDoor {
                 device: Lock::BuildingEntrance,
             },

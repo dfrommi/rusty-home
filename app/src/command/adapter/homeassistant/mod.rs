@@ -18,6 +18,7 @@ enum HaServiceTarget {
         humidifier_id: &'static str,
         fan_id: &'static str,
     },
+    PhilipsAirPurifierFan(&'static str),
     NukiLock(&'static str),
 }
 
@@ -82,6 +83,9 @@ impl HomeAssistantCommandExecutor {
             (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => self.lg_tv_energy_saving_mode(id, *on).await,
             (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
                 self.comfee_fan_speed(humidifier_id, fan_id, speed).await
+            }
+            (PhilipsAirPurifierFan(id), Command::ControlFan { speed, .. }) => {
+                self.philips_air_purifier_fan_speed(id, speed).await
             }
             (NukiLock(id), Command::OpenDoor { .. }) => {
                 self.client
@@ -160,6 +164,37 @@ impl HomeAssistantCommandExecutor {
             }
         };
 
+        Ok(())
+    }
+
+    async fn philips_air_purifier_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+        match airflow {
+            FanAirflow::Off => {
+                self.client
+                    .call_service(
+                        "fan",
+                        "turn_off",
+                        json!({
+                            "entity_id": vec![id.to_string()]
+                        }),
+                    )
+                    .await?;
+            }
+            FanAirflow::Forward(fan_speed) => {
+                self.client
+                    .call_service(
+                        "fan",
+                        "turn_on",
+                        json!({
+                            "entity_id": vec![id.to_string()],
+                            "preset_mode": philips_air_purifier_preset(fan_speed)
+                        }),
+                    )
+                    .await?;
+            }
+        }
+
+        record_executed(id);
         Ok(())
     }
 
@@ -282,6 +317,26 @@ fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> 
             "onfail": {"uri": luna_url, "params": payload},
         }
     })
+}
+
+fn philips_air_purifier_preset(speed: &FanSpeed) -> &'static str {
+    match speed {
+        FanSpeed::Low => "speed_1",
+        FanSpeed::Medium => "speed_2",
+        FanSpeed::High => "speed_3",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_philips_air_purifier_command_speed_presets() {
+        assert_eq!(philips_air_purifier_preset(&FanSpeed::Low), "speed_1");
+        assert_eq!(philips_air_purifier_preset(&FanSpeed::Medium), "speed_2");
+        assert_eq!(philips_air_purifier_preset(&FanSpeed::High), "speed_3");
+    }
 }
 
 #[derive(Debug, Clone)]

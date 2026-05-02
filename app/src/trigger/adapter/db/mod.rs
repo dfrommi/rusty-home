@@ -4,6 +4,7 @@ use crate::core::time::{DateTime, DateTimeRange};
 use crate::t;
 use crate::trigger::{UserTrigger, UserTriggerExecution, UserTriggerId};
 use anyhow::Context;
+use serde_json::Value;
 
 pub struct TriggerRepository {
     pool: sqlx::PgPool,
@@ -91,7 +92,9 @@ impl TriggerRepository {
         let mut result = Vec::with_capacity(records.len());
 
         for row in records {
-            let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+            let Some(trigger) = parse_user_trigger(row.id, row.trigger) else {
+                continue;
+            };
             let timestamp = row.timestamp.into();
             let active_from = row.active_from.map(|dt| dt.into());
             let active_until = row.active_until.map(|dt| dt.into());
@@ -130,7 +133,9 @@ impl TriggerRepository {
         let mut result = Vec::with_capacity(records.len());
 
         for row in records {
-            let trigger: UserTrigger = serde_json::from_value(row.trigger)?;
+            let Some(trigger) = parse_user_trigger(row.id, row.trigger) else {
+                continue;
+            };
             let timestamp = row.timestamp.into();
             let active_from = row.active_from.map(|dt| dt.into());
             let active_until = row.active_until.map(|dt| dt.into());
@@ -152,5 +157,94 @@ impl TriggerRepository {
         }
 
         Ok(result)
+    }
+}
+
+fn parse_user_trigger(id: i64, trigger: Value) -> Option<UserTrigger> {
+    match serde_json::from_value(trigger) {
+        Ok(trigger) => Some(trigger),
+        Err(e) => {
+            tracing::warn!("Invalid user_trigger row with id {}, ignoring: {}", id, e);
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{core::time::DateTimeRange, t, trigger::OnOffDevice};
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn active_trigger_query_ignores_unsupported_trigger_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let repo = TriggerRepository::new(pool);
+
+        sqlx::query!(
+            r#"INSERT INTO user_trigger (trigger, timestamp) VALUES ($1, $2), ($3, $4)"#,
+            serde_json::json!({
+                "type": "removed_trigger",
+                "device": "removed_device",
+                "on": true
+            }),
+            t!(30 minutes ago).into_db(),
+            serde_json::json!(UserTrigger::DevicePower {
+                device: OnOffDevice::InfraredHeater,
+                on: true,
+            }),
+            t!(20 minutes ago).into_db(),
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let triggers = repo.get_all_active_triggers_since(t!(1 hours ago)).await?;
+
+        assert_eq!(triggers.len(), 1);
+        match &triggers[0].trigger {
+            UserTrigger::DevicePower { device, on } => {
+                assert_eq!(device, &OnOffDevice::InfraredHeater);
+                assert!(*on);
+            }
+            other => panic!("Unexpected trigger: {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn range_trigger_query_ignores_unsupported_trigger_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let repo = TriggerRepository::new(pool);
+
+        sqlx::query!(
+            r#"INSERT INTO user_trigger (trigger, timestamp) VALUES ($1, $2), ($3, $4)"#,
+            serde_json::json!({
+                "type": "removed_trigger",
+                "device": "removed_device",
+                "on": true
+            }),
+            t!(30 minutes ago).into_db(),
+            serde_json::json!(UserTrigger::DevicePower {
+                device: OnOffDevice::InfraredHeater,
+                on: true,
+            }),
+            t!(20 minutes ago).into_db(),
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let triggers = repo
+            .get_all_triggers_active_anytime_in_range(DateTimeRange::since(t!(1 hours ago)))
+            .await?;
+
+        assert_eq!(triggers.len(), 1);
+        match &triggers[0].trigger {
+            UserTrigger::DevicePower { device, on } => {
+                assert_eq!(device, &OnOffDevice::InfraredHeater);
+                assert!(*on);
+            }
+            other => panic!("Unexpected trigger: {other:?}"),
+        }
+
+        Ok(())
     }
 }

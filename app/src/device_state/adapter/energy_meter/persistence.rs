@@ -51,7 +51,22 @@ impl EnergyReadingRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|row| row.id).collect())
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| match try_into_reading(&row.reading_type, &row.name, row.value) {
+                Ok(_) => Some(row.id),
+                Err(e) => {
+                    tracing::warn!(
+                        "Invalid energy_reading_total row with id {}, type {}, name {}, ignoring: {}",
+                        row.id,
+                        row.reading_type,
+                        row.name,
+                        e
+                    );
+                    None
+                }
+            })
+            .collect())
     }
 
     pub async fn get_total_reading_by_id(&self, id: i64) -> anyhow::Result<DataPoint<EnergyReading>> {
@@ -69,10 +84,19 @@ impl EnergyReadingRepository {
         .await?;
 
         match row {
-            Some(row) => Ok(DataPoint::new(
-                try_into_reading(&row.reading_type, &row.name, row.value)?,
-                row.timestamp.into(),
-            )),
+            Some(row) => match try_into_reading(&row.reading_type, &row.name, row.value) {
+                Ok(reading) => Ok(DataPoint::new(reading, row.timestamp.into())),
+                Err(e) => {
+                    tracing::warn!(
+                        "Invalid energy_reading_total row with id {}, type {}, name {}: {}",
+                        id,
+                        row.reading_type,
+                        row.name,
+                        e
+                    );
+                    Err(e)
+                }
+            },
             None => anyhow::bail!("No energy reading found with id {}", id),
         }
     }
@@ -136,5 +160,54 @@ impl TryInto<Faucet> for &str {
             "bathroom" => Ok(Faucet::Bathroom),
             _ => Err(anyhow::anyhow!("Error parsing Faucet from {}", self)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::t;
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn latest_total_reading_ids_ignore_unsupported_reading_type(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let repo = EnergyReadingRepository::new(pool);
+
+        sqlx::query!(
+            r#"INSERT INTO energy_reading (type, name, value, timestamp) VALUES ($1, $2, $3, $4)"#,
+            "removed_type",
+            "legacy_meter",
+            1.0,
+            t!(now).into_db(),
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let ids = repo.get_latest_total_readings_ids().await?;
+
+        assert!(ids.is_empty());
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn get_total_reading_by_id_warns_and_errors_for_unsupported_name(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let repo = EnergyReadingRepository::new(pool);
+
+        let rec = sqlx::query!(
+            r#"INSERT INTO energy_reading (type, name, value, timestamp) VALUES ($1, $2, $3, $4) RETURNING id"#,
+            "heating",
+            "removed_radiator",
+            1.0,
+            t!(now).into_db(),
+        )
+        .fetch_one(&repo.pool)
+        .await?;
+
+        let result = repo.get_total_reading_by_id(rec.id).await;
+
+        assert!(result.is_err());
+
+        Ok(())
     }
 }

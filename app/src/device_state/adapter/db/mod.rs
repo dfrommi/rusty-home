@@ -120,7 +120,12 @@ impl DeviceStateRepository {
                         timestamp: row.timestamp.into(),
                     }),
                     Err(e) => {
-                        tracing::trace!("Received no longer supported channel {}/{}: {:?}", row.channel, row.name, e);
+                        tracing::warn!(
+                            "Invalid thing_value_tag row for channel/name {}/{}, ignoring: {:?}",
+                            row.channel,
+                            row.name,
+                            e
+                        );
                         None
                     }
                 }
@@ -303,6 +308,36 @@ mod tests {
             dp.value,
             DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
         );
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_get_all_data_points_ignores_unsupported_tag(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(pool);
+
+        let tag_id = sqlx::query_scalar!(
+            r#"INSERT INTO thing_value_tag (channel, name) VALUES ($1, $2) RETURNING id as "id!""#,
+            "removed_state",
+            "removed_device",
+        )
+        .fetch_one(&repo.pool)
+        .await?;
+
+        sqlx::query!(
+            r#"INSERT INTO thing_value (tag_id, value, timestamp) VALUES ($1, $2, $3)"#,
+            tag_id,
+            1.0,
+            t!(now).into_db(),
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let dps = repo
+            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(1 hours ago)))
+            .await?;
+
+        assert!(dps.is_empty());
 
         Ok(())
     }

@@ -126,18 +126,25 @@ impl CommandRepository {
             .filter_map(|row| {
                 let source = ExternalId::new(row.source_type, row.source_id);
                 match serde_json::from_value::<Command>(row.command) {
-                    Ok(command) => Some(CommandExecution {
-                        id: row.id,
-                        command,
-                        state: CommandState::from((row.status, row.error)),
-                        created: row
-                            .created
-                            .expect("created timestamp is always set in the database")
-                            .into(),
-                        source,
-                        user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
-                        correlation_id: row.correlation_id.map(|id| id.into()),
-                    }),
+                    Ok(command) => {
+                        let Some(created) = row.created else {
+                            tracing::warn!(
+                                "Invalid command row with id {}, missing created timestamp, ignoring",
+                                row.id
+                            );
+                            return None;
+                        };
+
+                        Some(CommandExecution {
+                            id: row.id,
+                            command,
+                            state: CommandState::from((row.status, row.error)),
+                            created: created.into(),
+                            source,
+                            user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
+                            correlation_id: row.correlation_id.map(|id| id.into()),
+                        })
+                    }
                     Err(e) => {
                         tracing::warn!("Error mapping command with id {} from database, ignoring: {}", row.id, e);
                         None
@@ -215,5 +222,35 @@ mod tests {
         );
 
         assert_eq!(res.await.unwrap().len(), 4);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_unsupported_command_is_ignored(db_pool: PgPool) -> anyhow::Result<()> {
+        let repo = CommandRepository::new(db_pool);
+        let source = ExternalId::new("test", "source");
+
+        sqlx::query!(
+            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
+            serde_json::json!({
+                "type": "removed_command",
+                "device": "removed_device",
+                "power_on": true
+            }),
+            t!(now).into_db(),
+            DbCommandState::Pending as DbCommandState,
+            source.type_name(),
+            source.variant_name(),
+            None as Option<UserTriggerId>
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let res = repo
+            .query_all_commands(None, &DateTimeRange::since(t!(1 hours ago)))
+            .await?;
+
+        assert!(res.is_empty());
+
+        Ok(())
     }
 }

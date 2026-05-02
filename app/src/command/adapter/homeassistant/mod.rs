@@ -15,7 +15,6 @@ enum HaServiceTarget {
     LightTurnOnOff(&'static str),
     PushNotification(&'static str),
     LgWebosSmartTv(&'static str),
-    WindcalmFanSpeed(&'static str),
     ComfeeDehumidifier {
         humidifier_id: &'static str,
         fan_id: &'static str,
@@ -82,7 +81,6 @@ impl HomeAssistantCommandExecutor {
                 },
             ) => self.dismiss_window_opened_notification(mobile_id).await,
             (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => self.lg_tv_energy_saving_mode(id, *on).await,
-            (WindcalmFanSpeed(id), Command::ControlFan { speed, .. }) => self.windcalm_fan_speed(id, speed).await,
             (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
                 self.comfee_fan_speed(humidifier_id, fan_id, speed).await
             }
@@ -115,65 +113,6 @@ impl HomeAssistantCommandExecutor {
             )
             .await?;
         record_executed(id);
-        Ok(())
-    }
-
-    async fn windcalm_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
-        fn to_percent(fan_speed: &FanSpeed) -> usize {
-            match fan_speed {
-                FanSpeed::Silent => 1,
-                FanSpeed::Low => 21,
-                FanSpeed::Medium => 41,
-                FanSpeed::High => 61,
-                FanSpeed::Turbo => 81,
-            }
-        }
-
-        match airflow {
-            FanAirflow::Off => {
-                self.client
-                    .call_service(
-                        "fan",
-                        "turn_off",
-                        json!({
-                            "entity_id": vec![id.to_string()]
-                        }),
-                    )
-                    .await?;
-                record_executed(id);
-            }
-            FanAirflow::Forward(fan_speed) | FanAirflow::Reverse(fan_speed) => {
-                let direction = match airflow {
-                    FanAirflow::Forward(_) => "forward",
-                    FanAirflow::Reverse(_) => "reverse",
-                    _ => unreachable!(),
-                };
-                self.client
-                    .call_service(
-                        "fan",
-                        "set_direction",
-                        json!({
-                            "entity_id": vec![id.to_string()],
-                            "direction": direction
-                        }),
-                    )
-                    .await?;
-                record_executed(id);
-
-                self.client
-                    .call_service(
-                        "fan",
-                        "turn_on",
-                        json!({
-                            "entity_id": vec![id.to_string()],
-                            "percentage": to_percent(fan_speed)
-                        }),
-                    )
-                    .await?;
-                record_executed(id);
-            }
-        };
-
         Ok(())
     }
 

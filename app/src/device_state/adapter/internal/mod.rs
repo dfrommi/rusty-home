@@ -1,9 +1,9 @@
 use infrastructure::EventListener;
 
 use crate::{
-    command::{Command, CommandEvent, CommandExecution, EnergySavingDevice, Fan},
+    command::{Command, CommandEvent, CommandExecution, EnergySavingDevice},
     core::timeseries::DataPoint,
-    device_state::{DeviceStateValue, EnergySaving, FanActivity, adapter::IncomingDataSource},
+    device_state::{DeviceStateValue, EnergySaving, adapter::IncomingData, adapter::IncomingDataSource},
     t,
 };
 
@@ -36,16 +36,12 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
         &[()]
     }
 
-    async fn to_incoming_data(&self, _: &str, _: &(), msg: &CommandEvent) -> anyhow::Result<Vec<super::IncomingData>> {
-        let mut res = vec![];
-
-        let CommandEvent::CommandExecuted(channel) = msg;
-
-        match channel {
-            CommandExecution {
+    async fn to_incoming_data(&self, _: &str, _: &(), msg: &CommandEvent) -> anyhow::Result<Vec<IncomingData>> {
+        let res = match msg {
+            CommandEvent::CommandExecuted(CommandExecution {
                 command: Command::SetEnergySaving { device, on },
                 ..
-            } => {
+            }) => {
                 let dp = DataPoint::new(
                     DeviceStateValue::EnergySaving(
                         match device {
@@ -55,29 +51,10 @@ impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
                     ),
                     t!(now),
                 );
-                res.push(super::IncomingData::StateValue(dp));
+                vec![IncomingData::StateValue(dp)]
             }
-
-            CommandExecution {
-                command: Command::ControlFan { device, speed },
-                ..
-            } => {
-                let dp = DataPoint::new(
-                    DeviceStateValue::FanActivity(
-                        match device {
-                            Fan::LivingRoomCeilingFan => FanActivity::LivingRoomCeilingFan,
-                            Fan::BedroomCeilingFan => FanActivity::BedroomCeilingFan,
-                            Fan::BedroomDehumidifier => return Ok(vec![]),
-                        },
-                        speed.clone(),
-                    ),
-                    t!(now),
-                );
-                res.push(super::IncomingData::StateValue(dp));
-            }
-
-            _ => {}
-        }
+            CommandEvent::CommandExecuted(_) => Vec::new(),
+        };
 
         tracing::debug!("InternalDataSource produced incoming data: {:?}", res);
 

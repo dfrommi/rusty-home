@@ -10,7 +10,6 @@ use crate::trigger::{DualButtonPress, RemoteTrigger, RemoteTriggerTarget, UserTr
 pub enum RemoteTurnOff {
     InfraredHeater,
     BedroomDehumidifier,
-    BedroomCeilingFan,
 }
 
 impl Rule for RemoteTurnOff {
@@ -43,10 +42,6 @@ impl Rule for RemoteTurnOff {
             },
             RemoteTurnOff::BedroomDehumidifier => Command::ControlFan {
                 device: Fan::BedroomDehumidifier,
-                speed: FanAirflow::Off,
-            },
-            RemoteTurnOff::BedroomCeilingFan => Command::ControlFan {
-                device: Fan::BedroomCeilingFan,
                 speed: FanAirflow::Off,
             },
         };

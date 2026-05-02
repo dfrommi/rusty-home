@@ -72,8 +72,6 @@ impl UserTriggerAction {
                     }
                 }
             }
-            UserTriggerTarget::FanSpeed(FanActivity::LivingRoomCeilingFan)
-            | UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan) => Some(t!(10 hours)),
             UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier) => Some(t!(1 hours)),
             UserTriggerTarget::Heating(HeatingZone::LivingRoom)
             | UserTriggerTarget::Heating(HeatingZone::Bedroom)
@@ -117,8 +115,6 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         }),
         UserTrigger::FanSpeed { fan, airflow } => {
             let device = match fan {
-                FanActivity::LivingRoomCeilingFan => Fan::LivingRoomCeilingFan,
-                FanActivity::BedroomCeilingFan => Fan::BedroomCeilingFan,
                 FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
             };
             Some(Command::ControlFan { device, speed: airflow })

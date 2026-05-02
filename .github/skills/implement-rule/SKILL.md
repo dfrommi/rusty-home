@@ -213,7 +213,7 @@ These are the identifiers used with `ctx.current()` / `ctx.current_dp()`. Check 
 | `Temperature::Radiator(Radiator)` | `DegreeCelsius` | Bedroom, LivingRoomSmall, etc. |
 | `DewPoint::Room(Room)` | `DegreeCelsius` | Bedroom, LivingRoom |
 | `RiskOfMould::*` | `bool` | Bathroom |
-| `FanActivity::*` | `FanAirflow` | BedroomCeilingFan, LivingRoomCeilingFan, BedroomDehumidifier |
+| `FanActivity::*` | `FanAirflow` | BedroomDehumidifier |
 | `Opened::Room(RoomWithWindow)` | `bool` | LivingRoom, Bedroom |
 | `ColdAirComingIn::Room(RoomWithWindow)` | `bool` | LivingRoom, Bedroom |
 | `Presence::*` | `bool` | AtHomeDennis, AtHomeSabine |
@@ -227,7 +227,6 @@ These are the identifiers used with `ctx.current()` / `ctx.current_dp()`. Check 
 
 | File | Pattern demonstrated |
 |------|---------------------|
-| `support_with_fan.rs` | Multiple pure functions (`heating`, `ventilation`, `dehumidify`), `DataPoint` timestamp checks, temperature arithmetic |
 | `inform_window_open.rs` | Collecting state across variants with `EnumVariants`, `should_send_push_notification` with temporal filtering |
 | `dehumidify.rs` | `SimpleRule` with hysteresis, multiple early-return branches, elapsed-time guards |
 | `block_automation.rs` | Delegation to other rules, user override checks, combining time ranges with state |

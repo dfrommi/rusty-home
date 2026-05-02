@@ -206,8 +206,6 @@ pub enum EnergySavingDevice {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum Fan {
-    LivingRoomCeilingFan,
-    BedroomCeilingFan,
     BedroomDehumidifier,
 }
 

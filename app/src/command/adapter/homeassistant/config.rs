@@ -32,18 +32,6 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
         ),
         (
             CommandTarget::ControlFan {
-                device: Fan::LivingRoomCeilingFan,
-            },
-            HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_living_room"),
-        ),
-        (
-            CommandTarget::ControlFan {
-                device: Fan::BedroomCeilingFan,
-            },
-            HaServiceTarget::WindcalmFanSpeed("fan.ceiling_fan_bedroom"),
-        ),
-        (
-            CommandTarget::ControlFan {
                 device: Fan::BedroomDehumidifier,
             },
             HaServiceTarget::ComfeeDehumidifier {

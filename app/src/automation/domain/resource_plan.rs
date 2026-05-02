@@ -1,6 +1,6 @@
 use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
-    InformWindowOpen, RemoteTurnOff, SupportWithFan, UserTriggerAction,
+    InformWindowOpen, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::core::domain::Radiator;
@@ -55,23 +55,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         // --- Fan devices ---
         (
             CommandTarget::ControlFan {
-                device: Fan::BedroomCeilingFan,
-            },
-            vec![
-                BlockAutomation::BedroomCeilingFan.into(),
-                RemoteTurnOff::BedroomCeilingFan.into(),
-                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan)).into(),
-                SupportWithFan::BedroomVentilation.into(),
-                SupportWithFan::BedroomDehumidification.into(),
-                SupportWithFan::BedroomHeating.into(),
-                FollowDefaultSetting::new(CommandTarget::ControlFan {
-                    device: Fan::BedroomCeilingFan,
-                })
-                .into(),
-            ],
-        ),
-        (
-            CommandTarget::ControlFan {
                 device: Fan::BedroomDehumidifier,
             },
             vec![
@@ -81,20 +64,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 Dehumidify::Bedroom.into(),
                 FollowDefaultSetting::new(CommandTarget::ControlFan {
                     device: Fan::BedroomDehumidifier,
-                })
-                .into(),
-            ],
-        ),
-        (
-            CommandTarget::ControlFan {
-                device: Fan::LivingRoomCeilingFan,
-            },
-            vec![
-                SupportWithFan::LivingRoomVentilation.into(),
-                UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomCeilingFan)).into(),
-                // SupportWithFan::LivingRoomHeating currently disabled
-                FollowDefaultSetting::new(CommandTarget::ControlFan {
-                    device: Fan::LivingRoomCeilingFan,
                 })
                 .into(),
             ],

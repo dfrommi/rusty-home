@@ -5,9 +5,8 @@ use crate::core::unit::FanAirflow;
 use crate::{
     automation::domain::action::{Rule, RuleResult},
     command::{Command, Fan, PowerToggle},
-    core::{domain::Room, unit::DegreeCelsius},
     home_state::FanActivity,
-    home_state::{Resident, Temperature},
+    home_state::Resident,
     t,
     trigger::{OnOffDevice, RemoteTriggerTarget, UserTriggerTarget},
 };
@@ -16,7 +15,6 @@ use crate::{
 pub enum BlockAutomation {
     BathroomDehumidifier,
     BedroomDehumidifier,
-    BedroomCeilingFan,
 }
 
 impl Rule for BlockAutomation {
@@ -38,19 +36,6 @@ impl Rule for BlockAutomation {
                     .map(|s| s.min(night_time_start.unwrap_or(s)))
                     .or(night_time_start)
             }
-            BlockAutomation::BedroomCeilingFan => {
-                let room_temp = ctx.current(Temperature::Room(Room::Bedroom))?;
-                if room_temp >= DegreeCelsius(25.0) {
-                    tracing::info!("Bedroom temperature at least 25C; not blocking ceiling fan");
-                    None
-                } else if let Some(start) = sleeping_start {
-                    tracing::info!("Sleep mode active; blocking ceiling fan");
-                    Some(start)
-                } else {
-                    tracing::info!("Not in sleep mode; not blocking ceiling fan");
-                    None
-                }
-            }
         };
 
         let Some(blocked_start) = blocked_start else {
@@ -63,7 +48,6 @@ impl Rule for BlockAutomation {
         let trigger_target = match self {
             BlockAutomation::BathroomDehumidifier => UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier),
             BlockAutomation::BedroomDehumidifier => UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier),
-            BlockAutomation::BedroomCeilingFan => UserTriggerTarget::FanSpeed(FanActivity::BedroomCeilingFan),
         };
 
         let trigger = ctx.latest_trigger(trigger_target);
@@ -75,7 +59,7 @@ impl Rule for BlockAutomation {
         }
 
         // Also check remote trigger for bedroom devices
-        if matches!(self, BlockAutomation::BedroomDehumidifier | BlockAutomation::BedroomCeilingFan) {
+        if matches!(self, BlockAutomation::BedroomDehumidifier) {
             let remote_trigger = ctx.latest_trigger(UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote));
             if let Some(trigger) = remote_trigger
                 && trigger.timestamp > blocked_start
@@ -94,10 +78,6 @@ impl Rule for BlockAutomation {
             },
             BlockAutomation::BedroomDehumidifier => Command::ControlFan {
                 device: Fan::BedroomDehumidifier,
-                speed: FanAirflow::Off,
-            },
-            BlockAutomation::BedroomCeilingFan => Command::ControlFan {
-                device: Fan::BedroomCeilingFan,
                 speed: FanAirflow::Off,
             },
         };

@@ -20,22 +20,16 @@ use crate::{
 )]
 #[serde(rename_all = "snake_case")]
 pub enum FanActivity {
-    LivingRoomCeilingFan,
-    BedroomCeilingFan,
     BedroomDehumidifier,
 }
 
 pub struct FanActivityStateProvider;
 
 impl DerivedStateProvider<FanActivity, FanAirflow> for FanActivityStateProvider {
-    fn calculate_current(&self, id: FanActivity, ctx: &StateCalculationContext) -> Option<FanAirflow> {
+    fn calculate_current(&self, _: FanActivity, ctx: &StateCalculationContext) -> Option<FanAirflow> {
         use crate::device_state::FanActivity as DeviceFanActivity;
 
-        ctx.device_state(match id {
-            FanActivity::LivingRoomCeilingFan => DeviceFanActivity::LivingRoomCeilingFan,
-            FanActivity::BedroomCeilingFan => DeviceFanActivity::BedroomCeilingFan,
-            FanActivity::BedroomDehumidifier => DeviceFanActivity::BedroomDehumidifier,
-        })
-        .map(|dp| dp.value)
+        ctx.device_state(DeviceFanActivity::BedroomDehumidifier)
+            .map(|dp| dp.value)
     }
 }

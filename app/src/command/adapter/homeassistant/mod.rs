@@ -1,6 +1,5 @@
 mod config;
 
-use anyhow::bail;
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
@@ -134,7 +133,6 @@ impl HomeAssistantCommandExecutor {
                     FanSpeed::Low => "Low",
                     FanSpeed::Medium => "Medium",
                     FanSpeed::High => "High",
-                    _ => bail!("Unsupported fan speed for Comfee dehumidifier: {:?}", fan_speed),
                 };
 
                 self.client
@@ -160,8 +158,6 @@ impl HomeAssistantCommandExecutor {
                     .await?;
                 record_executed(fan_id);
             }
-
-            FanAirflow::Reverse(_) => bail!("Comfee dehumidifier does not support reverse airflow"),
         };
 
         Ok(())

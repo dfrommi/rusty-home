@@ -26,7 +26,7 @@ impl FanStatus {
         let airflow = normalize_airflow(&airflow);
 
         match &airflow {
-            FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => {
+            FanAirflow::Forward(speed) => {
                 self.last_speed = speed.clone();
             }
             FanAirflow::Off => {}
@@ -41,7 +41,7 @@ impl FanStatus {
 
     fn current_speed(&self) -> FanSpeed {
         match &self.airflow {
-            FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => speed.clone(),
+            FanAirflow::Forward(speed) => speed.clone(),
             FanAirflow::Off => self.last_speed.clone(),
         }
     }
@@ -166,7 +166,7 @@ fn default_speed() -> FanSpeed {
 fn normalize_airflow(airflow: &FanAirflow) -> FanAirflow {
     match airflow {
         FanAirflow::Off => FanAirflow::Off,
-        FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => FanAirflow::Forward(normalize_speed(speed)),
+        FanAirflow::Forward(speed) => FanAirflow::Forward(normalize_speed(speed)),
     }
 }
 
@@ -186,7 +186,7 @@ fn normalize_speed(speed: &FanSpeed) -> FanSpeed {
 fn airflow_to_percent(airflow: &FanAirflow) -> f64 {
     match airflow {
         FanAirflow::Off => 0.0,
-        FanAirflow::Forward(speed) | FanAirflow::Reverse(speed) => speed_to_percent(speed),
+        FanAirflow::Forward(speed) => speed_to_percent(speed),
     }
 }
 
@@ -210,11 +210,9 @@ fn percent_to_speed(percent: f64) -> FanSpeed {
 
 fn speed_rank(speed: &FanSpeed) -> i32 {
     match speed {
-        FanSpeed::Silent => 0,
         FanSpeed::Low => 1,
         FanSpeed::Medium => 2,
         FanSpeed::High => 3,
-        FanSpeed::Turbo => 4,
     }
 }
 

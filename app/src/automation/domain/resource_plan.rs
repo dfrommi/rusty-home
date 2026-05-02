@@ -1,6 +1,6 @@
 use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
-    InformWindowOpen, RemoteTurnOff, UserTriggerAction,
+    InformWindowOpen, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
 use crate::core::domain::Radiator;
@@ -74,6 +74,7 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             },
             vec![
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
+                PurifyAir::LivingRoom.into(),
                 FollowDefaultSetting::new(CommandTarget::ControlFan {
                     device: Fan::LivingRoomAirPurifier,
                 })

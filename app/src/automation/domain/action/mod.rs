@@ -3,6 +3,7 @@ mod dehumidify;
 mod follow_default_setting;
 mod heating;
 mod inform_window_open;
+mod purify_air;
 mod remote_turn_off;
 mod user_trigger_action;
 
@@ -22,6 +23,7 @@ pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
 pub use inform_window_open::InformWindowOpen;
+pub use purify_air::PurifyAir;
 pub use remote_turn_off::RemoteTurnOff;
 pub use user_trigger_action::UserTriggerAction;
 
@@ -144,6 +146,7 @@ impl<T: SimpleRule> Rule for T {
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     InformWindowOpen(InformWindowOpen),
+    PurifyAir(PurifyAir),
     AutoTurnOff(AutoTurnOff),
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
@@ -164,6 +167,7 @@ impl HomeAction {
         match self {
             HomeAction::Dehumidify(r) => (r, r.ext_id()),
             HomeAction::InformWindowOpen(r) => (r, r.ext_id()),
+            HomeAction::PurifyAir(r) => (r, r.ext_id()),
             HomeAction::AutoTurnOff(r) => (r, r.ext_id()),
             HomeAction::FollowDefaultSetting(r) => (r, r.ext_id()),
             HomeAction::UserTriggerAction(r) => (r, r.ext_id()),

@@ -156,9 +156,19 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
                     ),
                 };
 
+                let is_off = payload.system_mode.as_deref() == Some("off");
+                let (setpoint_lower_value, setpoint_upper_value) = if is_off {
+                    (DegreeCelsius(0.0), DegreeCelsius(0.0))
+                } else {
+                    (
+                        DegreeCelsius(payload.occupied_heating_setpoint + payload.temperature_accuracy),
+                        DegreeCelsius(payload.occupied_heating_setpoint),
+                    )
+                };
+
                 result.push(
                     DataPoint::new(
-                        DeviceStateValue::SetPoint(setpoint_upper, DegreeCelsius(payload.occupied_heating_setpoint)),
+                        DeviceStateValue::SetPoint(setpoint_upper, setpoint_upper_value),
                         payload.last_seen,
                     )
                     .into(),
@@ -166,10 +176,7 @@ impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
 
                 result.push(
                     DataPoint::new(
-                        DeviceStateValue::SetPoint(
-                            setpoint_lower,
-                            DegreeCelsius(payload.occupied_heating_setpoint + payload.temperature_accuracy),
-                        ),
+                        DeviceStateValue::SetPoint(setpoint_lower, setpoint_lower_value),
                         payload.last_seen,
                     )
                     .into(),
@@ -283,6 +290,7 @@ struct PowerPlug {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct SonoffThermostatPayload {
+    system_mode: Option<String>,
     valve_opening_degree: f64,
     valve_closing_degree: f64,
     occupied_heating_setpoint: f64,

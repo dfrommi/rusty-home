@@ -1,6 +1,3 @@
----
-applyTo: lib/infrastructure/**
----
 # Infrastructure
 
 Cross-cutting infrastructure services. Separate crate at `lib/infrastructure/`.

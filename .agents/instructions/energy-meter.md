@@ -1,6 +1,3 @@
----
-applyTo: app/src/frontends/energy_meter/**
----
 # Energy Meter Frontend
 
 HTTP API for receiving energy consumption readings from heating and water meters.

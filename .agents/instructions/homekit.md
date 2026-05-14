@@ -1,6 +1,3 @@
----
-applyTo: app/src/frontends/homekit/**
----
 # HomeKit Frontend
 
 Bridges the home automation system to Apple HomeKit via

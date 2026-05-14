@@ -1,6 +1,3 @@
----
-applyTo: lib/macro/**
----
 # Macro
 
 Procedural macro crate at `lib/macro/`.

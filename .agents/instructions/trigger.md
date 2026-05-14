@@ -1,6 +1,3 @@
----
-applyTo: app/src/trigger/**
----
 # Trigger
 
 Manages user-initiated triggers with time-windowed activation. Follows module + client + service pattern.

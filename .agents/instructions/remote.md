@@ -1,6 +1,3 @@
----
-applyTo: lib/macro/**
----
 # Remote Frontend
 
 Handles remote control triggers from Zigbee2MQTT devices.

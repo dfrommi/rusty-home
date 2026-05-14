@@ -1,6 +1,3 @@
----
-applyTo: app/src/command/**
----
 # Command
 
 Executes commands against external smart-home systems. Follows module + client + service pattern.

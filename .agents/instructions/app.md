@@ -1,6 +1,3 @@
----
-applyTo: app/src/**
----
 # Module Structure
 
 Composition root: `main.rs`. Each domain module lives in `<module>/`:

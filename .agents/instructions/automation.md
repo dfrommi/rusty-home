@@ -1,6 +1,3 @@
----
-applyTo: app/src/automation/**
----
 # Automation
 
 Resource-centric action planning system. Reacts to `HomeStateEvent` changes and a 30-second timer.

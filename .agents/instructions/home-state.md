@@ -1,6 +1,3 @@
----
-applyTo: app/src/home_state/**
----
 # Home State
 
 Derives higher-level home state from raw device state. No service — module owns the calculation loop directly.

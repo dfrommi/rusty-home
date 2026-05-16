@@ -44,10 +44,6 @@ reqwest = { version = "*", features = ["json", "stream", "form"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 mime = "0.3"
 
-#MCP dependencies
-rmcp = { version = "0.8", features = ["server", "macros"] }
-rmcp-actix-web = "0.8"
-
 #DB Dependencies
 sqlx = { version = "0.8", features = [
   "postgres",

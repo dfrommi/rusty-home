@@ -31,9 +31,6 @@ cached = { workspace = true }
 actix-web = { workspace = true }
 mime = { workspace = true }
 
-rmcp = { workspace = true }
-rmcp-actix-web = { workspace = true }
-
 macro = { path = "../lib/macro" }
 infrastructure = { path = "../lib/infrastructure" }
 

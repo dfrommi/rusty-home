@@ -56,6 +56,7 @@ impl SimpleRule for Dehumidify {
                 Ok(risk)
             }
             Dehumidify::Bedroom => {
+                let mould_risk = ctx.current(RiskOfMould::Bedroom)?;
                 let current_fan_state = ctx.current_dp(FanActivity::BedroomDehumidifier)?;
                 let current_dewpoint = ctx.current(DewPoint::Room(Room::Bedroom))?;
                 let current_outside_dewpoint = ctx.current(DewPoint::Outside)?;
@@ -65,10 +66,16 @@ impl SimpleRule for Dehumidify {
                     ctx.current(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))? == HeatingMode::Sleep;
 
                 TraceContext::current()
+                    .record("mould_risk", mould_risk.to_string())
                     .record("dewpoint", current_dewpoint.to_string())
                     .record("outside_dewpoint", current_outside_dewpoint.to_string())
                     .record("dewpoint_diff", current_dewpoint_diff.to_string())
                     .record("sleep_mode", sleep_mode.to_string());
+
+                if !mould_risk {
+                    tracing::info!("No bedroom mould risk; skipping dehumidification");
+                    return Ok(false);
+                }
 
                 //TODO move to central blocker
                 if sleep_mode {

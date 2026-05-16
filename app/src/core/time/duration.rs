@@ -72,6 +72,12 @@ impl Duration {
         from_chrono_duration(&self.delegate).to_string()
     }
 
+    pub fn to_half_life(&self) -> Self {
+        let millis = self.delegate.num_milliseconds();
+        let half_life_millis = (millis as f64) * std::f64::consts::LN_2; // t_half = tau * ln(2)
+        Self::new(chrono::Duration::milliseconds(half_life_millis as i64))
+    }
+
     pub fn into_db(self) -> chrono::Duration {
         self.delegate
     }

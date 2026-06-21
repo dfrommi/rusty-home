@@ -19,7 +19,6 @@ enum HaServiceTarget {
         fan_id: &'static str,
     },
     PhilipsAirPurifierFan(&'static str),
-    NukiLock(&'static str),
 }
 
 pub struct HomeAssistantCommandExecutor {
@@ -86,19 +85,6 @@ impl HomeAssistantCommandExecutor {
             }
             (PhilipsAirPurifierFan(id), Command::ControlFan { speed, .. }) => {
                 self.philips_air_purifier_fan_speed(id, speed).await
-            }
-            (NukiLock(id), Command::OpenDoor { .. }) => {
-                self.client
-                    .call_service(
-                        "lock",
-                        "open",
-                        json!({
-                            "entity_id": vec![id.to_string()]
-                        }),
-                    )
-                    .await?;
-                record_executed(id);
-                Ok(())
             }
             conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
         }

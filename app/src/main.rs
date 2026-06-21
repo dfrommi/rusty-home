@@ -70,6 +70,8 @@ pub async fn main() {
         &settings.z2m.event_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
+        &settings.nuki.url,
+        &settings.nuki.token,
         home_state_module.subscribe(),
     )
     .await;

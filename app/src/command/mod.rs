@@ -42,6 +42,8 @@ impl CommandModule {
         z2m_event_topic: &str,
         ha_url: &str,
         ha_token: &str,
+        nuki_url: &str,
+        nuki_token: &str,
         home_state_listener: EventListener<HomeStateEvent>,
     ) -> Self {
         let repo = CommandRepository::new(pool);
@@ -49,6 +51,7 @@ impl CommandModule {
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
         let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token);
         let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_client.sender(z2m_event_topic));
+        let nuki_executor = adapter::NukiCommandExecutor::new(nuki_url, nuki_token);
 
         let z2m_sensor_sync_runner =
             adapter::z2m::Z2mSensorSyncRunner::new(mqtt_client.sender(z2m_event_topic), home_state_listener);
@@ -57,6 +60,7 @@ impl CommandModule {
             repo,
             tasmota_executor,
             z2m_executor,
+            nuki_executor,
             ha_executor,
             event_bus.emitter(),
         ));

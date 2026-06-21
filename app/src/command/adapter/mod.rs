@@ -1,11 +1,13 @@
 pub mod db;
 mod homeassistant;
+pub mod nuki;
 mod tasmota;
 pub mod z2m;
 
 use crate::command::Command;
 
 pub use homeassistant::HomeAssistantCommandExecutor;
+pub use nuki::NukiCommandExecutor;
 pub use tasmota::TasmotaCommandExecutor;
 pub use z2m::Z2mCommandExecutor;
 
@@ -23,6 +25,8 @@ mod metrics {
         Tasmota,
         #[display("Z2M")]
         Z2M,
+        #[display("NUKI")]
+        Nuki,
         #[display("HA")]
         HomeAssistant,
     }

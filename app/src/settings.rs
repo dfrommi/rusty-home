@@ -12,6 +12,7 @@ pub struct Settings {
     pub homeassistant: HomeAssistantSettings,
     pub z2m: Zigbee2MqttSettings,
     pub tasmota: TasmotaSettings,
+    pub nuki: NukiSettings,
     pub metrics: MetricsExportSettings,
 }
 
@@ -41,6 +42,12 @@ pub struct TasmotaSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Zigbee2MqttSettings {
     pub event_topic: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct NukiSettings {
+    pub url: String,
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -1,3 +1,4 @@
+use super::HomekitCommand;
 use crate::{
     core::unit::{FanAirflow, FanSpeed},
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
@@ -91,7 +92,7 @@ impl Fan {
         }
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::Active) {
             if let Some(is_on) = value_to_bool(&trigger.value) {
                 let new_airflow = if is_on {
@@ -105,7 +106,7 @@ impl Fan {
                     FanAirflow::Off
                 };
 
-                return self.command_with_state(new_airflow);
+                return self.command_with_state(new_airflow, CommandPolicy::ImmediateCanceling, true);
             }
 
             tracing::warn!("Fan {} received invalid Active payload: {}", self.name, trigger.value);
@@ -122,7 +123,7 @@ impl Fan {
                     FanAirflow::Forward(percent_to_speed(percent))
                 };
 
-                return self.command_with_state(new_airflow);
+                return self.command_with_state(new_airflow, CommandPolicy::Debounced, false);
             }
 
             tracing::warn!("Fan {} received invalid RotationSpeed payload: {}", self.name, trigger.value);
@@ -143,20 +144,39 @@ impl Fan {
         }
     }
 
-    fn command_with_state(&mut self, airflow: FanAirflow) -> Option<UserTrigger> {
+    fn command_with_state(
+        &mut self,
+        airflow: FanAirflow,
+        policy: CommandPolicy,
+        emit_unchanged: bool,
+    ) -> Option<HomekitCommand> {
         let airflow = normalize_airflow(&airflow);
 
-        if airflow == self.status.airflow() {
+        if !emit_unchanged && airflow == self.status.airflow() {
             return None;
         }
 
         self.status.apply_state(airflow.clone());
 
-        Some(UserTrigger::FanSpeed {
+        let trigger = UserTrigger::FanSpeed {
             fan: self.activity,
             airflow,
+        };
+
+        Some(match policy {
+            CommandPolicy::Debounced => HomekitCommand::debounced(trigger),
+            CommandPolicy::ImmediateCanceling => {
+                let target = trigger.target();
+                HomekitCommand::immediate_canceling(trigger, target)
+            }
         })
     }
+}
+
+#[derive(Clone, Copy)]
+enum CommandPolicy {
+    Debounced,
+    ImmediateCanceling,
 }
 
 fn default_speed() -> FanSpeed {

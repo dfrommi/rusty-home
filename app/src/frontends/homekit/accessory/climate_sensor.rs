@@ -1,7 +1,7 @@
+use super::HomekitCommand;
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{HomeStateValue, RelativeHumidity, Temperature},
-    trigger::UserTrigger,
 };
 
 pub struct ClimateSensor {
@@ -62,7 +62,7 @@ impl ClimateSensor {
         }
     }
 
-    pub fn process_trigger(&self, _trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&self, _trigger: &HomekitEvent) -> Option<HomekitCommand> {
         None
     }
 }

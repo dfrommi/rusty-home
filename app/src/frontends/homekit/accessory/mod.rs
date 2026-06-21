@@ -1,6 +1,6 @@
 use crate::core::domain::RoomWithWindow;
 use crate::home_state::{EnergySaving, FanActivity, HomeStateValue, Opened, RelativeHumidity, Temperature};
-use crate::trigger::{Door, UserTrigger};
+use crate::trigger::{Door, UserTrigger, UserTriggerTarget};
 use crate::{
     command::PowerToggle,
     core::domain::{HeatingZone, Room},
@@ -20,6 +20,47 @@ mod fan;
 mod power_switch;
 mod thermostat;
 mod window_sensor;
+
+#[derive(Debug)]
+pub struct HomekitCommand {
+    pub trigger: UserTrigger,
+    pub policy: HomekitCommandPolicy,
+}
+
+impl HomekitCommand {
+    pub fn debounced(trigger: UserTrigger) -> Self {
+        let target = trigger.target();
+        Self {
+            trigger,
+            policy: HomekitCommandPolicy::Debounced { target },
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn immediate(trigger: UserTrigger) -> Self {
+        Self {
+            trigger,
+            policy: HomekitCommandPolicy::Immediate { cancel_pending: None },
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn immediate_canceling(trigger: UserTrigger, target: UserTriggerTarget) -> Self {
+        Self {
+            trigger,
+            policy: HomekitCommandPolicy::Immediate {
+                cancel_pending: Some(target),
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum HomekitCommandPolicy {
+    Immediate { cancel_pending: Option<UserTriggerTarget> },
+    Debounced { target: UserTriggerTarget },
+}
 
 enum HomekitAccessory {
     ClimateSensor(ClimateSensor),
@@ -70,7 +111,7 @@ impl HomekitRegistry {
             .collect()
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         self.accessories.iter_mut().find_map(|accessory| match accessory {
             HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
             HomekitAccessory::DoorLock(lock) => lock.process_trigger(trigger),

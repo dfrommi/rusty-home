@@ -1,3 +1,4 @@
+use super::HomekitCommand;
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     trigger::{Door, UserTrigger},
@@ -43,7 +44,7 @@ impl DoorLock {
         Vec::new()
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::TargetDoorState) {
             let value = trigger
                 .value
@@ -54,9 +55,9 @@ impl DoorLock {
                 Some(0) => {
                     // 0 = open: activate buzzer
                     self.pending_reset = true;
-                    Some(UserTrigger::OpenDoor {
+                    Some(HomekitCommand::immediate(UserTrigger::OpenDoor {
                         door: self.door.clone(),
-                    })
+                    }))
                 }
                 Some(1) => {
                     // Can't close mechanically, but push state back to closed

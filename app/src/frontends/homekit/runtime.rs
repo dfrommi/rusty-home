@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
 use super::{
-    HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig, accessory::HomekitRegistry,
+    HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig,
+    accessory::{HomekitCommand, HomekitCommandPolicy, HomekitRegistry},
     hap::HomekitCharacteristic,
 };
 use crate::{
     core::timeseries::DataPoint,
     home_state::{HomeStateEvent, HomeStateValue},
-    trigger::TriggerClient,
+    trigger::{TriggerClient, UserTrigger, UserTriggerTarget},
 };
 
 pub struct HomekitRunner {
@@ -20,7 +21,7 @@ pub struct HomekitRunner {
     mqtt_sender: MqttSender,
     mqtt_receiver: MqttSubscription,
     trigger_client: TriggerClient,
-    trigger_debounce: HashMap<HomekitTarget, JoinHandle<()>>,
+    trigger_debounce: HashMap<UserTriggerTarget, JoinHandle<()>>,
 }
 
 impl HomekitRunner {
@@ -129,24 +130,50 @@ impl HomekitRunner {
 
         tracing::debug!("Processing Homekit MQTT event: {:?}", state);
 
-        if let Some(trigger) = self.registry.process_trigger(&state) {
-            if let Some(handle) = self.trigger_debounce.get(&state.target) {
-                handle.abort();
+        if let Some(command) = self.registry.process_trigger(&state) {
+            self.handle_command(command).await;
+        }
+    }
+
+    async fn handle_command(&mut self, command: HomekitCommand) {
+        match command.policy {
+            HomekitCommandPolicy::Debounced { target } => {
+                self.cancel_debounced(&target);
+                self.schedule_debounced(target, command.trigger);
             }
-
-            tracing::info!("Debouncing Homekit command for target: {:?}", state.target);
-
-            let trigger_client = self.trigger_client.clone();
-            let handle = tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-
-                tracing::info!("Received Homekit trigger: {:?}", trigger);
-                if let Err(e) = trigger_client.add_trigger(trigger.clone()).await {
-                    tracing::error!("Error processing Homekit trigger {:?}: {:?}", trigger, e);
+            HomekitCommandPolicy::Immediate { cancel_pending } => {
+                if let Some(target) = cancel_pending {
+                    self.cancel_debounced(&target);
                 }
-            });
 
-            self.trigger_debounce.insert(state.target, handle);
+                Self::execute_trigger(self.trigger_client.clone(), command.trigger).await;
+            }
+        }
+    }
+
+    fn cancel_debounced(&mut self, target: &UserTriggerTarget) {
+        if let Some(handle) = self.trigger_debounce.remove(target) {
+            handle.abort();
+        }
+    }
+
+    fn schedule_debounced(&mut self, target: UserTriggerTarget, trigger: UserTrigger) {
+        tracing::info!("Debouncing Homekit command for target: {:?}", target);
+
+        let trigger_client = self.trigger_client.clone();
+        let handle = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+
+            Self::execute_trigger(trigger_client, trigger).await;
+        });
+
+        self.trigger_debounce.insert(target, handle);
+    }
+
+    async fn execute_trigger(trigger_client: TriggerClient, trigger: UserTrigger) {
+        tracing::info!("Received Homekit trigger: {:?}", trigger);
+        if let Err(e) = trigger_client.add_trigger(trigger.clone()).await {
+            tracing::error!("Error processing Homekit trigger {:?}: {:?}", trigger, e);
         }
     }
 

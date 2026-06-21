@@ -1,3 +1,4 @@
+use super::HomekitCommand;
 use crate::home_state::{HomeStateValue, PowerAvailable};
 use crate::trigger::{OnOffDevice, UserTrigger};
 use crate::{
@@ -35,7 +36,7 @@ impl PowerSwitch {
         }
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target
             == HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On)
             && let Some(is_on) = trigger.value.as_bool()
@@ -48,10 +49,10 @@ impl PowerSwitch {
                     return None;
                 }
             };
-            return Some(UserTrigger::DevicePower {
+            return Some(HomekitCommand::immediate(UserTrigger::DevicePower {
                 device: on_off_device,
                 on: is_on,
-            });
+            }));
         }
 
         None

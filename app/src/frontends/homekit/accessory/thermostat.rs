@@ -1,3 +1,4 @@
+use super::HomekitCommand;
 use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
 use crate::trigger::{HeatingRequest, UserTrigger};
 use crate::{
@@ -122,7 +123,7 @@ impl Thermostat {
         events
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<UserTrigger> {
+    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::TargetTemperature) {
             let target_temp = trigger
                 .value
@@ -132,7 +133,7 @@ impl Thermostat {
             if let Some(target_temp) = target_temp {
                 //rounded to 0.5 degree celsius steps
                 let temperature = DegreeCelsius((target_temp * 2.0).round() / 2.0);
-                return Some(self.zone_trigger(HeatingRequest::Heat(temperature)));
+                return Some(HomekitCommand::debounced(self.zone_trigger(HeatingRequest::Heat(temperature))));
             }
 
             tracing::warn!(
@@ -152,12 +153,15 @@ impl Thermostat {
 
             if let Some(state) = state {
                 return match state {
-                    0 => Some(self.zone_trigger(HeatingRequest::Off)),
-                    1 => self
-                        .status
-                        .set_point
-                        .map(|temperature| self.zone_trigger(HeatingRequest::Heat(temperature))),
-                    3 => Some(self.zone_trigger(HeatingRequest::Auto)),
+                    0 => {
+                        let trigger = self.zone_trigger(HeatingRequest::Off);
+                        let target = trigger.target();
+                        Some(HomekitCommand::immediate_canceling(trigger, target))
+                    }
+                    1 => self.status.set_point.map(|temperature| {
+                        HomekitCommand::immediate(self.zone_trigger(HeatingRequest::Heat(temperature)))
+                    }),
+                    3 => Some(HomekitCommand::immediate(self.zone_trigger(HeatingRequest::Auto))),
                     unsupported => {
                         tracing::warn!(
                             "Thermostat {} received unsupported TargetHeatingCoolingState value: {}",

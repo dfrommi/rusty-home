@@ -81,8 +81,11 @@ impl DeviceStateService {
 
         for id in DeviceStateId::variants() {
             match self.get_latest_for_device(&id).await {
-                Ok(dp) => {
+                Ok(Some(dp)) => {
                     res.insert(id, dp);
+                }
+                Ok(None) => {
+                    // Skip silently — device has no current value
                 }
                 Err(e) => {
                     tracing::warn!("Error getting latest device state for {:?}: {:?}", id, e);
@@ -93,19 +96,22 @@ impl DeviceStateService {
         Ok(res)
     }
 
-    async fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<DataPoint<DeviceStateValue>> {
+    async fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
         if DateTime::is_shifted() {
             //TODO uncached bootstapping leads to a lot of db hits, improve this
             return self.repo.get_latest_for_device(id).await;
         }
 
-        self.current_cache
-            .try_get_with(*id, async {
-                tracing::debug!("Cache miss for device state {:?}, fetching from repo", id);
-                self.repo.get_latest_for_device(id).await
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))
+        if let Some(dp) = self.current_cache.get(id).await {
+            return Ok(Some(dp));
+        }
+
+        tracing::debug!("Cache miss for device state {:?}, fetching from repo", id);
+        let Some(dp) = self.repo.get_latest_for_device(id).await? else {
+            return Ok(None);
+        };
+        self.current_cache.insert(*id, dp.clone()).await;
+        Ok(Some(dp))
     }
 
     pub async fn get_all_data_points_in_range(

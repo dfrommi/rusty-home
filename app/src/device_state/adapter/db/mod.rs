@@ -1,6 +1,7 @@
 use anyhow::{Context as _, Result};
 use moka::future::Cache;
 use sqlx::{PgPool, postgres::types::PgInterval};
+use std::collections::HashSet;
 
 use crate::{
     core::{
@@ -51,7 +52,7 @@ impl DeviceStateRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> Result<DataPoint<DeviceStateValue>> {
+    pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> Result<Option<DataPoint<DeviceStateValue>>> {
         let tag_id = self.get_tag_id(id).await?;
 
         let row = sqlx::query!(
@@ -64,13 +65,13 @@ impl DeviceStateRepository {
             tag_id as i32,
             t!(now).into_db()
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
 
-        Ok(DataPoint {
-            value: from_f64_value(*id, row.value),
-            timestamp: row.timestamp.into(),
-        })
+        Ok(row.map(|r| DataPoint {
+            value: from_f64_value(*id, r.value),
+            timestamp: r.timestamp.into(),
+        }))
     }
 
     pub async fn get_all_data_points_in_range_ts_asc(
@@ -109,6 +110,8 @@ impl DeviceStateRepository {
         .fetch_all(&self.pool)
         .await?;
 
+        let mut invalid_tags: HashSet<(String, String)> = HashSet::new();
+
         let dps: Vec<DataPoint<DeviceStateValue>> = recs
             .into_iter()
             .filter_map(|row| {
@@ -119,18 +122,23 @@ impl DeviceStateRepository {
                         value: from_f64_value(target, row.value),
                         timestamp: row.timestamp.into(),
                     }),
-                    Err(e) => {
-                        tracing::warn!(
-                            "Invalid thing_value_tag row for channel/name {}/{}, ignoring: {:?}",
-                            row.channel,
-                            row.name,
-                            e
-                        );
+                    Err(_) => {
+                        invalid_tags.insert((row.channel.clone(), row.name.clone()));
                         None
                     }
                 }
             })
             .collect();
+
+        if !invalid_tags.is_empty() {
+            tracing::debug!(
+                "Found {} unsupported device-state tags in range [{}..{}]: {:?}",
+                invalid_tags.len(),
+                range.start(),
+                range.end(),
+                invalid_tags
+            );
+        }
 
         Ok(dps)
     }
@@ -304,12 +312,27 @@ mod tests {
 
         let dp = repo
             .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))
-            .await?;
+            .await?
+            .expect("expected a data point for existing device");
 
         assert_eq!(
             dp.value,
             DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
         );
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_get_latest_for_device_no_data(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(pool);
+        // No data inserted — device has no rows in thing_value
+
+        let dp = repo
+            .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))
+            .await?;
+
+        assert!(dp.is_none());
 
         Ok(())
     }

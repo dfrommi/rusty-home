@@ -44,215 +44,250 @@ impl Z2mIncomingDataSource {
     }
 }
 
-impl IncomingDataSource<MqttInMessage, Z2mChannel> for Z2mIncomingDataSource {
-    fn ds_name(&self) -> &str {
-        "Z2M"
-    }
+impl IncomingDataSource for Z2mIncomingDataSource {
+    async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
+        loop {
+            let msg = self.mqtt_receiver.recv().await?;
 
-    async fn recv(&mut self) -> Option<MqttInMessage> {
-        self.mqtt_receiver.recv().await
-    }
+            let Some(device_id) = z2m_device_id(&msg) else {
+                continue;
+            };
 
-    fn device_id(&self, msg: &MqttInMessage) -> Option<String> {
-        //Command topics end with /set and should be ignored. State not yet applied
-        if msg.topic.ends_with("/set") {
-            return None;
+            let Some(channels) = self.device_config.get_optional(&device_id) else {
+                continue;
+            };
+
+            if channels.is_empty() {
+                continue;
+            }
+
+            tracing::debug!("Received Z2M event for devices {}: {:?}", device_id, channels);
+
+            return Some(parse_configured_channels(&device_id, channels, &msg));
         }
+    }
+}
 
-        Some(msg.topic.clone())
+fn z2m_device_id(msg: &MqttInMessage) -> Option<String> {
+    //Command topics end with /set and should be ignored. State not yet applied
+    if msg.topic.ends_with("/set") {
+        return None;
     }
 
-    fn get_channels(&self, device_id: &str) -> &[Z2mChannel] {
-        self.device_config.get(device_id)
+    Some(msg.topic.clone())
+}
+
+fn parse_configured_channels(device_id: &str, channels: &[Z2mChannel], msg: &MqttInMessage) -> Vec<IncomingData> {
+    let mut incoming_data = vec![];
+
+    for channel in channels {
+        match parse_z2m_channel(device_id, channel, &msg.payload) {
+            Ok(events) => incoming_data.extend(events),
+            Err(e) => {
+                tracing::error!(
+                    "Error parsing Z2M event for channel {:?} with payload {:?}: {:?}",
+                    channel,
+                    msg,
+                    e
+                );
+            }
+        }
     }
 
-    async fn to_incoming_data(
-        &self,
-        device_id: &str,
-        channel: &Z2mChannel,
-        msg: &MqttInMessage,
-    ) -> anyhow::Result<Vec<IncomingData>> {
-        emit_debug_metrics(device_id, &msg.payload);
+    incoming_data
+}
 
-        let result: Vec<IncomingData> = match channel {
-            Z2mChannel::ClimateSensor(t, h) => {
-                let payload: ClimateSensor = serde_json::from_str(&msg.payload)?;
+fn parse_z2m_channel(device_id: &str, channel: &Z2mChannel, payload: &str) -> anyhow::Result<Vec<IncomingData>> {
+    emit_debug_metrics(device_id, payload);
 
-                vec![
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(*t, DegreeCelsius(payload.temperature)),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::RelativeHumidity(*h, Percent(payload.humidity)),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    availability(device_id, payload.last_seen),
-                ]
-            }
-
-            //Sonoff thermostats
-            Z2mChannel::SonoffThermostat(thermostat) => {
-                let payload: SonoffThermostatPayload = serde_json::from_str(&msg.payload)?;
-
-                let mut result = vec![
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(
-                            Temperature::ThermostatOnDevice(*thermostat),
-                            DegreeCelsius(payload.local_temperature),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::Temperature(
-                            Temperature::ThermostatExternalInput(*thermostat),
-                            DegreeCelsius(payload.external_temperature_input),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    availability(device_id, payload.last_seen),
-                ];
-
-                let (setpoint_lower, setpoint_upper, demand_lower, demand_upper) = match thermostat {
-                    Radiator::LivingRoomBig => (
-                        SetPoint::LivingRoomBigLower,
-                        SetPoint::LivingRoomBig,
-                        HeatingDemandLimit::LivingRoomBigLower,
-                        HeatingDemandLimit::LivingRoomBigUpper,
-                    ),
-                    Radiator::LivingRoomSmall => (
-                        SetPoint::LivingRoomSmallLower,
-                        SetPoint::LivingRoomSmall,
-                        HeatingDemandLimit::LivingRoomSmallLower,
-                        HeatingDemandLimit::LivingRoomSmallUpper,
-                    ),
-                    Radiator::Bedroom => (
-                        SetPoint::BedroomLower,
-                        SetPoint::Bedroom,
-                        HeatingDemandLimit::BedroomLower,
-                        HeatingDemandLimit::BedroomUpper,
-                    ),
-                    Radiator::Kitchen => (
-                        SetPoint::KitchenLower,
-                        SetPoint::Kitchen,
-                        HeatingDemandLimit::KitchenLower,
-                        HeatingDemandLimit::KitchenUpper,
-                    ),
-                    Radiator::RoomOfRequirements => (
-                        SetPoint::RoomOfRequirementsLower,
-                        SetPoint::RoomOfRequirements,
-                        HeatingDemandLimit::RoomOfRequirementsLower,
-                        HeatingDemandLimit::RoomOfRequirementsUpper,
-                    ),
-                    Radiator::Bathroom => (
-                        SetPoint::BathroomLower,
-                        SetPoint::Bathroom,
-                        HeatingDemandLimit::BathroomLower,
-                        HeatingDemandLimit::BathroomUpper,
-                    ),
-                };
-
-                let is_off = payload.system_mode.as_deref() == Some("off");
-                let (setpoint_lower_value, setpoint_upper_value) = if is_off {
-                    (DegreeCelsius(0.0), DegreeCelsius(0.0))
-                } else {
-                    (
-                        DegreeCelsius(payload.occupied_heating_setpoint + payload.temperature_accuracy),
-                        DegreeCelsius(payload.occupied_heating_setpoint),
-                    )
-                };
-
-                result.push(
-                    DataPoint::new(
-                        DeviceStateValue::SetPoint(setpoint_upper, setpoint_upper_value),
-                        payload.last_seen,
-                    )
-                    .into(),
-                );
-
-                result.push(
-                    DataPoint::new(
-                        DeviceStateValue::SetPoint(setpoint_lower, setpoint_lower_value),
-                        payload.last_seen,
-                    )
-                    .into(),
-                );
-
-                result.push(
-                    DataPoint::new(
-                        DeviceStateValue::HeatingDemandLimit(
-                            demand_upper,
-                            Percent(payload.valve_opening_degree).clamp(),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                );
-
-                result.push(
-                    DataPoint::new(
-                        DeviceStateValue::HeatingDemandLimit(
-                            demand_lower,
-                            Percent(100.0 - payload.valve_closing_degree).clamp(),
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                );
-
-                //Current demand not exposed directly at running state is not reliable and no other
-                //way of reading the current demand exists.
-
-                result
-            }
-
-            Z2mChannel::ContactSensor(opened) => {
-                let payload: ContactSensor = serde_json::from_str(&msg.payload)?;
-                vec![
-                    DataPoint::new(DeviceStateValue::Opened(*opened, !payload.contact), payload.last_seen).into(),
-                    availability(device_id, payload.last_seen),
-                ]
-            }
-
-            Z2mChannel::PowerPlug(power, energy, energy_offset, power_available) => {
-                let payload: PowerPlug = serde_json::from_str(&msg.payload)?;
-                let mut items = vec![
-                    DataPoint::new(
-                        DeviceStateValue::CurrentPowerUsage(*power, Watt(payload.current_power_w)),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    DataPoint::new(
-                        DeviceStateValue::TotalEnergyConsumption(
-                            *energy,
-                            KiloWattHours(payload.total_energy_kwh) + *energy_offset,
-                        ),
-                        payload.last_seen,
-                    )
-                    .into(),
-                    availability(device_id, payload.last_seen),
-                ];
-
-                if let Some(power_available) = power_available {
-                    items.push(
-                        DataPoint::new(
-                            DeviceStateValue::PowerAvailable(*power_available, payload.state == "ON"),
-                            payload.last_seen,
-                        )
-                        .into(),
-                    );
-                }
-
-                items
-            }
-        };
-
-        Ok(result)
+    match channel {
+        Z2mChannel::ClimateSensor(temperature, humidity) => {
+            parse_climate_sensor(device_id, *temperature, *humidity, payload)
+        }
+        Z2mChannel::ContactSensor(opened) => parse_contact_sensor(device_id, *opened, payload),
+        Z2mChannel::PowerPlug(power, energy, energy_offset, power_available) => {
+            parse_power_plug(device_id, *power, *energy, *energy_offset, *power_available, payload)
+        }
+        Z2mChannel::SonoffThermostat(thermostat) => parse_sonoff_thermostat(device_id, *thermostat, payload),
     }
+}
+
+fn parse_climate_sensor(
+    device_id: &str,
+    temperature: Temperature,
+    humidity: RelativeHumidity,
+    payload: &str,
+) -> anyhow::Result<Vec<IncomingData>> {
+    let payload: ClimateSensor = serde_json::from_str(payload)?;
+
+    Ok(vec![
+        DataPoint::new(
+            DeviceStateValue::Temperature(temperature, DegreeCelsius(payload.temperature)),
+            payload.last_seen,
+        )
+        .into(),
+        DataPoint::new(
+            DeviceStateValue::RelativeHumidity(humidity, Percent(payload.humidity)),
+            payload.last_seen,
+        )
+        .into(),
+        availability(device_id, payload.last_seen),
+    ])
+}
+
+fn parse_contact_sensor(device_id: &str, opened: Opened, payload: &str) -> anyhow::Result<Vec<IncomingData>> {
+    let payload: ContactSensor = serde_json::from_str(payload)?;
+
+    Ok(vec![
+        DataPoint::new(DeviceStateValue::Opened(opened, !payload.contact), payload.last_seen).into(),
+        availability(device_id, payload.last_seen),
+    ])
+}
+
+fn parse_power_plug(
+    device_id: &str,
+    power: CurrentPowerUsage,
+    energy: TotalEnergyConsumption,
+    energy_offset: KiloWattHours,
+    power_available: Option<PowerAvailable>,
+    payload: &str,
+) -> anyhow::Result<Vec<IncomingData>> {
+    let payload: PowerPlug = serde_json::from_str(payload)?;
+    let mut items = vec![
+        DataPoint::new(
+            DeviceStateValue::CurrentPowerUsage(power, Watt(payload.current_power_w)),
+            payload.last_seen,
+        )
+        .into(),
+        DataPoint::new(
+            DeviceStateValue::TotalEnergyConsumption(energy, KiloWattHours(payload.total_energy_kwh) + energy_offset),
+            payload.last_seen,
+        )
+        .into(),
+        availability(device_id, payload.last_seen),
+    ];
+
+    if let Some(power_available) = power_available {
+        items.push(
+            DataPoint::new(
+                DeviceStateValue::PowerAvailable(power_available, payload.state == "ON"),
+                payload.last_seen,
+            )
+            .into(),
+        );
+    }
+
+    Ok(items)
+}
+
+fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str) -> anyhow::Result<Vec<IncomingData>> {
+    let payload: SonoffThermostatPayload = serde_json::from_str(payload)?;
+
+    let mut result = vec![
+        DataPoint::new(
+            DeviceStateValue::Temperature(
+                Temperature::ThermostatOnDevice(thermostat),
+                DegreeCelsius(payload.local_temperature),
+            ),
+            payload.last_seen,
+        )
+        .into(),
+        DataPoint::new(
+            DeviceStateValue::Temperature(
+                Temperature::ThermostatExternalInput(thermostat),
+                DegreeCelsius(payload.external_temperature_input),
+            ),
+            payload.last_seen,
+        )
+        .into(),
+        availability(device_id, payload.last_seen),
+    ];
+
+    let (setpoint_lower, setpoint_upper, demand_lower, demand_upper) = match thermostat {
+        Radiator::LivingRoomBig => (
+            SetPoint::LivingRoomBigLower,
+            SetPoint::LivingRoomBig,
+            HeatingDemandLimit::LivingRoomBigLower,
+            HeatingDemandLimit::LivingRoomBigUpper,
+        ),
+        Radiator::LivingRoomSmall => (
+            SetPoint::LivingRoomSmallLower,
+            SetPoint::LivingRoomSmall,
+            HeatingDemandLimit::LivingRoomSmallLower,
+            HeatingDemandLimit::LivingRoomSmallUpper,
+        ),
+        Radiator::Bedroom => (
+            SetPoint::BedroomLower,
+            SetPoint::Bedroom,
+            HeatingDemandLimit::BedroomLower,
+            HeatingDemandLimit::BedroomUpper,
+        ),
+        Radiator::Kitchen => (
+            SetPoint::KitchenLower,
+            SetPoint::Kitchen,
+            HeatingDemandLimit::KitchenLower,
+            HeatingDemandLimit::KitchenUpper,
+        ),
+        Radiator::RoomOfRequirements => (
+            SetPoint::RoomOfRequirementsLower,
+            SetPoint::RoomOfRequirements,
+            HeatingDemandLimit::RoomOfRequirementsLower,
+            HeatingDemandLimit::RoomOfRequirementsUpper,
+        ),
+        Radiator::Bathroom => (
+            SetPoint::BathroomLower,
+            SetPoint::Bathroom,
+            HeatingDemandLimit::BathroomLower,
+            HeatingDemandLimit::BathroomUpper,
+        ),
+    };
+
+    let is_off = payload.system_mode.as_deref() == Some("off");
+    let (setpoint_lower_value, setpoint_upper_value) = if is_off {
+        (DegreeCelsius(0.0), DegreeCelsius(0.0))
+    } else {
+        (
+            DegreeCelsius(payload.occupied_heating_setpoint + payload.temperature_accuracy),
+            DegreeCelsius(payload.occupied_heating_setpoint),
+        )
+    };
+
+    result.push(
+        DataPoint::new(
+            DeviceStateValue::SetPoint(setpoint_upper, setpoint_upper_value),
+            payload.last_seen,
+        )
+        .into(),
+    );
+
+    result.push(
+        DataPoint::new(
+            DeviceStateValue::SetPoint(setpoint_lower, setpoint_lower_value),
+            payload.last_seen,
+        )
+        .into(),
+    );
+
+    result.push(
+        DataPoint::new(
+            DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(payload.valve_opening_degree).clamp()),
+            payload.last_seen,
+        )
+        .into(),
+    );
+
+    result.push(
+        DataPoint::new(
+            DeviceStateValue::HeatingDemandLimit(demand_lower, Percent(100.0 - payload.valve_closing_degree).clamp()),
+            payload.last_seen,
+        )
+        .into(),
+    );
+
+    //Current demand not exposed directly at running state is not reliable and no other
+    //way of reading the current demand exists.
+
+    Ok(result)
 }
 
 fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {
@@ -340,5 +375,64 @@ fn emit_debug_metrics(device_id: &str, payload: &str) {
                 &[("item", key.as_str()), ("device_id", device_id)],
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state_values(items: Vec<IncomingData>) -> Vec<DeviceStateValue> {
+        items
+            .into_iter()
+            .filter_map(|item| match item {
+                IncomingData::StateValue(data_point) => Some(data_point.value),
+                IncomingData::ItemAvailability(_) => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ignores_command_topics() {
+        let msg = MqttInMessage {
+            topic: "living_room/sensor/set".to_string(),
+            payload: "{}".to_string(),
+        };
+
+        assert!(z2m_device_id(&msg).is_none());
+    }
+
+    #[test]
+    fn parse_error_in_one_channel_does_not_block_other_channels() {
+        let msg = MqttInMessage {
+            topic: "power/plug".to_string(),
+            payload: r#"{
+                "power": 42.0,
+                "energy": 10.5,
+                "state": "ON",
+                "last_seen": "2025-01-01T00:00:00+00:00"
+            }"#
+            .to_string(),
+        };
+        let channels = vec![
+            Z2mChannel::ContactSensor(Opened::KitchenWindow),
+            Z2mChannel::PowerPlug(
+                CurrentPowerUsage::Kettle,
+                TotalEnergyConsumption::Kettle,
+                KiloWattHours(1.0),
+                Some(PowerAvailable::InfraredHeater),
+            ),
+        ];
+
+        let values = state_values(parse_configured_channels("power/plug", &channels, &msg));
+
+        assert_eq!(
+            values,
+            vec![
+                DeviceStateValue::CurrentPowerUsage(CurrentPowerUsage::Kettle, Watt(42.0)),
+                DeviceStateValue::TotalEnergyConsumption(TotalEnergyConsumption::Kettle, KiloWattHours(11.5)),
+                DeviceStateValue::PowerAvailable(PowerAvailable::InfraredHeater, true),
+            ]
+        );
     }
 }

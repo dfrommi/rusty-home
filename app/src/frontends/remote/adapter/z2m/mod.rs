@@ -34,10 +34,9 @@ impl Z2mRemoteIncomingDataSource {
                 continue;
             };
 
-            let targets = self.device_config.get(&device_id);
-            if targets.is_empty() {
+            let Some(targets) = self.device_config.get_optional(&device_id) else {
                 continue;
-            }
+            };
 
             match self.parse_triggers(msg.payload, targets) {
                 Ok(Some(triggers)) => return Some(triggers),

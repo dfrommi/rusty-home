@@ -3,7 +3,10 @@ use infrastructure::EventListener;
 use crate::{
     command::{Command, CommandEvent, CommandExecution, EnergySavingDevice},
     core::timeseries::DataPoint,
-    device_state::{DeviceStateValue, EnergySaving, adapter::IncomingData, adapter::IncomingDataSource},
+    device_state::{
+        DeviceStateValue, EnergySaving,
+        adapter::{IncomingData, IncomingDataSource},
+    },
     t,
 };
 
@@ -17,47 +20,93 @@ impl InternalDataSource {
     }
 }
 
-impl IncomingDataSource<CommandEvent, ()> for InternalDataSource {
-    fn ds_name(&self) -> &str {
-        "InternalDS"
-    }
+impl IncomingDataSource for InternalDataSource {
+    async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
+        loop {
+            let msg = self.rx.recv().await?;
+            let Some(data) = incoming_data_from_command_event(&msg) else {
+                continue;
+            };
 
-    async fn recv(&mut self) -> Option<CommandEvent> {
-        self.rx.recv().await
+            tracing::debug!("InternalDataSource produced incoming data: {:?}", data);
+            return Some(data);
+        }
     }
+}
 
-    fn device_id(&self, msg: &CommandEvent) -> Option<String> {
-        match msg {
-            CommandEvent::CommandExecuted(cmd_exec) => Some(cmd_exec.id.to_string()),
+fn incoming_data_from_command_event(msg: &CommandEvent) -> Option<Vec<IncomingData>> {
+    match msg {
+        CommandEvent::CommandExecuted(CommandExecution {
+            command: Command::SetEnergySaving { device, on },
+            ..
+        }) => {
+            let dp = DataPoint::new(
+                DeviceStateValue::EnergySaving(
+                    match device {
+                        EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
+                    },
+                    *on,
+                ),
+                t!(now),
+            );
+            Some(vec![IncomingData::StateValue(dp)])
+        }
+        CommandEvent::CommandExecuted(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use infrastructure::EventBus;
+
+    use crate::{
+        command::{CommandState, PowerToggle},
+        core::id::ExternalId,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn skips_noop_commands_until_energy_saving_command() {
+        let bus = EventBus::new(8);
+        let mut ds = InternalDataSource::new(bus.subscribe());
+        let emitter = bus.emitter();
+
+        emitter.send(command_event(
+            1,
+            Command::SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: true,
+            },
+        ));
+        emitter.send(command_event(
+            2,
+            Command::SetEnergySaving {
+                device: EnergySavingDevice::LivingRoomTv,
+                on: true,
+            },
+        ));
+
+        let updates = ds.recv_multi().await.expect("internal source closed");
+
+        assert_eq!(updates.len(), 1);
+        match &updates[0] {
+            IncomingData::StateValue(dp) => {
+                assert_eq!(dp.value, DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, true))
+            }
+            IncomingData::ItemAvailability(_) => panic!("expected state value"),
         }
     }
 
-    fn get_channels(&self, _: &str) -> &[()] {
-        &[()]
-    }
-
-    async fn to_incoming_data(&self, _: &str, _: &(), msg: &CommandEvent) -> anyhow::Result<Vec<IncomingData>> {
-        let res = match msg {
-            CommandEvent::CommandExecuted(CommandExecution {
-                command: Command::SetEnergySaving { device, on },
-                ..
-            }) => {
-                let dp = DataPoint::new(
-                    DeviceStateValue::EnergySaving(
-                        match device {
-                            EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
-                        },
-                        *on,
-                    ),
-                    t!(now),
-                );
-                vec![IncomingData::StateValue(dp)]
-            }
-            CommandEvent::CommandExecuted(_) => Vec::new(),
-        };
-
-        tracing::debug!("InternalDataSource produced incoming data: {:?}", res);
-
-        Ok(res)
+    fn command_event(id: i64, command: Command) -> CommandEvent {
+        CommandEvent::CommandExecuted(CommandExecution {
+            id,
+            command,
+            state: CommandState::Success,
+            created: t!(now),
+            source: ExternalId::new_static("test", "test"),
+            user_trigger_id: None,
+            correlation_id: None,
+        })
     }
 }

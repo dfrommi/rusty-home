@@ -108,12 +108,29 @@ impl HomeAssistantIncomingDataSource {
     }
 }
 
-impl IncomingDataSource<StateChangedEvent, HaChannel> for HomeAssistantIncomingDataSource {
-    fn ds_name(&self) -> &str {
-        "HomeAssistant"
-    }
+impl IncomingDataSource for HomeAssistantIncomingDataSource {
+    async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
+        loop {
+            let msg = self.recv_state_changed_event().await?;
+            let device_id = &msg.entity_id;
 
-    async fn recv(&mut self) -> Option<StateChangedEvent> {
+            let Some(channels) = self.config.get_optional(device_id) else {
+                continue;
+            };
+
+            if channels.is_empty() {
+                continue;
+            }
+
+            tracing::debug!("Received HomeAssistant event for devices {}: {:?}", device_id, channels);
+
+            return Some(parse_configured_channels(device_id, channels, &msg, &self.comfee_cache));
+        }
+    }
+}
+
+impl HomeAssistantIncomingDataSource {
+    async fn recv_state_changed_event(&mut self) -> Option<StateChangedEvent> {
         if self.initial_load.is_none() {
             self.initial_load = match self.client.get_current_state().await {
                 Ok(v) => Some(v),
@@ -129,62 +146,53 @@ impl IncomingDataSource<StateChangedEvent, HaChannel> for HomeAssistantIncomingD
             _ => self.listener.recv().await,
         }
     }
+}
 
-    fn device_id(&self, msg: &StateChangedEvent) -> Option<String> {
-        Some(msg.entity_id.clone())
-    }
+fn parse_configured_channels(
+    device_id: &str,
+    channels: &[HaChannel],
+    msg: &StateChangedEvent,
+    comfee_cache: &Mutex<HashMap<FanActivity, ComfeeFanCache>>,
+) -> Vec<IncomingData> {
+    let mut incoming_data = vec![];
 
-    fn get_channels(&self, device_id: &str) -> &[HaChannel] {
-        self.config.get(device_id)
-    }
-
-    async fn to_incoming_data(
-        &self,
-        device_id: &str,
-        channel: &HaChannel,
-        msg: &StateChangedEvent,
-    ) -> anyhow::Result<Vec<IncomingData>> {
-        let mut result = match &msg.state {
+    for channel in channels {
+        match &msg.state {
             StateValue::Available(state_value) => {
                 tracing::info!("Received supported event {}", device_id);
 
-                let dp_result = to_persistent_data_point(
-                    channel.clone(),
-                    state_value,
-                    &msg.attributes,
-                    msg.last_changed,
-                    &self.comfee_cache,
-                );
-
-                match dp_result {
-                    Ok(Some(dp)) => vec![dp],
-                    Ok(None) => vec![],
+                match parse_ha_channel(channel, state_value, &msg.attributes, msg.last_changed, comfee_cache) {
+                    Ok(Some(dp)) => incoming_data.push(dp),
+                    Ok(None) => {}
                     Err(e) => {
-                        tracing::error!("Error processing homeassistant event of {}: {:?}", device_id, e);
-                        vec![]
+                        tracing::error!(
+                            "Error processing homeassistant event of {} for channel {:?}: {:?}",
+                            device_id,
+                            channel,
+                            e
+                        );
                     }
                 }
             }
-            _ => {
+            StateValue::Unavailable => {
                 tracing::warn!("Value of {} is not available", device_id);
-                vec![]
             }
-        };
+        }
 
-        result.push(to_item_availability(msg));
-
-        Ok(result)
+        incoming_data.push(to_item_availability(msg));
     }
+
+    incoming_data
 }
 
-fn to_persistent_data_point(
-    channel: HaChannel,
+fn parse_ha_channel(
+    channel: &HaChannel,
     ha_value: &str,
     attributes: &HashMap<String, serde_json::Value>,
     timestamp: DateTime,
     comfee_cache: &Mutex<HashMap<FanActivity, ComfeeFanCache>>,
 ) -> anyhow::Result<Option<IncomingData>> {
-    let dp: Option<IncomingData> = match channel {
+    let dp: Option<IncomingData> = match channel.clone() {
         HaChannel::AllergenIndex(channel) => Some(
             DataPoint::new(
                 DeviceStateValue::AllergenIndex(channel, AllergenIndexValue(ha_value.parse()?)),
@@ -377,28 +385,25 @@ impl HaMqttClient {
 
 impl HaMqttClient {
     pub async fn recv(&mut self) -> Option<StateChangedEvent> {
-        match self.state_rx.recv().await {
-            Some(msg) => {
-                match serde_json::from_str::<HaEvent>(&msg.payload) {
-                    Ok(HaEvent::StateChanged { new_state: event, .. }) => Some(event),
-                    Ok(HaEvent::Unknown(_)) => {
-                        tracing::trace!("Received unsupported event: {:?}", msg.payload);
-                        None
-                    }
-
-                    //json parsing error
-                    Err(e) => {
-                        tracing::error!("Error parsing MQTT message: {}", e);
-                        None
-                    }
-                }
-            }
-
-            None => {
+        loop {
+            let Some(msg) = self.state_rx.recv().await else {
                 tracing::error!("Error parsing MQTT message: channel closed");
-                None
+                return None;
+            };
+
+            match parse_ha_event_payload(&msg.payload) {
+                Ok(Some(event)) => return Some(event),
+                Ok(None) => tracing::trace!("Received unsupported event: {:?}", msg.payload),
+                Err(e) => tracing::error!("Error parsing MQTT message: {}", e),
             }
         }
+    }
+}
+
+fn parse_ha_event_payload(payload: &str) -> anyhow::Result<Option<StateChangedEvent>> {
+    match serde_json::from_str::<HaEvent>(payload)? {
+        HaEvent::StateChanged { new_state: event, .. } => Ok(Some(event)),
+        HaEvent::Unknown(_) => Ok(None),
     }
 }
 
@@ -430,10 +435,40 @@ mod tests {
         }
     }
 
+    fn state_event(entity_id: &str, state: StateValue) -> StateChangedEvent {
+        StateChangedEvent {
+            entity_id: entity_id.to_string(),
+            state,
+            last_changed: t!(now),
+            last_updated: t!(now),
+            attributes: HashMap::new(),
+        }
+    }
+
+    fn state_values(items: &[IncomingData]) -> Vec<DeviceStateValue> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                IncomingData::StateValue(dp) => Some(dp.value.clone()),
+                IncomingData::ItemAvailability(_) => None,
+            })
+            .collect()
+    }
+
+    fn availabilities(items: &[IncomingData]) -> Vec<&DeviceAvailability> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                IncomingData::StateValue(_) => None,
+                IncomingData::ItemAvailability(availability) => Some(availability),
+            })
+            .collect()
+    }
+
     #[test]
     fn parses_allergen_index() {
-        let value = to_persistent_data_point(
-            HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
+        let value = parse_ha_channel(
+            &HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
             "7",
             &HashMap::new(),
             t!(now),
@@ -450,8 +485,8 @@ mod tests {
 
     #[test]
     fn parses_pm25() {
-        let value = to_persistent_data_point(
-            HaChannel::ParticulateMatter(ParticulateMatter::LivingRoomPM25),
+        let value = parse_ha_channel(
+            &HaChannel::ParticulateMatter(ParticulateMatter::LivingRoomPM25),
             "3.25",
             &HashMap::new(),
             t!(now),
@@ -464,6 +499,62 @@ mod tests {
             extract_state_value(value),
             DeviceStateValue::ParticulateMatter(ParticulateMatter::LivingRoomPM25, MicrogramsPerCubicMeter(3.25),)
         );
+    }
+
+    #[test]
+    fn unavailable_configured_state_emits_availability_only() {
+        let event = state_event("sensor.test", StateValue::Unavailable);
+
+        let items = parse_configured_channels(
+            "sensor.test",
+            &[HaChannel::Powered(PowerAvailable::LivingRoomTv)],
+            &event,
+            &Mutex::new(HashMap::new()),
+        );
+
+        assert!(state_values(&items).is_empty());
+
+        let availabilities = availabilities(&items);
+        assert_eq!(availabilities.len(), 1);
+        assert_eq!(availabilities[0].source, "HA");
+        assert_eq!(availabilities[0].device_id, "sensor.test");
+        assert!(availabilities[0].marked_offline);
+    }
+
+    #[test]
+    fn parse_error_does_not_block_other_configured_channels() {
+        let event = state_event("sensor.test", StateValue::Available("on".to_string()));
+
+        let items = parse_configured_channels(
+            "sensor.test",
+            &[
+                HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
+                HaChannel::Powered(PowerAvailable::LivingRoomTv),
+            ],
+            &event,
+            &Mutex::new(HashMap::new()),
+        );
+
+        assert_eq!(
+            state_values(&items),
+            vec![DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, true)]
+        );
+
+        let availabilities = availabilities(&items);
+        assert_eq!(availabilities.len(), 2);
+        assert!(availabilities.iter().all(|availability| !availability.marked_offline));
+    }
+
+    #[test]
+    fn unsupported_ha_event_payload_is_ignored() {
+        let event = parse_ha_event_payload(r#"{"event_type":"call_service","event_data":{"domain":"light"}}"#).unwrap();
+
+        assert!(event.is_none());
+    }
+
+    #[test]
+    fn malformed_ha_event_payload_is_an_error() {
+        assert!(parse_ha_event_payload("not json").is_err());
     }
 
     #[test]
@@ -516,8 +607,8 @@ mod tests {
     fn parses_philips_air_purifier_fan_state() {
         let attributes = HashMap::from([("preset_mode".to_string(), json!("turbo"))]);
 
-        let value = to_persistent_data_point(
-            HaChannel::PhilipsAirPurifierFan(FanActivity::LivingRoomAirPurifier),
+        let value = parse_ha_channel(
+            &HaChannel::PhilipsAirPurifierFan(FanActivity::LivingRoomAirPurifier),
             "on",
             &attributes,
             t!(now),

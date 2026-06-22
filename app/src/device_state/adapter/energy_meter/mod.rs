@@ -9,15 +9,10 @@ use infrastructure::EventListener;
 
 use crate::frontends::energy_meter::{EnergyReading, Faucet, Radiator};
 
-#[derive(Debug, Clone)]
-pub struct EnergyReadingAddedEvent {
-    pub id: i64,
-}
-
 pub struct EnergyMeterIncomingDataSource {
     repo: EnergyReadingRepository,
     rx: EventListener<EnergyReading>,
-    initial_load: Option<Vec<EnergyReadingAddedEvent>>,
+    initial_load: Option<Vec<i64>>,
 }
 
 impl EnergyMeterIncomingDataSource {
@@ -29,55 +24,45 @@ impl EnergyMeterIncomingDataSource {
             initial_load: None,
         }
     }
+
+    async fn incoming_data_for_reading_id(&self, id: i64) -> anyhow::Result<Vec<IncomingData>> {
+        let dp = self.repo.get_total_reading_by_id(id).await?;
+        Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into()))])
+    }
 }
 
-impl IncomingDataSource<EnergyReadingAddedEvent, ()> for EnergyMeterIncomingDataSource {
-    fn ds_name(&self) -> &str {
-        "EnergyMeter"
-    }
-
-    async fn recv(&mut self) -> Option<EnergyReadingAddedEvent> {
-        if self.initial_load.is_none() {
-            self.initial_load = match self.repo.get_latest_total_readings_ids().await {
-                Ok(v) => Some(v.iter().map(|id| EnergyReadingAddedEvent { id: *id }).collect()),
-                Err(e) => {
-                    tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
-                    Some(vec![])
-                }
-            };
-        }
-
-        match &mut self.initial_load {
-            Some(data) if !data.is_empty() => data.pop(),
-            _ => match self.rx.recv().await {
-                Some(msg) => match self.repo.add_yearly_energy_reading(msg, t!(now)).await {
-                    Ok(id) => Some(EnergyReadingAddedEvent { id }),
+impl IncomingDataSource for EnergyMeterIncomingDataSource {
+    async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
+        loop {
+            if self.initial_load.is_none() {
+                self.initial_load = match self.repo.get_latest_total_readings_ids().await {
+                    Ok(ids) => Some(ids),
                     Err(e) => {
-                        tracing::error!("Error saving Energy Reading: {:?}", e);
-                        None
+                        tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
+                        Some(vec![])
                     }
+                };
+            }
+
+            if let Some(id) = self.initial_load.as_mut().and_then(|data| data.pop()) {
+                match self.incoming_data_for_reading_id(id).await {
+                    Ok(data) => return Some(data),
+                    Err(e) => {
+                        tracing::error!("Error loading Energy Reading with id {}: {:?}", id, e);
+                        continue;
+                    }
+                }
+            }
+
+            let msg = self.rx.recv().await?;
+            match self.repo.add_yearly_energy_reading(msg, t!(now)).await {
+                Ok(id) => match self.incoming_data_for_reading_id(id).await {
+                    Ok(data) => return Some(data),
+                    Err(e) => tracing::error!("Error loading Energy Reading with id {}: {:?}", id, e),
                 },
-                None => None,
-            },
+                Err(e) => tracing::error!("Error saving Energy Reading: {:?}", e),
+            }
         }
-    }
-
-    fn device_id(&self, msg: &EnergyReadingAddedEvent) -> Option<String> {
-        Some(msg.id.to_string())
-    }
-
-    fn get_channels(&self, _: &str) -> &[()] {
-        &[()]
-    }
-
-    async fn to_incoming_data(
-        &self,
-        _: &str,
-        _: &(),
-        msg: &EnergyReadingAddedEvent,
-    ) -> anyhow::Result<Vec<IncomingData>> {
-        let dp = self.repo.get_total_reading_by_id(msg.id).await?;
-        Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into()))])
     }
 }
 
@@ -110,5 +95,33 @@ impl From<&EnergyReading> for DeviceStateValue {
                 KiloCubicMeter(*value),
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use infrastructure::EventBus;
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn live_reading_is_saved_then_emitted_as_total(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let bus = EventBus::new(8);
+        let mut ds = EnergyMeterIncomingDataSource::new(pool, bus.subscribe());
+
+        bus.emitter().send(EnergyReading::Heating(Radiator::Bedroom, 12.5));
+
+        let updates = ds.recv_multi().await.expect("energy meter source closed");
+
+        assert_eq!(updates.len(), 1);
+        match &updates[0] {
+            IncomingData::StateValue(dp) => assert_eq!(
+                dp.value,
+                DeviceStateValue::TotalRadiatorConsumption(TotalRadiatorConsumption::Bedroom, HeatingUnit(12.5))
+            ),
+            IncomingData::ItemAvailability(_) => panic!("expected state value"),
+        }
+
+        Ok(())
     }
 }

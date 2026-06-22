@@ -17,7 +17,7 @@ use crate::{
     },
     device_state::{
         adapter::{
-            IncomingDataSource as _, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
+            IncomingDataSource, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
             homeassistant::HomeAssistantIncomingDataSource, internal::InternalDataSource,
             tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
         },
@@ -109,18 +109,20 @@ impl DeviceStateModule {
 
     pub async fn run(mut self) {
         loop {
-            //TODO expose error like "closed" when data-source gets refactored
-            let updates = tokio::select! {
-                updates = self.tasmota_ds.recv_multi() => updates,
-                updates = self.z2m_ds.recv_multi() => updates,
-                updates = self.ha_ds.recv_multi() => updates,
-                updates = self.energy_meter_ds.recv_multi() => updates,
-                updates = self.internal_ds.recv_multi() => updates,
+            let (source, updates) = tokio::select! {
+                updates = self.tasmota_ds.recv_multi() => ("Tasmota", updates),
+                updates = self.z2m_ds.recv_multi() => ("Z2M", updates),
+                updates = self.ha_ds.recv_multi() => ("HomeAssistant", updates),
+                updates = self.energy_meter_ds.recv_multi() => ("EnergyMeter", updates),
+                updates = self.internal_ds.recv_multi() => ("Internal", updates),
             };
 
-            if let Some(updates) = updates {
-                self.process_incoming_data(updates).await;
-            }
+            let Some(updates) = updates else {
+                tracing::error!("Device state data source {} closed; stopping device state module", source);
+                return;
+            };
+
+            self.process_incoming_data(updates).await;
         }
     }
 

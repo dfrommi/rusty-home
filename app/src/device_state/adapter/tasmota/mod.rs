@@ -5,7 +5,6 @@ use crate::device_state::{CurrentPowerUsage, DeviceAvailability, PowerAvailable,
 
 use crate::core::DeviceConfig;
 
-use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{KiloWattHours, Watt};
 use crate::device_state::DeviceStateValue;
@@ -142,25 +141,25 @@ fn parse_energy_meter(
 ) -> anyhow::Result<Vec<IncomingData>> {
     let tele_message: TeleMessage = serde_json::from_str(payload)?;
 
+    //Timezone of the message is fragile. No info in the timestamp, so it depends on the device's
+    //setting and also might not have DST handling. As messages don't use retain, now is working.
+    let msg_time = t!(now);
+
     let Some(energy_report) = &tele_message.energy_report else {
         return Ok(vec![]);
     };
 
     Ok(vec![
-        DataPoint::new(
-            DeviceStateValue::CurrentPowerUsage(power, Watt(energy_report.power)),
-            tele_message.time,
-        )
-        .into(),
+        DataPoint::new(DeviceStateValue::CurrentPowerUsage(power, Watt(energy_report.power)), msg_time).into(),
         DataPoint::new(
             DeviceStateValue::TotalEnergyConsumption(energy, KiloWattHours(energy_report.total)),
-            tele_message.time,
+            msg_time,
         )
         .into(),
         DeviceAvailability {
             source: "Tasmota".to_string(),
             device_id: device_id.to_string(),
-            last_seen: tele_message.time,
+            last_seen: msg_time,
             marked_offline: false,
         }
         .into(),
@@ -182,9 +181,6 @@ fn parse_power_toggle(device_id: &str, powered: PowerAvailable, payload: &str) -
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct TeleMessage {
-    #[serde(rename = "Time", deserialize_with = "datetime_format::deserialize")]
-    time: DateTime,
-
     #[serde(rename = "ENERGY")]
     energy_report: Option<EnergyReport>,
 }
@@ -194,29 +190,6 @@ struct TeleMessage {
 struct EnergyReport {
     power: f64,
     total: f64,
-}
-
-mod datetime_format {
-    use crate::core::time::DateTime;
-    use chrono::{Local, NaiveDateTime, TimeZone, offset::LocalResult};
-    use serde::{self, Deserialize, Deserializer};
-
-    const FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        let naive = NaiveDateTime::parse_from_str(s, FORMAT).map_err(serde::de::Error::custom)?;
-        let local = match Local.from_local_datetime(&naive) {
-            LocalResult::Single(local) => local,
-            LocalResult::Ambiguous(local, _) => local,
-            LocalResult::None => return Err(serde::de::Error::custom("Invalid local datetime")),
-        };
-
-        Ok(DateTime::from(local))
-    }
 }
 
 #[cfg(test)]
@@ -348,7 +321,6 @@ mod tests {
         let parsed: TeleMessage = serde_json::from_str(json).unwrap();
         let energy_report = parsed.energy_report.unwrap();
 
-        assert_eq!(parsed.time.to_iso_string(), "2025-01-11T23:10:38+01:00");
         assert_eq!(energy_report.power, 1.0);
         assert_eq!(energy_report.total, 6.096);
     }

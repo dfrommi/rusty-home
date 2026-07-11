@@ -14,6 +14,7 @@ pub struct Settings {
     pub tasmota: TasmotaSettings,
     pub nuki: NukiSettings,
     pub metrics: MetricsExportSettings,
+    pub tado: TadoSettings,
 }
 
 impl Settings {
@@ -53,4 +54,10 @@ pub struct NukiSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct MetricsExportSettings {
     pub victoria_url: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TadoSettings {
+    pub url: String,
+    pub home_id: String,
 }

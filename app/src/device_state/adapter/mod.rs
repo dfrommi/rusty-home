@@ -2,6 +2,7 @@ pub mod db;
 pub mod energy_meter;
 pub mod homeassistant;
 pub mod internal;
+pub mod tado;
 pub mod tasmota;
 pub mod z2m;
 

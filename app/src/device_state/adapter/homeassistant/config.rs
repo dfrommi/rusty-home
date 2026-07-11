@@ -21,36 +21,12 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // TEMPERATURE
         //
         ("sensor.home_temperature", HaChannel::Temperature(Temperature::Outside)),
-        (
-            "sensor.wohnzimmer_temperature",
-            HaChannel::Temperature(Temperature::LivingRoomTado),
-        ),
-        (
-            "sensor.schlafzimmer_temperature",
-            HaChannel::Temperature(Temperature::BedroomTado),
-        ),
-        (
-            "sensor.arbeitszimmer_temperature",
-            HaChannel::Temperature(Temperature::RoomOfRequirementsTado),
-        ),
         //
         // HUMIDITY
         //
         (
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
-        ),
-        (
-            "sensor.wohnzimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::LivingRoomTado),
-        ),
-        (
-            "sensor.schlafzimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::BedroomTado),
-        ),
-        (
-            "sensor.arbeitszimmer_humidity",
-            HaChannel::RelativeHumidity(RelativeHumidity::RoomOfRequirementsTado),
         ),
         //
         //POWERED STATE

@@ -73,6 +73,8 @@ reqwest-tracing = { version = "0.7", features = ["opentelemetry_0_32"] }
 assert-json-diff = "2"
 mockito = "1"
 
+rand = "0.8"
+
 linfa = "0.8"
 linfa-logistic = "0.8"
 linfa-linear = "0.8"

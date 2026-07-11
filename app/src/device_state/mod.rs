@@ -18,7 +18,7 @@ use crate::{
     device_state::{
         adapter::{
             IncomingDataSource, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
-            homeassistant::HomeAssistantIncomingDataSource, internal::InternalDataSource,
+            homeassistant::HomeAssistantIncomingDataSource, internal::InternalDataSource, tado::TadoIncomingDataSource,
             tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
         },
         service::DeviceStateService,
@@ -61,6 +61,7 @@ pub struct DeviceStateModule {
     ha_ds: HomeAssistantIncomingDataSource,
     energy_meter_ds: EnergyMeterIncomingDataSource,
     internal_ds: InternalDataSource,
+    tado_ds: TadoIncomingDataSource,
 }
 
 impl DeviceStateModule {
@@ -74,6 +75,8 @@ impl DeviceStateModule {
         ha_token: &str,
         energy_reading_rx: EventListener<EnergyReading>,
         command_events: EventListener<CommandEvent>,
+        tado_url: &str,
+        tado_home_id: &str,
     ) -> Self {
         let repo = DeviceStateRepository::new(pool.clone());
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
@@ -81,6 +84,7 @@ impl DeviceStateModule {
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await;
         let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
         let internal_ds = InternalDataSource::new(command_events);
+        let tado_ds = TadoIncomingDataSource::new(tado_url, tado_home_id).expect("Error creating Tado adapter");
 
         let event_bus = EventBus::new(128);
 
@@ -94,6 +98,7 @@ impl DeviceStateModule {
             ha_ds,
             energy_meter_ds,
             internal_ds,
+            tado_ds,
         }
     }
 
@@ -115,6 +120,7 @@ impl DeviceStateModule {
                 updates = self.ha_ds.recv_multi() => ("HomeAssistant", updates),
                 updates = self.energy_meter_ds.recv_multi() => ("EnergyMeter", updates),
                 updates = self.internal_ds.recv_multi() => ("Internal", updates),
+                updates = self.tado_ds.recv_multi() => ("Tado", updates),
             };
 
             let Some(updates) = updates else {

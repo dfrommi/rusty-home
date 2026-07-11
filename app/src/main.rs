@@ -49,6 +49,8 @@ pub async fn main() {
         &settings.homeassistant.token,
         energy_meter_bus.subscribe(),
         command_event_bus.subscribe(),
+        &settings.tado.url,
+        &settings.tado.home_id,
     )
     .await;
 

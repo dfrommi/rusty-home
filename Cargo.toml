@@ -58,17 +58,16 @@ moka = { version = "0.12", features = ["future"] }
 
 #Tracing dependencies
 tracing = "0.1"
-tracing-opentelemetry = "0.32"
+tracing-opentelemetry = "0.33"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-opentelemetry = { version = "0.31", features = ["trace"] }
+opentelemetry = { version = "0.32", features = ["trace"] }
 
-# add feature "experimental_span_attributes" when 0.32 is released
-opentelemetry-appender-tracing = { version = "0.31", features = [ "experimental_metadata_attributes" ] }
-opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"] }
-opentelemetry-stdout = "0.31"
-opentelemetry_sdk = { version = "0.31", features = ["trace", "rt-tokio"] }
-tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_30"] }
-reqwest-tracing = { version = "0.6", features = ["opentelemetry_0_30"] }
+opentelemetry-appender-tracing = { version = "0.32", features = ["experimental_span_attributes", "experimental_metadata_attributes"] }
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"] }
+opentelemetry-stdout = "0.32"
+opentelemetry_sdk = { version = "0.32", features = ["trace", "rt-tokio"] }
+tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_32"] }
+reqwest-tracing = { version = "0.7", features = ["opentelemetry_0_32"] }
 
 #Test dependencies
 assert-json-diff = "2"

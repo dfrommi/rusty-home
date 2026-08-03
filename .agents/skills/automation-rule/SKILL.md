@@ -7,7 +7,7 @@ description: Use when a user asks to create or update an automation rule, add a 
 
 You are adding or updating an automation rule in the rusty-home project. Rules live in `app/src/automation/domain/action/` and are evaluated by the goal-driven planner.
 
-Read `app/src/automation/CLAUDE.md` before starting — it contains the reference architecture and logging conventions you must follow.
+Read the [automation module reference](.agents/instructions/automation.md) before starting — it contains the reference architecture you must follow.
 
 ## Step 1: Gather Requirements
 
@@ -131,7 +131,7 @@ fn decide(value: SomeType) -> Option<Command> {
 }
 ```
 
-### Logging conventions (from CLAUDE.md)
+### Logging conventions
 
 - Every execution or skip must produce an `info!` log explaining the decision
 - Log at the point where the decision is made

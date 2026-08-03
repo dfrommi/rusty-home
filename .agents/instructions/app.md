@@ -27,3 +27,11 @@ Composition root: `main.rs`. Each domain module lives in `<module>/`:
 Default to module + client + service unless it's a pure runner or stateless adapter.
 Keep wiring in `mod.rs`, logic in `service.rs`, types in `domain/`, IO in `adapter/`.
 
+## Code Organization Conventions
+
+- **Tests**: inline `#[cfg(test)] mod tests` in the same file as the code under test. Descriptive snake_case names describing scenario and expected outcome.
+- **New enum variants**: go into the existing module file (e.g. `Temperature::BedroomCorner` in `temperature.rs`), not new files.
+- **Monolithic `calculate_current`**: refactor into a dispatcher calling per-variant helpers when adding variants (see `risk_of_mould.rs`). Preserve existing logic in the helper.
+- **Trace calibration constants**: trace alongside computed values with `ctx.trace(id, "...", value)` (e.g. `t_room`, `t_outside`, `f_rsi`).
+- **Test builder helpers**: inline in test modules to reduce repetitive `DataPoint` construction.
+

@@ -7,7 +7,7 @@ description: Use when a user asks to create or update a derived home state item,
 
 You are adding or updating a derived home state item in the rusty-home project. Home state items derive higher-level state (occupancy, felt temperature, risk of mould, etc.) from raw device state or other home state items.
 
-Read `app/src/home_state/CLAUDE.md` before starting.
+Read the [home-state module reference](.agents/instructions/home-state.md) before starting.
 
 ## Step 1: Gather Requirements
 

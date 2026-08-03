@@ -8,6 +8,8 @@ Resource-centric action planning system. Reacts to `HomeStateEvent` changes and 
 
 Each rule returns a single `Command` (not a vec). Rules are independent — they don't delegate to each other. Lower-priority rules win naturally when higher-priority ones return Skip.
 
+Rules whose logic is physics-grounded (`dehumidify` — mould risk, dewpoint margins) build on `docs/calculations.md`; read it before changing thresholds or moisture/mould logic.
+
 ## Adding or updating a rule
 
 Use the `automation-rule` skill (structure/wiring) and `implement-rule` skill (decision logic).

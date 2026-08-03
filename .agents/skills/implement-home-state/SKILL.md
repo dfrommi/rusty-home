@@ -11,7 +11,7 @@ This is the most critical code in the smart home. The quality of these calculati
 
 ## Step 1: Understand the Item
 
-Read the existing item file. Identify:
+Read `docs/calculations.md` first — it documents the physics/rationale behind the existing calculation items (f_Rsi mould model, 3-Kelvin rule, dewpoint vs absolute humidity, known TODOs and calibration gaps). Then read the existing item file. Identify:
 
 - The identifier enum and its variants
 - The output type

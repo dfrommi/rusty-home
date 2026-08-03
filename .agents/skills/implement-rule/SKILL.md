@@ -7,7 +7,7 @@ description: Use when a user wants to implement or update the decision logic ins
 
 You are implementing or updating the decision logic inside an automation rule in `app/src/automation/domain/action/`. The rule module and wiring (HomeAction enum, goal assignment) should already exist — this skill focuses on the content of the `Rule` or `SimpleRule` trait implementation.
 
-Read `app/src/automation/CLAUDE.md` for the reference architecture and logging conventions.
+Read the [automation module reference](.agents/instructions/automation.md) for the reference architecture and logging conventions. If the rule models physical conditions (moisture, mould, temperature — e.g. `dehumidify`), also read `docs/calculations.md` before touching thresholds.
 
 ## Step 1: Understand the Rule
 

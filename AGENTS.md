@@ -33,9 +33,14 @@ t!(in 5 hours)     // DateTime
 ```
 
 Three non-obvious behaviors in `app/src/core/`:
+
 - `DateTime::now()` uses a task-local override — use it in tests for deterministic time.
 - `DataFrame` deduplicates on insert: consecutive identical values are silently dropped. Timestamps mark when a value *became* active, not when the last message arrived.
 - Unit types (`DegreeCelsius`, `Percent`, etc.) divided by `Duration` produce `RateOfChange<T>`.
+
+## Code Style
+
+- Use `pub` instead of `pub(crate)`
 
 ## System Architecture
 
@@ -50,15 +55,20 @@ See [Observability Reference](.agents/observability.md) for the full Grafana dat
 When editing files in a module, read its reference doc before making changes:
 
 | Path | Reference |
-|---|---|
+| --- | --- |
 | `app/src/**` | [Module structure & wiring](.agents/instructions/app.md) |
 | `app/src/automation/**` | [Automation planner & rules](.agents/instructions/automation.md) |
 | `app/src/command/**` | [Command executor chain](.agents/instructions/command.md) |
 | `app/src/device_state/**` | [Device state module](.agents/instructions/device-state.md) |
 | `app/src/frontends/energy_meter/**` | [Energy meter frontend](.agents/instructions/energy-meter.md) |
 | `app/src/home_state/**` | [Home state module](.agents/instructions/home-state.md) |
+| `app/src/observability/**` | [Observability module](.agents/instructions/observability.md) |
 | `app/src/frontends/homekit/**` | [HomeKit frontend](.agents/instructions/homekit.md) |
 | `lib/infrastructure/**` | [Infrastructure (MQTT, event bus)](.agents/instructions/infrastructure.md) |
 | `lib/macro/**` | [Procedural macros](.agents/instructions/macro.md) |
 | `app/src/frontends/remote/**` | [Remote frontend](.agents/instructions/remote.md) |
 | `app/src/trigger/**` | [Trigger module](.agents/instructions/trigger.md) |
+
+## Domain Knowledge
+
+- [Calculation physics](docs/calculations.md) — theory/rationale behind home-state calculations (f_Rsi mould model, 3-Kelvin rule, dewpoint vs absolute humidity). **Read before touching any calculation item** (`RiskOfMould`, `DewPoint`, `AbsoluteHumidity`, `Temperature::BedroomCorner`) or the `dehumidify` rule.

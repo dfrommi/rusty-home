@@ -9,7 +9,7 @@ use crate::{
         timeseries::DataPoint,
     },
     device_state::{
-        DeviceAvailability, DeviceStateEvent, DeviceStateId, DeviceStateValue, OfflineItem,
+        DeviceAvailability, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId, DeviceStateValue,
         adapter::db::DeviceStateRepository,
     },
 };
@@ -121,7 +121,7 @@ impl DeviceStateService {
         self.repo.get_all_data_points_in_range_ts_asc(range).await
     }
 
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
-        self.repo.get_offline_items().await
+    pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
+        self.repo.get_item_availabilities().await
     }
 }

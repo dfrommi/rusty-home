@@ -16,7 +16,10 @@ use crate::{
     t,
 };
 
-use crate::observability::adapter::{device_metrics::DeviceMetricsAdapter, home_metrics::HomeMetricsAdapter};
+use crate::observability::adapter::{
+    availability_metrics::AvailabilityMetricsAdapter, device_metrics::DeviceMetricsAdapter,
+    home_metrics::HomeMetricsAdapter,
+};
 
 pub struct ObservabilityModule {
     repo: Arc<VictoriaRepository>,
@@ -27,6 +30,7 @@ pub struct ObservabilityModule {
     command_client: CommandClient,
     home_metrics_adapter: HomeMetricsAdapter,
     device_metrics_adapter: DeviceMetricsAdapter,
+    availability_metrics_adapter: AvailabilityMetricsAdapter,
 }
 
 impl ObservabilityModule {
@@ -49,6 +53,7 @@ impl ObservabilityModule {
             command_client,
             home_metrics_adapter: HomeMetricsAdapter,
             device_metrics_adapter: DeviceMetricsAdapter,
+            availability_metrics_adapter: AvailabilityMetricsAdapter,
         }
     }
 
@@ -65,6 +70,7 @@ impl ObservabilityModule {
         const MAX_BATCH: usize = 500;
 
         let mut device_state_timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut availability_timer = tokio::time::interval(std::time::Duration::from_secs(60));
         let mut buffer = Vec::with_capacity(MAX_BATCH);
         let mut last_flush = t!(now);
 
@@ -90,7 +96,19 @@ impl ObservabilityModule {
                 event = self.home_state_events.recv() => match event {
                     Some(HomeStateEvent::Updated(data_point)) => self.home_metrics_adapter.to_metrics(data_point.clone()),
                     _ => vec![],
-                }
+                },
+
+                _ = availability_timer.tick() => match self.device_state_client.get_item_availabilities().await {
+                    Ok(records) => {
+                        records.into_iter().flat_map(|r| {
+                            self.availability_metrics_adapter.to_metrics(r)
+                        }).collect()
+                    },
+                    Err(e) => {
+                        tracing::error!("Error fetching item availabilities for metrics export: {:?}", e);
+                        vec![]
+                    }
+                },
             };
 
             for mut metric in metrics.into_iter() {

@@ -139,7 +139,7 @@ async fn get_offline_items(client: web::Data<DeviceStateClient>) -> GrafanaRespo
     let rows = offline_items.into_iter().map(|item| Row {
         source: item.source,
         item: item.item,
-        days: item.duration.as_days_f64(),
+        days: item.last_seen_ago.as_days_f64(),
     });
 
     csv_response(rows)

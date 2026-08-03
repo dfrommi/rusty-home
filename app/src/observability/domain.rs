@@ -19,6 +19,7 @@ pub enum MetricLabel {
     Room(String),
     FriendlyName(String),
     EnumVariant(String),
+    Source(String),
 }
 
 impl std::fmt::Display for Metric {
@@ -45,6 +46,7 @@ impl std::fmt::Display for MetricLabel {
             MetricLabel::Room(r) => write!(f, "room=\"{}\"", r),
             MetricLabel::FriendlyName(n) => write!(f, "friendly_name=\"{}\"", n),
             MetricLabel::EnumVariant(ev) => write!(f, "enum_variant=\"{}\"", ev),
+            MetricLabel::Source(s) => write!(f, "source=\"{}\"", s),
         }
     }
 }

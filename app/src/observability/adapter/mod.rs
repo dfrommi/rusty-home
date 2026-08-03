@@ -1,4 +1,5 @@
 pub mod api;
+pub mod availability_metrics;
 pub mod device_metrics;
 pub mod home_metrics;
 pub mod repository;

@@ -9,7 +9,7 @@ use crate::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::DataPoint,
     },
-    device_state::{DeviceStateId, DeviceStateValue, OfflineItem},
+    device_state::{DeviceAvailabilityStatus, DeviceStateId, DeviceStateValue},
     t,
 };
 
@@ -169,7 +169,7 @@ impl DeviceStateRepository {
         Ok(())
     }
 
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
+    pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         let recs = sqlx::query!(
             r#"SELECT source, item, last_seen, marked_offline, considered_offline_after, entry_updated
                 FROM item_availability"#
@@ -177,25 +177,26 @@ impl DeviceStateRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut offline_items = vec![];
+        let now = t!(now);
 
-        for rec in recs.iter() {
-            let considered_offline_after = convert_pginterval_to_duration(&rec.considered_offline_after);
-            let duration = std::cmp::max(
-                t!(now).elapsed_since(rec.last_seen.into()),
-                t!(now).elapsed_since(rec.entry_updated.into()),
-            );
+        Ok(recs
+            .into_iter()
+            .map(|rec| {
+                let considered_offline_after = convert_pginterval_to_duration(&rec.considered_offline_after);
+                let last_seen_ago = std::cmp::max(
+                    now.elapsed_since(rec.last_seen.into()),
+                    now.elapsed_since(rec.entry_updated.into()),
+                );
+                let is_offline = rec.marked_offline || last_seen_ago > considered_offline_after;
 
-            if rec.marked_offline || duration > considered_offline_after {
-                offline_items.push(OfflineItem {
-                    source: rec.source.clone(),
-                    item: rec.item.clone(),
-                    duration,
-                });
-            }
-        }
-
-        Ok(offline_items)
+                DeviceAvailabilityStatus {
+                    source: rec.source,
+                    item: rec.item,
+                    last_seen_ago,
+                    is_offline,
+                }
+            })
+            .collect())
     }
 
     async fn get_tag_id(&self, id: &DeviceStateId) -> Result<i64> {

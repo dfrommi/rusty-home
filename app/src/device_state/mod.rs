@@ -47,10 +47,11 @@ pub struct DeviceAvailability {
 }
 
 #[derive(Debug, Clone)]
-pub struct OfflineItem {
+pub struct DeviceAvailabilityStatus {
     pub source: String,
     pub item: String,
-    pub duration: Duration,
+    pub last_seen_ago: Duration,
+    pub is_offline: bool,
 }
 
 pub struct DeviceStateModule {
@@ -156,8 +157,17 @@ impl DeviceStateClient {
         Ok(group_by_device_id(self.service.get_all_data_points_in_range(range).await?))
     }
 
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<OfflineItem>> {
-        self.service.get_offline_items().await
+    pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
+        self.service.get_item_availabilities().await
+    }
+
+    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
+        Ok(self
+            .get_item_availabilities()
+            .await?
+            .into_iter()
+            .filter(|s| s.is_offline)
+            .collect())
     }
 }
 

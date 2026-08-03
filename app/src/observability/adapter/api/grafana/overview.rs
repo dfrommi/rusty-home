@@ -11,7 +11,6 @@ pub fn routes(command_client: Arc<CommandClient>, device_state_client: Arc<Devic
     web::scope("/overview")
         .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
-        .route("/offline", web::get().to(get_offline_items))
         .app_data(web::Data::from(command_client))
         .app_data(web::Data::from(device_state_client))
 }
@@ -118,28 +117,6 @@ async fn get_states(
             //TODO implement proper formatting again
             value: format!("{fvalue}"),
         }
-    });
-
-    csv_response(rows)
-}
-
-async fn get_offline_items(client: web::Data<DeviceStateClient>) -> GrafanaResponse {
-    #[derive(serde::Serialize)]
-    struct Row {
-        source: String,
-        item: String,
-        days: f64,
-    }
-
-    let offline_items = client
-        .get_offline_items()
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?;
-
-    let rows = offline_items.into_iter().map(|item| Row {
-        source: item.source,
-        item: item.item,
-        days: item.last_seen_ago.as_days_f64(),
     });
 
     csv_response(rows)

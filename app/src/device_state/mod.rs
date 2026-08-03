@@ -160,15 +160,6 @@ impl DeviceStateClient {
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         self.service.get_item_availabilities().await
     }
-
-    pub async fn get_offline_items(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
-        Ok(self
-            .get_item_availabilities()
-            .await?
-            .into_iter()
-            .filter(|s| s.is_offline)
-            .collect())
-    }
 }
 
 fn group_by_device_id(

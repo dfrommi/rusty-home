@@ -41,6 +41,10 @@ Three non-obvious behaviors in `app/src/core/`:
 
 See [ARCHITECTURE.md](.agents/ARCHITECTURE.md) for the full data-flow and module responsibilities.
 
+## Observability
+
+See [Observability Reference](.agents/observability.md) for the full Grafana datasource inventory, telemetry pipelines (OTLP + VictoriaMetrics), metric-to-code mappings, trace structure, and query patterns.
+
 ## Module Reference
 
 When editing files in a module, read its reference doc before making changes:

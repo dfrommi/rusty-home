@@ -7,6 +7,13 @@ target/
 !.claude/
 !.github/
 !.agents/
+
+#Externally mainaged GCX skills
+.agents/skills/create-dashboard 
+.agents/skills/debug-with-grafana 
+.agents/skills/investigate-alert 
+.agents/skills/manage-dashboards
+
 *.local.json
 
 Cargo.lock
@@ -17,4 +24,3 @@ Cargo.lock
 
 *.stderr
 
-/homebridge/

@@ -1,21 +1,33 @@
 ---
 name: command
-description: Use when a user asks to add a new command, add a device to an existing command, or wire a command to a backend executor (Tasmota, Z2M, HomeAssistant).
+description: Use when a user asks to add a new command, add a device to an existing command, or wire a command to a backend executor (Tasmota, Z2M, Nuki, HomeAssistant).
 ---
 
 # Command Skill
 
 You are adding or updating a command in the rusty-home project. Follow this workflow precisely.
 
+## Reference architecture
+
+`CommandModule` follows the module + client + service pattern.
+
+Executors are tried sequentially: Tasmota → Z2M → Nuki → HomeAssistant. Each returns `Ok(true)` (handled), `Ok(false)` (not mine), or `Err` (failed).
+
+Before re-executing a command, the planner checks two things in `app/src/command/domain/command_state.rs`:
+
+- **`is_reflected_in_state()`** — is the desired effect already visible in home state?
+- **`min_wait_duration_between_executions()`** — per-command-type cooldown
+
 ## Step 1: Gather Requirements
 
 If the user has not already provided all of the following, ask using AskUserQuestion:
 
 - **What the command does** (e.g., toggle power, set temperature, open a lock)
-- **Which backend executor** handles it: Tasmota (MQTT), Z2M (Zigbee2MQTT via MQTT), or HomeAssistant (HTTP REST)
+- **Which backend executor** handles it: Tasmota (MQTT), Z2M (Zigbee2MQTT via MQTT), Nuki (HTTP REST, door locks), or HomeAssistant (HTTP REST)
 - **External device identifier**:
   - Tasmota: MQTT device ID (e.g., `irheater`)
   - Z2M: friendly name path (e.g., `bathroom/dehumidifier_plug`)
+  - Nuki: Nuki opener ID (e.g., `1CC90CCA`)
   - HomeAssistant: entity ID (e.g., `light.hue_go`, `lock.nuki_nuki_lock`)
 - **Payload / protocol details**: what exactly to send to the backend. **CRITICAL: Never guess the payload or API interface. Always ask the user.**
   - Tasmota: MQTT topic pattern and payload (e.g., `cmnd/{id}/Power1` with `ON`/`OFF`)
@@ -212,6 +224,44 @@ Based on the chosen backend, modify the appropriate adapter files:
    (
        CommandTarget::MyCommand { device: MyDevice::Variant },
        Z2mCommandTarget::NewTarget("friendly_name/device"),
+   ),
+   ```
+
+### Nuki (`app/src/command/adapter/nuki/`)
+
+1. **Target type** in `mod.rs` — add variant to `NukiCommandTarget` if needed:
+   ```rust
+   enum NukiCommandTarget {
+       Opener(&'static str),
+       NewTarget(&'static str),  // add if needed
+   }
+   ```
+
+2. **Execution logic** in `mod.rs` — add match arm in `execute_command()` and implement handler method:
+   ```rust
+   // In execute_command match:
+   (Command::OpenDoor { .. }, NukiCommandTarget::NewTarget(nuki_id)) => {
+       self.open_door(nuki_id).await?;
+       Ok(true)
+   }
+
+   // Handler method on NukiCommandExecutor:
+   async fn open_door(&self, nuki_id: &str) -> anyhow::Result<()> {
+       let url = format!(
+           "{}/lockAction?nukiId={}&deviceType=2&action=3&token={}",
+           self.bridge_url, nuki_id, self.token
+       );
+       let body: serde_json::Value = self.client.get(&url).send().await?.json().await?;
+       anyhow::ensure!(body.get("success").and_then(|v| v.as_bool()) == Some(true), "Nuki bridge returned non-success: {:?}", body);
+       Ok(())
+   }
+   ```
+
+3. **Config mapping** in `config.rs` — add entry to `default_nuki_command_config()`:
+   ```rust
+   (
+       CommandTarget::OpenDoor { device: Lock::BuildingEntrance },
+       NukiCommandTarget::NewTarget("nuki_id"),
    ),
    ```
 

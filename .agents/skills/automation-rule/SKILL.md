@@ -1,13 +1,13 @@
 ---
 name: automation-rule
-description: Use when a user asks to create or update an automation rule, add a new home automation action, or wire a rule into the goal-based planning system.
+description: Use when a user asks to create or update an automation rule, add a new home automation action, or wire a rule into the priority-ordered resource plans.
 ---
 
 # Automation Rule Skill
 
-You are adding or updating an automation rule in the rusty-home project. Rules live in `app/src/automation/domain/action/` and are evaluated by the goal-driven planner.
+You are adding or updating an automation rule in the rusty-home project. Rules live in `app/src/automation/domain/action/` and are evaluated by the resource-planning loop.
 
-Read the [automation module reference](.agents/instructions/automation.md) before starting — it contains the reference architecture you must follow.
+`resource_plans()` in `app/src/automation/domain/resource_plan.rs` defines, per `CommandTarget`, a priority-ordered list of `HomeAction` rules; the planner evaluates them in order and the first non-`Skip` wins. Each rule returns a single `Command` (not a vec), and rules are independent — they don't delegate to each other.
 
 ## Step 1: Gather Requirements
 
@@ -27,28 +27,28 @@ Choose between:
 | Trait | When to use |
 |-------|------------|
 | `SimpleRule` | Single command output, boolean preconditions. Implement `command()` and `preconditions_fulfilled()`. Automatically gets a `Rule` impl. |
-| `Rule` | Multiple commands, conditional command selection, delegation to other rules, or complex return logic. Implement `evaluate()` directly. |
+| `Rule` | Conditional command selection (still a single `Command`), delegation to other rules, or complex return logic. Implement `evaluate()` directly. |
 
 Present the choice to the user with reasoning.
 
-## Step 3: Determine Goal Assignment and Priority
+## Step 3: Determine Target and Priority
 
 **This is critical and requires explicit user confirmation.**
 
-Read `app/src/automation/domain/goal.rs` to see the current goal ordering and rule lists.
+Read `app/src/automation/domain/resource_plan.rs` to see the current resource plans and rule ordering.
 
 ### How priority works
 
-Goals are ordered in `get_active_goals()` from highest to lowest priority. Within each goal, rules are ordered top-to-bottom in the `rules()` vec. The planner evaluates all goals/rules, and the **first rule ready to execute for a given device (CommandTarget) wins** — later rules targeting the same device are skipped due to resource locking.
+`resource_plans()` returns `Vec<(CommandTarget, Vec<HomeAction>)>` — one entry per controllable device/resource. The `Vec<HomeAction>` for each `CommandTarget` is ordered from highest to lowest priority. The planner (`plan_and_execute` in `app/src/automation/planner/processor.rs`) evaluates each action in order; the **first action that does not return `Skip` wins** — its single command is executed and the remaining actions for that target are not evaluated.
 
 ### What to present to the user
 
-1. **Which goal** the rule belongs to — suggest one based on the rule's purpose, but always confirm
-2. **Position within the goal's rule list** — explain what other rules exist in that goal and what being placed before/after them means for priority
-3. If the rule targets a device that other goals also control, explain the cross-goal priority implications
-4. If no existing goal fits, suggest creating a new one and where it should go in the priority order
+1. **Which `CommandTarget`** the rule controls — suggest one based on the command the rule produces, but always confirm
+2. **Position within that target's `Vec<HomeAction>`** — explain what other rules exist for that target and what being placed before/after them means for priority
+3. **Interaction with existing rules** for the same target (e.g. `BlockAutomation`, `UserTriggerAction`, `FollowDefaultSetting`) — placing a new rule before/after them changes who wins
+4. If no `CommandTarget` entry exists yet, confirm adding a new `(CommandTarget, Vec<HomeAction>)` entry and its position in the outer vec
 
-**Never auto-assign a goal or position. Always get explicit confirmation.**
+**Never auto-assign a target or position. Always get explicit confirmation.**
 
 ## Step 4: Determine Implementation Approach
 
@@ -122,7 +122,7 @@ impl Rule for MyRule {
         let command = match self {
             MyRule::Variant1 => decide(ctx.current(SomeState::X)?),
         };
-        Ok(command.map_or(RuleResult::Skip, |c| RuleResult::Execute(vec![c])))
+        Ok(command.map_or(RuleResult::Skip, RuleResult::Execute))
     }
 }
 
@@ -166,21 +166,28 @@ In `app/src/automation/domain/action/mod.rs`:
 
 The `#[derive(derive_more::From)]` on `HomeAction` auto-generates `From<MyRule>` — no manual `From` impl needed.
 
-## Step 7: Wire into Goal
+## Step 7: Wire into Resource Plans
 
-In `app/src/automation/domain/goal.rs`:
+In `app/src/automation/domain/resource_plan.rs`:
 
-1. Add `MyRule` to the import block at the top
-2. Add rule instance(s) to the confirmed goal's `rules()` match arm at the confirmed position
+1. Add `MyRule` to the import block at the top (alphabetical order)
+2. Add `MyRule::Variant1.into()` to the confirmed `CommandTarget`'s `Vec<HomeAction>` at the confirmed position
 
 Example:
 ```rust
-HomeGoal::SomeGoal => vec![
-    // ... existing rules above (higher priority)
-    MyRule::Variant1.into(),
-    // ... existing rules below (lower priority)
-],
+(
+    CommandTarget::SetPower {
+        device: PowerToggle::Dehumidifier,
+    },
+    vec![
+        // ... existing rules above (higher priority)
+        MyRule::Variant1.into(),
+        // ... existing rules below (lower priority)
+    ],
+),
 ```
+
+If the rule controls a device that has no `CommandTarget` entry yet, add a new `(CommandTarget, Vec<HomeAction>)` entry to the outer `vec![]`.
 
 ## Step 8: Add Command Variants (if needed)
 

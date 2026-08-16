@@ -36,7 +36,7 @@ Three non-obvious behaviors in `app/src/core/`:
 
 - `DateTime::now()` uses a task-local override — use it in tests for deterministic time.
 - `DataFrame` deduplicates on insert: consecutive identical values are silently dropped. Timestamps mark when a value *became* active, not when the last message arrived.
-- Unit types (`DegreeCelsius`, `Percent`, etc.) divided by `Duration` produce `RateOfChange<T>`.
+- Unit types (`DegreeCelsius`, `Percent`) divided by `Duration` produce `RateOfChange<T>`.
 
 ## Code Style
 
@@ -52,18 +52,13 @@ See [Observability Reference](.agents/observability.md) for the full Grafana dat
 
 ## Module Reference
 
-When editing files in a module, read its reference doc before making changes:
+For automation rules, commands, device states, home states, and HomeKit accessories, use the matching skill — the reference architecture is inlined there. The short docs below cover the remaining modules and only document what isn't self-evident from the code:
 
 | Path | Reference |
 | --- | --- |
 | `app/src/**` | [Module structure & wiring](.agents/instructions/app.md) |
-| `app/src/automation/**` | [Automation planner & rules](.agents/instructions/automation.md) |
-| `app/src/command/**` | [Command executor chain](.agents/instructions/command.md) |
-| `app/src/device_state/**` | [Device state module](.agents/instructions/device-state.md) |
 | `app/src/frontends/energy_meter/**` | [Energy meter frontend](.agents/instructions/energy-meter.md) |
-| `app/src/home_state/**` | [Home state module](.agents/instructions/home-state.md) |
 | `app/src/observability/**` | [Observability module](.agents/instructions/observability.md) |
-| `app/src/frontends/homekit/**` | [HomeKit frontend](.agents/instructions/homekit.md) |
 | `lib/infrastructure/**` | [Infrastructure (MQTT, event bus)](.agents/instructions/infrastructure.md) |
 | `lib/macro/**` | [Procedural macros](.agents/instructions/macro.md) |
 | `app/src/frontends/remote/**` | [Remote frontend](.agents/instructions/remote.md) |

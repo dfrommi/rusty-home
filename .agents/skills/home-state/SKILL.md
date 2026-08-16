@@ -7,7 +7,7 @@ description: Use when a user asks to create or update a derived home state item,
 
 You are adding or updating a derived home state item in the rusty-home project. Home state items derive higher-level state (occupancy, felt temperature, risk of mould, etc.) from raw device state or other home state items.
 
-Read the [home-state module reference](.agents/instructions/home-state.md) before starting.
+Home state derives higher-level state from raw device state; the module owns the calculation loop directly (no service). **Before changing calculation logic**, read `docs/calculations.md` — it documents the physics/rationale behind `RiskOfMould`, `Temperature::BedroomCorner`, `DewPoint`, `AbsoluteHumidity` (f_Rsi mould model, 3-Kelvin rule, dewpoint vs absolute humidity, known TODOs).
 
 ## Step 1: Gather Requirements
 

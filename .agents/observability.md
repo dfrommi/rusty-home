@@ -147,7 +147,7 @@ Discover available label values: `gcx logs labels -d grafanacloud-logs -l <label
 
 ## Planning Loop Traces
 
-Root span: `plan_for_home` (`app/src/automation/planner/mod.rs:14`), runs every ~18s, ~220ms, ~76 child spans.
+Root span: `plan_for_home` (`app/src/automation/planner/mod.rs:15`), runs every ~30s, ~220ms, ~76 child spans.
 
 ```
 plan_for_home
@@ -190,7 +190,7 @@ All spans carry `code.file.path`, `code.line.number`, `code.module.name`, `busy_
 | Smart Home Overview | `be8vajnp7stmoe` | Main overview |
 | Energiemonitor | `a358001b-…` | Energy monitoring |
 | Energy IQ | `ce84bz10sh88we` | Energy insights |
-| GOAP Monitor | `b617ab80-…` | Automation planner |
+| GOAP Monitor | `b617ab80-…` | Automation planner — resource plans (dashboard name is historical) |
 | State Machine | `d3bb14dc-…` | Device state machine |
 | Heizen Details | `e13c9ce3-…` | Heating details |
 | Luftfeuchtigkeit | `dfpxq6p` | Humidity |

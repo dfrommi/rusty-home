@@ -7,13 +7,22 @@ description: Use when a user asks to create or update a device state, add a sens
 
 You are adding or updating a device state in the rusty-home project. Follow this workflow precisely.
 
+## Reference architecture
+
+`DeviceStateModule` follows the module + client + service pattern. It emits two event types:
+
+- `DeviceStateEvent::Updated` — emitted on every value received (for observability)
+- `DeviceStateEvent::Changed` — emitted only when the value differs from the previous one
+
+Downstream modules (home_state, observability) subscribe to the appropriate event type.
+
 ## Step 1: Gather Requirements
 
 If the user has not already provided all of the following, ask using AskUserQuestion:
 
 - **What is being measured** (e.g., temperature, CO2 level, power usage, presence)
-- **Which backend adapter** delivers the data: Tasmota, Z2M (Zigbee2MQTT), HomeAssistant, EnergyMeter, or Internal
-- **External device identifier**: the MQTT topic (for Tasmota/Z2M), HA entity ID (for HomeAssistant), or event source
+- **Which backend adapter** delivers the data: Tasmota, Z2M (Zigbee2MQTT), HomeAssistant, Tado, EnergyMeter, or Internal
+- **External device identifier**: the MQTT topic (for Tasmota/Z2M), HA entity ID (for HomeAssistant), Tado zone id (for Tado), or event source
 - **Payload structure**: which JSON fields in the incoming message map to which values (e.g., `{"temperature": 21.5, "humidity": 55.0, "last_seen": "..."}`)
 
 ## Step 2: Classify the Work
@@ -104,7 +113,7 @@ Based on the adapter, modify the appropriate files:
   ```rust
   ("device_id", TasmotaChannel::ChannelVariant(DomainEnum::Variant, ...)),
   ```
-- **Parsing** in `mod.rs` `to_incoming_data()`: Add match arm if new channel type. Create serde `Deserialize` struct if payload shape is novel
+- **Parsing** in `mod.rs`: Add a match arm in `parse_tasmota_channel()` if new channel type. Create serde `Deserialize` struct if payload shape is novel
 
 #### Z2M (`app/src/device_state/adapter/z2m/`)
 
@@ -113,7 +122,7 @@ Based on the adapter, modify the appropriate files:
   ```rust
   ("friendly_name/device", Z2mChannel::ChannelVariant(DomainEnum::Variant, ...)),
   ```
-- **Parsing** in `mod.rs` `to_incoming_data()`: Add match arm if new channel type
+- **Parsing** in `mod.rs`: Add a match arm in `parse_z2m_channel()` if new channel type
 
 #### HomeAssistant (`app/src/device_state/adapter/homeassistant/`)
 
@@ -122,7 +131,7 @@ Based on the adapter, modify the appropriate files:
   ```rust
   ("sensor.entity_id", HaChannel::ChannelVariant(DomainEnum::Variant)),
   ```
-- **Parsing** in `mod.rs` `to_persistent_data_point()`: Add match arm if new channel type
+- **Parsing** in `mod.rs`: Add a match arm in `parse_ha_channel()` if new channel type
 
 #### EnergyMeter (`app/src/device_state/adapter/energy_meter/mod.rs`)
 
@@ -130,7 +139,17 @@ Based on the adapter, modify the appropriate files:
 
 #### Internal (`app/src/device_state/adapter/internal/mod.rs`)
 
-- Extend the `to_incoming_data()` match on `CommandExecution`
+- Extend the `incoming_data_from_command_event()` match on `CommandEvent`
+
+#### Tado (`app/src/device_state/adapter/tado/`)
+
+- **Channel enum** in `mod.rs`: Add or extend `TadoChannel` variant if the existing ones don't cover this data shape
+- **Config** in `config.rs`: Add entry to `default_tado_state_config()` keyed by the Tado zone id (string):
+  ```rust
+  ("4", TadoChannel::Temperature(Temperature::NewRoomTado)),
+  ("4", TadoChannel::RelativeHumidity(RelativeHumidity::NewRoomTado)),
+  ```
+- **Parsing** in `mod.rs`: The adapter polls Tado's HTTP API (`poll_api` / `poll_zones`); add a match arm in `poll_api()` if a new channel type needs special handling
 
 ### Payload Parsing Patterns
 

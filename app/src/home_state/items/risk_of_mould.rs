@@ -75,8 +75,8 @@ impl RiskOfMouldStateProvider {
         let corner_temps = ctx.all_since(Temperature::BedroomCorner, window)?;
         let bedroom_dewpoints = ctx.all_since(DewPoint::Room(Room::Bedroom), window)?;
 
-        let mean_corner = corner_temps.weighted_aged_mean(t!(1 hours).to_half_life(), LinearInterpolator);
-        let mean_dewpoint = bedroom_dewpoints.weighted_aged_mean(t!(1 hours).to_half_life(), LinearInterpolator);
+        let mean_corner = corner_temps.weighted_aged_mean(t!(1 hours), LinearInterpolator);
+        let mean_dewpoint = bedroom_dewpoints.weighted_aged_mean(t!(1 hours), LinearInterpolator);
         let mean_margin = mean_corner - mean_dewpoint;
 
         let risk = mean_margin < MARGIN_THRESHOLD_K;

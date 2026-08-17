@@ -91,10 +91,25 @@ impl StateCalculationResult {
 pub struct StateCalculationContext {
     start_time: DateTime,
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
+    calculating: RefCell<Vec<HomeStateId>>,
     device_state: Box<dyn DeviceStateProvider>,
     active_user_triggers: Box<dyn UserTriggerProvider>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
+}
+
+/// Removes the id from the in-progress stack on drop, so an early return
+/// (e.g. `calculate_new_home_state_value` yielding `None`) does not leave a
+/// stale marker behind that would cause a false cycle detection later.
+struct CalculatingGuard<'a> {
+    id: HomeStateId,
+    stack: &'a RefCell<Vec<HomeStateId>>,
+}
+
+impl Drop for CalculatingGuard<'_> {
+    fn drop(&mut self) {
+        self.stack.borrow_mut().retain(|x| x != &self.id);
+    }
 }
 
 impl StateCalculationContext {
@@ -129,6 +144,7 @@ impl StateCalculationContext {
         StateCalculationContext {
             start_time,
             current: RefCell::new(HashMap::new()),
+            calculating: RefCell::new(Vec::new()),
             device_state: Box::new(device_state),
             active_user_triggers: Box::new(active_user_triggers),
             prev: previous,
@@ -226,32 +242,44 @@ impl StateCalculationContext {
 
 impl StateCalculationContext {
     fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
-        let current_value = {
-            let current = self.current.borrow();
-            current.get(&id).cloned()
+        if let Some(dp) = self.current.borrow().get(&id).cloned() {
+            return Some(dp);
+        }
+
+        // Re-entering an id that is still being calculated is a dependency cycle.
+        {
+            let mut calculating = self.calculating.borrow_mut();
+            if calculating.contains(&id) {
+                tracing::error!(
+                    "Dependency cycle detected: {:?} is already being calculated (chain: {:?})",
+                    id,
+                    calculating
+                );
+                return None;
+            }
+            calculating.push(id);
+        }
+
+        let _guard = CalculatingGuard {
+            id,
+            stack: &self.calculating,
         };
 
-        match current_value {
-            Some(dp) => Some(dp),
-            None => {
-                let calculated_value = self.calculate_new_home_state_value(id)?;
-                let previous_dp = self.prev.get_home_state_value(id);
+        let calculated_value = self.calculate_new_home_state_value(id)?;
+        let previous_dp = self.prev.get_home_state_value(id);
 
-                //check if previous value is the same, then reuse timestamp
-                let calculated_dp = if let Some(previous_dp) = previous_dp
-                    && previous_dp.value == calculated_value
-                {
-                    previous_dp.clone()
-                } else {
-                    //no or different previous value
-                    DataPoint::new(calculated_value, self.start_time)
-                };
+        //check if previous value is the same, then reuse timestamp
+        let calculated_dp = if let Some(previous_dp) = previous_dp
+            && previous_dp.value == calculated_value
+        {
+            previous_dp.clone()
+        } else {
+            //no or different previous value
+            DataPoint::new(calculated_value, self.start_time)
+        };
 
-                let mut current_mut = self.current.borrow_mut();
-                current_mut.insert(id, calculated_dp.clone());
-                Some(calculated_dp)
-            }
-        }
+        self.current.borrow_mut().insert(id, calculated_dp.clone());
+        Some(calculated_dp)
     }
 
     fn calculate_new_home_state_value(&self, id: HomeStateId) -> Option<HomeStateValue> {

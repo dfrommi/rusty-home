@@ -56,6 +56,7 @@ fn incoming_data_from_command_event(msg: &CommandEvent) -> Option<Vec<IncomingDa
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use infrastructure::EventBus;
 

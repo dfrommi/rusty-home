@@ -185,6 +185,7 @@ impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod constructor {
     use super::*;
 

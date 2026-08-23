@@ -173,6 +173,7 @@ fn from_chrono_duration(duration: &chrono::Duration) -> iso8601_duration::Durati
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::t;

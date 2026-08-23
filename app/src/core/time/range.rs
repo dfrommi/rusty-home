@@ -192,6 +192,7 @@ impl Iterator for DateTimeIterator {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::zero_prefixed_literal)]
 mod tests {
     use super::*;
     use crate::t;

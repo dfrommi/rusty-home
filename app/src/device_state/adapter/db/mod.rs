@@ -271,6 +271,7 @@ async fn get_or_insert_tag_id_from_db(db_pool: &PgPool, id: &DeviceStateId) -> R
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use crate::{core::unit::DegreeCelsius, device_state::Temperature};
 

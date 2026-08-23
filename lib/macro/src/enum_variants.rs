@@ -26,7 +26,7 @@ pub fn derive_typed_item(input: TokenStream) -> TokenStream {
             }
             // Variant with exactly one unnamed field
             Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
-                let field_type = &fields.unnamed.first().unwrap().ty;
+                let field_type = &fields.unnamed[0].ty;
 
                 // Generate combinations by calling variants() on the nested enum
                 nested_variants.push(quote! {

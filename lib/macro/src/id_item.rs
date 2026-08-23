@@ -87,7 +87,10 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
                 let bindings: Vec<_> = fields
                     .named
                     .into_iter()
-                    .map(|field| field.ident.expect("named field expected"))
+                    .map(|field| match field.ident {
+                        Some(ident) => ident,
+                        None => unreachable!("named field expected"),
+                    })
                     .collect();
 
                 let variant_segments = bindings.iter().map(|binding| {
@@ -189,7 +192,10 @@ fn derive_struct(struct_name: &Ident, type_name_ext: &str, data_struct: DataStru
             let field_idents: Vec<_> = fields
                 .named
                 .iter()
-                .map(|field| field.ident.as_ref().expect("named field expected").clone())
+                .map(|field| match field.ident.as_ref() {
+                    Some(ident) => ident.clone(),
+                    None => unreachable!("named field expected"),
+                })
                 .collect();
 
             let variant_parts = field_idents.iter().map(|field_ident| {

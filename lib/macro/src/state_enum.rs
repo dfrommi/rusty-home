@@ -9,11 +9,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let enum_name = input.ident;
     let variants = super::enum_variants(input.data);
 
-    let base_name = enum_name
-        .to_string()
-        .strip_suffix("Value")
-        .expect("StateEnumDerive expects enum names to end with Value")
-        .to_string();
+    let base_name = match enum_name.to_string().strip_suffix("Value") {
+        Some(base_name) => base_name.to_string(),
+        None => panic!("StateEnumDerive expects enum names to end with Value"),
+    };
     let id_enum_name = format_ident!("{}Id", base_name);
     let item_trait_name = format_ident!("{}Item", base_name);
 

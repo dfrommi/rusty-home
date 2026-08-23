@@ -29,7 +29,7 @@ type AppTask = (&'static str, JoinHandle<()>);
 
 #[tokio::main(flavor = "multi_thread")]
 #[allow(clippy::expect_used)]
-pub async fn main() {
+pub async fn main() -> anyhow::Result<()> {
     let settings = Settings::new().expect("Error reading configuration");
 
     let mut infrastructure = Infrastructure::init(&settings)
@@ -52,7 +52,7 @@ pub async fn main() {
         &settings.tado.url,
         &settings.tado.home_id,
     )
-    .await;
+    .await?;
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
 

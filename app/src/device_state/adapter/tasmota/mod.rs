@@ -9,7 +9,7 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::{KiloWattHours, Watt};
 use crate::device_state::DeviceStateValue;
 use crate::t;
-use anyhow::bail;
+use anyhow::{Context, bail};
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 #[derive(Debug, Clone)]
@@ -24,18 +24,17 @@ pub struct TasmotaIncomingDataSource {
 }
 
 impl TasmotaIncomingDataSource {
-    #[allow(clippy::expect_used)]
-    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
+    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> anyhow::Result<Self> {
         let config = DeviceConfig::new(&config::default_tasmota_state_config());
         let rx = mqtt_client
             .subscribe_all(event_topic, &["tele/+/SENSOR", "stat/+/POWER"])
             .await
-            .expect("Error subscribing to MQTT topic");
+            .context("Error subscribing to Tasmota MQTT topics")?;
 
-        Self {
+        Ok(Self {
             device_config: config,
             mqtt_receiver: rx,
-        }
+        })
     }
 }
 

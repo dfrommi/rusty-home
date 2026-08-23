@@ -2,6 +2,8 @@ mod config;
 
 use std::collections::HashMap;
 
+use anyhow::Context;
+
 use crate::core::DeviceConfig;
 use crate::core::domain::Radiator;
 use crate::core::time::DateTime;
@@ -29,18 +31,17 @@ pub struct Z2mIncomingDataSource {
 }
 
 impl Z2mIncomingDataSource {
-    #[allow(clippy::expect_used)]
-    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> Self {
+    pub async fn new(mqtt_client: &mut Mqtt, event_topic: &str) -> anyhow::Result<Self> {
         let config = DeviceConfig::new(&config::default_z2m_state_config());
         let rx = mqtt_client
             .subscribe(event_topic, "#")
             .await
-            .expect("Error subscribing to MQTT topic");
+            .context("Error subscribing to Z2M MQTT topics")?;
 
-        Self {
+        Ok(Self {
             device_config: config,
             mqtt_receiver: rx,
-        }
+        })
     }
 }
 

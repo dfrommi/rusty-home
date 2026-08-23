@@ -2,6 +2,7 @@ mod adapter;
 mod domain;
 mod service;
 
+use anyhow::Context;
 pub use domain::*;
 use infrastructure::{EventBus, EventListener, Mqtt};
 
@@ -78,20 +79,20 @@ impl DeviceStateModule {
         command_events: EventListener<CommandEvent>,
         tado_url: &str,
         tado_home_id: &str,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let repo = DeviceStateRepository::new(pool.clone());
-        let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await;
-        let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await;
-        let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await;
+        let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
+        let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
+        let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
         let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
         let internal_ds = InternalDataSource::new(command_events);
-        let tado_ds = TadoIncomingDataSource::new(tado_url, tado_home_id).expect("Error creating Tado adapter");
+        let tado_ds = TadoIncomingDataSource::new(tado_url, tado_home_id).context("Error creating Tado adapter")?;
 
         let event_bus = EventBus::new(128);
 
         let service = DeviceStateService::new(repo.clone(), event_bus.emitter());
 
-        DeviceStateModule {
+        Ok(DeviceStateModule {
             service: Arc::new(service),
             event_bus,
             tasmota_ds,
@@ -100,7 +101,7 @@ impl DeviceStateModule {
             energy_meter_ds,
             internal_ds,
             tado_ds,
-        }
+        })
     }
 
     pub fn client(&self) -> DeviceStateClient {
@@ -173,6 +174,7 @@ fn group_by_device_id(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use crate::{core::unit::DegreeCelsius, t};
 

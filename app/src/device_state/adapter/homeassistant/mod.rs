@@ -87,24 +87,23 @@ pub struct HomeAssistantIncomingDataSource {
 }
 
 impl HomeAssistantIncomingDataSource {
-    #[allow(clippy::expect_used)]
-    pub async fn new(mqtt: &mut Mqtt, event_topic: &str, url: &str, token: &str) -> Self {
+    pub async fn new(mqtt: &mut Mqtt, event_topic: &str, url: &str, token: &str) -> anyhow::Result<Self> {
         let config = DeviceConfig::new(&config::default_ha_state_config());
         let rx = mqtt
             .subscribe(event_topic, "")
             .await
-            .expect("Error subscribing to MQTT topic");
+            .context("Error subscribing to Home Assistant MQTT topic")?;
 
         let mqtt_client = HaMqttClient::new(rx);
-        let http_client = HaHttpClient::new(url, token).expect("Error creating HA HTTP client");
+        let http_client = HaHttpClient::new(url, token).context("Error creating HA HTTP client")?;
 
-        Self {
+        Ok(Self {
             client: http_client,
             listener: mqtt_client,
             config,
             initial_load: None,
             comfee_cache: Mutex::new(HashMap::new()),
-        }
+        })
     }
 }
 

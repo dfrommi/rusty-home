@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::{Accessory, HomekitCommand};
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     trigger::{Door, UserTrigger},
@@ -20,8 +20,10 @@ impl DoorLock {
             pending_reset: true,
         }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for DoorLock {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         // CurrentDoorState: 1 = closed, TargetDoorState: 1 = closed
         // ObstructionDetected is required by HAP but managed internally by homebridge-mqtt
         vec![
@@ -32,7 +34,7 @@ impl DoorLock {
         ]
     }
 
-    pub fn export_state(&mut self, _state: &crate::home_state::HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, _state: &crate::home_state::HomeStateValue) -> Vec<HomekitEvent> {
         if self.pending_reset {
             self.pending_reset = false;
             // Reset to closed after the trigger was fired
@@ -44,7 +46,7 @@ impl DoorLock {
         Vec::new()
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::TargetDoorState) {
             let value = trigger
                 .value
@@ -78,7 +80,9 @@ impl DoorLock {
 
         None
     }
+}
 
+impl DoorLock {
     fn target(&self, characteristic: HomekitCharacteristic) -> HomekitTarget {
         HomekitTarget::new(self.name.to_string(), HomekitService::GarageDoorOpener, characteristic)
     }

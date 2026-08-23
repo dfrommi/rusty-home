@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::{Accessory, HomekitCommand};
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{EnergySaving, HomeStateValue},
@@ -14,12 +14,14 @@ impl EnergySavingSwitch {
     pub fn new(name: &'static str, target: EnergySaving) -> Self {
         Self { name, target }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for EnergySavingSwitch {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         vec![self.target_config()]
     }
 
-    pub fn export_state(&self, state: &HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         match state {
             HomeStateValue::EnergySaving(id, enabled) if *id == self.target => vec![HomekitEvent {
                 target: self.homekit_target(),
@@ -29,7 +31,7 @@ impl EnergySavingSwitch {
         }
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.homekit_target() {
             if let Some(is_on) = trigger.value.as_bool() {
                 let energy_saving = !is_on;
@@ -44,7 +46,9 @@ impl EnergySavingSwitch {
 
         None
     }
+}
 
+impl EnergySavingSwitch {
     fn homekit_target(&self) -> HomekitTarget {
         HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On)
     }

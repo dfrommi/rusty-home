@@ -62,65 +62,45 @@ pub enum HomekitCommandPolicy {
     Debounced { target: UserTriggerTarget },
 }
 
-enum HomekitAccessory {
-    ClimateSensor(ClimateSensor),
-    DoorLock(DoorLock),
-    EnergySavingSwitch(EnergySavingSwitch),
-    Fan(Fan),
-    PowerSwitch(PowerSwitch),
-    Thermostat(Thermostat),
-    WindowSensor(WindowSensor),
+trait Accessory: Send {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig>;
+
+    fn export_state(&mut self, _state: &HomeStateValue) -> Vec<HomekitEvent> {
+        Vec::new()
+    }
+
+    fn process_trigger(&mut self, _trigger: &HomekitEvent) -> Option<HomekitCommand> {
+        None
+    }
 }
 
 pub struct HomekitRegistry {
-    accessories: Vec<HomekitAccessory>,
+    accessories: Vec<Box<dyn Accessory>>,
 }
 
 impl HomekitRegistry {
-    fn new(accessories: Vec<HomekitAccessory>) -> Self {
+    fn new(accessories: Vec<Box<dyn Accessory>>) -> Self {
         Self { accessories }
     }
 
     pub fn get_device_config(&self) -> Vec<HomekitTargetConfig> {
         self.accessories
             .iter()
-            .flat_map(|accessory| match accessory {
-                HomekitAccessory::ClimateSensor(sensor) => sensor.get_all_targets(),
-                HomekitAccessory::DoorLock(lock) => lock.get_all_targets(),
-                HomekitAccessory::EnergySavingSwitch(switch) => switch.get_all_targets(),
-                HomekitAccessory::Fan(fan) => fan.get_all_targets(),
-                HomekitAccessory::Thermostat(sensor) => sensor.get_all_targets(),
-                HomekitAccessory::WindowSensor(sensor) => sensor.get_all_targets(),
-                HomekitAccessory::PowerSwitch(power_switch) => power_switch.get_all_targets(),
-            })
+            .flat_map(|accessory| accessory.get_all_targets())
             .collect()
     }
 
     pub fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         self.accessories
             .iter_mut()
-            .flat_map(|accessory| match accessory {
-                HomekitAccessory::ClimateSensor(sensor) => sensor.export_state(state),
-                HomekitAccessory::DoorLock(lock) => lock.export_state(state),
-                HomekitAccessory::EnergySavingSwitch(switch) => switch.export_state(state),
-                HomekitAccessory::Fan(fan) => fan.export_state(state),
-                HomekitAccessory::Thermostat(sensor) => sensor.export_state(state),
-                HomekitAccessory::WindowSensor(sensor) => sensor.export_state(state),
-                HomekitAccessory::PowerSwitch(power_switch) => power_switch.export_state(state),
-            })
+            .flat_map(|accessory| accessory.export_state(state))
             .collect()
     }
 
     pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
-        self.accessories.iter_mut().find_map(|accessory| match accessory {
-            HomekitAccessory::ClimateSensor(sensor) => sensor.process_trigger(trigger),
-            HomekitAccessory::DoorLock(lock) => lock.process_trigger(trigger),
-            HomekitAccessory::EnergySavingSwitch(switch) => switch.process_trigger(trigger),
-            HomekitAccessory::Fan(fan) => fan.process_trigger(trigger),
-            HomekitAccessory::Thermostat(sensor) => sensor.process_trigger(trigger),
-            HomekitAccessory::WindowSensor(sensor) => sensor.process_trigger(trigger),
-            HomekitAccessory::PowerSwitch(power_switch) => power_switch.process_trigger(trigger),
-        })
+        self.accessories
+            .iter_mut()
+            .find_map(|accessory| accessory.process_trigger(trigger))
     }
 }
 
@@ -130,59 +110,59 @@ impl Default for HomekitRegistry {
     }
 }
 
-fn config() -> Vec<HomekitAccessory> {
+fn config() -> Vec<Box<dyn Accessory>> {
     vec![
-        HomekitAccessory::ClimateSensor(ClimateSensor::new(
+        Box::new(ClimateSensor::new(
             "Klimasensor Wohnzimmer",
             Temperature::Room(Room::LivingRoom),
             RelativeHumidity::Room(Room::LivingRoom),
         )),
-        HomekitAccessory::ClimateSensor(ClimateSensor::new(
+        Box::new(ClimateSensor::new(
             "Klimasensor Schlafzimmer",
             Temperature::Room(Room::Bedroom),
             RelativeHumidity::Room(Room::Bedroom),
         )),
-        HomekitAccessory::ClimateSensor(ClimateSensor::new(
+        Box::new(ClimateSensor::new(
             "Klimasensor Arbeitszimmer",
             Temperature::Room(Room::RoomOfRequirements),
             RelativeHumidity::Room(Room::RoomOfRequirements),
         )),
-        HomekitAccessory::ClimateSensor(ClimateSensor::new(
+        Box::new(ClimateSensor::new(
             "Klimasensor Küche",
             Temperature::Room(Room::Kitchen),
             RelativeHumidity::Room(Room::Kitchen),
         )),
-        HomekitAccessory::ClimateSensor(ClimateSensor::new(
+        Box::new(ClimateSensor::new(
             "Klimasensor Bad",
             Temperature::Room(Room::Bathroom),
             RelativeHumidity::Room(Room::Bathroom),
         )),
-        HomekitAccessory::WindowSensor(WindowSensor::new(
+        Box::new(WindowSensor::new(
             "Fenstersensor Wohnzimmer",
             Opened::Room(RoomWithWindow::LivingRoom),
         )),
-        HomekitAccessory::WindowSensor(WindowSensor::new(
+        Box::new(WindowSensor::new(
             "Fenstersensor Schlafzimmer",
             Opened::Room(RoomWithWindow::Bedroom),
         )),
-        HomekitAccessory::WindowSensor(WindowSensor::new("Fenstersensor Küche", Opened::Room(RoomWithWindow::Kitchen))),
-        HomekitAccessory::WindowSensor(WindowSensor::new(
+        Box::new(WindowSensor::new("Fenstersensor Küche", Opened::Room(RoomWithWindow::Kitchen))),
+        Box::new(WindowSensor::new(
             "Fenstersensor Arbeitszimmer",
             Opened::Room(RoomWithWindow::RoomOfRequirements),
         )),
-        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Wohnzimmer", HeatingZone::LivingRoom)),
-        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Schlafzimmer", HeatingZone::Bedroom)),
-        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Arbeitszimmer", HeatingZone::RoomOfRequirements)),
-        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
-        HomekitAccessory::Thermostat(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
-        HomekitAccessory::DoorLock(DoorLock::new("Haustür", Door::Building)),
-        HomekitAccessory::PowerSwitch(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
-        HomekitAccessory::PowerSwitch(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
-        HomekitAccessory::EnergySavingSwitch(EnergySavingSwitch::new(
+        Box::new(Thermostat::new("Thermostat Wohnzimmer", HeatingZone::LivingRoom)),
+        Box::new(Thermostat::new("Thermostat Schlafzimmer", HeatingZone::Bedroom)),
+        Box::new(Thermostat::new("Thermostat Arbeitszimmer", HeatingZone::RoomOfRequirements)),
+        Box::new(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
+        Box::new(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
+        Box::new(DoorLock::new("Haustür", Door::Building)),
+        Box::new(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
+        Box::new(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
+        Box::new(EnergySavingSwitch::new(
             "Wohnzimmer TV Bildqualität",
             EnergySaving::LivingRoomTv,
         )),
-        HomekitAccessory::Fan(Fan::new("Entfeuchter Bad", FanActivity::BedroomDehumidifier)),
-        HomekitAccessory::Fan(Fan::new("Luftreiniger Wohnzimmer", FanActivity::LivingRoomAirPurifier)),
+        Box::new(Fan::new("Entfeuchter Bad", FanActivity::BedroomDehumidifier)),
+        Box::new(Fan::new("Luftreiniger Wohnzimmer", FanActivity::LivingRoomAirPurifier)),
     ]
 }

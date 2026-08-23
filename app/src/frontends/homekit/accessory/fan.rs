@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::{Accessory, HomekitCommand};
 use crate::{
     core::unit::{FanAirflow, FanSpeed},
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
@@ -66,8 +66,10 @@ impl Fan {
             status: FanStatus::new(),
         }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for Fan {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         vec![
             self.target(HomekitCharacteristic::Active).into_config(),
             self.target(HomekitCharacteristic::RotationSpeed)
@@ -75,7 +77,7 @@ impl Fan {
         ]
     }
 
-    pub fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         match state {
             HomeStateValue::FanActivity(activity, airflow) if *activity == self.activity => {
                 self.status.apply_state(airflow.clone());
@@ -92,7 +94,7 @@ impl Fan {
         }
     }
 
-    pub fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::Active) {
             if let Some(is_on) = value_to_bool(&trigger.value) {
                 let new_airflow = if is_on {
@@ -132,7 +134,9 @@ impl Fan {
 
         None
     }
+}
 
+impl Fan {
     fn target(&self, characteristic: HomekitCharacteristic) -> HomekitTarget {
         HomekitTarget::new(self.name.to_string(), HomekitService::Fanv2, characteristic)
     }

@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::{Accessory, HomekitCommand};
 use crate::home_state::{HeatingDemand, HeatingMode, HomeStateValue, SetPoint, TargetHeatingMode, Temperature};
 use crate::trigger::{HeatingRequest, UserTrigger};
 use crate::{
@@ -70,8 +70,10 @@ impl Thermostat {
             status: ThermostatStatus::default(),
         }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for Thermostat {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         vec![
             self.target(HomekitCharacteristic::CurrentTemperature).into_config(),
             self.target(HomekitCharacteristic::TargetTemperature).into_config(),
@@ -84,7 +86,7 @@ impl Thermostat {
         ]
     }
 
-    pub fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         let mut events = Vec::new();
 
         if !self.status.display_units_sent {
@@ -123,7 +125,7 @@ impl Thermostat {
         events
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target == self.target(HomekitCharacteristic::TargetTemperature) {
             let target_temp = trigger
                 .value
@@ -182,7 +184,9 @@ impl Thermostat {
 
         None
     }
+}
 
+impl Thermostat {
     fn event(&self, characteristic: HomekitCharacteristic, value: serde_json::Value) -> HomekitEvent {
         HomekitEvent {
             target: self.target(characteristic),

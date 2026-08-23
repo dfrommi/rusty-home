@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::Accessory;
 use crate::{
     frontends::homekit::{HomekitCharacteristic, HomekitEvent, HomekitService, HomekitTarget, HomekitTargetConfig},
     home_state::{HomeStateValue, Opened},
@@ -13,8 +13,10 @@ impl WindowSensor {
     pub fn new(name: &'static str, opened_area: Opened) -> Self {
         Self { name, opened_area }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for WindowSensor {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         vec![
             HomekitTarget::new(
                 self.name.to_string(),
@@ -25,7 +27,7 @@ impl WindowSensor {
         ]
     }
 
-    pub fn export_state(&self, state: &HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         match state {
             HomeStateValue::Opened(area, is_open) if area == &self.opened_area => {
                 // HomeKit reports 0 when the window is closed (contact detected) and 1 when it is open.
@@ -41,9 +43,5 @@ impl WindowSensor {
             }
             _ => Vec::new(),
         }
-    }
-
-    pub fn process_trigger(&self, _trigger: &HomekitEvent) -> Option<HomekitCommand> {
-        None
     }
 }

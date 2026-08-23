@@ -1,4 +1,4 @@
-use super::HomekitCommand;
+use super::{Accessory, HomekitCommand};
 use crate::home_state::{HomeStateValue, PowerAvailable};
 use crate::trigger::{OnOffDevice, UserTrigger};
 use crate::{
@@ -15,12 +15,14 @@ impl PowerSwitch {
     pub fn new(name: &'static str, power_toggle: PowerToggle) -> Self {
         Self { name, power_toggle }
     }
+}
 
-    pub fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
+impl Accessory for PowerSwitch {
+    fn get_all_targets(&self) -> Vec<HomekitTargetConfig> {
         vec![HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On).into_config()]
     }
 
-    pub fn export_state(&self, state: &HomeStateValue) -> Vec<HomekitEvent> {
+    fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         let powered_item = match self.power_toggle {
             PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
             PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
@@ -36,7 +38,7 @@ impl PowerSwitch {
         }
     }
 
-    pub fn process_trigger(&self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
+    fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
         if trigger.target
             == HomekitTarget::new(self.name.to_string(), HomekitService::Switch, HomekitCharacteristic::On)
             && let Some(is_on) = trigger.value.as_bool()

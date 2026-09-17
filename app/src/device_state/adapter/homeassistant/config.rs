@@ -32,10 +32,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         //POWERED STATE
         //
         ("light.hue_go", HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight)),
-        (
-            "media_player.lg_webos_smart_tv",
-            HaChannel::Powered(PowerAvailable::LivingRoomTv),
-        ),
         //
         // PRESENCE
         //

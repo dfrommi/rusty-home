@@ -507,7 +507,7 @@ mod tests {
 
         let items = parse_configured_channels(
             "sensor.test",
-            &[HaChannel::Powered(PowerAvailable::LivingRoomTv)],
+            &[HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight)],
             &event,
             &Mutex::new(HashMap::new()),
         );
@@ -529,7 +529,7 @@ mod tests {
             "sensor.test",
             &[
                 HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
-                HaChannel::Powered(PowerAvailable::LivingRoomTv),
+                HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight),
             ],
             &event,
             &Mutex::new(HashMap::new()),
@@ -537,7 +537,10 @@ mod tests {
 
         assert_eq!(
             state_values(&items),
-            vec![DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, true)]
+            vec![DeviceStateValue::PowerAvailable(
+                PowerAvailable::LivingRoomNotificationLight,
+                true
+            )]
         );
 
         let availabilities = availabilities(&items);

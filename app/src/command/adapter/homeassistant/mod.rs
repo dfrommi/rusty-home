@@ -13,7 +13,6 @@ use serde_json::json;
 enum HaServiceTarget {
     LightTurnOnOff(&'static str),
     PushNotification(&'static str),
-    LgWebosSmartTv(&'static str),
     ComfeeDehumidifier {
         humidifier_id: &'static str,
         fan_id: &'static str,
@@ -79,7 +78,6 @@ impl HomeAssistantCommandExecutor {
                     ..
                 },
             ) => self.dismiss_window_opened_notification(mobile_id).await,
-            (LgWebosSmartTv(id), Command::SetEnergySaving { on, .. }) => self.lg_tv_energy_saving_mode(id, *on).await,
             (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
                 self.comfee_fan_speed(humidifier_id, fan_id, speed).await
             }
@@ -222,60 +220,6 @@ impl HomeAssistantCommandExecutor {
 
         Ok(())
     }
-
-    async fn lg_tv_energy_saving_mode(&self, id: &str, energy_saving: bool) -> anyhow::Result<()> {
-        let luna_result = self
-            .client
-            .call_service(
-                "webostv",
-                "command",
-                luna_send_payload(
-                    id,
-                    "com.webos.settingsservice/setSystemSettings",
-                    json!({
-                        "category": "picture",
-                        "settings": {
-                            "energySaving": if energy_saving { "auto" } else { "off" },
-                            "energySavingModified": "true"
-                        }
-                    }),
-                ),
-            )
-            .await;
-        record_executed(id);
-
-        if luna_result.is_ok() {
-            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-            self.client
-                .call_service(
-                    "webostv",
-                    "button",
-                    json!({
-                        "entity_id": vec![id.to_string()],
-                        "button": "ENTER"
-                    }),
-                )
-                .await?;
-            record_executed(id);
-
-            if !energy_saving {
-                tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
-                self.client
-                    .call_service(
-                        "webostv",
-                        "button",
-                        json!({
-                            "entity_id": vec![id.to_string()],
-                            "button": "ENTER"
-                        }),
-                    )
-                    .await?;
-                record_executed(id);
-            }
-        }
-
-        Ok(())
-    }
 }
 
 fn record_executed(id: &str) {
@@ -284,25 +228,6 @@ fn record_executed(id: &str) {
         system: CommandTargetSystem::HomeAssistant,
     }
     .record();
-}
-
-fn luna_send_payload(entity_id: &str, uri: &str, payload: serde_json::Value) -> serde_json::Value {
-    let luna_url = format!("luna://{uri}");
-
-    json!({
-        "entity_id": vec![entity_id.to_string()],
-        "command": "system.notifications/createAlert",
-        "payload": {
-            "message": " ",
-            "buttons": [{
-                    "label": "",
-                    "onClick": luna_url,
-                    "params": payload,
-            }],
-            "onclose": {"uri": luna_url, "params": payload},
-            "onfail": {"uri": luna_url, "params": payload},
-        }
-    })
 }
 
 fn philips_air_purifier_preset(speed: &FanSpeed) -> &'static str {

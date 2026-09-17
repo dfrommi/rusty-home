@@ -1,4 +1,4 @@
-use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::command::{CommandTarget, Fan, Notification, NotificationRecipient, PowerToggle};
 
 use super::HaServiceTarget;
 
@@ -23,12 +23,6 @@ pub fn default_ha_command_config() -> Vec<(CommandTarget, HaServiceTarget)> {
                 notification: Notification::WindowOpened,
             },
             HaServiceTarget::PushNotification("mobile_app_simi_2"),
-        ),
-        (
-            CommandTarget::SetEnergySaving {
-                device: EnergySavingDevice::LivingRoomTv,
-            },
-            HaServiceTarget::LgWebosSmartTv("media_player.lg_webos_smart_tv"),
         ),
         (
             CommandTarget::ControlFan {

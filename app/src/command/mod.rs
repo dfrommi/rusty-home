@@ -7,7 +7,7 @@ pub use domain::*;
 use std::sync::Arc;
 
 use adapter::db::CommandRepository;
-use infrastructure::{EventBus, EventListener, Mqtt, TraceContext};
+use infrastructure::{EventListener, Mqtt, TraceContext};
 use service::CommandService;
 use sqlx::PgPool;
 
@@ -16,11 +16,6 @@ use crate::{
     home_state::HomeStateEvent,
     trigger::UserTriggerId,
 };
-
-#[derive(Debug, Clone)]
-pub enum CommandEvent {
-    CommandExecuted(CommandExecution),
-}
 
 pub struct CommandModule {
     service: Arc<CommandService>,
@@ -35,7 +30,6 @@ pub struct CommandClient {
 impl CommandModule {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
-        event_bus: EventBus<CommandEvent>,
         pool: PgPool,
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
@@ -62,7 +56,6 @@ impl CommandModule {
             z2m_executor,
             nuki_executor,
             ha_executor,
-            event_bus.emitter(),
         ));
 
         Self {

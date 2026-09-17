@@ -1,8 +1,8 @@
-use infrastructure::{CorrelationId, EventEmitter};
+use infrastructure::CorrelationId;
 
 use crate::{
     command::{
-        Command, CommandEvent, CommandExecution, CommandState, CommandTarget,
+        Command, CommandExecution, CommandState, CommandTarget,
         adapter::{
             CommandExecutor, HomeAssistantCommandExecutor, NukiCommandExecutor, TasmotaCommandExecutor,
             Z2mCommandExecutor,
@@ -24,7 +24,6 @@ pub struct CommandService {
     z2m_executor: Z2mCommandExecutor,
     nuki_executor: NukiCommandExecutor,
     ha_executor: HomeAssistantCommandExecutor,
-    event_tx: EventEmitter<CommandEvent>,
 }
 
 impl CommandService {
@@ -34,7 +33,6 @@ impl CommandService {
         z2m_executor: Z2mCommandExecutor,
         nuki_executor: NukiCommandExecutor,
         ha_executor: HomeAssistantCommandExecutor,
-        event_tx: EventEmitter<CommandEvent>,
     ) -> Self {
         Self {
             repo,
@@ -42,7 +40,6 @@ impl CommandService {
             z2m_executor,
             nuki_executor,
             ha_executor,
-            event_tx,
         }
     }
 
@@ -87,8 +84,6 @@ impl CommandService {
                 e
             );
         }
-
-        self.event_tx.send(CommandEvent::CommandExecuted(command_exec.clone()));
 
         Ok(command_exec)
     }

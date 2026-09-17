@@ -37,7 +37,6 @@ pub async fn main() -> anyhow::Result<()> {
         .expect("Error initializing infrastructure");
 
     let energy_meter_bus = EventBus::new(64);
-    let command_event_bus = EventBus::new(64);
 
     let device_state_module = device_state::DeviceStateModule::new(
         infrastructure.db_pool.clone(),
@@ -65,7 +64,6 @@ pub async fn main() -> anyhow::Result<()> {
     );
 
     let command_module = CommandModule::new(
-        command_event_bus,
         infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,

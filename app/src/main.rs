@@ -68,6 +68,7 @@ pub async fn main() -> anyhow::Result<()> {
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
+        &settings.lgtv.base_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
         &settings.nuki.url,

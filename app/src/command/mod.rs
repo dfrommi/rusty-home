@@ -34,6 +34,7 @@ impl CommandModule {
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,
+        lgtv_base_topic: &str,
         ha_url: &str,
         ha_token: &str,
         nuki_url: &str,
@@ -45,6 +46,7 @@ impl CommandModule {
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
         let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token);
         let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_client.sender(z2m_event_topic));
+        let lgtv_executor = adapter::LgTvCommandExecutor::new(mqtt_client.sender(lgtv_base_topic));
         let nuki_executor = adapter::NukiCommandExecutor::new(nuki_url, nuki_token);
 
         let z2m_sensor_sync_runner =
@@ -54,6 +56,7 @@ impl CommandModule {
             repo,
             tasmota_executor,
             z2m_executor,
+            lgtv_executor,
             nuki_executor,
             ha_executor,
         ));

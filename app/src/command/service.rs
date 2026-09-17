@@ -4,8 +4,8 @@ use crate::{
     command::{
         Command, CommandExecution, CommandState, CommandTarget,
         adapter::{
-            CommandExecutor, HomeAssistantCommandExecutor, NukiCommandExecutor, TasmotaCommandExecutor,
-            Z2mCommandExecutor,
+            CommandExecutor, HomeAssistantCommandExecutor, LgTvCommandExecutor, NukiCommandExecutor,
+            TasmotaCommandExecutor, Z2mCommandExecutor,
         },
     },
     core::{
@@ -22,6 +22,7 @@ pub struct CommandService {
     repo: CommandRepository,
     tasmota_executor: TasmotaCommandExecutor,
     z2m_executor: Z2mCommandExecutor,
+    lgtv_executor: LgTvCommandExecutor,
     nuki_executor: NukiCommandExecutor,
     ha_executor: HomeAssistantCommandExecutor,
 }
@@ -31,6 +32,7 @@ impl CommandService {
         repo: CommandRepository,
         tasmota_executor: TasmotaCommandExecutor,
         z2m_executor: Z2mCommandExecutor,
+        lgtv_executor: LgTvCommandExecutor,
         nuki_executor: NukiCommandExecutor,
         ha_executor: HomeAssistantCommandExecutor,
     ) -> Self {
@@ -38,6 +40,7 @@ impl CommandService {
             repo,
             tasmota_executor,
             z2m_executor,
+            lgtv_executor,
             nuki_executor,
             ha_executor,
         }
@@ -56,14 +59,16 @@ impl CommandService {
             .await?;
 
         let command_id = command_exec.id;
-
         let res = match self.execute_via(&self.tasmota_executor, &command).await {
             Some(r) => Some(r),
             None => match self.execute_via(&self.z2m_executor, &command).await {
                 Some(r) => Some(r),
-                None => match self.execute_via(&self.nuki_executor, &command).await {
+                None => match self.execute_via(&self.lgtv_executor, &command).await {
                     Some(r) => Some(r),
-                    None => self.execute_via(&self.ha_executor, &command).await,
+                    None => match self.execute_via(&self.nuki_executor, &command).await {
+                        Some(r) => Some(r),
+                        None => self.execute_via(&self.ha_executor, &command).await,
+                    },
                 },
             },
         };

@@ -1,5 +1,6 @@
 pub mod db;
 mod homeassistant;
+mod lgtv;
 pub mod nuki;
 mod tasmota;
 pub mod z2m;
@@ -7,6 +8,7 @@ pub mod z2m;
 use crate::command::Command;
 
 pub use homeassistant::HomeAssistantCommandExecutor;
+pub use lgtv::LgTvCommandExecutor;
 pub use nuki::NukiCommandExecutor;
 pub use tasmota::TasmotaCommandExecutor;
 pub use z2m::Z2mCommandExecutor;
@@ -29,6 +31,9 @@ mod metrics {
         Nuki,
         #[display("HA")]
         HomeAssistant,
+        #[allow(clippy::upper_case_acronyms)]
+        #[display("LGTV")]
+        LGTV,
     }
 
     pub enum CommandMetric {

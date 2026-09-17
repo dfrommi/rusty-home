@@ -11,7 +11,6 @@ use std::{collections::HashMap, sync::Arc};
 use sqlx::PgPool;
 
 use crate::{
-    command::CommandEvent,
     core::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::{DataFrame, DataPoint},
@@ -19,8 +18,8 @@ use crate::{
     device_state::{
         adapter::{
             IncomingDataSource, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
-            homeassistant::HomeAssistantIncomingDataSource, internal::InternalDataSource, lgtv::LgtvIncomingDataSource,
-            tado::TadoIncomingDataSource, tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
+            homeassistant::HomeAssistantIncomingDataSource, lgtv::LgtvIncomingDataSource, tado::TadoIncomingDataSource,
+            tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
         },
         service::DeviceStateService,
     },
@@ -63,7 +62,6 @@ pub struct DeviceStateModule {
     ha_ds: HomeAssistantIncomingDataSource,
     lgtv_ds: LgtvIncomingDataSource,
     energy_meter_ds: EnergyMeterIncomingDataSource,
-    internal_ds: InternalDataSource,
     tado_ds: TadoIncomingDataSource,
 }
 
@@ -78,7 +76,6 @@ impl DeviceStateModule {
         ha_token: &str,
         lgtv_base_topic: &str,
         energy_reading_rx: EventListener<EnergyReading>,
-        command_events: EventListener<CommandEvent>,
         tado_url: &str,
         tado_home_id: &str,
     ) -> anyhow::Result<Self> {
@@ -88,7 +85,6 @@ impl DeviceStateModule {
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
         let lgtv_ds = LgtvIncomingDataSource::new(mqtt_client, lgtv_base_topic).await?;
         let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
-        let internal_ds = InternalDataSource::new(command_events);
         let tado_ds = TadoIncomingDataSource::new(tado_url, tado_home_id).context("Error creating Tado adapter")?;
 
         let event_bus = EventBus::new(128);
@@ -103,7 +99,6 @@ impl DeviceStateModule {
             ha_ds,
             lgtv_ds,
             energy_meter_ds,
-            internal_ds,
             tado_ds,
         })
     }
@@ -126,7 +121,6 @@ impl DeviceStateModule {
                 updates = self.ha_ds.recv_multi() => ("HomeAssistant", updates),
                 updates = self.lgtv_ds.recv_multi() => ("LGTV", updates),
                 updates = self.energy_meter_ds.recv_multi() => ("EnergyMeter", updates),
-                updates = self.internal_ds.recv_multi() => ("Internal", updates),
                 updates = self.tado_ds.recv_multi() => ("Tado", updates),
             };
 

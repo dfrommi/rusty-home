@@ -9,8 +9,8 @@ use anyhow::Result;
 use crate::home_state::EnergySaving;
 
 use super::{
-    Command, CommandExecution, CommandTarget, EnergySavingDevice, Fan, Notification, NotificationAction,
-    NotificationRecipient, NotificationTarget, PowerToggle, Radiator,
+    Command, CommandExecution, EnergySavingDevice, Fan, Notification, NotificationAction, NotificationRecipient,
+    NotificationTarget, PowerToggle, Radiator,
 };
 
 impl Command {
@@ -43,9 +43,7 @@ impl Command {
                 notification,
                 action,
             } => is_push_notify_reflected_in_state(recipient, notification, action, command_client).await,
-            Command::SetEnergySaving { device, on } => {
-                is_set_energy_saving_reflected_in_state(device, *on, command_client, snapshot).await
-            }
+            Command::SetEnergySaving { device, on } => is_set_energy_saving_reflected_in_state(device, *on, snapshot),
             Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
             Command::OpenDoor { .. } => {
                 //Only a short trigger, no permanent state change
@@ -122,26 +120,15 @@ async fn is_push_notify_reflected_in_state(
     }
 }
 
-//Energy saving not reflected on HA. Trying to guess from actions
-async fn is_set_energy_saving_reflected_in_state(
+fn is_set_energy_saving_reflected_in_state(
     device: &EnergySavingDevice,
     on: bool,
-    command_client: &CommandClient,
     snapshot: &StateSnapshot,
 ) -> Result<bool> {
     let state_device = match device {
         EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
     };
-
-    let is_energy_saving = snapshot.try_get(state_device)?.value;
-
-    let recent_command = command_client
-        .get_latest_command(CommandTarget::SetEnergySaving { device: device.clone() }, t!(24 hours ago))
-        .await?
-        .is_some();
-
-    //sent in last 24 hours and state matches => retrigger daily in case of external changes
-    Ok(recent_command && is_energy_saving == on)
+    Ok(snapshot.try_get(state_device)?.value == on)
 }
 
 fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, snapshot: &StateSnapshot) -> Result<bool> {

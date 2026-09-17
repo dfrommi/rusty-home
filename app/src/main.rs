@@ -47,6 +47,7 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.homeassistant.topic_event,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
+        &settings.lgtv.base_topic,
         energy_meter_bus.subscribe(),
         command_event_bus.subscribe(),
         &settings.tado.url,

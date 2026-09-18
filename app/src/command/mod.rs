@@ -102,8 +102,4 @@ impl CommandClient {
     ) -> anyhow::Result<Option<CommandExecution>> {
         self.service.get_latest_command(target.into(), since).await
     }
-
-    pub async fn get_all_commands(&self, from: DateTime, until: DateTime) -> anyhow::Result<Vec<CommandExecution>> {
-        self.service.get_all_commands(from, until).await
-    }
 }

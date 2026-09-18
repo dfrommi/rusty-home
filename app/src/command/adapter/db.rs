@@ -86,30 +86,30 @@ impl CommandRepository {
     }
 
     #[allow(clippy::expect_used)]
-    pub async fn query_all_commands(
+    pub async fn query_commands_for_target(
         &self,
-        target: Option<CommandTarget>,
+        target: CommandTarget,
         range: &DateTimeRange,
     ) -> Result<Vec<CommandExecution>> {
-        let db_target = target.map(|j| serde_json::json!(j));
+        let db_target = serde_json::json!(target);
 
         let records = sqlx::query!(
             r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id, user_trigger_id
                 from thing_command 
-                where (command @> $1 or $1 is null)
+                where command @> $1
                 and created >= $2
                 and created <= $3)
             UNION ALL
             (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
                 from thing_command 
-                where (command @> $1 or $1 is null)
+                where command @> $1
                 and created < $2
                 order by created DESC
                 limit 1)
             UNION ALL
             (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
                 from thing_command 
-                where (command @> $1 or $1 is null)
+                where command @> $1
                 and created > $3
                 order by created ASC
                 limit 1)
@@ -215,43 +215,13 @@ mod tests {
         }
 
         let range = DateTimeRange::new(t!(10 minutes ago), t!(now));
-        let res = repo.query_all_commands(
-            Some(CommandTarget::SetPower {
+        let res = repo.query_commands_for_target(
+            CommandTarget::SetPower {
                 device: PowerToggle::LivingRoomNotificationLight,
-            }),
+            },
             &range,
         );
 
         assert_eq!(res.await.unwrap().len(), 4);
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn test_unsupported_command_is_ignored(db_pool: PgPool) -> anyhow::Result<()> {
-        let repo = CommandRepository::new(db_pool);
-        let source = ExternalId::new("test", "source");
-
-        sqlx::query!(
-            r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
-            serde_json::json!({
-                "type": "removed_command",
-                "device": "removed_device",
-                "power_on": true
-            }),
-            t!(now).into_db(),
-            DbCommandState::Pending as DbCommandState,
-            source.type_name(),
-            source.variant_name(),
-            None as Option<UserTriggerId>
-        )
-        .execute(&repo.pool)
-        .await?;
-
-        let res = repo
-            .query_all_commands(None, &DateTimeRange::since(t!(1 hours ago)))
-            .await?;
-
-        assert!(res.is_empty());
-
-        Ok(())
     }
 }

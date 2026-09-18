@@ -9,7 +9,6 @@ use std::sync::Arc;
 use infrastructure::EventListener;
 
 use crate::{
-    command::CommandClient,
     device_state::{DeviceStateClient, DeviceStateEvent},
     home_state::{HomeStateClient, HomeStateEvent},
     observability::adapter::{MetricsAdapter as _, api::MetricsExportApi, repository::VictoriaRepository},
@@ -27,7 +26,6 @@ pub struct ObservabilityModule {
     home_state_events: EventListener<HomeStateEvent>,
     device_state_client: DeviceStateClient,
     home_state_client: HomeStateClient,
-    command_client: CommandClient,
     home_metrics_adapter: HomeMetricsAdapter,
     device_metrics_adapter: DeviceMetricsAdapter,
     availability_metrics_adapter: AvailabilityMetricsAdapter,
@@ -40,7 +38,6 @@ impl ObservabilityModule {
         home_state_events: EventListener<HomeStateEvent>,
         device_state_client: DeviceStateClient,
         home_state_client: HomeStateClient,
-        command_client: CommandClient,
     ) -> Self {
         let repo = Arc::new(VictoriaRepository::new(victoria_url));
 
@@ -50,7 +47,6 @@ impl ObservabilityModule {
             home_state_events,
             device_state_client,
             home_state_client,
-            command_client,
             home_metrics_adapter: HomeMetricsAdapter,
             device_metrics_adapter: DeviceMetricsAdapter,
             availability_metrics_adapter: AvailabilityMetricsAdapter,
@@ -60,7 +56,6 @@ impl ObservabilityModule {
     pub fn api(&self) -> MetricsExportApi {
         MetricsExportApi::new(
             self.repo.clone(),
-            self.command_client.clone(),
             self.device_state_client.clone(),
             self.home_state_client.clone(),
         )

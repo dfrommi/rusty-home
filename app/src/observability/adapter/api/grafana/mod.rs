@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::core::time::DateTime;
 use crate::core::time::DateTimeRange;
 
-use crate::{command::CommandClient, device_state::DeviceStateClient};
+use crate::device_state::DeviceStateClient;
 use actix_web::{HttpResponse, http::header};
 use actix_web::{
     ResponseError,
@@ -17,9 +17,9 @@ use derive_more::derive::{Display, Error};
 
 type GrafanaResponse = Result<HttpResponse, GrafanaApiError>;
 
-pub fn routes(command_client: Arc<CommandClient>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
+pub fn routes(device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/grafana")
-        .service(overview::routes(command_client, device_state_client))
+        .service(overview::routes(device_state_client))
         .service(meta::routes())
 }
 

@@ -106,7 +106,6 @@ pub async fn main() -> anyhow::Result<()> {
         home_state_module.subscribe(),
         device_state_module.client(),
         home_state_module.client(),
-        command_module.client(),
     );
 
     let http_server_exec = {

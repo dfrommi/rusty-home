@@ -1,83 +1,14 @@
 use std::sync::Arc;
 
 use actix_web::web;
-use infrastructure::CorrelationId;
 
-use crate::command::{Command, CommandClient};
 use crate::device_state::{DeviceStateClient, DeviceStateId};
 use crate::observability::adapter::api::grafana::{GrafanaApiError, GrafanaResponse, TimeRangeQuery, csv_response};
 
-pub fn routes(command_client: Arc<CommandClient>, device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
+pub fn routes(device_state_client: Arc<DeviceStateClient>) -> actix_web::Scope {
     web::scope("/overview")
-        .route("/commands", web::get().to(get_commands))
         .route("/states", web::get().to(get_states))
-        .app_data(web::Data::from(command_client))
         .app_data(web::Data::from(device_state_client))
-}
-
-async fn get_commands(
-    command_client: web::Data<CommandClient>,
-    time_range: web::Query<TimeRangeQuery>,
-) -> GrafanaResponse {
-    #[derive(serde::Serialize)]
-    struct Row {
-        icon: String,
-        timestamp: String,
-        r#type: String,
-        target: String,
-        state: String,
-        source: String,
-        trace_id: Option<String>,
-    }
-
-    let range = time_range.range();
-    let mut commands = command_client
-        .get_all_commands(*range.start(), *range.end())
-        .await
-        .map_err(GrafanaApiError::DataAccessError)?;
-
-    commands.sort_by(|a, b| b.created.cmp(&a.created));
-
-    let rows = commands.into_iter().map(|cmd| {
-        let (command_type, target, state) = command_as_string(&cmd.command);
-        let source = cmd.source.to_string();
-        let icon = if cmd.is_user_generated() { "USER" } else { "SYSTEM" };
-
-        let trace_id = cmd.correlation_id.map(|id| CorrelationId::parse(id).trace_id());
-
-        Row {
-            icon: icon.to_string(),
-            timestamp: cmd.created.to_human_readable(),
-            r#type: command_type.to_string(),
-            target,
-            state,
-            source,
-            trace_id,
-        }
-    });
-
-    csv_response(rows)
-}
-
-fn command_as_string(command: &Command) -> (&str, String, String) {
-    match command {
-        Command::SetPower { device, power_on } => {
-            ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
-        }
-        Command::SetHeating { device, target_state } => ("SetHeating", device.to_string(), target_state.to_string()),
-        Command::PushNotify {
-            action,
-            notification,
-            recipient,
-        } => ("PushNotify", format!("{notification} @ {recipient}"), action.to_string()),
-        Command::SetEnergySaving { device, on } => (
-            "SetEnergySaving",
-            device.to_string(),
-            if *on { "on" } else { "off" }.to_string(),
-        ),
-        Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
-        Command::OpenDoor { device } => ("Open", device.to_string(), "open".to_string()),
-    }
 }
 
 async fn get_states(

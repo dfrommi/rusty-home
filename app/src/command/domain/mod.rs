@@ -91,6 +91,31 @@ impl From<&Command> for CommandTarget {
     }
 }
 
+impl Command {
+    pub fn display_parts(&self) -> (&'static str, String, String) {
+        match self {
+            Command::SetPower { device, power_on } => {
+                ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
+            }
+            Command::SetHeating { device, target_state } => {
+                ("SetHeating", device.to_string(), target_state.to_string())
+            }
+            Command::PushNotify {
+                action,
+                notification,
+                recipient,
+            } => ("PushNotify", format!("{notification} @ {recipient}"), action.to_string()),
+            Command::SetEnergySaving { device, on } => (
+                "SetEnergySaving",
+                device.to_string(),
+                if *on { "on" } else { "off" }.to_string(),
+            ),
+            Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
+            Command::OpenDoor { device } => ("Open", device.to_string(), "open".to_string()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CommandExecution {
     pub id: i64,

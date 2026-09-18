@@ -67,3 +67,4 @@ For automation rules, commands, device states, home states, and HomeKit accessor
 ## Domain Knowledge
 
 - [Calculation physics](docs/calculations.md) — theory/rationale behind home-state calculations (f_Rsi mould model, 3-Kelvin rule, dewpoint vs absolute humidity). **Read before touching any calculation item** (`RiskOfMould`, `DewPoint`, `AbsoluteHumidity`, `Temperature::BedroomCorner`) or the `dehumidify` rule.
+- [Heating control](docs/heating-control.md) — the physical setup, the TRV model, the full control chain, the environment constraints, and the design dead ends. **Read before touching any heating item** (`TargetHeatingMode`, `SetPoint`, `TargetHeatingAdjustment`, `TargetHeatingDemand`, `HeatingDemand`, `HeatingDemandLimit`), the `FollowTargetHeatingDemand` rule, the Z2M heating executor, or the `Z2mSensorSyncRunner`.

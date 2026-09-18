@@ -11,19 +11,23 @@ You are adding or updating a command in the rusty-home project. Follow this work
 
 `CommandModule` follows the module + client + service pattern.
 
-Executors are tried sequentially: Tasmota → Z2M → Nuki → HomeAssistant. Each returns `Ok(true)` (handled), `Ok(false)` (not mine), or `Err` (failed).
+`CommandService` is the explicit command dispatcher. It exhaustively matches each `Command` and calls one backend's capability method with the command's physical target ID. Backends do not implement a shared command executor interface, and there is no fallback or `Ok(false)` “not mine” result.
+
+Command routing and device-state collection are independent mappings. A physical ID used for a command may match a state ID, but this is not assumed; commands and state may use different devices or have no state feedback.
 
 Before re-executing a command, the planner checks two things in `app/src/command/domain/command_state.rs`:
 
 - **`is_reflected_in_state()`** — is the desired effect already visible in home state?
 - **`min_wait_duration_between_executions()`** — per-command-type cooldown
 
+For heating commands (`SetHeating`) and the `Z2mSensorSyncRunner`, read `docs/heating-control.md` — the Sonoff TRV is a dumb binary valve (no PID); the command sets setpoint + valve opening/closing limits, not a valve position.
+
 ## Step 1: Gather Requirements
 
 If the user has not already provided all of the following, ask using AskUserQuestion:
 
 - **What the command does** (e.g., toggle power, set temperature, open a lock)
-- **Which backend executor** handles it: Tasmota (MQTT), Z2M (Zigbee2MQTT via MQTT), Nuki (HTTP REST, door locks), or HomeAssistant (HTTP REST)
+- **Which backend** handles it: Tasmota (MQTT), Z2M (Zigbee2MQTT via MQTT), Nuki (HTTP REST, door locks), or HomeAssistant (HTTP REST)
 - **External device identifier**:
   - Tasmota: MQTT device ID (e.g., `irheater`)
   - Z2M: friendly name path (e.g., `bathroom/dehumidifier_plug`)
@@ -54,7 +58,7 @@ Names to confirm (as applicable):
 - `Command` enum variant name and its fields
 - `CommandTarget` enum variant name
 - Device enum name and variant(s) (e.g., `Lock::BuildingEntrance`)
-- Executor-internal target type variant name (e.g., `HaServiceTarget::NukiLock`)
+- Backend-specific capability method, if a new one is needed
 
 ## Step 4a: New Command Type Flow
 
@@ -146,164 +150,24 @@ In `app/src/command/domain/command_state.rs`:
    ExistingDevice::NewVariant => StateItem::NewVariant,
    ```
 
-3. **Continue to Step 4c** to wire the executor
+3. **Continue to Step 4c** to wire the command
 
-## Step 4c: Wire the Executor
+## Step 4c: Wire the command
 
-Based on the chosen backend, modify the appropriate adapter files:
+Add a capability method to the selected backend adapter. The method should accept the physical command target ID and command-specific values, perform the backend protocol operation, record command metrics, and return `anyhow::Result<()>`.
 
-### Tasmota (`app/src/command/adapter/tasmota/`)
+Then add an exhaustive arm to the dispatcher in `app/src/command/service.rs`:
 
-1. **Target type** in `mod.rs` — add variant to `TasmotaCommandTarget` if the existing ones don't cover this device shape:
-   ```rust
-   enum TasmotaCommandTarget {
-       PowerSwitch(&'static str),
-       NewTarget(&'static str),  // add if needed
-   }
-   ```
+```rust
+Command::MyCommand {
+    device: MyDevice::Variant,
+    value,
+} => self.backend.my_capability("physical-command-id", value).await,
+```
 
-2. **Execution logic** in `mod.rs` — add match arm in `execute_command()`:
-   ```rust
-   (Command::MyCommand { field, .. }, TasmotaCommandTarget::NewTarget(device_id)) => {
-       self.sender
-           .send_transient(
-               format!("cmnd/{}/Topic", device_id),
-               "payload".to_string(),
-           )
-           .await?;
+Do not add a wildcard arm. The dispatcher must produce a compile-time error when a new command or device variant has no route. Do not add command routing tables to backend adapters.
 
-       CommandMetric::Executed {
-           device_id: device_id.to_string(),
-           system: CommandTargetSystem::Tasmota,
-       }
-       .record();
-
-       Ok(true)
-   }
-   ```
-
-3. **Config mapping** in `config.rs` — add entry to `default_tasmota_command_config()`:
-   ```rust
-   (
-       CommandTarget::MyCommand { device: MyDevice::Variant },
-       TasmotaCommandTarget::NewTarget("device_id"),
-   ),
-   ```
-
-### Z2M (`app/src/command/adapter/z2m/`)
-
-1. **Target type** in `mod.rs` — add variant to `Z2mCommandTarget` if needed:
-   ```rust
-   pub enum Z2mCommandTarget {
-       SonoffThermostat(&'static str),
-       PowerPlug(&'static str),
-       NewTarget(&'static str),  // add if needed
-   }
-   ```
-
-2. **Execution logic** in `mod.rs` — add match arm in `execute_command()` and implement handler method:
-   ```rust
-   // In execute_command match:
-   (Command::MyCommand { field, .. }, Z2mCommandTarget::NewTarget(device_id)) => {
-       self.my_command_handler(device_id, field).await?;
-       device_id
-   }
-
-   // Handler method on Z2mCommandExecutor:
-   pub async fn my_command_handler(&self, device_id: &str, /* params */) -> anyhow::Result<()> {
-       let set_topic = format!("{}/set", device_id);
-       self.sender
-           .send_transient(set_topic, json!({ /* payload */ }).to_string())
-           .await?;
-       Ok(())
-   }
-   ```
-
-3. **Config mapping** in `config.rs` — add entry to `default_z2m_command_config()`:
-   ```rust
-   (
-       CommandTarget::MyCommand { device: MyDevice::Variant },
-       Z2mCommandTarget::NewTarget("friendly_name/device"),
-   ),
-   ```
-
-### Nuki (`app/src/command/adapter/nuki/`)
-
-1. **Target type** in `mod.rs` — add variant to `NukiCommandTarget` if needed:
-   ```rust
-   enum NukiCommandTarget {
-       Opener(&'static str),
-       NewTarget(&'static str),  // add if needed
-   }
-   ```
-
-2. **Execution logic** in `mod.rs` — add match arm in `execute_command()` and implement handler method:
-   ```rust
-   // In execute_command match:
-   (Command::OpenDoor { .. }, NukiCommandTarget::NewTarget(nuki_id)) => {
-       self.open_door(nuki_id).await?;
-       Ok(true)
-   }
-
-   // Handler method on NukiCommandExecutor:
-   async fn open_door(&self, nuki_id: &str) -> anyhow::Result<()> {
-       let url = format!(
-           "{}/lockAction?nukiId={}&deviceType=2&action=3&token={}",
-           self.bridge_url, nuki_id, self.token
-       );
-       let body: serde_json::Value = self.client.get(&url).send().await?.json().await?;
-       anyhow::ensure!(body.get("success").and_then(|v| v.as_bool()) == Some(true), "Nuki bridge returned non-success: {:?}", body);
-       Ok(())
-   }
-   ```
-
-3. **Config mapping** in `config.rs` — add entry to `default_nuki_command_config()`:
-   ```rust
-   (
-       CommandTarget::OpenDoor { device: Lock::BuildingEntrance },
-       NukiCommandTarget::NewTarget("nuki_id"),
-   ),
-   ```
-
-### HomeAssistant (`app/src/command/adapter/homeassistant/`)
-
-1. **Target type** in `mod.rs` — add variant to `HaServiceTarget`:
-   ```rust
-   enum HaServiceTarget {
-       // ... existing variants
-       NewTarget(&'static str),
-   }
-   ```
-
-2. **Execution logic** in `mod.rs` — add match arm in `dispatch_service_call()` and implement handler method:
-   ```rust
-   // In dispatch_service_call match:
-   (NewTarget(id), Command::MyCommand { .. }) => self.my_command_handler(id).await,
-
-   // Handler method:
-   async fn my_command_handler(&self, id: &str) -> anyhow::Result<()> {
-       self.client
-           .call_service(
-               "domain",
-               "service",
-               json!({
-                   "entity_id": vec![id.to_string()],
-                   // additional service data
-               }),
-           )
-           .await?;
-       record_executed(id);
-       Ok(())
-   }
-   ```
-
-3. **Config mapping** in `config.rs` — add entry to `default_ha_command_config()`:
-   ```rust
-   (
-       CommandTarget::MyCommand { device: MyDevice::Variant },
-       HaServiceTarget::NewTarget("entity.id"),
-   ),
-   ```
+Keep command physical IDs independent from device-state adapter IDs. A command may target a different physical device than the one used to derive state.
 
 ## Step 5: Verify
 

@@ -5,18 +5,11 @@ pub mod nuki;
 mod tasmota;
 pub mod z2m;
 
-use crate::command::Command;
-
 pub use homeassistant::HomeAssistantCommandExecutor;
 pub use lgtv::LgTvCommandExecutor;
 pub use nuki::NukiCommandExecutor;
 pub use tasmota::TasmotaCommandExecutor;
 pub use z2m::Z2mCommandExecutor;
-
-pub trait CommandExecutor {
-    //Returns true if command was executed
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool>;
-}
 
 mod metrics {
     use crate::observability::system_metric_increment;

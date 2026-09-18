@@ -1,81 +1,32 @@
-mod config;
 mod sync;
 
 pub use sync::Z2mSensorSyncRunner;
 
-use crate::{
-    command::{
-        Command, CommandTarget, HeatingTargetState,
-        adapter::{
-            CommandExecutor,
-            metrics::{CommandMetric, CommandTargetSystem},
-        },
-    },
-    core::math::round_to_one_decimal,
-};
+use super::metrics::{CommandMetric, CommandTargetSystem};
+use crate::{command::HeatingTargetState, core::math::round_to_one_decimal};
 use infrastructure::MqttSender;
 use serde_json::json;
 
-#[derive(Debug, Clone)]
-pub enum Z2mCommandTarget {
-    SonoffThermostat(&'static str),
-    PowerPlug(&'static str),
-}
-
 pub struct Z2mCommandExecutor {
-    config: Vec<(CommandTarget, Z2mCommandTarget)>,
     sender: MqttSender,
 }
 
 impl Z2mCommandExecutor {
     pub fn new(mqtt_sender: MqttSender) -> Self {
-        let config = config::default_z2m_command_config();
-        Self {
-            config,
-            sender: mqtt_sender,
-        }
+        Self { sender: mqtt_sender }
     }
-}
 
-impl CommandExecutor for Z2mCommandExecutor {
-    #[tracing::instrument(name = "execute_command Z2M", ret, skip(self))]
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        let cmd_target: CommandTarget = command.into();
-        let z2m_target = self
-            .config
-            .iter()
-            .find_map(|(cmd, z2m)| if cmd == &cmd_target { Some(z2m) } else { None });
-
-        let Some(z2m_target) = z2m_target else {
-            return Ok(false);
-        };
-
-        let device_id = match (command, z2m_target) {
-            (Command::SetPower { power_on, .. }, Z2mCommandTarget::PowerPlug(device_id)) => {
-                self.set_power_state(device_id, *power_on).await?;
-                device_id
-            }
-            (Command::SetHeating { target_state, .. }, Z2mCommandTarget::SonoffThermostat(device_id)) => {
-                self.set_sonoff_heating(device_id, target_state.clone()).await?;
-                device_id
-            }
-            (_, z2m_target) => {
-                anyhow::bail!("Mismatch between command and Z2M target {:?}", z2m_target)
-            }
-        };
-
+    fn record_executed(&self, device_id: &str) {
         CommandMetric::Executed {
             device_id: device_id.to_string(),
             system: CommandTargetSystem::Z2M,
         }
         .record();
-
-        Ok(true)
     }
 }
 
 impl Z2mCommandExecutor {
-    pub async fn set_sonoff_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<()> {
+    pub async fn set_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<()> {
         let set_topic = format!("{}/set", device_id);
 
         match state {
@@ -93,8 +44,6 @@ impl Z2mCommandExecutor {
                         .to_string(),
                     )
                     .await?;
-
-                Ok(())
             }
             HeatingTargetState::Heat {
                 target_temperature,
@@ -116,13 +65,14 @@ impl Z2mCommandExecutor {
                         .to_string(),
                     )
                     .await?;
-
-                Ok(())
             }
         }
+
+        self.record_executed(device_id);
+        Ok(())
     }
 
-    pub async fn set_power_state(&self, device_id: &str, power_on: bool) -> anyhow::Result<()> {
+    pub async fn set_power(&self, device_id: &str, power_on: bool) -> anyhow::Result<()> {
         let set_topic = format!("{}/set", device_id);
         let power_state = if power_on { "ON" } else { "OFF" };
 
@@ -136,6 +86,7 @@ impl Z2mCommandExecutor {
             )
             .await?;
 
+        self.record_executed(device_id);
         Ok(())
     }
 }

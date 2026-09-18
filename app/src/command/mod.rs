@@ -1,4 +1,5 @@
 mod adapter;
+mod dispatcher;
 mod domain;
 mod service;
 
@@ -7,6 +8,7 @@ pub use domain::*;
 use std::sync::Arc;
 
 use adapter::db::CommandRepository;
+use dispatcher::CommandDispatcher;
 use infrastructure::{EventListener, Mqtt, TraceContext};
 use service::CommandService;
 use sqlx::PgPool;
@@ -52,14 +54,9 @@ impl CommandModule {
         let z2m_sensor_sync_runner =
             adapter::z2m::Z2mSensorSyncRunner::new(mqtt_client.sender(z2m_event_topic), home_state_listener);
 
-        let service = Arc::new(CommandService::new(
-            repo,
-            tasmota_executor,
-            z2m_executor,
-            lgtv_executor,
-            nuki_executor,
-            ha_executor,
-        ));
+        let dispatcher =
+            CommandDispatcher::new(tasmota_executor, z2m_executor, lgtv_executor, nuki_executor, ha_executor);
+        let service = Arc::new(CommandService::new(repo, dispatcher));
 
         Self {
             service,

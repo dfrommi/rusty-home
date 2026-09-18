@@ -213,14 +213,17 @@ async fn execute_command(
     let target: CommandTarget = command.clone().into();
 
     match should_execute(&command, &source, notification_client, last_executions, ctx).await {
-        Ok(true) => match command_client.execute(command, source, user_trigger_id).await {
-            Ok(execution) => {
+        Ok(true) => match command_client
+            .execute(command.clone(), source.clone(), user_trigger_id)
+            .await
+        {
+            Ok(()) => {
                 last_executions.insert(
                     target.clone(),
                     LastExecution {
-                        command: execution.command,
-                        source: execution.source,
-                        created: execution.created,
+                        command,
+                        source,
+                        created: t!(now),
                     },
                 );
                 tracing::info!("Command {} executed via action {}", target, trace.action);

@@ -3,10 +3,7 @@ mod command_state;
 use crate::core::domain::Radiator;
 use crate::core::range::Range;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
-use crate::core::{id::ExternalId, time::DateTime};
-use crate::trigger::UserTriggerId;
 use derive_more::derive::{Display, From};
-use infrastructure::CorrelationId;
 use r#macro::{EnumVariants, Id};
 use serde::{Deserialize, Serialize};
 
@@ -113,32 +110,6 @@ impl Command {
             Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
             Command::OpenDoor { device } => ("Open", device.to_string(), "open".to_string()),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CommandExecution {
-    pub id: i64,
-    pub command: Command,
-    pub state: CommandState,
-    pub created: DateTime,
-    pub source: ExternalId,
-    pub user_trigger_id: Option<UserTriggerId>,
-    pub correlation_id: Option<CorrelationId>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CommandState {
-    Pending,
-    InProgress,
-    Success,
-    Error(String),
-}
-
-impl CommandExecution {
-    pub fn is_user_generated(&self) -> bool {
-        self.user_trigger_id.is_some()
     }
 }
 

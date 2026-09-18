@@ -1,22 +1,22 @@
 use infrastructure::{CorrelationId, TraceContext};
 
 use crate::{
-    command::{Command, CommandExecution, CommandState, CommandTarget},
+    command::{Command, CommandTarget},
     core::id::ExternalId,
     observability::system_metric_increment,
+    t,
     trigger::UserTriggerId,
 };
 
-use super::{adapter::db::CommandRepository, dispatcher::CommandDispatcher};
+use super::dispatcher::CommandDispatcher;
 
 pub struct CommandService {
-    repo: CommandRepository,
     dispatcher: CommandDispatcher,
 }
 
 impl CommandService {
-    pub fn new(repo: CommandRepository, dispatcher: CommandDispatcher) -> Self {
-        Self { repo, dispatcher }
+    pub fn new(dispatcher: CommandDispatcher) -> Self {
+        Self { dispatcher }
     }
 
     #[tracing::instrument(
@@ -35,48 +35,30 @@ impl CommandService {
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
         correlation_id: Option<CorrelationId>,
-    ) -> anyhow::Result<CommandExecution> {
-        let mut command_exec = self
-            .repo
-            .insert_command_for_processing(&command, &source, user_trigger_id, correlation_id)
-            .await?;
-
-        let command_id = command_exec.id;
-        let final_state = match self.dispatcher.dispatch(&command).await {
-            Ok(()) => CommandState::Success,
-            Err(e) => CommandState::Error(e.to_string()),
-        };
-
-        command_exec.state = final_state.clone();
-
+    ) -> anyhow::Result<()> {
+        let command_json = serde_json::json!(&command);
         let trace_context = TraceContext::current();
-        let command_json = serde_json::json!(&command_exec.command);
         trace_context.record_json("command", &command_json);
 
-        let (result, error) = match &final_state {
-            CommandState::Success => ("success", None),
-            CommandState::Error(error) => ("error", Some(error.as_str())),
-            CommandState::Pending | CommandState::InProgress => ("in_progress", None),
+        let (result, error) = match self.dispatcher.dispatch(&command).await {
+            Ok(()) => ("success", None),
+            Err(error) => ("error", Some(error.to_string())),
         };
         trace_context.record("result", result);
-        if let Some(error) = error {
-            trace_context.set_error(error.to_owned());
+        if let Some(error) = &error {
+            trace_context.set_error(error.clone());
         } else {
             trace_context.set_ok();
         }
 
-        let target = CommandTarget::from(&command_exec.command);
+        let target = CommandTarget::from(&command);
         let metric_target = target.to_string();
-        let (command_type, display_target, state) = command_exec.command.display_parts();
-        let command_json = serde_json::to_string(&command_exec.command)
-            .unwrap_or_else(|error| format!("<command serialization failed: {error}>"));
-        let created = command_exec.created.to_iso_string();
-        let source = command_exec.source.to_string();
-        let trace_id = command_exec
-            .correlation_id
-            .as_ref()
-            .map(|id| id.trace_id())
-            .unwrap_or_default();
+        let (command_type, display_target, state) = command.display_parts();
+        let command_json =
+            serde_json::to_string(&command).unwrap_or_else(|error| format!("<command serialization failed: {error}>"));
+        let created = t!(now).to_iso_string();
+        let source_name = source.to_string();
+        let trace_id = correlation_id.as_ref().map(|id| id.trace_id()).unwrap_or_default();
 
         system_metric_increment("command_execution", &[("target", metric_target.as_str()), ("result", result)]);
 
@@ -87,24 +69,15 @@ impl CommandService {
             state = %state,
             command = %command_json,
             created = %created,
-            source = %source,
-            user_generated = command_exec.is_user_generated(),
+            source = %source_name,
+            user_generated = user_trigger_id.is_some(),
             execution_result = result,
-            error = error.unwrap_or_default(),
+            error = error.as_deref().unwrap_or_default(),
             trace_id = %trace_id,
             "Command executed"
         );
 
-        if let Err(e) = self.repo.set_command_state(command_id, final_state.clone()).await {
-            tracing::warn!(
-                "Failed to update command state of {} to {:?} in DB: {}",
-                command_id,
-                final_state,
-                e
-            );
-        }
-
-        Ok(command_exec)
+        Ok(())
     }
 }
 

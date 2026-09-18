@@ -67,7 +67,6 @@ pub async fn main() -> anyhow::Result<()> {
     );
 
     let command_module = CommandModule::new(
-        infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,

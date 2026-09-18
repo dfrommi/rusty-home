@@ -7,11 +7,9 @@ pub use domain::*;
 
 use std::sync::Arc;
 
-use adapter::db::CommandRepository;
 use dispatcher::CommandDispatcher;
 use infrastructure::{EventListener, Mqtt, TraceContext};
 use service::CommandService;
-use sqlx::PgPool;
 
 use crate::{
     core::id::ExternalId, home_state::HomeStateEvent, notification::NotificationClient, trigger::UserTriggerId,
@@ -30,7 +28,6 @@ pub struct CommandClient {
 impl CommandModule {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
-        pool: PgPool,
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,
@@ -42,8 +39,6 @@ impl CommandModule {
         nuki_token: &str,
         home_state_listener: EventListener<HomeStateEvent>,
     ) -> Self {
-        let repo = CommandRepository::new(pool);
-
         let tasmota_executor = adapter::TasmotaCommandExecutor::new(mqtt_client.sender(tasmota_event_topic));
         let ha_executor = adapter::HomeAssistantCommandExecutor::new(ha_url, ha_token);
         let z2m_executor = adapter::Z2mCommandExecutor::new(mqtt_client.sender(z2m_event_topic));
@@ -61,7 +56,7 @@ impl CommandModule {
             ha_executor,
             notification_client,
         );
-        let service = Arc::new(CommandService::new(repo, dispatcher));
+        let service = Arc::new(CommandService::new(dispatcher));
 
         Self {
             service,
@@ -86,7 +81,7 @@ impl CommandClient {
         command: Command,
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-    ) -> anyhow::Result<CommandExecution> {
+    ) -> anyhow::Result<()> {
         self.service
             .execute_command(command, source, user_trigger_id, TraceContext::current().correlation_id())
             .await

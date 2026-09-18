@@ -1,10 +1,8 @@
 use crate::command::HeatingTargetState;
 use crate::core::range::Range;
-use crate::core::time::Duration;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::home_state::{FanActivity, HeatingDemandLimit, PowerAvailable, SetPoint, StateSnapshot};
 use crate::notification::NotificationClient;
-use crate::t;
 use anyhow::Result;
 
 use crate::home_state::EnergySaving;
@@ -54,17 +52,6 @@ impl Command {
                 //Only a short trigger, no permanent state change
                 Ok(false)
             }
-        }
-    }
-
-    pub fn min_wait_duration_between_executions(&self) -> Option<Duration> {
-        match self {
-            Command::SetHeating { .. } => Some(t!(2 minutes)),
-            Command::SetPower { .. } => Some(t!(1 minutes)),
-            Command::SetEnergySaving { .. } => Some(t!(2 minutes)),
-            Command::ControlFan { .. } => Some(t!(3 minutes)),
-            Command::PushNotify { .. } => None,
-            Command::OpenDoor { .. } => None,
         }
     }
 }

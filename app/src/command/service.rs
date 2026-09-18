@@ -2,12 +2,8 @@ use infrastructure::{CorrelationId, TraceContext};
 
 use crate::{
     command::{Command, CommandExecution, CommandState, CommandTarget},
-    core::{
-        id::ExternalId,
-        time::{DateTime, DateTimeRange},
-    },
+    core::id::ExternalId,
     observability::system_metric_increment,
-    t,
     trigger::UserTriggerId,
 };
 
@@ -109,29 +105,6 @@ impl CommandService {
         }
 
         Ok(command_exec)
-    }
-
-    pub async fn get_latest_command(
-        &self,
-        target: CommandTarget,
-        since: DateTime,
-    ) -> anyhow::Result<Option<CommandExecution>> {
-        let range = DateTimeRange::new(since, t!(now));
-        let commands = self.repo.query_commands_for_target(target, &range).await?;
-        Ok(self
-            .apply_timeshift_filter(commands, |cmd| cmd.created)
-            .into_iter()
-            .max_by_key(|cmd| cmd.created))
-    }
-
-    //TODO why not on DB?
-    fn apply_timeshift_filter<T>(&self, items: Vec<T>, get_timestamp: impl Fn(&T) -> DateTime) -> Vec<T> {
-        if DateTime::is_shifted() {
-            let now = t!(now);
-            items.into_iter().filter(|item| get_timestamp(item) <= now).collect()
-        } else {
-            items
-        }
     }
 }
 

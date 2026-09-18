@@ -12,9 +12,9 @@ use crate::trigger::{TriggerClient, UserTriggerId};
 
 use crate::automation::{HomeAction, RuleEvaluationContext};
 
-use super::PlanningTrace;
 use super::action::ActionEvaluationResult;
 use super::trace::PlanningTraceStep;
+use super::{LastExecution, LastExecutions, PlanningTrace};
 
 pub async fn plan_and_execute(
     resource_plans: &[(CommandTarget, Vec<HomeAction>)],
@@ -22,6 +22,7 @@ pub async fn plan_and_execute(
     command_client: &CommandClient,
     notification_client: &NotificationClient,
     trigger_client: &TriggerClient,
+    last_executions: &mut LastExecutions,
 ) -> Result<PlanningTrace> {
     debug_assert_eq!(
         resource_plans
@@ -46,6 +47,7 @@ pub async fn plan_and_execute(
             &ctx,
             command_client,
             notification_client,
+            last_executions,
             &mut steps,
             &mut used_triggers,
         )
@@ -64,6 +66,7 @@ async fn evaluate_resource_plan(
     ctx: &RuleEvaluationContext,
     command_client: &CommandClient,
     notification_client: &NotificationClient,
+    last_executions: &mut LastExecutions,
     steps: &mut Vec<PlanningTraceStep>,
     used_triggers: &mut Vec<UserTriggerId>,
 ) -> Result<()> {
@@ -82,9 +85,18 @@ async fn evaluate_resource_plan(
             Ok(ActionEvaluationResult::Execute(command, source)) => {
                 trace.fulfilled = Some(true);
                 // Async execution — use .instrument() to avoid holding span guard across .await
-                execute_command(&mut trace, command, source, None, command_client, notification_client, ctx)
-                    .instrument(action_span.clone())
-                    .await;
+                execute_command(
+                    &mut trace,
+                    command,
+                    source,
+                    None,
+                    command_client,
+                    notification_client,
+                    last_executions,
+                    ctx,
+                )
+                .instrument(action_span.clone())
+                .await;
                 finalize_action_span(&action_span, action, &trace);
                 steps.push(trace);
                 return Ok(());
@@ -99,6 +111,7 @@ async fn evaluate_resource_plan(
                     Some(trigger_id),
                     command_client,
                     notification_client,
+                    last_executions,
                     ctx,
                 )
                 .instrument(action_span.clone())
@@ -122,6 +135,14 @@ async fn evaluate_resource_plan(
     }
 
     Ok(())
+}
+
+fn last_execution_at(command: &Command, source: &ExternalId, last_executions: &LastExecutions) -> Option<DateTime> {
+    let target: CommandTarget = command.into();
+    last_executions
+        .get(&target)
+        .filter(|execution| execution.source == *source && execution.command == *command)
+        .map(|execution| execution.created)
 }
 
 fn finalize_action_span(span: &tracing::Span, action: &HomeAction, trace: &PlanningTraceStep) {
@@ -148,41 +169,24 @@ async fn handle_trigger_updates(
         .map(|_| ())
 }
 
-#[tracing::instrument(skip(command_client, notification_client, ctx))]
+#[tracing::instrument(skip(notification_client, last_executions, ctx))]
 async fn should_execute(
     command: &Command,
     source: &ExternalId,
-    command_client: &CommandClient,
     notification_client: &NotificationClient,
+    last_executions: &LastExecutions,
     ctx: &RuleEvaluationContext,
 ) -> anyhow::Result<bool> {
-    let target: CommandTarget = command.clone().into();
-    let last_execution = command_client
-        .get_latest_command(target.clone(), t!(48 hours ago))
-        .await?
-        .filter(|e| e.source == *source && e.command == *command)
-        .map(|e| e.created);
+    let target: CommandTarget = command.into();
+    let last_execution = last_execution_at(command, source, last_executions);
 
-    if let Some(last_execution) = last_execution {
-        let elapsed = last_execution.elapsed();
-
-        if elapsed < t!(30 seconds) {
-            tracing::trace!(
-                "Command for {target} was last executed less than 30 seconds ago, waiting for state update. Skipping for now."
-            );
-            return Ok(false);
-        }
-
-        if let Some(min_wait) = command.min_wait_duration_between_executions()
-            && elapsed < min_wait
-        {
-            tracing::trace!(
-                "Command for {target} was last executed {:?} ago, which is less than the minimum wait duration of {:?}. Skipping for now.",
-                elapsed,
-                min_wait
-            );
-            return Ok(false);
-        }
+    if let Some(last_execution) = last_execution
+        && last_execution.elapsed() < t!(30 seconds)
+    {
+        tracing::trace!(
+            "Command for {target} was last executed less than 30 seconds ago, waiting for state update. Skipping for now."
+        );
+        return Ok(false);
     }
 
     let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), notification_client).await?;
@@ -203,13 +207,22 @@ async fn execute_command(
     user_trigger_id: Option<UserTriggerId>,
     command_client: &CommandClient,
     notification_client: &NotificationClient,
+    last_executions: &mut LastExecutions,
     ctx: &RuleEvaluationContext,
 ) {
     let target: CommandTarget = command.clone().into();
 
-    match should_execute(&command, &source, command_client, notification_client, ctx).await {
+    match should_execute(&command, &source, notification_client, last_executions, ctx).await {
         Ok(true) => match command_client.execute(command, source, user_trigger_id).await {
-            Ok(_) => {
+            Ok(execution) => {
+                last_executions.insert(
+                    target.clone(),
+                    LastExecution {
+                        command: execution.command,
+                        source: execution.source,
+                        created: execution.created,
+                    },
+                );
                 tracing::info!("Command {} executed via action {}", target, trace.action);
                 trace.triggered = Some(true);
             }
@@ -227,5 +240,47 @@ async fn execute_command(
                 e
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::PowerToggle;
+
+    #[test]
+    fn last_execution_requires_same_source_and_command() {
+        let command = Command::SetPower {
+            device: PowerToggle::Dehumidifier,
+            power_on: true,
+        };
+        let source = ExternalId::new_static("test", "source");
+        let created = t!(now);
+        let mut last_executions = LastExecutions::default();
+        last_executions.insert(
+            command.clone().into(),
+            LastExecution {
+                command: command.clone(),
+                source: source.clone(),
+                created,
+            },
+        );
+
+        assert_eq!(last_execution_at(&command, &source, &last_executions), Some(created));
+        assert_eq!(
+            last_execution_at(&command, &ExternalId::new_static("test", "other_source"), &last_executions,),
+            None
+        );
+        assert_eq!(
+            last_execution_at(
+                &Command::SetPower {
+                    device: PowerToggle::Dehumidifier,
+                    power_on: false,
+                },
+                &source,
+                &last_executions,
+            ),
+            None
+        );
     }
 }

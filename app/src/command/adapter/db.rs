@@ -1,6 +1,6 @@
 use crate::{
-    command::{Command, CommandExecution, CommandState, CommandTarget},
-    core::{id::ExternalId, time::DateTimeRange},
+    command::{Command, CommandExecution, CommandState},
+    core::id::ExternalId,
     t,
     trigger::UserTriggerId,
 };
@@ -84,77 +84,6 @@ impl CommandRepository {
         .map(|_| ())
         .map_err(Into::into)
     }
-
-    #[allow(clippy::expect_used)]
-    pub async fn query_commands_for_target(
-        &self,
-        target: CommandTarget,
-        range: &DateTimeRange,
-    ) -> Result<Vec<CommandExecution>> {
-        let db_target = serde_json::json!(target);
-
-        let records = sqlx::query!(
-            r#"(SELECT id as "id!", command as "command!", created as "created", status as "status!: DbCommandState", error, source_type as "source_type!", source_id as "source_id!", correlation_id, user_trigger_id
-                from thing_command 
-                where command @> $1
-                and created >= $2
-                and created <= $3)
-            UNION ALL
-            (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
-                from thing_command 
-                where command @> $1
-                and created < $2
-                order by created DESC
-                limit 1)
-            UNION ALL
-            (SELECT id, command, created, status, error, source_type, source_id, correlation_id, user_trigger_id
-                from thing_command 
-                where command @> $1
-                and created > $3
-                order by created ASC
-                limit 1)
-            order by created asc"#,
-            db_target,
-            range.start().into_db(),
-            range.end().into_db()
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        let commands = records
-            .into_iter()
-            .filter_map(|row| {
-                let source = ExternalId::new(row.source_type, row.source_id);
-                match serde_json::from_value::<Command>(row.command) {
-                    Ok(command) => {
-                        let Some(created) = row.created else {
-                            tracing::warn!(
-                                "Invalid command row with id {}, missing created timestamp, ignoring",
-                                row.id
-                            );
-                            return None;
-                        };
-
-                        Some(CommandExecution {
-                            id: row.id,
-                            command,
-                            state: CommandState::from((row.status, row.error)),
-                            created: created.into(),
-                            source,
-                            user_trigger_id: row.user_trigger_id.map(UserTriggerId::from),
-                            correlation_id: row.correlation_id.map(|id| id.into()),
-                        })
-                    }
-                    Err(e) => {
-                        tracing::warn!("Error mapping command with id {} from database, ignoring: {}", row.id, e);
-                        None
-                    }
-                }
-            })
-            .collect();
-
-        Ok(commands)
-    }
 }
 
 #[derive(Debug, Clone, sqlx::Type)]
@@ -164,64 +93,4 @@ pub enum DbCommandState {
     InProgress,
     Success,
     Error,
-}
-
-impl From<(DbCommandState, Option<String>)> for CommandState {
-    fn from((status, error): (DbCommandState, Option<String>)) -> Self {
-        match status {
-            DbCommandState::Pending => CommandState::Pending,
-            DbCommandState::InProgress => CommandState::InProgress,
-            DbCommandState::Success => CommandState::Success,
-            DbCommandState::Error => CommandState::Error(error.unwrap_or("unknown error".to_string())),
-        }
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
-    use super::*;
-    use crate::command::PowerToggle;
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn test_command_found(db_pool: PgPool) {
-        let repo = CommandRepository::new(db_pool);
-
-        for (power_on, timestamp) in [
-            (true, t!(4 minutes ago)),
-            (false, t!(6 minutes ago)),
-            (true, t!(8 minutes ago)),
-            (true, t!(24 minutes ago)),
-            (false, t!(26 minutes ago)),
-        ] {
-            let cmd = Command::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on,
-            };
-            let source = ExternalId::new("test", "source");
-            let user_trigger_id = None;
-            sqlx::query!(
-                r#"INSERT INTO THING_COMMAND (COMMAND, CREATED, STATUS, SOURCE_TYPE, SOURCE_ID, USER_TRIGGER_ID) VALUES ($1, $2, $3, $4, $5, $6)"#,
-                serde_json::json!(cmd),
-                timestamp.into_db(),
-                DbCommandState::Pending as DbCommandState,
-                source.type_name(),
-                source.variant_name(),
-                user_trigger_id as Option<UserTriggerId>
-            )
-            .execute(&repo.pool)
-            .await
-            .unwrap();
-        }
-
-        let range = DateTimeRange::new(t!(10 minutes ago), t!(now));
-        let res = repo.query_commands_for_target(
-            CommandTarget::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-            },
-            &range,
-        );
-
-        assert_eq!(res.await.unwrap().len(), 4);
-    }
 }

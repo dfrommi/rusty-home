@@ -14,10 +14,7 @@ use service::CommandService;
 use sqlx::PgPool;
 
 use crate::{
-    core::{id::ExternalId, time::DateTime},
-    home_state::HomeStateEvent,
-    notification::NotificationClient,
-    trigger::UserTriggerId,
+    core::id::ExternalId, home_state::HomeStateEvent, notification::NotificationClient, trigger::UserTriggerId,
 };
 
 pub struct CommandModule {
@@ -93,13 +90,5 @@ impl CommandClient {
         self.service
             .execute_command(command, source, user_trigger_id, TraceContext::current().correlation_id())
             .await
-    }
-
-    pub async fn get_latest_command(
-        &self,
-        target: impl Into<CommandTarget>,
-        since: DateTime,
-    ) -> anyhow::Result<Option<CommandExecution>> {
-        self.service.get_latest_command(target.into(), since).await
     }
 }

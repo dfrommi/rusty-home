@@ -16,6 +16,8 @@ You are adding or updating a device state in the rusty-home project. Follow this
 
 Downstream modules (home_state, observability) subscribe to the appropriate event type.
 
+Device-state mappings are independent from command routing. A state source ID can match a command target ID, but this is not assumed: commands may use another physical device to affect the system, or the command may have no usable state feedback.
+
 ## Step 1: Gather Requirements
 
 If the user has not already provided all of the following, ask using AskUserQuestion:

@@ -1,7 +1,5 @@
 use infrastructure::MqttSender;
 
-use crate::command::{Command, adapter::CommandExecutor};
-
 use super::metrics::{CommandMetric, CommandTargetSystem};
 
 pub struct LgTvCommandExecutor {
@@ -12,17 +10,10 @@ impl LgTvCommandExecutor {
     pub fn new(sender: MqttSender) -> Self {
         Self { sender }
     }
-}
 
-impl CommandExecutor for LgTvCommandExecutor {
-    #[tracing::instrument(name = "execute_command LGTV", ret, skip(self))]
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        let Command::SetEnergySaving { on, .. } = command else {
-            return Ok(false);
-        };
-
+    pub async fn set_energy_saving(&self, on: bool) -> anyhow::Result<()> {
         self.sender
-            .send_transient("command/energySaving", energy_saving_payload(*on))
+            .send_transient("command/energySaving", energy_saving_payload(on))
             .await?;
 
         CommandMetric::Executed {
@@ -31,7 +22,7 @@ impl CommandExecutor for LgTvCommandExecutor {
         }
         .record();
 
-        Ok(true)
+        Ok(())
     }
 }
 

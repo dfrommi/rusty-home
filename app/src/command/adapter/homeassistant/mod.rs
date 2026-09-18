@@ -1,28 +1,12 @@
-mod config;
-
 use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
 use super::metrics::*;
-use crate::command::adapter::CommandExecutor;
-use crate::command::{Command, CommandTarget};
 use crate::core::unit::{FanAirflow, FanSpeed};
 use serde_json::json;
 
-#[derive(Debug, Clone)]
-enum HaServiceTarget {
-    LightTurnOnOff(&'static str),
-    PushNotification(&'static str),
-    ComfeeDehumidifier {
-        humidifier_id: &'static str,
-        fan_id: &'static str,
-    },
-    PhilipsAirPurifierFan(&'static str),
-}
-
 pub struct HomeAssistantCommandExecutor {
     client: HaHttpClient,
-    config: Vec<(CommandTarget, HaServiceTarget)>,
 }
 
 impl HomeAssistantCommandExecutor {
@@ -30,65 +14,10 @@ impl HomeAssistantCommandExecutor {
     pub fn new(url: &str, token: &str) -> Self {
         let http_client = HaHttpClient::new(url, token).expect("Error initializing Home Assistant REST client");
 
-        Self {
-            client: http_client,
-            config: config::default_ha_command_config(),
-        }
-    }
-}
-
-impl CommandExecutor for HomeAssistantCommandExecutor {
-    #[tracing::instrument(name = "execute_command HA", ret, skip(self))]
-    async fn execute_command(&self, command: &Command) -> anyhow::Result<bool> {
-        let command_target: CommandTarget = command.clone().into();
-
-        let ha_target = self
-            .config
-            .iter()
-            .find_map(|(cmd, ha)| if cmd == &command_target { Some(ha) } else { None });
-
-        let Some(ha_target) = ha_target else {
-            return Ok(false);
-        };
-
-        self.dispatch_service_call(command, ha_target).await.map(|_| true)
-    }
-}
-
-impl HomeAssistantCommandExecutor {
-    async fn dispatch_service_call(&self, command: &Command, ha_target: &HaServiceTarget) -> anyhow::Result<()> {
-        use crate::command::*;
-        use HaServiceTarget::*;
-
-        match (ha_target, command) {
-            (LightTurnOnOff(id), Command::SetPower { power_on, .. }) => self.light_turn_on_off(id, *power_on).await,
-            (
-                PushNotification(mobile_id),
-                Command::PushNotify {
-                    notification: Notification::WindowOpened,
-                    action: NotificationAction::Notify,
-                    ..
-                },
-            ) => self.notify_window_opened(mobile_id).await,
-            (
-                PushNotification(mobile_id),
-                Command::PushNotify {
-                    notification: Notification::WindowOpened,
-                    action: NotificationAction::Dismiss,
-                    ..
-                },
-            ) => self.dismiss_window_opened_notification(mobile_id).await,
-            (ComfeeDehumidifier { humidifier_id, fan_id }, Command::ControlFan { speed, .. }) => {
-                self.comfee_fan_speed(humidifier_id, fan_id, speed).await
-            }
-            (PhilipsAirPurifierFan(id), Command::ControlFan { speed, .. }) => {
-                self.philips_air_purifier_fan_speed(id, speed).await
-            }
-            conf => Err(anyhow::anyhow!("Invalid configuration: {:?}", conf,)),
-        }
+        Self { client: http_client }
     }
 
-    async fn light_turn_on_off(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
+    pub async fn set_light_power(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
         let service = if power_on { "turn_on" } else { "turn_off" };
         self.client
             .call_service(
@@ -103,7 +32,12 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    async fn comfee_fan_speed(&self, humidifier_id: &str, fan_id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+    pub async fn set_comfee_fan_speed(
+        &self,
+        humidifier_id: &str,
+        fan_id: &str,
+        airflow: &FanAirflow,
+    ) -> anyhow::Result<()> {
         match airflow {
             FanAirflow::Off => {
                 self.client
@@ -151,7 +85,7 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    async fn philips_air_purifier_fan_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
+    pub async fn set_philips_air_purifier_speed(&self, id: &str, airflow: &FanAirflow) -> anyhow::Result<()> {
         match airflow {
             FanAirflow::Off => {
                 self.client
@@ -182,7 +116,7 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {
+    pub async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {
         self.client
             .call_service(
                 "notify",
@@ -202,7 +136,7 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    async fn dismiss_window_opened_notification(&self, mobile_id: &str) -> anyhow::Result<()> {
+    pub async fn dismiss_window_opened_notification(&self, mobile_id: &str) -> anyhow::Result<()> {
         self.client
             .call_service(
                 "notify",

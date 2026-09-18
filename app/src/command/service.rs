@@ -1,13 +1,7 @@
 use infrastructure::CorrelationId;
 
 use crate::{
-    command::{
-        Command, CommandExecution, CommandState, CommandTarget,
-        adapter::{
-            CommandExecutor, HomeAssistantCommandExecutor, LgTvCommandExecutor, NukiCommandExecutor,
-            TasmotaCommandExecutor, Z2mCommandExecutor,
-        },
-    },
+    command::{Command, CommandExecution, CommandState, CommandTarget},
     core::{
         id::ExternalId,
         time::{DateTime, DateTimeRange},
@@ -16,34 +10,16 @@ use crate::{
     trigger::UserTriggerId,
 };
 
-use super::adapter::db::CommandRepository;
+use super::{adapter::db::CommandRepository, dispatcher::CommandDispatcher};
 
 pub struct CommandService {
     repo: CommandRepository,
-    tasmota_executor: TasmotaCommandExecutor,
-    z2m_executor: Z2mCommandExecutor,
-    lgtv_executor: LgTvCommandExecutor,
-    nuki_executor: NukiCommandExecutor,
-    ha_executor: HomeAssistantCommandExecutor,
+    dispatcher: CommandDispatcher,
 }
 
 impl CommandService {
-    pub fn new(
-        repo: CommandRepository,
-        tasmota_executor: TasmotaCommandExecutor,
-        z2m_executor: Z2mCommandExecutor,
-        lgtv_executor: LgTvCommandExecutor,
-        nuki_executor: NukiCommandExecutor,
-        ha_executor: HomeAssistantCommandExecutor,
-    ) -> Self {
-        Self {
-            repo,
-            tasmota_executor,
-            z2m_executor,
-            lgtv_executor,
-            nuki_executor,
-            ha_executor,
-        }
+    pub fn new(repo: CommandRepository, dispatcher: CommandDispatcher) -> Self {
+        Self { repo, dispatcher }
     }
 
     pub async fn execute_command(
@@ -59,24 +35,9 @@ impl CommandService {
             .await?;
 
         let command_id = command_exec.id;
-        let res = match self.execute_via(&self.tasmota_executor, &command).await {
-            Some(r) => Some(r),
-            None => match self.execute_via(&self.z2m_executor, &command).await {
-                Some(r) => Some(r),
-                None => match self.execute_via(&self.lgtv_executor, &command).await {
-                    Some(r) => Some(r),
-                    None => match self.execute_via(&self.nuki_executor, &command).await {
-                        Some(r) => Some(r),
-                        None => self.execute_via(&self.ha_executor, &command).await,
-                    },
-                },
-            },
-        };
-
-        let final_state = match res {
-            Some(Ok(())) => CommandState::Success,
-            Some(Err(e)) => CommandState::Error(e.to_string()),
-            None => CommandState::Error("No executor".to_string()),
+        let final_state = match self.dispatcher.dispatch(&command).await {
+            Ok(()) => CommandState::Success,
+            Err(e) => CommandState::Error(e.to_string()),
         };
 
         command_exec.state = final_state.clone();
@@ -91,14 +52,6 @@ impl CommandService {
         }
 
         Ok(command_exec)
-    }
-
-    async fn execute_via(&self, executor: &impl CommandExecutor, command: &Command) -> Option<anyhow::Result<()>> {
-        match executor.execute_command(command).await {
-            Ok(true) => Some(Ok(())),
-            Ok(false) => None,
-            Err(e) => Some(Err(e)),
-        }
     }
 
     pub async fn get_latest_command(

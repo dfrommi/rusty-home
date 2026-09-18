@@ -15,10 +15,10 @@ You are adding or updating a command in the rusty-home project. Follow this work
 
 Command routing and device-state collection are independent mappings. A physical ID used for a command may match a state ID, but this is not assumed; commands and state may use different devices or have no state feedback.
 
-Before re-executing a command, the planner checks two things in `app/src/command/domain/command_state.rs`:
+Before re-executing a command, the automation planner checks two things:
 
-- **`is_reflected_in_state()`** — is the desired effect already visible in home state?
-- **`min_wait_duration_between_executions()`** — per-command-type cooldown
+- **`is_reflected_in_state()`** in `app/src/command/domain/command_state.rs` — is the desired effect already visible in home state?
+- **In-memory last execution** in `app/src/automation/planner/` — was the same source and command sent to the target less than 30 seconds ago?
 
 For heating commands (`SetHeating`) and the `Z2mSensorSyncRunner`, read `docs/heating-control.md` — the Sonoff TRV is a dumb binary valve (no PID); the command sets setpoint + valve opening/closing limits, not a valve position.
 
@@ -115,10 +115,10 @@ In `app/src/command/domain/command_state.rs`:
      }
      ```
 
-   - **Command-history-based** (for transient actions like notifications):
+   - **Notification-state-based** (for notification lifecycle actions):
      ```rust
      Command::MyCommand { .. } => {
-         // Use command_client.get_latest_command() to check recent history
+         // Use NotificationClient state for the notification lifecycle
          Ok(false)
      }
      ```
@@ -128,10 +128,7 @@ In `app/src/command/domain/command_state.rs`:
      Command::MyCommand { .. } => Ok(false),
      ```
 
-2. Add match arm to `min_wait_duration_between_executions()`:
-   ```rust
-   Command::MyCommand { .. } => Some(t!(N minutes)),  // or None for no cooldown
-   ```
+2. Do not add a per-command cooldown method. The planner uses one 30-second in-memory execution guard for the same source and command. Device state remains the authority for persistent command effects.
 
 ### 4a.3: Add Executor — continue to Step 4c
 

@@ -23,7 +23,7 @@ Device-state mappings are independent from command routing. A state source ID ca
 If the user has not already provided all of the following, ask using AskUserQuestion:
 
 - **What is being measured** (e.g., temperature, CO2 level, power usage, presence)
-- **Which backend adapter** delivers the data: Tasmota, Z2M (Zigbee2MQTT), HomeAssistant, Tado, EnergyMeter, or Internal
+- **Which backend adapter** delivers the data: Tasmota, Z2M (Zigbee2MQTT), HomeAssistant, Tado, EnergyMeter, or LG TV MQTT
 - **External device identifier**: the MQTT topic (for Tasmota/Z2M), HA entity ID (for HomeAssistant), Tado zone id (for Tado), or event source
 - **Payload structure**: which JSON fields in the incoming message map to which values (e.g., `{"temperature": 21.5, "humidity": 55.0, "last_seen": "..."}`)
 
@@ -139,9 +139,10 @@ Based on the adapter, modify the appropriate files:
 
 - Extend the `From<&EnergyReading> for DeviceStateValue` implementation
 
-#### Internal (`app/src/device_state/adapter/internal/mod.rs`)
+#### LG TV (`app/src/device_state/adapter/lgtv/`)
 
-- Extend the `incoming_data_from_command_event()` match on `CommandEvent`
+- **Subscription** in `mod.rs`: Subscribe to the LG TV MQTT base topic and supported state subtopics
+- **Parsing** in `mod.rs`: Extend `parse_lgtv_message()` for new state topics
 
 #### Tado (`app/src/device_state/adapter/tado/`)
 

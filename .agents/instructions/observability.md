@@ -1,6 +1,6 @@
 # Observability
 
-Exports device and home state as Prometheus metrics to VictoriaMetrics. Provides Grafana CSV endpoints.
+Exports device and home state as Prometheus metrics to VictoriaMetrics. Provides a Grafana CSV endpoint for state data. Command execution rows are emitted as structured OTLP logs and queried directly from Loki.
 
 ## Non-obvious metric conversions
 

@@ -155,7 +155,7 @@ Scans the last 3 h of (surface − room) temperature vs demand; finds the smalle
 ## Runtime cadence & throttling
 
 - Home state recalculates on `DeviceStateEvent::Changed` (50 ms debounce) and a 30 s timer; planning runs on every `SnapshotUpdated` and a 30 s timer over the last snapshot.
-- The real throttle is **state reflection, not time**: `should_execute` skips if the same command ran < 30 s ago, < 2 min (`SetHeating`), or if `is_reflected_in_state` (the TRV already reports the target setpoint + demand limit). A *different* command (changed demand value) bypasses the 30 s/2 min cooldowns.
+- The real throttle is **state reflection, not time**: `should_execute` skips if the same source and command ran less than 30 s ago while feedback propagates, or if `is_reflected_in_state` (the TRV already reports the target setpoint + demand limit). A *different* command (for example, a changed demand value) is not blocked by the 30-second guard.
 - `adjustment_needed` gates the step controller: no change within 30 s of the valve's last physical move; force re-eval after 10 min or on mode change.
 
 ## Control approaches tried (chronological)

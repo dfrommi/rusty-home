@@ -115,45 +115,6 @@ impl HomeAssistantCommandExecutor {
         record_executed(id);
         Ok(())
     }
-
-    pub async fn notify_window_opened(&self, mobile_id: &str) -> anyhow::Result<()> {
-        self.client
-            .call_service(
-                "notify",
-                mobile_id,
-                json!({
-                    "title": "Fenster offen",
-                    "message": "Mindestens ein Fenster ist offen",
-                    "data": {
-                        "tag": "window_opened"
-                    }
-                }),
-            )
-            .await?;
-
-        record_executed(mobile_id);
-
-        Ok(())
-    }
-
-    pub async fn dismiss_window_opened_notification(&self, mobile_id: &str) -> anyhow::Result<()> {
-        self.client
-            .call_service(
-                "notify",
-                mobile_id,
-                json!({
-                    "message": "clear_notification",
-                    "data": {
-                        "tag": "window_opened"
-                    }
-                }),
-            )
-            .await?;
-
-        record_executed(mobile_id);
-
-        Ok(())
-    }
 }
 
 fn record_executed(id: &str) {

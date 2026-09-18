@@ -7,6 +7,7 @@ use infrastructure::EventListener;
 use crate::{
     command::CommandClient,
     home_state::{HomeStateEvent, StateSnapshot},
+    notification::NotificationClient,
     trigger::TriggerClient,
 };
 
@@ -16,6 +17,7 @@ pub struct AutomationModule {
     home_state_rx: EventListener<HomeStateEvent>,
     command_client: CommandClient,
     trigger_client: TriggerClient,
+    _notification_client: NotificationClient,
 }
 
 impl AutomationModule {
@@ -23,11 +25,13 @@ impl AutomationModule {
         home_state_rx: EventListener<HomeStateEvent>,
         command_client: CommandClient,
         trigger_client: TriggerClient,
+        notification_client: NotificationClient,
     ) -> Self {
         Self {
             home_state_rx,
             command_client,
             trigger_client,
+            _notification_client: notification_client,
         }
     }
 

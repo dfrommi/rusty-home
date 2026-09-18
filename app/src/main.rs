@@ -16,6 +16,7 @@ mod core;
 mod device_state;
 mod frontends;
 mod home_state;
+mod notification;
 mod observability;
 mod settings;
 mod trigger;
@@ -54,6 +55,8 @@ pub async fn main() -> anyhow::Result<()> {
     .await?;
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
+    let notification_module =
+        notification::NotificationModule::new(&settings.homeassistant.url, &settings.homeassistant.token);
 
     let home_state_module = HomeStateModule::new(
         t!(25 hours),
@@ -71,14 +74,19 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.lgtv.base_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
+        notification_module.client(),
         &settings.nuki.url,
         &settings.nuki.token,
         home_state_module.subscribe(),
     )
     .await;
 
-    let automation_module =
-        AutomationModule::new(home_state_module.subscribe(), command_module.client(), trigger_module.client());
+    let automation_module = AutomationModule::new(
+        home_state_module.subscribe(),
+        command_module.client(),
+        trigger_module.client(),
+        notification_module.client(),
+    );
 
     let homekit_module = settings
         .homebridge

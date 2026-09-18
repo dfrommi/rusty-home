@@ -1,12 +1,13 @@
 use crate::{
     command::{
-        Command, EnergySavingDevice, Fan, Lock, Notification, NotificationAction, NotificationRecipient, PowerToggle,
+        Command, EnergySavingDevice, Fan, Lock, NotificationAction, PowerToggle,
         adapter::{
             HomeAssistantCommandExecutor, LgTvCommandExecutor, NukiCommandExecutor, TasmotaCommandExecutor,
             Z2mCommandExecutor,
         },
     },
     core::domain::Radiator,
+    notification::{NotificationClient, NotificationId},
 };
 
 pub struct CommandDispatcher {
@@ -15,6 +16,7 @@ pub struct CommandDispatcher {
     lgtv: LgTvCommandExecutor,
     nuki: NukiCommandExecutor,
     homeassistant: HomeAssistantCommandExecutor,
+    notifications: NotificationClient,
 }
 
 impl CommandDispatcher {
@@ -24,6 +26,7 @@ impl CommandDispatcher {
         lgtv: LgTvCommandExecutor,
         nuki: NukiCommandExecutor,
         homeassistant: HomeAssistantCommandExecutor,
+        notifications: NotificationClient,
     ) -> Self {
         Self {
             tasmota,
@@ -31,6 +34,7 @@ impl CommandDispatcher {
             lgtv,
             nuki,
             homeassistant,
+            notifications,
         }
     }
 
@@ -60,33 +64,17 @@ impl CommandDispatcher {
                 self.z2m.set_heating(device_id, target_state.clone()).await
             }
             Command::PushNotify {
-                action: NotificationAction::Notify,
-                notification: Notification::WindowOpened,
-                recipient: NotificationRecipient::Dennis,
-            } => self.homeassistant.notify_window_opened("mobile_app_jarvis").await,
-            Command::PushNotify {
-                action: NotificationAction::Notify,
-                notification: Notification::WindowOpened,
-                recipient: NotificationRecipient::Sabine,
-            } => self.homeassistant.notify_window_opened("mobile_app_simi_2").await,
-            Command::PushNotify {
-                action: NotificationAction::Dismiss,
-                notification: Notification::WindowOpened,
-                recipient: NotificationRecipient::Dennis,
-            } => {
-                self.homeassistant
-                    .dismiss_window_opened_notification("mobile_app_jarvis")
-                    .await
-            }
-            Command::PushNotify {
-                action: NotificationAction::Dismiss,
-                notification: Notification::WindowOpened,
-                recipient: NotificationRecipient::Sabine,
-            } => {
-                self.homeassistant
-                    .dismiss_window_opened_notification("mobile_app_simi_2")
-                    .await
-            }
+                action,
+                notification,
+                recipient,
+            } => match action {
+                NotificationAction::Notify => self.notifications.notify(recipient, notification).await,
+                NotificationAction::Dismiss => {
+                    self.notifications
+                        .dismiss(recipient, NotificationId::from(notification))
+                        .await
+                }
+            },
             Command::SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
                 on,

@@ -17,7 +17,7 @@ pub struct AutomationModule {
     home_state_rx: EventListener<HomeStateEvent>,
     command_client: CommandClient,
     trigger_client: TriggerClient,
-    _notification_client: NotificationClient,
+    notification_client: NotificationClient,
 }
 
 impl AutomationModule {
@@ -31,7 +31,7 @@ impl AutomationModule {
             home_state_rx,
             command_client,
             trigger_client,
-            _notification_client: notification_client,
+            notification_client,
         }
     }
 
@@ -43,12 +43,12 @@ impl AutomationModule {
             tokio::select! {
                 _ = timer.tick() => {
                     if let Some(snapshot) = &last_snapshot {
-                        plan_for_home(snapshot, &self.command_client, &self.trigger_client).await;
+                        plan_for_home(snapshot, &self.command_client, &self.notification_client, &self.trigger_client).await;
                     }
                 },
 
                 event = self.home_state_rx.recv() => if let Some(HomeStateEvent::SnapshotUpdated(new_snapshot)) = event {
-                    plan_for_home(&new_snapshot, &self.command_client, &self.trigger_client).await;
+                    plan_for_home(&new_snapshot, &self.command_client, &self.notification_client, &self.trigger_client).await;
                     last_snapshot = Some(new_snapshot);
                 },
             };

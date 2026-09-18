@@ -5,17 +5,25 @@ mod trace;
 use trace::display_planning_trace;
 
 use crate::{
-    automation::domain::resource_plans, command::CommandClient, home_state::StateSnapshot, trigger::TriggerClient,
+    automation::domain::resource_plans, command::CommandClient, home_state::StateSnapshot,
+    notification::NotificationClient, trigger::TriggerClient,
 };
 
 pub use action::ActionEvaluationResult;
 pub use trace::PlanningTrace;
 
 #[tracing::instrument(skip_all)]
-pub async fn plan_for_home(snapshot: &StateSnapshot, command_client: &CommandClient, trigger_client: &TriggerClient) {
+pub async fn plan_for_home(
+    snapshot: &StateSnapshot,
+    command_client: &CommandClient,
+    notification_client: &NotificationClient,
+    trigger_client: &TriggerClient,
+) {
     tracing::info!("Start planning");
     let plans = resource_plans();
-    let res = processor::plan_and_execute(&plans, snapshot.clone(), command_client, trigger_client).await;
+    let res =
+        processor::plan_and_execute(&plans, snapshot.clone(), command_client, notification_client, trigger_client)
+            .await;
 
     match res {
         Ok(res) => {

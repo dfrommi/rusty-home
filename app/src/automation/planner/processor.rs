@@ -6,6 +6,7 @@ use crate::command::{Command, CommandClient, CommandTarget};
 use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::home_state::StateSnapshot;
+use crate::notification::NotificationClient;
 use crate::t;
 use crate::trigger::{TriggerClient, UserTriggerId};
 
@@ -19,6 +20,7 @@ pub async fn plan_and_execute(
     resource_plans: &[(CommandTarget, Vec<HomeAction>)],
     snapshot: StateSnapshot,
     command_client: &CommandClient,
+    notification_client: &NotificationClient,
     trigger_client: &TriggerClient,
 ) -> Result<PlanningTrace> {
     debug_assert_eq!(
@@ -38,7 +40,16 @@ pub async fn plan_and_execute(
     let mut used_triggers = Vec::new();
 
     for (resource, rules) in resource_plans {
-        evaluate_resource_plan(resource, rules, &ctx, command_client, &mut steps, &mut used_triggers).await?;
+        evaluate_resource_plan(
+            resource,
+            rules,
+            &ctx,
+            command_client,
+            notification_client,
+            &mut steps,
+            &mut used_triggers,
+        )
+        .await?;
     }
 
     handle_trigger_updates(planning_data_timestamp, used_triggers, trigger_client).await?;
@@ -52,6 +63,7 @@ async fn evaluate_resource_plan(
     rules: &[HomeAction],
     ctx: &RuleEvaluationContext,
     command_client: &CommandClient,
+    notification_client: &NotificationClient,
     steps: &mut Vec<PlanningTraceStep>,
     used_triggers: &mut Vec<UserTriggerId>,
 ) -> Result<()> {
@@ -70,7 +82,7 @@ async fn evaluate_resource_plan(
             Ok(ActionEvaluationResult::Execute(command, source)) => {
                 trace.fulfilled = Some(true);
                 // Async execution — use .instrument() to avoid holding span guard across .await
-                execute_command(&mut trace, command, source, None, command_client, ctx)
+                execute_command(&mut trace, command, source, None, command_client, notification_client, ctx)
                     .instrument(action_span.clone())
                     .await;
                 finalize_action_span(&action_span, action, &trace);
@@ -80,9 +92,17 @@ async fn evaluate_resource_plan(
             Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
                 trace.fulfilled = Some(true);
                 used_triggers.push(trigger_id.clone());
-                execute_command(&mut trace, command, source, Some(trigger_id), command_client, ctx)
-                    .instrument(action_span.clone())
-                    .await;
+                execute_command(
+                    &mut trace,
+                    command,
+                    source,
+                    Some(trigger_id),
+                    command_client,
+                    notification_client,
+                    ctx,
+                )
+                .instrument(action_span.clone())
+                .await;
                 finalize_action_span(&action_span, action, &trace);
                 steps.push(trace);
                 return Ok(());
@@ -128,11 +148,12 @@ async fn handle_trigger_updates(
         .map(|_| ())
 }
 
-#[tracing::instrument(skip(command_client, ctx))]
+#[tracing::instrument(skip(command_client, notification_client, ctx))]
 async fn should_execute(
     command: &Command,
     source: &ExternalId,
     command_client: &CommandClient,
+    notification_client: &NotificationClient,
     ctx: &RuleEvaluationContext,
 ) -> anyhow::Result<bool> {
     let target: CommandTarget = command.clone().into();
@@ -164,7 +185,7 @@ async fn should_execute(
         }
     }
 
-    let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), command_client).await?;
+    let is_reflected_in_state = command.is_reflected_in_state(ctx.inner(), notification_client).await?;
     if is_reflected_in_state {
         tracing::trace!("Command for {target} is already reflected in state, skipping");
         return Ok(false);
@@ -181,11 +202,12 @@ async fn execute_command(
     source: ExternalId,
     user_trigger_id: Option<UserTriggerId>,
     command_client: &CommandClient,
+    notification_client: &NotificationClient,
     ctx: &RuleEvaluationContext,
 ) {
     let target: CommandTarget = command.clone().into();
 
-    match should_execute(&command, &source, command_client, ctx).await {
+    match should_execute(&command, &source, command_client, notification_client, ctx).await {
         Ok(true) => match command_client.execute(command, source, user_trigger_id).await {
             Ok(_) => {
                 tracing::info!("Command {} executed via action {}", target, trace.action);

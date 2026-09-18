@@ -64,7 +64,6 @@ impl NotificationModule {
 }
 
 impl NotificationClient {
-    #[allow(dead_code)]
     pub fn is_delivered(&self, recipient: &NotificationRecipient, notification: &Notification) -> bool {
         let key = NotificationKey {
             recipient: recipient.clone(),

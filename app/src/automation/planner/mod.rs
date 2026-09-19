@@ -4,6 +4,8 @@ mod trace;
 
 use std::collections::HashMap;
 
+use infrastructure::TraceContext;
+
 use crate::{
     command::{Command, CommandTarget},
     core::{id::ExternalId, time::DateTime},
@@ -36,6 +38,10 @@ pub async fn plan_for_home(
     trigger_client: &TriggerClient,
     last_executions: &mut LastExecutions,
 ) {
+    if let Some(correlation_id) = snapshot.correlation_id() {
+        TraceContext::current().link_to(correlation_id);
+    }
+
     tracing::info!("Start planning");
     let plans = resource_plans();
     let res = processor::plan_and_execute(

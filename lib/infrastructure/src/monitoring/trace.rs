@@ -26,6 +26,11 @@ impl TraceContext {
         CorrelationId::from_context(&self.otel_ctx())
     }
 
+    pub fn link_to(&self, correlation_id: &CorrelationId) {
+        self.span
+            .add_link(correlation_id.to_context().span().span_context().clone());
+    }
+
     pub fn trace_id(&self) -> String {
         self.otel_ctx().span().span_context().trace_id().to_string()
     }

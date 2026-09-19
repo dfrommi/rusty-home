@@ -46,6 +46,16 @@ impl CorrelationId {
         })
     }
 
+    pub(super) fn to_context(&self) -> opentelemetry::Context {
+        let propagator = TraceContextPropagator::default();
+
+        let mut headers: HashMap<String, String> = HashMap::new();
+        headers.insert("traceparent".to_string(), self.id.clone());
+
+        propagator.extract(&headers)
+        //otel_ctx.span().span_context().clone()
+    }
+
     pub fn trace_id(&self) -> String {
         self.trace_id.clone()
     }
@@ -89,5 +99,10 @@ mod tests {
 
         assert_eq!(ctx.trace_id(), "4318fb888997822f5d20fc5c5793c0dc");
         assert_eq!(ctx.span_id(), "1075ceed63969488");
+        assert_eq!(
+            ctx.to_context().span().span_context().trace_id().to_string(),
+            "4318fb888997822f5d20fc5c5793c0dc"
+        );
+        assert_eq!(ctx.to_context().span().span_context().span_id().to_string(), "1075ceed63969488");
     }
 }

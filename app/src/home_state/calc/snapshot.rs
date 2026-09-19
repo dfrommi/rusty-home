@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use infrastructure::{CorrelationId, TraceContext};
+
 use crate::{
     core::{
         time::DateTime,
@@ -12,12 +14,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct StateSnapshot {
     inner: Arc<StateCalculationResult>,
+    correlation_id: Option<CorrelationId>,
 }
 
 impl Default for StateSnapshot {
     fn default() -> Self {
         StateSnapshot {
             inner: Arc::new(StateCalculationResult::default()),
+            correlation_id: TraceContext::current().correlation_id(),
         }
     }
 }
@@ -26,7 +30,12 @@ impl StateSnapshot {
     pub fn new(result: StateCalculationResult) -> Self {
         StateSnapshot {
             inner: Arc::new(result),
+            correlation_id: TraceContext::current().correlation_id(),
         }
+    }
+
+    pub fn correlation_id(&self) -> Option<&CorrelationId> {
+        self.correlation_id.as_ref()
     }
 
     pub fn timestamp(&self) -> DateTime {

@@ -2,6 +2,8 @@ use config::{Config, ConfigError, Environment, File};
 use infrastructure::{DatabaseConfig, HttpServerConfig, MonitoringConfig, MqttConfig};
 use serde::Deserialize;
 
+use crate::device_state::DeviceAvailabilityConfig;
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub database: DatabaseConfig,
@@ -16,6 +18,7 @@ pub struct Settings {
     pub nuki: NukiSettings,
     pub metrics: MetricsExportSettings,
     pub tado: TadoSettings,
+    pub device_availability: DeviceAvailabilityConfig,
 }
 
 impl Settings {
@@ -25,7 +28,9 @@ impl Settings {
             .add_source(Environment::default().separator("_").list_separator(","));
 
         let s = builder.build()?;
-        s.try_deserialize()
+        let settings: Self = s.try_deserialize()?;
+        settings.device_availability.validate().map_err(ConfigError::Message)?;
+        Ok(settings)
     }
 }
 

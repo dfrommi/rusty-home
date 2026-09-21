@@ -6,23 +6,27 @@ use std::collections::HashSet;
 use crate::{
     core::{
         id::ExternalId,
-        time::{DateTime, DateTimeRange, Duration},
+        time::{DateTime, DateTimeRange},
         timeseries::DataPoint,
     },
-    device_state::{DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateId, DeviceStateValue},
+    device_state::{
+        DeviceAvailabilityConfig, DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateId, DeviceStateValue,
+    },
     t,
 };
 
 #[derive(Debug, Clone)]
 pub struct DeviceStateRepository {
     pool: PgPool,
+    availability_config: DeviceAvailabilityConfig,
     tag_id_cache: Cache<DeviceStateId, i64>,
 }
 
 impl DeviceStateRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, availability_config: DeviceAvailabilityConfig) -> Self {
         Self {
             pool,
+            availability_config,
             tag_id_cache: Cache::builder().build(),
         }
     }
@@ -170,6 +174,8 @@ impl DeviceStateRepository {
     }
 
     pub async fn sync_item_availability(&self, items: &HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
+        self.availability_config.warn_unknown_items(items);
+
         let (sources, item_names): (Vec<String>, Vec<String>) = items
             .iter()
             .map(|item| (item.source.clone(), item.item.clone()))
@@ -213,7 +219,7 @@ impl DeviceStateRepository {
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         let recs = sqlx::query!(
-            r#"SELECT source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled
+            r#"SELECT source, item, last_seen, marked_offline, entry_updated, disabled
                 FROM item_availability"#
         )
         .fetch_all(&self.pool)
@@ -224,12 +230,16 @@ impl DeviceStateRepository {
         Ok(recs
             .into_iter()
             .map(|rec| {
-                let considered_offline_after = convert_pginterval_to_duration(&rec.considered_offline_after);
+                let offline_after = if rec.disabled {
+                    &self.availability_config.default_offline_after
+                } else {
+                    self.availability_config.offline_after(&rec.source, &rec.item)
+                };
                 let last_seen_ago = std::cmp::max(
                     now.elapsed_since(rec.last_seen.into()),
                     now.elapsed_since(rec.entry_updated.into()),
                 );
-                let is_offline = rec.marked_offline || last_seen_ago > considered_offline_after;
+                let is_offline = rec.marked_offline || last_seen_ago > offline_after.clone();
 
                 DeviceAvailabilityStatus {
                     source: rec.source,
@@ -248,15 +258,6 @@ impl DeviceStateRepository {
             .await
             .map_err(|e| anyhow::anyhow!(e))
     }
-}
-
-fn convert_pginterval_to_duration(pg_interval: &PgInterval) -> Duration {
-    let days_from_months = pg_interval.months * 30; // Rough estimation
-    let total_days = days_from_months + pg_interval.days;
-
-    let total_milliseconds = pg_interval.microseconds / 1_000;
-
-    Duration::days(total_days as i64) + Duration::millis(total_milliseconds)
 }
 
 fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
@@ -317,13 +318,23 @@ async fn get_or_insert_tag_id_from_db(db_pool: &PgPool, id: &DeviceStateId) -> R
 mod tests {
     use std::collections::HashSet;
 
-    use crate::{core::unit::DegreeCelsius, device_state::Temperature};
+    use crate::{
+        core::unit::DegreeCelsius,
+        device_state::{DeviceAvailabilityOverride, Temperature},
+    };
 
     use super::*;
 
+    fn default_availability_config() -> DeviceAvailabilityConfig {
+        DeviceAvailabilityConfig {
+            default_offline_after: t!(1 hours),
+            overrides: vec![],
+        }
+    }
+
     #[sqlx::test(migrations = "../migrations")]
     async fn test_get_all_data_points_in_range_ts_asc(pool: PgPool) -> anyhow::Result<()> {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool, default_availability_config());
         prepare_test_data(&repo).await?;
 
         let dps = repo
@@ -353,7 +364,7 @@ mod tests {
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_get_latest_for_device(pool: PgPool) -> anyhow::Result<()> {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool, default_availability_config());
         prepare_test_data(&repo).await?;
 
         let dp = repo
@@ -371,7 +382,7 @@ mod tests {
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_get_latest_for_device_no_data(pool: PgPool) -> anyhow::Result<()> {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool, default_availability_config());
         // No data inserted — device has no rows in thing_value
 
         let dp = repo
@@ -385,7 +396,7 @@ mod tests {
 
     #[sqlx::test(migrations = "../migrations")]
     async fn sync_item_availability_reconciles_existing_and_missing_items(pool: PgPool) -> anyhow::Result<()> {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool, default_availability_config());
         let now = t!(now).into_db();
 
         sqlx::query!(
@@ -439,8 +450,50 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
+    async fn get_item_availabilities_uses_configured_duration(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(
+            pool,
+            DeviceAvailabilityConfig {
+                default_offline_after: t!(1 hours),
+                overrides: vec![DeviceAvailabilityOverride {
+                    source: "HA".to_string(),
+                    item: "sensor.home_temperature".to_string(),
+                    offline_after: t!(3 hours),
+                }],
+            },
+        );
+        let last_seen = t!(2 hours ago).into_db();
+
+        sqlx::query(
+            r#"INSERT INTO item_availability
+                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
+                VALUES
+                    ('HA', 'sensor.home_temperature', $1, false, INTERVAL '1 hour', $1, false),
+                    ('HA', 'sensor.home_relative_humidity', $1, false, INTERVAL '3 hours', $1, false)"#,
+        )
+        .bind(last_seen)
+        .execute(&repo.pool)
+        .await?;
+
+        let statuses = repo.get_item_availabilities().await?;
+        let override_status = statuses
+            .iter()
+            .find(|status| status.item == "sensor.home_temperature")
+            .expect("configured override status not found");
+        let default_status = statuses
+            .iter()
+            .find(|status| status.item == "sensor.home_relative_humidity")
+            .expect("default status not found");
+
+        assert!(!override_status.is_offline);
+        assert!(default_status.is_offline);
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
     async fn test_get_all_data_points_ignores_unsupported_tag(pool: PgPool) -> anyhow::Result<()> {
-        let repo = DeviceStateRepository::new(pool);
+        let repo = DeviceStateRepository::new(pool, default_availability_config());
 
         let tag_id = sqlx::query_scalar!(
             r#"INSERT INTO thing_value_tag (channel, name) VALUES ($1, $2) RETURNING id as "id!""#,

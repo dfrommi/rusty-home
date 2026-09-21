@@ -51,6 +51,7 @@ pub async fn main() -> anyhow::Result<()> {
         energy_meter_bus.subscribe(),
         &settings.tado.url,
         &settings.tado.home_id,
+        settings.device_availability.clone(),
     )
     .await?;
     device_state_module.initialize_availability().await?;

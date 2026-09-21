@@ -5,6 +5,7 @@ mod service;
 use anyhow::Context;
 pub use domain::*;
 use infrastructure::{EventBus, EventListener, Mqtt};
+use serde::Deserialize;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -39,6 +40,59 @@ pub enum DeviceStateEvent {
 #[derive(Clone)]
 pub struct DeviceStateClient {
     service: Arc<DeviceStateService>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeviceAvailabilityConfig {
+    pub default_offline_after: Duration,
+    #[serde(default)]
+    pub overrides: Vec<DeviceAvailabilityOverride>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeviceAvailabilityOverride {
+    pub source: String,
+    pub item: String,
+    pub offline_after: Duration,
+}
+
+impl DeviceAvailabilityConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        let mut seen = HashSet::new();
+
+        for override_config in &self.overrides {
+            let key = (&override_config.source, &override_config.item);
+            if !seen.insert(key) {
+                return Err(format!(
+                    "Duplicate device availability override for {}/{}",
+                    override_config.source, override_config.item
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn warn_unknown_items(&self, items: &HashSet<DeviceAvailabilityItem>) {
+        for override_config in &self.overrides {
+            let item = DeviceAvailabilityItem::new(&override_config.source, &override_config.item);
+            if !items.contains(&item) {
+                tracing::warn!(
+                    source = %override_config.source,
+                    item = %override_config.item,
+                    "Ignoring device availability override for unknown item"
+                );
+            }
+        }
+    }
+
+    pub fn offline_after(&self, source: &str, item: &str) -> &Duration {
+        self.overrides
+            .iter()
+            .find(|override_config| override_config.source == source && override_config.item == item)
+            .map(|override_config| &override_config.offline_after)
+            .unwrap_or(&self.default_offline_after)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -96,8 +150,9 @@ impl DeviceStateModule {
         energy_reading_rx: EventListener<EnergyReading>,
         tado_url: &str,
         tado_home_id: &str,
+        availability_config: DeviceAvailabilityConfig,
     ) -> anyhow::Result<Self> {
-        let repo = DeviceStateRepository::new(pool.clone());
+        let repo = DeviceStateRepository::new(pool.clone(), availability_config);
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
@@ -208,6 +263,65 @@ mod tests {
     use crate::{core::unit::DegreeCelsius, t};
 
     use super::*;
+
+    #[test]
+    fn availability_config_uses_override_or_default_duration() {
+        let config = DeviceAvailabilityConfig {
+            default_offline_after: t!(1 hours),
+            overrides: vec![DeviceAvailabilityOverride {
+                source: "HA".to_string(),
+                item: "sensor.home_temperature".to_string(),
+                offline_after: t!(3 hours),
+            }],
+        };
+
+        assert_eq!(config.offline_after("HA", "sensor.home_temperature"), &t!(3 hours));
+        assert_eq!(config.offline_after("Tado", "1"), &t!(1 hours));
+    }
+
+    #[test]
+    fn availability_config_deserializes_toml_format() {
+        let settings = config::Config::builder()
+            .add_source(config::File::from_str(
+                r#"
+                    [device_availability]
+                    default_offline_after = "PT1H"
+
+                    [[device_availability.overrides]]
+                    source = "HA"
+                    item = "sensor.home_temperature"
+                    offline_after = "PT3H"
+                "#,
+                config::FileFormat::Toml,
+            ))
+            .build()
+            .unwrap();
+
+        let availability_config: DeviceAvailabilityConfig = settings.get("device_availability").unwrap();
+
+        assert_eq!(availability_config.offline_after("HA", "sensor.home_temperature"), &t!(3 hours));
+    }
+
+    #[test]
+    fn availability_config_rejects_duplicate_overrides() {
+        let config = DeviceAvailabilityConfig {
+            default_offline_after: t!(1 hours),
+            overrides: vec![
+                DeviceAvailabilityOverride {
+                    source: "HA".to_string(),
+                    item: "sensor.home_temperature".to_string(),
+                    offline_after: t!(3 hours),
+                },
+                DeviceAvailabilityOverride {
+                    source: "HA".to_string(),
+                    item: "sensor.home_temperature".to_string(),
+                    offline_after: t!(2 hours),
+                },
+            ],
+        };
+
+        assert!(config.validate().is_err());
+    }
 
     #[test]
     fn test_group_by_device_id() {

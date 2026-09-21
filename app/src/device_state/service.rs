@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::OnceLock,
-};
+use std::collections::{HashMap, HashSet};
 
 use infrastructure::EventEmitter;
 use moka::future::Cache;
@@ -21,7 +18,6 @@ pub struct DeviceStateService {
     repo: DeviceStateRepository,
     event_tx: EventEmitter<DeviceStateEvent>,
     current_cache: Cache<DeviceStateId, DataPoint<DeviceStateValue>>,
-    availability_items: OnceLock<HashSet<DeviceAvailabilityItem>>,
 }
 
 impl DeviceStateService {
@@ -32,14 +28,11 @@ impl DeviceStateService {
             repo,
             event_tx,
             current_cache,
-            availability_items: OnceLock::new(),
         }
     }
 
-    pub fn initialize_availability(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
-        self.availability_items
-            .set(items)
-            .map_err(|_| anyhow::anyhow!("Device availability was already initialized"))
+    pub async fn initialize_availability(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
+        self.repo.sync_item_availability(&items).await
     }
 
     pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {

@@ -80,10 +80,13 @@ Special cases:
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
-| `device_last_seen_seconds` | gauge | `item`, `source` | Seconds since the device was last seen (max of `now - last_seen` and `now - entry_updated`). Emitted for all devices in `item_availability`. |
+| `device_last_seen_seconds` | gauge | `item`, `source` | Seconds since the device was last seen (max of `now - last_seen` and `now - entry_updated`). Emitted for all devices in `item_availability`, including disabled devices. |
 | `device_offline` | gauge | `item`, `source` | `1` if offline, `0` if online. A device is offline when `marked_offline` is true OR `max(now - last_seen, now - entry_updated) > considered_offline_after`. |
+| `device_disabled` | gauge | `item`, `source` | `1` if the availability record is disabled, `0` if active. |
 
-The **Offline Devices** panel on the Smart Home Overview dashboard uses these metrics via PromQL (`device_last_seen_seconds / 86400 and on(item, source) (device_offline == 1)`); the old Infinity/API-backed panel and the `GET /observability/grafana/overview/offline` endpoint were removed.
+The **Offline Devices** panel on the Smart Home Overview dashboard should use the stable series and filter disabled devices separately:
+`(device_last_seen_seconds / 86400) and on(item, source) (device_offline == 1) and on(item, source) (device_disabled == 0)`.
+The old Infinity/API-backed panel and the `GET /observability/grafana/overview/offline` endpoint were removed.
 
 ### Home-state metrics (no prefix)
 

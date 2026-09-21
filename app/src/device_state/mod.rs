@@ -69,6 +69,7 @@ pub struct DeviceAvailabilityStatus {
     pub item: String,
     pub last_seen_ago: Duration,
     pub is_offline: bool,
+    pub disabled: bool,
 }
 
 pub struct DeviceStateModule {
@@ -130,7 +131,7 @@ impl DeviceStateModule {
         self.event_bus.subscribe()
     }
 
-    pub fn initialize_availability(&self) -> anyhow::Result<()> {
+    pub async fn initialize_availability(&self) -> anyhow::Result<()> {
         let mut items = HashSet::new();
         items.extend(self.tasmota_ds.availability_items());
         items.extend(self.z2m_ds.availability_items());
@@ -139,7 +140,7 @@ impl DeviceStateModule {
         items.extend(self.energy_meter_ds.availability_items());
         items.extend(self.tado_ds.availability_items());
 
-        self.service.initialize_availability(items)
+        self.service.initialize_availability(items).await
     }
 
     pub async fn run(mut self) {

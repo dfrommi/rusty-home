@@ -9,7 +9,7 @@ use crate::{
         time::{DateTime, DateTimeRange, Duration},
         timeseries::DataPoint,
     },
-    device_state::{DeviceAvailabilityStatus, DeviceStateId, DeviceStateValue},
+    device_state::{DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateId, DeviceStateValue},
     t,
 };
 
@@ -152,9 +152,9 @@ impl DeviceStateRepository {
         offline: bool,
     ) -> anyhow::Result<()> {
         sqlx::query!(
-            r#"INSERT INTO item_availability (source, item, last_seen, marked_offline, considered_offline_after, entry_updated)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (source, item) DO UPDATE SET last_seen = $3, marked_offline = $4, entry_updated = $6"#,
+            r#"INSERT INTO item_availability (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
+                VALUES ($1, $2, $3, $4, $5, $6, false)
+                ON CONFLICT (source, item) DO UPDATE SET last_seen = $3, marked_offline = $4, entry_updated = $6, disabled = false"#,
             source,
             device_id,
             last_seen.into_db(),
@@ -169,9 +169,51 @@ impl DeviceStateRepository {
         Ok(())
     }
 
+    pub async fn sync_item_availability(&self, items: &HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
+        let (sources, item_names): (Vec<String>, Vec<String>) = items
+            .iter()
+            .map(|item| (item.source.clone(), item.item.clone()))
+            .unzip();
+        let now = t!(now).into_db();
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            r#"UPDATE item_availability AS existing
+               SET disabled = NOT EXISTS (
+                   SELECT 1
+                   FROM UNNEST($1::text[], $2::text[]) AS configured(source, item)
+                   WHERE configured.source = existing.source
+                     AND configured.item = existing.item
+               )"#,
+        )
+        .bind(&sources)
+        .bind(&item_names)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"INSERT INTO item_availability (
+                   source, item, last_seen, marked_offline,
+                   considered_offline_after, entry_updated, disabled
+               )
+               SELECT configured.source, configured.item, $3, true,
+                      INTERVAL '1 hour', $3, false
+               FROM UNNEST($1::text[], $2::text[]) AS configured(source, item)
+               ON CONFLICT (source, item) DO UPDATE SET disabled = false"#,
+        )
+        .bind(&sources)
+        .bind(&item_names)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         let recs = sqlx::query!(
-            r#"SELECT source, item, last_seen, marked_offline, considered_offline_after, entry_updated
+            r#"SELECT source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled
                 FROM item_availability"#
         )
         .fetch_all(&self.pool)
@@ -194,6 +236,7 @@ impl DeviceStateRepository {
                     item: rec.item,
                     last_seen_ago,
                     is_offline,
+                    disabled: rec.disabled,
                 }
             })
             .collect())
@@ -273,6 +316,8 @@ async fn get_or_insert_tag_id_from_db(db_pool: &PgPool, id: &DeviceStateId) -> R
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::{core::unit::DegreeCelsius, device_state::Temperature};
 
     use super::*;
@@ -335,6 +380,61 @@ mod tests {
             .await?;
 
         assert!(dp.is_none());
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn sync_item_availability_reconciles_existing_and_missing_items(pool: PgPool) -> anyhow::Result<()> {
+        let repo = DeviceStateRepository::new(pool);
+        let now = t!(now).into_db();
+
+        sqlx::query!(
+            r#"INSERT INTO item_availability
+                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
+                VALUES ($1, $2, $3, true, INTERVAL '1 hour', $3, true)"#,
+            "Tasmota",
+            "existing",
+            now,
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        sqlx::query!(
+            r#"INSERT INTO item_availability
+                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
+                VALUES ($1, $2, $3, false, INTERVAL '1 hour', $3, false)"#,
+            "Tasmota",
+            "removed",
+            now,
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let items = HashSet::from([
+            DeviceAvailabilityItem::new("Tasmota", "existing"),
+            DeviceAvailabilityItem::new("Tasmota", "missing"),
+        ]);
+        repo.sync_item_availability(&items).await?;
+
+        let rows = sqlx::query!(
+            r#"SELECT item, marked_offline, disabled
+               FROM item_availability
+               ORDER BY item"#
+        )
+        .fetch_all(&repo.pool)
+        .await?;
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].item, "existing");
+        assert!(rows[0].marked_offline);
+        assert!(!rows[0].disabled);
+        assert_eq!(rows[1].item, "missing");
+        assert!(rows[1].marked_offline);
+        assert!(!rows[1].disabled);
+        assert_eq!(rows[2].item, "removed");
+        assert!(!rows[2].marked_offline);
+        assert!(rows[2].disabled);
 
         Ok(())
     }

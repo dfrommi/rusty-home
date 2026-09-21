@@ -81,7 +81,7 @@ Special cases:
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
 | `device_last_seen_seconds` | gauge | `item`, `source` | Seconds since the device was last seen (max of `now - last_seen` and `now - entry_updated`). Emitted for all devices in `item_availability`, including disabled devices. |
-| `device_offline` | gauge | `item`, `source` | `1` if offline, `0` if online. A device is offline when `marked_offline` is true OR `max(now - last_seen, now - entry_updated) > considered_offline_after`. |
+| `device_offline` | gauge | `item`, `source` | `1` if offline, `0` if online. A device is offline when `marked_offline` is true OR `max(now - last_seen, now - entry_updated)` exceeds the configured device availability duration. |
 | `device_disabled` | gauge | `item`, `source` | `1` if the availability record is disabled, `0` if active. |
 
 The **Offline Devices** panel on the Smart Home Overview dashboard should use the stable series and filter disabled devices separately:

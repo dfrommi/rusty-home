@@ -1,6 +1,6 @@
 use anyhow::{Context as _, Result};
 use moka::future::Cache;
-use sqlx::{PgPool, postgres::types::PgInterval};
+use sqlx::PgPool;
 use std::collections::HashSet;
 
 use crate::{
@@ -147,7 +147,6 @@ impl DeviceStateRepository {
         Ok(dps)
     }
 
-    #[allow(clippy::expect_used)]
     pub async fn update_device_availability(
         &self,
         device_id: &str,
@@ -156,15 +155,13 @@ impl DeviceStateRepository {
         offline: bool,
     ) -> anyhow::Result<()> {
         sqlx::query!(
-            r#"INSERT INTO item_availability (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
-                VALUES ($1, $2, $3, $4, $5, $6, false)
-                ON CONFLICT (source, item) DO UPDATE SET last_seen = $3, marked_offline = $4, entry_updated = $6, disabled = false"#,
+            r#"INSERT INTO item_availability (source, item, last_seen, marked_offline, entry_updated, disabled)
+                VALUES ($1, $2, $3, $4, $5, false)
+                ON CONFLICT (source, item) DO UPDATE SET last_seen = $3, marked_offline = $4, entry_updated = $5, disabled = false"#,
             source,
             device_id,
             last_seen.into_db(),
             offline,
-            //TODO should just work via chrono::Duration, but doesn't
-            PgInterval::try_from(t!(1 hours).into_db()).expect("PgInterval conversion of hardcoded 1-hour duration cannot fail"),
             t!(now).into_db(),
         )
         .execute(&self.pool)
@@ -200,10 +197,10 @@ impl DeviceStateRepository {
         sqlx::query(
             r#"INSERT INTO item_availability (
                    source, item, last_seen, marked_offline,
-                   considered_offline_after, entry_updated, disabled
+                   entry_updated, disabled
                )
                SELECT configured.source, configured.item, $3, true,
-                      INTERVAL '1 hour', $3, false
+                      $3, false
                FROM UNNEST($1::text[], $2::text[]) AS configured(source, item)
                ON CONFLICT (source, item) DO UPDATE SET disabled = false"#,
         )
@@ -401,8 +398,8 @@ mod tests {
 
         sqlx::query!(
             r#"INSERT INTO item_availability
-                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
-                VALUES ($1, $2, $3, true, INTERVAL '1 hour', $3, true)"#,
+                (source, item, last_seen, marked_offline, entry_updated, disabled)
+                VALUES ($1, $2, $3, true, $3, true)"#,
             "Tasmota",
             "existing",
             now,
@@ -412,8 +409,8 @@ mod tests {
 
         sqlx::query!(
             r#"INSERT INTO item_availability
-                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
-                VALUES ($1, $2, $3, false, INTERVAL '1 hour', $3, false)"#,
+                (source, item, last_seen, marked_offline, entry_updated, disabled)
+                VALUES ($1, $2, $3, false, $3, false)"#,
             "Tasmota",
             "removed",
             now,
@@ -466,10 +463,10 @@ mod tests {
 
         sqlx::query(
             r#"INSERT INTO item_availability
-                (source, item, last_seen, marked_offline, considered_offline_after, entry_updated, disabled)
+                (source, item, last_seen, marked_offline, entry_updated, disabled)
                 VALUES
-                    ('HA', 'sensor.home_temperature', $1, false, INTERVAL '1 hour', $1, false),
-                    ('HA', 'sensor.home_relative_humidity', $1, false, INTERVAL '3 hours', $1, false)"#,
+                    ('HA', 'sensor.home_temperature', $1, false, $1, false),
+                    ('HA', 'sensor.home_relative_humidity', $1, false, $1, false)"#,
         )
         .bind(last_seen)
         .execute(&repo.pool)

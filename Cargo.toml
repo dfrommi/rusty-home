@@ -32,8 +32,7 @@ iso8601-duration = { version = "0.2", features = ["serde", "chrono"] }
 
 #Data format dependencies
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-csv = "1"
+serde_json = "1"
 
 #MQTT dependencies
 rumqttc = "*"
@@ -42,7 +41,6 @@ rumqttc = "*"
 actix-web = "4"
 reqwest = { version = "*", features = ["json", "stream", "form"] }
 reqwest-middleware = { version = "*", features = ["json"] }
-mime = "0.3"
 
 #DB Dependencies
 sqlx = { version = "0.8", features = [

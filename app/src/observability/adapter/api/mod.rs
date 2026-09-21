@@ -1,5 +1,4 @@
 pub mod admin;
-pub mod grafana;
 
 use std::sync::Arc;
 
@@ -29,12 +28,10 @@ impl MetricsExportApi {
     }
 
     pub fn routes(&self) -> actix_web::Scope {
-        actix_web::web::scope("/observability")
-            .service(admin::routes(
-                self.repo.clone(),
-                self.device_state_client.clone(),
-                self.home_state_client.clone(),
-            ))
-            .service(grafana::routes(self.device_state_client.clone()))
+        actix_web::web::scope("/observability").service(admin::routes(
+            self.repo.clone(),
+            self.device_state_client.clone(),
+            self.home_state_client.clone(),
+        ))
     }
 }

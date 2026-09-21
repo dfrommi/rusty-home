@@ -24,12 +24,10 @@ moka = { workspace = true }
 config = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-csv = { workspace = true }
 
 cached = { workspace = true }
 
 actix-web = { workspace = true }
-mime = { workspace = true }
 
 macro = { path = "../lib/macro" }
 infrastructure = { path = "../lib/infrastructure" }

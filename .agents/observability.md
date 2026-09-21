@@ -86,7 +86,7 @@ Special cases:
 
 The **Offline Devices** panel on the Smart Home Overview dashboard should use the stable series and filter disabled devices separately:
 `(device_last_seen_seconds / 86400) and on(item, source) (device_offline == 1) and on(item, source) (device_disabled == 0)`.
-The old Infinity/API-backed panel and the `GET /observability/grafana/overview/offline` endpoint were removed.
+The old Infinity/API-backed state and offline panels and their Grafana API endpoints were removed. State history is queried directly from PostgreSQL.
 
 ### Home-state metrics (no prefix)
 

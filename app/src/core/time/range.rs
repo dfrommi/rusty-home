@@ -109,11 +109,6 @@ impl DateTimeRange {
         Self::new(t!(now) - duration, t!(now))
     }
 
-    pub fn non_future(&self) -> Self {
-        let now = t!(now);
-        Self::new(now.min(self.start), now.min(self.end))
-    }
-
     pub fn intersection_with(&self, other: &Self) -> Self {
         Self::new(self.start.max(other.start), self.end.min(other.end))
     }

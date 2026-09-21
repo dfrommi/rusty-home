@@ -167,7 +167,7 @@ impl TadoIncomingDataSource {
 
             events.push(IncomingData::ItemAvailability(DeviceAvailability {
                 source: "Tado".to_string(),
-                device_id: zone.name.clone(),
+                device_id: zone_id,
                 last_seen: ru01.connection_state.timestamp,
                 marked_offline: !ru01.connection_state.value,
             }));
@@ -180,7 +180,6 @@ impl TadoIncomingDataSource {
 #[derive(Deserialize)]
 struct ZoneInfo {
     id: i64,
-    name: String,
     devices: Vec<DeviceInfo>,
 }
 

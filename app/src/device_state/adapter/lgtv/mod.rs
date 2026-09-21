@@ -3,7 +3,7 @@ use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::core::timeseries::DataPoint;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceStateValue, EnergySaving, PowerAvailable};
+use crate::device_state::{DeviceAvailability, DeviceStateValue, EnergySaving, PowerAvailable};
 use crate::t;
 
 pub struct LgtvIncomingDataSource {
@@ -31,7 +31,7 @@ impl IncomingDataSource for LgtvIncomingDataSource {
             let message = self.mqtt_receiver.recv().await?;
 
             match parse_lgtv_message(&self.base_topic, &message) {
-                Ok(data) => return Some(vec![data]),
+                Ok(data) => return Some(data),
                 Err(error) => {
                     tracing::error!("Error parsing LG TV MQTT message {:?}: {:?}", message, error);
                 }
@@ -40,34 +40,43 @@ impl IncomingDataSource for LgtvIncomingDataSource {
     }
 }
 
-fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Result<IncomingData> {
+fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Result<Vec<IncomingData>> {
     let energy_saving_topic = format!("{base_topic}/state/picture/energySaving");
     let power_topic = format!("{base_topic}/state/power/systemOn");
     let timestamp = t!(now);
 
-    if message.topic == energy_saving_topic {
-        return Ok(DataPoint::new(
+    let state = if message.topic == energy_saving_topic {
+        DataPoint::new(
             DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, message.payload != "off"),
             timestamp,
         )
-        .into());
-    }
-
-    if message.topic == power_topic {
+        .into()
+    } else if message.topic == power_topic {
         let powered = match message.payload.as_str() {
             "true" => true,
             "false" => false,
             payload => bail!("Unexpected systemOn payload: {payload}"),
         };
 
-        return Ok(DataPoint::new(
+        DataPoint::new(
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, powered),
             timestamp,
         )
-        .into());
-    }
+        .into()
+    } else {
+        bail!("Unexpected LG TV topic: {}", message.topic)
+    };
 
-    bail!("Unexpected LG TV topic: {}", message.topic)
+    Ok(vec![
+        state,
+        DeviceAvailability {
+            source: "LGTV".to_string(),
+            device_id: base_topic.to_string(),
+            last_seen: timestamp,
+            marked_offline: false,
+        }
+        .into(),
+    ])
 }
 
 #[cfg(test)]
@@ -82,10 +91,17 @@ mod tests {
         }
     }
 
-    fn state_value(data: IncomingData) -> DeviceStateValue {
-        match data {
+    fn state_value(data: Vec<IncomingData>) -> DeviceStateValue {
+        match data.into_iter().next().expect("expected state value") {
             IncomingData::StateValue(data_point) => data_point.value,
             IncomingData::ItemAvailability(_) => panic!("expected state value"),
+        }
+    }
+
+    fn availability(data: Vec<IncomingData>) -> DeviceAvailability {
+        match data.into_iter().nth(1).expect("expected availability") {
+            IncomingData::ItemAvailability(availability) => availability,
+            IncomingData::StateValue(_) => panic!("expected availability"),
         }
     }
 
@@ -119,6 +135,12 @@ mod tests {
             state_value(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "false"),).unwrap()),
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, false)
         );
+
+        let availability =
+            availability(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "false")).unwrap());
+        assert_eq!(availability.source, "LGTV");
+        assert_eq!(availability.device_id, "lgtv");
+        assert!(!availability.marked_offline);
     }
 
     #[test]

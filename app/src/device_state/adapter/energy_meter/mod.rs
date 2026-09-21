@@ -1,9 +1,10 @@
 mod persistence;
 
+use crate::core::time::DateTime;
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
 use crate::device_state::adapter::energy_meter::persistence::EnergyReadingRepository;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
+use crate::device_state::{DeviceAvailability, DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
 use crate::t;
 use infrastructure::EventListener;
 
@@ -27,7 +28,9 @@ impl EnergyMeterIncomingDataSource {
 
     async fn incoming_data_for_reading_id(&self, id: i64) -> anyhow::Result<Vec<IncomingData>> {
         let dp = self.repo.get_total_reading_by_id(id).await?;
-        Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into()))])
+        let availability = availability(&dp.value, dp.timestamp);
+
+        Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into())), availability])
     }
 }
 
@@ -63,6 +66,40 @@ impl IncomingDataSource for EnergyMeterIncomingDataSource {
                 Err(e) => tracing::error!("Error saving Energy Reading: {:?}", e),
             }
         }
+    }
+}
+
+fn availability(reading: &EnergyReading, last_seen: DateTime) -> IncomingData {
+    let (reading_type, item) = match reading {
+        EnergyReading::Heating(item, _) => ("heating", radiator_item(item)),
+        EnergyReading::ColdWater(item, _) => ("cold_water", faucet_item(item)),
+        EnergyReading::HotWater(item, _) => ("hot_water", faucet_item(item)),
+    };
+
+    DeviceAvailability {
+        source: "EnergyMeter".to_string(),
+        device_id: format!("{reading_type}/{item}"),
+        last_seen,
+        marked_offline: false,
+    }
+    .into()
+}
+
+fn radiator_item(item: &Radiator) -> &'static str {
+    match item {
+        Radiator::LivingRoomBig => "living_room_big",
+        Radiator::LivingRoomSmall => "living_room_small",
+        Radiator::Bedroom => "bedroom",
+        Radiator::Kitchen => "kitchen",
+        Radiator::RoomOfRequirements => "room_of_requirements",
+        Radiator::Bathroom => "bathroom",
+    }
+}
+
+fn faucet_item(item: &Faucet) -> &'static str {
+    match item {
+        Faucet::Kitchen => "kitchen",
+        Faucet::Bathroom => "bathroom",
     }
 }
 
@@ -114,13 +151,21 @@ mod tests {
 
         let updates = ds.recv_multi().await.expect("energy meter source closed");
 
-        assert_eq!(updates.len(), 1);
+        assert_eq!(updates.len(), 2);
         match &updates[0] {
             IncomingData::StateValue(dp) => assert_eq!(
                 dp.value,
                 DeviceStateValue::TotalRadiatorConsumption(TotalRadiatorConsumption::Bedroom, HeatingUnit(12.5))
             ),
             IncomingData::ItemAvailability(_) => panic!("expected state value"),
+        }
+        match &updates[1] {
+            IncomingData::ItemAvailability(availability) => {
+                assert_eq!(availability.source, "EnergyMeter");
+                assert_eq!(availability.device_id, "heating/bedroom");
+                assert!(!availability.marked_offline);
+            }
+            IncomingData::StateValue(_) => panic!("expected availability"),
         }
 
         Ok(())

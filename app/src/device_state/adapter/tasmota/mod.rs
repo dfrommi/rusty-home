@@ -167,15 +167,23 @@ fn parse_energy_meter(
 
 //No timestamp available in Tasmota. TODO: trigger update of state on startup
 fn parse_power_toggle(device_id: &str, powered: PowerAvailable, payload: &str) -> anyhow::Result<Vec<IncomingData>> {
-    match payload {
-        "ON" => Ok(vec![
-            DataPoint::new(DeviceStateValue::PowerAvailable(powered, true), t!(now)).into(),
-        ]),
-        "OFF" => Ok(vec![
-            DataPoint::new(DeviceStateValue::PowerAvailable(powered, false), t!(now)).into(),
-        ]),
+    let timestamp = t!(now);
+    let state = match payload {
+        "ON" => true,
+        "OFF" => false,
         _ => bail!("Unexpected payload for PowerToggle {}: {}", device_id, payload),
-    }
+    };
+
+    Ok(vec![
+        DataPoint::new(DeviceStateValue::PowerAvailable(powered, state), timestamp).into(),
+        DeviceAvailability {
+            source: "Tasmota".to_string(),
+            device_id: device_id.to_string(),
+            last_seen: timestamp,
+            marked_offline: false,
+        }
+        .into(),
+    ])
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -202,6 +210,16 @@ mod tests {
             .filter_map(|item| match item {
                 IncomingData::StateValue(data_point) => Some(data_point.value),
                 IncomingData::ItemAvailability(_) => None,
+            })
+            .collect()
+    }
+
+    fn availabilities(items: Vec<IncomingData>) -> Vec<DeviceAvailability> {
+        items
+            .into_iter()
+            .filter_map(|item| match item {
+                IncomingData::StateValue(_) => None,
+                IncomingData::ItemAvailability(availability) => Some(availability),
             })
             .collect()
     }
@@ -247,6 +265,13 @@ mod tests {
             values,
             vec![DeviceStateValue::PowerAvailable(PowerAvailable::InfraredHeater, true)]
         );
+
+        let items = parse_configured_channels(&topic, &channels, &msg);
+        let availabilities = availabilities(items);
+        assert_eq!(availabilities.len(), 1);
+        assert_eq!(availabilities[0].source, "Tasmota");
+        assert_eq!(availabilities[0].device_id, "irheater");
+        assert!(!availabilities[0].marked_offline);
     }
 
     #[test]

@@ -42,7 +42,6 @@ pub enum HaChannel {
     Temperature(Temperature),
     RelativeHumidity(RelativeHumidity),
     Powered(PowerAvailable),
-    PresenceFromEsp(Presence),
     PresenceFromDeviceTracker(Presence),
     PresenceFromFP2(Presence),
     ComfeeDehumidifierFanPowerState(FanActivity),
@@ -231,9 +230,6 @@ fn parse_ha_channel(
         ),
         HaChannel::Powered(channel) => {
             Some(DataPoint::new(DeviceStateValue::PowerAvailable(channel, ha_value == "on"), timestamp).into())
-        }
-        HaChannel::PresenceFromEsp(channel) => {
-            Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "on"), timestamp).into())
         }
         HaChannel::PresenceFromDeviceTracker(channel) => {
             Some(DataPoint::new(DeviceStateValue::Presence(channel, ha_value == "home"), timestamp).into())

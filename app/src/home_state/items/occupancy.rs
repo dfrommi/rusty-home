@@ -14,7 +14,6 @@ use r#macro::{EnumVariants, Id};
 pub enum Occupancy {
     LivingRoomCouch,
     LivingRoomCouchShort,
-    BedroomBed,
     RoomOfRequirementsDesk,
 }
 
@@ -31,10 +30,6 @@ impl DerivedStateProvider<Occupancy, Probability> for OccupancyStateProvider {
             Occupancy::LivingRoomCouchShort => {
                 let df = ctx.all_since(Presence::LivingRoomCouch, since)?;
                 Occupancy::calculate(-2.5507124246455235, 97.5596255787969, t!(4 minutes), df)
-            }
-            Occupancy::BedroomBed => {
-                let df = ctx.all_since(Presence::BedroomBed, since)?;
-                Occupancy::calculate(-1.7968470630447446, 8.635109947226839, t!(30 minutes), df)
             }
             Occupancy::RoomOfRequirementsDesk => {
                 let df = ctx.all_since(IsRunning::RoomOfRequirementsMonitor, since)?;

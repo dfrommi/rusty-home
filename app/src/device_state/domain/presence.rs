@@ -4,11 +4,7 @@ use r#macro::{EnumVariants, Id};
 pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,
-    CouchLeft,
-    CouchCenter,
-    CouchRight,
     KitchenArea,
     LivingRoomArea,
     LivingRoomCouch,
-    BedroomBed,
 }

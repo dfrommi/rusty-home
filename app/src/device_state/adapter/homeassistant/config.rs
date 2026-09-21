@@ -36,18 +36,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         // PRESENCE
         //
         (
-            "binary_sensor.esphome_couch_couch_left",
-            HaChannel::PresenceFromEsp(Presence::CouchLeft),
-        ),
-        (
-            "binary_sensor.esphome_couch_couch_center",
-            HaChannel::PresenceFromEsp(Presence::CouchCenter),
-        ),
-        (
-            "binary_sensor.esphome_couch_couch_right",
-            HaChannel::PresenceFromEsp(Presence::CouchRight),
-        ),
-        (
             "device_tracker.jarvis",
             HaChannel::PresenceFromDeviceTracker(Presence::AtHomeDennis),
         ),
@@ -66,10 +54,6 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
         (
             "binary_sensor.presence_sensor_fp2_d775_presence_sensor_1",
             HaChannel::PresenceFromFP2(Presence::KitchenArea),
-        ),
-        (
-            "binary_sensor.presence_sensor_fp2_2b4e_presence_sensor_2",
-            HaChannel::PresenceFromFP2(Presence::BedroomBed),
         ),
         //
         // FAN SPEED

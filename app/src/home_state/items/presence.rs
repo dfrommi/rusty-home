@@ -7,7 +7,6 @@ pub enum Presence {
     AtHomeDennis,
     AtHomeSabine,
     LivingRoomCouch,
-    BedroomBed,
 }
 
 pub struct PresenceStateProvider;
@@ -20,7 +19,6 @@ impl DerivedStateProvider<Presence, bool> for PresenceStateProvider {
             Presence::AtHomeDennis => DevicePresence::AtHomeDennis,
             Presence::AtHomeSabine => DevicePresence::AtHomeSabine,
             Presence::LivingRoomCouch => DevicePresence::LivingRoomCouch,
-            Presence::BedroomBed => DevicePresence::BedroomBed,
         })
         .map(|dp| dp.value)
     }

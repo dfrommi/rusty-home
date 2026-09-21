@@ -1,7 +1,9 @@
 mod config;
 
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{CurrentPowerUsage, DeviceAvailability, PowerAvailable, TotalEnergyConsumption};
+use crate::device_state::{
+    CurrentPowerUsage, DeviceAvailability, DeviceAvailabilityItem, PowerAvailable, TotalEnergyConsumption,
+};
 
 use crate::core::DeviceConfig;
 
@@ -11,6 +13,8 @@ use crate::device_state::DeviceStateValue;
 use crate::t;
 use anyhow::{Context, bail};
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
+
+const AVAILABILITY_SOURCE: &str = "Tasmota";
 
 #[derive(Debug, Clone)]
 pub enum TasmotaChannel {
@@ -39,6 +43,13 @@ impl TasmotaIncomingDataSource {
 }
 
 impl IncomingDataSource for TasmotaIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        self.device_config
+            .keys()
+            .map(|item| DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, item))
+            .collect()
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             let msg = self.mqtt_receiver.recv().await?;
@@ -156,8 +167,7 @@ fn parse_energy_meter(
         )
         .into(),
         DeviceAvailability {
-            source: "Tasmota".to_string(),
-            device_id: device_id.to_string(),
+            item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, device_id),
             last_seen: msg_time,
             marked_offline: false,
         }
@@ -177,8 +187,7 @@ fn parse_power_toggle(device_id: &str, powered: PowerAvailable, payload: &str) -
     Ok(vec![
         DataPoint::new(DeviceStateValue::PowerAvailable(powered, state), timestamp).into(),
         DeviceAvailability {
-            source: "Tasmota".to_string(),
-            device_id: device_id.to_string(),
+            item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, device_id),
             last_seen: timestamp,
             marked_offline: false,
         }
@@ -269,8 +278,8 @@ mod tests {
         let items = parse_configured_channels(&topic, &channels, &msg);
         let availabilities = availabilities(items);
         assert_eq!(availabilities.len(), 1);
-        assert_eq!(availabilities[0].source, "Tasmota");
-        assert_eq!(availabilities[0].device_id, "irheater");
+        assert_eq!(availabilities[0].item.source, AVAILABILITY_SOURCE);
+        assert_eq!(availabilities[0].item.item, "irheater");
         assert!(!availabilities[0].marked_offline);
     }
 

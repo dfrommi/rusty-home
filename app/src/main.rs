@@ -53,6 +53,7 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.tado.home_id,
     )
     .await?;
+    device_state_module.initialize_availability()?;
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
     let notification_module =

@@ -8,7 +8,7 @@ pub mod z2m;
 
 use crate::{
     core::timeseries::DataPoint,
-    device_state::{DeviceAvailability, DeviceStateValue},
+    device_state::{DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue},
 };
 
 #[derive(Debug, Clone, derive_more::From)]
@@ -18,5 +18,7 @@ pub enum IncomingData {
 }
 
 pub trait IncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem>;
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>>;
 }

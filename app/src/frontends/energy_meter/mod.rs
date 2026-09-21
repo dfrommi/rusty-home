@@ -1,4 +1,5 @@
 use infrastructure::EventEmitter;
+use r#macro::{EnumVariants, Id};
 
 mod http_server;
 
@@ -11,6 +12,13 @@ impl EnergyMeter {
     }
 }
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
+pub enum EnergyMeterTarget {
+    Heating(Radiator),
+    ColdWater(Faucet),
+    HotWater(Faucet),
+}
+
 #[derive(Debug, Clone)]
 pub enum EnergyReading {
     Heating(Radiator, f64),
@@ -18,7 +26,17 @@ pub enum EnergyReading {
     HotWater(Faucet, f64),
 }
 
-#[derive(Debug, Clone)]
+impl EnergyReading {
+    pub fn target(&self) -> EnergyMeterTarget {
+        match self {
+            Self::Heating(item, _) => EnergyMeterTarget::Heating(*item),
+            Self::ColdWater(item, _) => EnergyMeterTarget::ColdWater(*item),
+            Self::HotWater(item, _) => EnergyMeterTarget::HotWater(*item),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Radiator {
     LivingRoomBig,
     LivingRoomSmall,
@@ -28,7 +46,7 @@ pub enum Radiator {
     Bathroom,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum Faucet {
     Kitchen,
     Bathroom,

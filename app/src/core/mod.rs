@@ -29,6 +29,10 @@ where
     pub fn get_optional(&self, key: &str) -> Option<&[V]> {
         self.config.get(key).map(Vec::as_slice)
     }
+
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        self.config.keys().map(String::as_str)
+    }
 }
 
 #[cfg(test)]
@@ -47,5 +51,15 @@ mod tests {
         let config = DeviceConfig::new(&[("device", 1)]);
 
         assert_eq!(config.get_optional("missing"), None);
+    }
+
+    #[test]
+    fn device_config_lists_distinct_keys() {
+        let config = DeviceConfig::new(&[("device", 1), ("device", 2), ("other", 3)]);
+
+        let mut keys = config.keys().collect::<Vec<_>>();
+        keys.sort_unstable();
+
+        assert_eq!(keys, vec!["device", "other"]);
     }
 }

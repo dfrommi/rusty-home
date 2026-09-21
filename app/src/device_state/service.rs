@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::OnceLock,
+};
 
 use infrastructure::EventEmitter;
 use moka::future::Cache;
@@ -9,8 +12,8 @@ use crate::{
         timeseries::DataPoint,
     },
     device_state::{
-        DeviceAvailability, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId, DeviceStateValue,
-        adapter::db::DeviceStateRepository,
+        DeviceAvailability, DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId,
+        DeviceStateValue, adapter::db::DeviceStateRepository,
     },
 };
 
@@ -18,6 +21,7 @@ pub struct DeviceStateService {
     repo: DeviceStateRepository,
     event_tx: EventEmitter<DeviceStateEvent>,
     current_cache: Cache<DeviceStateId, DataPoint<DeviceStateValue>>,
+    availability_items: OnceLock<HashSet<DeviceAvailabilityItem>>,
 }
 
 impl DeviceStateService {
@@ -28,7 +32,14 @@ impl DeviceStateService {
             repo,
             event_tx,
             current_cache,
+            availability_items: OnceLock::new(),
         }
+    }
+
+    pub fn initialize_availability(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
+        self.availability_items
+            .set(items)
+            .map_err(|_| anyhow::anyhow!("Device availability was already initialized"))
     }
 
     pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
@@ -60,18 +71,18 @@ impl DeviceStateService {
     pub async fn handle_availability_update(&self, avail: DeviceAvailability) {
         match self
             .repo
-            .update_device_availability(&avail.device_id, &avail.source, &avail.last_seen, avail.marked_offline)
+            .update_device_availability(&avail.item.item, &avail.item.source, &avail.last_seen, avail.marked_offline)
             .await
         {
             Ok(_) => {
                 tracing::info!(
                     "Device availability updated for {}: marked_offline={}",
-                    avail.device_id,
+                    avail.item.item,
                     avail.marked_offline
                 );
             }
             Err(e) => {
-                tracing::error!("Error updating device availability for {}: {:?}", avail.device_id, e);
+                tracing::error!("Error updating device availability for {}: {:?}", avail.item.item, e);
             }
         }
     }

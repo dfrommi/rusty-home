@@ -1,8 +1,8 @@
-use crate::core::time::DateTime;
+use crate::core::{id::ExternalId, time::DateTime};
 
 use crate::core::timeseries::DataPoint;
 
-use super::{EnergyReading, Faucet, Radiator};
+use super::{EnergyMeterTarget, EnergyReading};
 
 #[derive(Clone)]
 pub struct EnergyReadingRepository {
@@ -15,19 +15,19 @@ impl EnergyReadingRepository {
     }
 
     pub async fn add_yearly_energy_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<i64> {
-        //TODO derive automatically from enum
-        let (type_, item, value): (&str, &str, f64) = match reading {
-            EnergyReading::Heating(item, value) => ("heating", item.into(), value),
-            EnergyReading::ColdWater(item, value) => ("cold_water", item.into(), value),
-            EnergyReading::HotWater(item, value) => ("hot_water", item.into(), value),
+        let (type_, item) = database_identity(&reading)?;
+        let value = match &reading {
+            EnergyReading::Heating(_, value)
+            | EnergyReading::ColdWater(_, value)
+            | EnergyReading::HotWater(_, value) => *value,
         };
 
         let rec = sqlx::query!(
             r#"INSERT INTO ENERGY_READING (TYPE, NAME, VALUE, TIMESTAMP)
                 VALUES ($1, $2, $3, $4)
                 RETURNING id"#,
-            type_,
-            item,
+            &type_,
+            &item,
             value,
             timestamp.into_db(),
         )
@@ -102,69 +102,47 @@ impl EnergyReadingRepository {
     }
 }
 
+fn database_identity(reading: &EnergyReading) -> anyhow::Result<(String, String)> {
+    let target = reading.target();
+    let variant_name = target.ext_id().variant_name().to_string();
+    let Some((reading_type, item)) = variant_name.split_once("::") else {
+        anyhow::bail!("Invalid EnergyMeterTarget external ID: {variant_name}");
+    };
+
+    Ok((reading_type.to_string(), item.to_string()))
+}
+
 fn try_into_reading(type_: &str, name: &str, value: f64) -> anyhow::Result<EnergyReading> {
-    match type_ {
-        "heating" => Ok(EnergyReading::Heating(name.try_into()?, value)),
-        "cold_water" => Ok(EnergyReading::ColdWater(name.try_into()?, value)),
-        "hot_water" => Ok(EnergyReading::HotWater(name.try_into()?, value)),
-        _ => Err(anyhow::anyhow!("Received unsupported energy reading type {}", type_)),
-    }
-}
+    let target = EnergyMeterTarget::try_from(ExternalId::new("energy_meter_target", format!("{type_}::{name}")))?;
 
-//TODO macro
-
-impl From<Radiator> for &'static str {
-    fn from(val: Radiator) -> Self {
-        match val {
-            Radiator::LivingRoomBig => "living_room_big",
-            Radiator::LivingRoomSmall => "living_room_small",
-            Radiator::Bedroom => "bedroom",
-            Radiator::Kitchen => "kitchen",
-            Radiator::RoomOfRequirements => "room_of_requirements",
-            Radiator::Bathroom => "bathroom",
-        }
-    }
-}
-
-impl From<Faucet> for &'static str {
-    fn from(val: Faucet) -> Self {
-        match val {
-            Faucet::Kitchen => "kitchen",
-            Faucet::Bathroom => "bathroom",
-        }
-    }
-}
-
-impl TryInto<Radiator> for &str {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> anyhow::Result<Radiator> {
-        match self {
-            "living_room_big" => Ok(Radiator::LivingRoomBig),
-            "living_room_small" => Ok(Radiator::LivingRoomSmall),
-            "bedroom" => Ok(Radiator::Bedroom),
-            "kitchen" => Ok(Radiator::Kitchen),
-            "room_of_requirements" => Ok(Radiator::RoomOfRequirements),
-            "bathroom" => Ok(Radiator::Bathroom),
-            _ => Err(anyhow::anyhow!("Error parsing Radiator from {}", self)),
-        }
-    }
-}
-
-impl TryInto<Faucet> for &str {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> anyhow::Result<Faucet> {
-        match self {
-            "kitchen" => Ok(Faucet::Kitchen),
-            "bathroom" => Ok(Faucet::Bathroom),
-            _ => Err(anyhow::anyhow!("Error parsing Faucet from {}", self)),
-        }
-    }
+    Ok(match target {
+        EnergyMeterTarget::Heating(item) => EnergyReading::Heating(item, value),
+        EnergyMeterTarget::ColdWater(item) => EnergyReading::ColdWater(item, value),
+        EnergyMeterTarget::HotWater(item) => EnergyReading::HotWater(item, value),
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::database_identity;
+    use crate::frontends::energy_meter::{EnergyReading, Faucet, Radiator};
+
+    #[test]
+    fn target_database_identity_preserves_existing_storage_ids() {
+        assert_eq!(
+            database_identity(&EnergyReading::Heating(Radiator::Bedroom, 12.5)).ok(),
+            Some(("heating".to_string(), "bedroom".to_string()))
+        );
+        assert_eq!(
+            database_identity(&EnergyReading::ColdWater(Faucet::Kitchen, 12.5)).ok(),
+            Some(("cold_water".to_string(), "kitchen".to_string()))
+        );
+        assert_eq!(
+            database_identity(&EnergyReading::HotWater(Faucet::Kitchen, 12.5)).ok(),
+            Some(("hot_water".to_string(), "kitchen".to_string()))
+        );
+    }
+
     use crate::t;
 
     use super::*;

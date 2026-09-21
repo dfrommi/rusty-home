@@ -3,8 +3,10 @@ use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::core::timeseries::DataPoint;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceAvailability, DeviceStateValue, EnergySaving, PowerAvailable};
+use crate::device_state::{DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, EnergySaving, PowerAvailable};
 use crate::t;
+
+const AVAILABILITY_SOURCE: &str = "LGTV";
 
 pub struct LgtvIncomingDataSource {
     base_topic: String,
@@ -26,6 +28,13 @@ impl LgtvIncomingDataSource {
 }
 
 impl IncomingDataSource for LgtvIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        vec![DeviceAvailabilityItem::new(
+            AVAILABILITY_SOURCE,
+            self.base_topic.clone(),
+        )]
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             let message = self.mqtt_receiver.recv().await?;
@@ -70,8 +79,7 @@ fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Resu
     Ok(vec![
         state,
         DeviceAvailability {
-            source: "LGTV".to_string(),
-            device_id: base_topic.to_string(),
+            item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, base_topic),
             last_seen: timestamp,
             marked_offline: false,
         }
@@ -138,8 +146,8 @@ mod tests {
 
         let availability =
             availability(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "false")).unwrap());
-        assert_eq!(availability.source, "LGTV");
-        assert_eq!(availability.device_id, "lgtv");
+        assert_eq!(availability.item.source, AVAILABILITY_SOURCE);
+        assert_eq!(availability.item.item, "lgtv");
         assert!(!availability.marked_offline);
     }
 

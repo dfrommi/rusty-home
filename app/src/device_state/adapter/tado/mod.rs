@@ -15,12 +15,14 @@ use crate::{
         unit::{DegreeCelsius, Percent},
     },
     device_state::{
-        DeviceAvailability, DeviceStateValue,
+        DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue,
         adapter::{IncomingData, IncomingDataSource},
     },
 };
 
 use config::TadoChannel;
+
+const AVAILABILITY_SOURCE: &str = "Tado";
 
 pub struct TadoIncomingDataSource {
     client: ClientWithMiddleware,
@@ -50,6 +52,13 @@ impl TadoIncomingDataSource {
 }
 
 impl IncomingDataSource for TadoIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        self.config
+            .keys()
+            .map(|item| DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, item))
+            .collect()
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             let now = tokio::time::Instant::now();
@@ -166,8 +175,7 @@ impl TadoIncomingDataSource {
             };
 
             events.push(IncomingData::ItemAvailability(DeviceAvailability {
-                source: "Tado".to_string(),
-                device_id: zone_id,
+                item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, zone_id),
                 last_seen: ru01.connection_state.timestamp,
                 marked_offline: !ru01.connection_state.value,
             }));

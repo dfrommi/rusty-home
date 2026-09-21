@@ -9,8 +9,8 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{
-    AllergenIndex, DeviceAvailability, FanActivity, LightLevel, ParticulateMatter, PowerAvailable, Presence,
-    RelativeHumidity, Temperature,
+    AllergenIndex, DeviceAvailability, DeviceAvailabilityItem, FanActivity, LightLevel, ParticulateMatter,
+    PowerAvailable, Presence, RelativeHumidity, Temperature,
 };
 use std::collections::HashMap;
 
@@ -26,6 +26,8 @@ use crate::device_state::DeviceStateValue;
 
 use crate::core::DeviceConfig;
 use std::sync::Mutex;
+
+const AVAILABILITY_SOURCE: &str = "HA";
 
 #[derive(Debug, Default, Clone)]
 struct ComfeeFanCache {
@@ -108,6 +110,13 @@ impl HomeAssistantIncomingDataSource {
 }
 
 impl IncomingDataSource for HomeAssistantIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        self.config
+            .keys()
+            .map(|item| DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, item))
+            .collect()
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             let msg = self.recv_state_changed_event().await?;
@@ -336,8 +345,7 @@ fn to_item_availability(new_state: &StateChangedEvent) -> IncomingData {
     let entity_id: &str = &new_state.entity_id;
 
     DeviceAvailability {
-        source: "HA".to_string(),
-        device_id: entity_id.to_string(),
+        item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, entity_id),
         last_seen: new_state.last_updated,
         marked_offline: matches!(new_state.state, StateValue::Unavailable),
     }
@@ -516,8 +524,8 @@ mod tests {
 
         let availabilities = availabilities(&items);
         assert_eq!(availabilities.len(), 1);
-        assert_eq!(availabilities[0].source, "HA");
-        assert_eq!(availabilities[0].device_id, "sensor.test");
+        assert_eq!(availabilities[0].item.source, AVAILABILITY_SOURCE);
+        assert_eq!(availabilities[0].item.item, "sensor.test");
         assert!(availabilities[0].marked_offline);
     }
 

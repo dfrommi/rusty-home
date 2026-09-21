@@ -6,7 +6,10 @@ use anyhow::Context;
 pub use domain::*;
 use infrastructure::{EventBus, EventListener, Mqtt};
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use sqlx::PgPool;
 
@@ -38,10 +41,24 @@ pub struct DeviceStateClient {
     service: Arc<DeviceStateService>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DeviceAvailabilityItem {
+    pub source: String,
+    pub item: String,
+}
+
+impl DeviceAvailabilityItem {
+    pub fn new(source: impl Into<String>, item: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            item: item.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceAvailability {
-    pub source: String,
-    pub device_id: String,
+    pub item: DeviceAvailabilityItem,
     pub last_seen: DateTime,
     pub marked_offline: bool,
 }
@@ -111,6 +128,18 @@ impl DeviceStateModule {
 
     pub fn subscribe(&self) -> EventListener<DeviceStateEvent> {
         self.event_bus.subscribe()
+    }
+
+    pub fn initialize_availability(&self) -> anyhow::Result<()> {
+        let mut items = HashSet::new();
+        items.extend(self.tasmota_ds.availability_items());
+        items.extend(self.z2m_ds.availability_items());
+        items.extend(self.ha_ds.availability_items());
+        items.extend(self.lgtv_ds.availability_items());
+        items.extend(self.energy_meter_ds.availability_items());
+        items.extend(self.tado_ds.availability_items());
+
+        self.service.initialize_availability(items)
     }
 
     pub async fn run(mut self) {

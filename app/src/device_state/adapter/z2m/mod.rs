@@ -11,11 +11,14 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{
-    DeviceAvailability, DeviceStateValue, HeatingDemandLimit, PowerAvailable, SetPoint, Temperature,
+    DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, HeatingDemandLimit, PowerAvailable, SetPoint,
+    Temperature,
 };
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
 use crate::device_state::{CurrentPowerUsage, Opened, RelativeHumidity, TotalEnergyConsumption};
+
+const AVAILABILITY_SOURCE: &str = "Z2M";
 
 #[derive(Debug, Clone)]
 pub enum Z2mChannel {
@@ -46,6 +49,13 @@ impl Z2mIncomingDataSource {
 }
 
 impl IncomingDataSource for Z2mIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        self.device_config
+            .keys()
+            .map(|item| DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, item))
+            .collect()
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             let msg = self.mqtt_receiver.recv().await?;
@@ -293,8 +303,7 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
 
 fn availability(friendly_name: &str, last_seen: DateTime) -> IncomingData {
     DeviceAvailability {
-        source: "Z2M".to_string(),
-        device_id: friendly_name.to_string(),
+        item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, friendly_name),
         last_seen,
         marked_offline: false,
     }

@@ -4,11 +4,15 @@ use crate::core::time::DateTime;
 use crate::core::unit::{HeatingUnit, KiloCubicMeter};
 use crate::device_state::adapter::energy_meter::persistence::EnergyReadingRepository;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{DeviceAvailability, DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption};
+use crate::device_state::{
+    DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption,
+};
 use crate::t;
 use infrastructure::EventListener;
 
-use crate::frontends::energy_meter::{EnergyReading, Faucet, Radiator};
+use crate::frontends::energy_meter::{EnergyMeterTarget, EnergyReading, Faucet, Radiator};
+
+const AVAILABILITY_SOURCE: &str = "EnergyMeter";
 
 pub struct EnergyMeterIncomingDataSource {
     repo: EnergyReadingRepository,
@@ -35,6 +39,13 @@ impl EnergyMeterIncomingDataSource {
 }
 
 impl IncomingDataSource for EnergyMeterIncomingDataSource {
+    fn availability_items(&self) -> Vec<DeviceAvailabilityItem> {
+        EnergyMeterTarget::variants()
+            .iter()
+            .map(|target| DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, target.ext_id().variant_name().to_string()))
+            .collect()
+    }
+
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
         loop {
             if self.initial_load.is_none() {
@@ -70,37 +81,14 @@ impl IncomingDataSource for EnergyMeterIncomingDataSource {
 }
 
 fn availability(reading: &EnergyReading, last_seen: DateTime) -> IncomingData {
-    let (reading_type, item) = match reading {
-        EnergyReading::Heating(item, _) => ("heating", radiator_item(item)),
-        EnergyReading::ColdWater(item, _) => ("cold_water", faucet_item(item)),
-        EnergyReading::HotWater(item, _) => ("hot_water", faucet_item(item)),
-    };
+    let target = reading.target();
 
     DeviceAvailability {
-        source: "EnergyMeter".to_string(),
-        device_id: format!("{reading_type}/{item}"),
+        item: DeviceAvailabilityItem::new(AVAILABILITY_SOURCE, target.ext_id().variant_name().to_string()),
         last_seen,
         marked_offline: false,
     }
     .into()
-}
-
-fn radiator_item(item: &Radiator) -> &'static str {
-    match item {
-        Radiator::LivingRoomBig => "living_room_big",
-        Radiator::LivingRoomSmall => "living_room_small",
-        Radiator::Bedroom => "bedroom",
-        Radiator::Kitchen => "kitchen",
-        Radiator::RoomOfRequirements => "room_of_requirements",
-        Radiator::Bathroom => "bathroom",
-    }
-}
-
-fn faucet_item(item: &Faucet) -> &'static str {
-    match item {
-        Faucet::Kitchen => "kitchen",
-        Faucet::Bathroom => "bathroom",
-    }
 }
 
 impl From<&EnergyReading> for DeviceStateValue {
@@ -161,8 +149,8 @@ mod tests {
         }
         match &updates[1] {
             IncomingData::ItemAvailability(availability) => {
-                assert_eq!(availability.source, "EnergyMeter");
-                assert_eq!(availability.device_id, "heating/bedroom");
+                assert_eq!(availability.item.source, AVAILABILITY_SOURCE);
+                assert_eq!(availability.item.item, "heating::bedroom");
                 assert!(!availability.marked_offline);
             }
             IncomingData::StateValue(_) => panic!("expected availability"),

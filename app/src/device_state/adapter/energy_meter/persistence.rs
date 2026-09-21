@@ -17,9 +17,7 @@ impl EnergyReadingRepository {
     pub async fn add_yearly_energy_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<i64> {
         let (type_, item) = database_identity(&reading)?;
         let value = match &reading {
-            EnergyReading::Heating(_, value)
-            | EnergyReading::ColdWater(_, value)
-            | EnergyReading::HotWater(_, value) => *value,
+            EnergyReading::Heating(_, value) => *value,
         };
 
         let rec = sqlx::query!(
@@ -117,29 +115,19 @@ fn try_into_reading(type_: &str, name: &str, value: f64) -> anyhow::Result<Energ
 
     Ok(match target {
         EnergyMeterTarget::Heating(item) => EnergyReading::Heating(item, value),
-        EnergyMeterTarget::ColdWater(item) => EnergyReading::ColdWater(item, value),
-        EnergyMeterTarget::HotWater(item) => EnergyReading::HotWater(item, value),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::database_identity;
-    use crate::frontends::energy_meter::{EnergyReading, Faucet, Radiator};
+    use crate::frontends::energy_meter::{EnergyReading, Radiator};
 
     #[test]
     fn target_database_identity_preserves_existing_storage_ids() {
         assert_eq!(
             database_identity(&EnergyReading::Heating(Radiator::Bedroom, 12.5)).ok(),
             Some(("heating".to_string(), "bedroom".to_string()))
-        );
-        assert_eq!(
-            database_identity(&EnergyReading::ColdWater(Faucet::Kitchen, 12.5)).ok(),
-            Some(("cold_water".to_string(), "kitchen".to_string()))
-        );
-        assert_eq!(
-            database_identity(&EnergyReading::HotWater(Faucet::Kitchen, 12.5)).ok(),
-            Some(("hot_water".to_string(), "kitchen".to_string()))
         );
     }
 

@@ -281,7 +281,6 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
         DeviceStateId::Temperature(id) => DeviceStateValue::Temperature(id, value.into()),
         DeviceStateId::TotalEnergyConsumption(id) => DeviceStateValue::TotalEnergyConsumption(id, value.into()),
         DeviceStateId::TotalRadiatorConsumption(id) => DeviceStateValue::TotalRadiatorConsumption(id, value.into()),
-        DeviceStateId::TotalWaterConsumption(id) => DeviceStateValue::TotalWaterConsumption(id, value.into()),
     }
 }
 

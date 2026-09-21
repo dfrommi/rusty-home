@@ -18,7 +18,6 @@ mod set_point;
 mod temperature;
 mod total_energy_consumption;
 mod total_radiator_consumption;
-mod total_water_consumption;
 
 pub use allergen_index::AllergenIndex;
 pub use current_power_usage::CurrentPowerUsage;
@@ -36,7 +35,6 @@ pub use set_point::SetPoint;
 pub use temperature::Temperature;
 pub use total_energy_consumption::TotalEnergyConsumption;
 pub use total_radiator_consumption::TotalRadiatorConsumption;
-pub use total_water_consumption::TotalWaterConsumption;
 
 #[derive(Debug, Clone, PartialEq, StateEnumDerive)]
 pub enum DeviceStateValue {
@@ -56,7 +54,6 @@ pub enum DeviceStateValue {
     Temperature(temperature::Temperature, DegreeCelsius),
     TotalEnergyConsumption(total_energy_consumption::TotalEnergyConsumption, KiloWattHours),
     TotalRadiatorConsumption(total_radiator_consumption::TotalRadiatorConsumption, HeatingUnit),
-    TotalWaterConsumption(total_water_consumption::TotalWaterConsumption, KiloCubicMeter),
 }
 
 impl From<&DeviceStateValue> for f64 {
@@ -74,7 +71,6 @@ impl From<&DeviceStateValue> for f64 {
             DeviceStateValue::Temperature(_, v) => v.into(),
             DeviceStateValue::TotalEnergyConsumption(_, v) => v.into(),
             DeviceStateValue::TotalRadiatorConsumption(_, v) => v.into(),
-            DeviceStateValue::TotalWaterConsumption(_, v) => v.into(),
             DeviceStateValue::EnergySaving(_, v)
             | DeviceStateValue::Opened(_, v)
             | DeviceStateValue::PowerAvailable(_, v)

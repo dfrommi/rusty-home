@@ -1,16 +1,14 @@
 mod persistence;
 
 use crate::core::time::DateTime;
-use crate::core::unit::{HeatingUnit, KiloCubicMeter};
+use crate::core::unit::HeatingUnit;
 use crate::device_state::adapter::energy_meter::persistence::EnergyReadingRepository;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
-use crate::device_state::{
-    DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, TotalRadiatorConsumption, TotalWaterConsumption,
-};
+use crate::device_state::{DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, TotalRadiatorConsumption};
 use crate::t;
 use infrastructure::EventListener;
 
-use crate::frontends::energy_meter::{EnergyMeterTarget, EnergyReading, Faucet, Radiator};
+use crate::frontends::energy_meter::{EnergyMeterTarget, EnergyReading, Radiator};
 
 const AVAILABILITY_SOURCE: &str = "EnergyMeter";
 
@@ -104,20 +102,6 @@ impl From<&EnergyReading> for DeviceStateValue {
                     Radiator::Bathroom => TotalRadiatorConsumption::Bathroom,
                 },
                 HeatingUnit(*value),
-            ),
-            EnergyReading::ColdWater(item, value) => DeviceStateValue::TotalWaterConsumption(
-                match item {
-                    Faucet::Kitchen => TotalWaterConsumption::KitchenCold,
-                    Faucet::Bathroom => TotalWaterConsumption::BathroomCold,
-                },
-                KiloCubicMeter(*value),
-            ),
-            EnergyReading::HotWater(item, value) => DeviceStateValue::TotalWaterConsumption(
-                match item {
-                    Faucet::Kitchen => TotalWaterConsumption::KitchenWarm,
-                    Faucet::Bathroom => TotalWaterConsumption::BathroomWarm,
-                },
-                KiloCubicMeter(*value),
             ),
         }
     }

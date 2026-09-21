@@ -15,23 +15,17 @@ impl EnergyMeter {
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Id, EnumVariants)]
 pub enum EnergyMeterTarget {
     Heating(Radiator),
-    ColdWater(Faucet),
-    HotWater(Faucet),
 }
 
 #[derive(Debug, Clone)]
 pub enum EnergyReading {
     Heating(Radiator, f64),
-    ColdWater(Faucet, f64),
-    HotWater(Faucet, f64),
 }
 
 impl EnergyReading {
     pub fn target(&self) -> EnergyMeterTarget {
         match self {
             Self::Heating(item, _) => EnergyMeterTarget::Heating(*item),
-            Self::ColdWater(item, _) => EnergyMeterTarget::ColdWater(*item),
-            Self::HotWater(item, _) => EnergyMeterTarget::HotWater(*item),
         }
     }
 }
@@ -43,11 +37,5 @@ pub enum Radiator {
     Bedroom,
     Kitchen,
     RoomOfRequirements,
-    Bathroom,
-}
-
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Id, EnumVariants)]
-pub enum Faucet {
-    Kitchen,
     Bathroom,
 }

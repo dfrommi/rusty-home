@@ -3,14 +3,13 @@ use actix_web::{HttpResponse, Responder};
 use infrastructure::EventEmitter;
 use serde::Deserialize;
 
-use super::{EnergyReading, Faucet, Radiator};
+use super::{EnergyReading, Radiator};
 
 type EnergyReadingSender = EventEmitter<EnergyReading>;
 
 pub fn new_actix_web_scope(events: EventEmitter<EnergyReading>) -> actix_web::Scope {
     web::scope("/api/energy/readings")
         .route("/heating", web::put().to(handle_heating_reading))
-        .route("/water", web::put().to(handle_water_reading))
         .app_data(web::Data::new(events))
 }
 
@@ -18,13 +17,6 @@ pub fn new_actix_web_scope(events: EventEmitter<EnergyReading>) -> actix_web::Sc
 struct HeatingReadingDTO {
     label: String,
     value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct WaterReadingDTO {
-    label: String,
-    value: String,
-    is_hot: bool,
 }
 
 async fn handle_heating_reading(
@@ -49,34 +41,6 @@ async fn handle_heating_reading(
     let reading = EnergyReading::Heating(radiator, value);
 
     tracing::info!("Received reading {:?}", reading);
-
-    sender.send(reading);
-
-    HttpResponse::NoContent()
-}
-
-async fn handle_water_reading(
-    sender: web::Data<EnergyReadingSender>,
-    Json(dto): Json<WaterReadingDTO>,
-) -> impl Responder {
-    let faucet = match dto.label.as_str() {
-        "Küche" => Faucet::Kitchen,
-        "Bad" => Faucet::Bathroom,
-        _ => return HttpResponse::BadRequest(),
-    };
-
-    let value = match dto.value.parse::<f64>() {
-        Ok(v) => v / 1000.0,
-        Err(_) => return HttpResponse::BadRequest(),
-    };
-
-    let reading = if dto.is_hot {
-        EnergyReading::HotWater(faucet, value)
-    } else {
-        EnergyReading::ColdWater(faucet, value)
-    };
-
-    tracing::info!("Adding reading {:?}", reading);
 
     sender.send(reading);
 

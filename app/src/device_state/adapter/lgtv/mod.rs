@@ -50,17 +50,15 @@ impl IncomingDataSource for LgtvIncomingDataSource {
 }
 
 fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Result<Vec<IncomingData>> {
-    let energy_saving_topic = format!("{base_topic}/state/picture/energySaving");
-    let power_topic = format!("{base_topic}/state/power/systemOn");
     let timestamp = t!(now);
 
-    let state = if message.topic == energy_saving_topic {
+    let state = if message.topic == "state/picture/energySaving" {
         DataPoint::new(
             DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, message.payload != "off"),
             timestamp,
         )
         .into()
-    } else if message.topic == power_topic {
+    } else if message.topic == "state/power/systemOn" {
         let powered = match message.payload.as_str() {
             "true" => true,
             "false" => false,
@@ -116,11 +114,11 @@ mod tests {
     #[test]
     fn parses_energy_saving_values() {
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("lgtv/state/picture/energySaving", "auto"),).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/picture/energySaving", "auto"),).unwrap()),
             DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, true)
         );
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("lgtv/state/picture/energySaving", "off"),).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/picture/energySaving", "off"),).unwrap()),
             DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, false)
         );
     }
@@ -128,7 +126,7 @@ mod tests {
     #[test]
     fn treats_other_energy_saving_values_as_enabled() {
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("lgtv/state/picture/energySaving", "high"),).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/picture/energySaving", "high"),).unwrap()),
             DeviceStateValue::EnergySaving(EnergySaving::LivingRoomTv, true)
         );
     }
@@ -136,16 +134,15 @@ mod tests {
     #[test]
     fn parses_system_power_values() {
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "true"),).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/power/systemOn", "true"),).unwrap()),
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, true)
         );
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "false"),).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/power/systemOn", "false"),).unwrap()),
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, false)
         );
 
-        let availability =
-            availability(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "false")).unwrap());
+        let availability = availability(parse_lgtv_message("lgtv", &message("state/power/systemOn", "false")).unwrap());
         assert_eq!(availability.item.source, AVAILABILITY_SOURCE);
         assert_eq!(availability.item.item, "lgtv");
         assert!(!availability.marked_offline);
@@ -153,6 +150,6 @@ mod tests {
 
     #[test]
     fn rejects_invalid_system_power_values() {
-        assert!(parse_lgtv_message("lgtv", &message("lgtv/state/power/systemOn", "on")).is_err());
+        assert!(parse_lgtv_message("lgtv", &message("state/power/systemOn", "on")).is_err());
     }
 }

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use dispatcher::CommandDispatcher;
 use infrastructure::{EventListener, Mqtt, TraceContext};
+pub use service::CommandExecutionResult;
 use service::CommandService;
 
 use crate::{
@@ -54,9 +55,9 @@ impl CommandModule {
             lgtv_executor,
             nuki_executor,
             ha_executor,
-            notification_client,
+            notification_client.clone(),
         );
-        let service = Arc::new(CommandService::new(dispatcher));
+        let service = Arc::new(CommandService::new(dispatcher, notification_client));
 
         Self {
             service,
@@ -81,9 +82,16 @@ impl CommandClient {
         command: Command,
         source: ExternalId,
         user_trigger_id: Option<UserTriggerId>,
-    ) -> anyhow::Result<()> {
+        snapshot: &crate::home_state::StateSnapshot,
+    ) -> anyhow::Result<CommandExecutionResult> {
         self.service
-            .execute_command(command, source, user_trigger_id, TraceContext::current().correlation_id())
+            .execute_command(
+                command,
+                source,
+                user_trigger_id,
+                snapshot,
+                TraceContext::current().correlation_id(),
+            )
             .await
     }
 }

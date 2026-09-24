@@ -82,12 +82,8 @@ pub async fn main() -> anyhow::Result<()> {
     )
     .await;
 
-    let automation_module = AutomationModule::new(
-        home_state_module.subscribe(),
-        command_module.client(),
-        trigger_module.client(),
-        notification_module.client(),
-    );
+    let automation_module =
+        AutomationModule::new(home_state_module.subscribe(), command_module.client(), trigger_module.client());
 
     let homekit_module = settings
         .homebridge

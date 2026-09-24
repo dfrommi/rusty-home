@@ -51,7 +51,6 @@ struct Planner<'a> {
     trigger_client: &'a TriggerClient,
     context: RuleEvaluationContext,
     planning_data_timestamp: DateTime,
-    active_trigger_ids: Vec<UserTriggerId>,
 }
 
 impl<'a> Planner<'a> {
@@ -61,28 +60,22 @@ impl<'a> Planner<'a> {
             trigger_client,
             context: RuleEvaluationContext::new(snapshot.clone()),
             planning_data_timestamp: snapshot.timestamp(),
-            active_trigger_ids: Vec::new(),
         }
     }
 
-    async fn run(mut self) -> Result<()> {
+    async fn run(self) -> Result<()> {
         let resource_plans = crate::automation::domain::resource_plans();
-
-        debug_assert_eq!(
-            resource_plans
-                .iter()
-                .map(|(resource, _)| resource)
-                .collect::<std::collections::HashSet<_>>()
-                .len(),
-            resource_plans.len(),
-            "resource_plans contains duplicate CommandTarget keys"
-        );
+        let mut active_trigger_ids = Vec::new();
 
         for (resource, rules) in &resource_plans {
             match self.evaluate_resource_plan(resource, rules).await {
                 Ok(result) => {
+                    if matches!(result, PlanResult::Executed(_)) {
+                        TraceContext::current().set_ok();
+                    }
+
                     if let Some(trigger_id) = result.trigger_id() {
-                        self.active_trigger_ids.push(trigger_id.clone());
+                        active_trigger_ids.push(trigger_id.clone());
                     }
                 }
                 Err(error) => {
@@ -92,7 +85,7 @@ impl<'a> Planner<'a> {
             }
         }
 
-        self.update_triggers().await
+        self.update_triggers(active_trigger_ids).await
     }
 
     #[tracing::instrument(
@@ -103,7 +96,12 @@ impl<'a> Planner<'a> {
     async fn evaluate_resource_plan(&self, resource: &CommandTarget, rules: &[HomeAction]) -> Result<PlanResult> {
         for action in rules {
             match self.process_action(resource, action).await {
-                Ok(Some(result)) => return Ok(result),
+                Ok(Some(result)) => {
+                    if matches!(result, PlanResult::Executed(_)) {
+                        TraceContext::current().set_ok();
+                    }
+                    return Ok(result);
+                }
                 Ok(None) => {}
                 Err(error) => {
                     TraceContext::current().set_error(error.to_string());
@@ -117,21 +115,24 @@ impl<'a> Planner<'a> {
 
     #[tracing::instrument(
         name = "process_action",
-        skip(self, action),
+        skip_all,
         fields(resource = %resource, action = %action, otel.name = %action)
     )]
     async fn process_action(&self, resource: &CommandTarget, action: &HomeAction) -> Result<Option<PlanResult>> {
+        let trace = TraceContext::current();
         match action.evaluate(&self.context) {
             Ok(ActionEvaluationResult::Execute(command, source)) => {
+                trace.set_ok();
                 Ok(Some(self.execute_command(None, command, source).await))
             }
             Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
+                trace.set_ok();
                 Ok(Some(self.execute_command(Some(trigger_id), command, source).await))
             }
             Ok(ActionEvaluationResult::Skip) => Ok(None),
             Err(error) => {
                 tracing::error!("Error evaluating action {}: {:?}", action, error);
-                TraceContext::current().set_error(error.to_string());
+                trace.set_error(error.to_string());
                 Err(error)
             }
         }
@@ -143,40 +144,35 @@ impl<'a> Planner<'a> {
         command: Command,
         source: ExternalId,
     ) -> PlanResult {
-        let target: CommandTarget = command.clone().into();
-
         match self
             .command_client
             .execute(command, source, trigger_id.clone(), self.context.inner())
             .await
         {
             Ok(CommandExecutionResult::Executed) => {
-                tracing::info!("Command {} executed", target);
                 TraceContext::current().set_ok();
                 PlanResult::Executed(trigger_id)
             }
             Ok(CommandExecutionResult::Debounced | CommandExecutionResult::AlreadyReflected) => {
-                tracing::trace!("Skipped execution command {}", target);
                 TraceContext::current().set_ok();
                 PlanResult::Active(trigger_id)
             }
             Err(error) => {
-                tracing::error!("Error executing command for {}: {:?}", target, error);
                 TraceContext::current().set_error(error.to_string());
                 PlanResult::Active(trigger_id)
             }
         }
     }
 
-    async fn update_triggers(&self) -> anyhow::Result<()> {
-        if !self.active_trigger_ids.is_empty() {
+    async fn update_triggers(&self, active_trigger_ids: Vec<UserTriggerId>) -> anyhow::Result<()> {
+        if !active_trigger_ids.is_empty() {
             self.trigger_client
-                .set_triggers_active_from_if_unset(&self.active_trigger_ids)
+                .set_triggers_active_from_if_unset(&active_trigger_ids)
                 .await?;
         }
 
         self.trigger_client
-            .disable_triggers_before_except(self.planning_data_timestamp, &self.active_trigger_ids)
+            .disable_triggers_before_except(self.planning_data_timestamp, &active_trigger_ids)
             .await
             .map(|_| ())
     }

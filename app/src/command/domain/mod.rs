@@ -88,27 +88,50 @@ impl From<&Command> for CommandTarget {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandDisplayParts {
+    pub command_type: &'static str,
+    pub target: String,
+    pub state: String,
+}
+
 impl Command {
-    pub fn display_parts(&self) -> (&'static str, String, String) {
+    pub fn display_parts(&self) -> CommandDisplayParts {
         match self {
-            Command::SetPower { device, power_on } => {
-                ("SetPower", device.to_string(), if *power_on { "on" } else { "off" }.to_string())
-            }
-            Command::SetHeating { device, target_state } => {
-                ("SetHeating", device.to_string(), target_state.to_string())
-            }
+            Command::SetPower { device, power_on } => CommandDisplayParts {
+                command_type: "SetPower",
+                target: device.to_string(),
+                state: if *power_on { "on".to_string() } else { "off".to_string() },
+            },
+            Command::SetHeating { device, target_state } => CommandDisplayParts {
+                command_type: "SetHeating",
+                target: device.to_string(),
+                state: target_state.to_string(),
+            },
             Command::PushNotify {
                 action,
                 notification,
                 recipient,
-            } => ("PushNotify", format!("{notification} @ {recipient}"), action.to_string()),
-            Command::SetEnergySaving { device, on } => (
-                "SetEnergySaving",
-                device.to_string(),
-                if *on { "on" } else { "off" }.to_string(),
-            ),
-            Command::ControlFan { device, speed } => ("ControlFan", device.to_string(), speed.to_string()),
-            Command::OpenDoor { device } => ("Open", device.to_string(), "open".to_string()),
+            } => CommandDisplayParts {
+                command_type: "PushNotify",
+                target: format!("{notification} @ {recipient}"),
+                state: action.to_string(),
+            },
+            Command::SetEnergySaving { device, on } => CommandDisplayParts {
+                command_type: "SetEnergySaving",
+                target: device.to_string(),
+                state: if *on { "on" } else { "off" }.to_string(),
+            },
+            Command::ControlFan { device, speed } => CommandDisplayParts {
+                command_type: "ControlFan",
+                target: device.to_string(),
+                state: speed.to_string(),
+            },
+            Command::OpenDoor { device } => CommandDisplayParts {
+                command_type: "OpenDoor",
+                target: device.to_string(),
+                state: "open".to_string(),
+            },
         }
     }
 }

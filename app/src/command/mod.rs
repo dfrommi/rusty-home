@@ -8,7 +8,7 @@ pub use domain::*;
 use std::sync::Arc;
 
 use dispatcher::CommandDispatcher;
-use infrastructure::{EventListener, Mqtt, TraceContext};
+use infrastructure::{EventListener, Mqtt};
 pub use service::CommandExecutionResult;
 use service::CommandService;
 
@@ -85,13 +85,7 @@ impl CommandClient {
         snapshot: &crate::home_state::StateSnapshot,
     ) -> anyhow::Result<CommandExecutionResult> {
         self.service
-            .execute_command(
-                command,
-                source,
-                user_trigger_id,
-                snapshot,
-                TraceContext::current().correlation_id(),
-            )
+            .execute_command(command, source, user_trigger_id, snapshot)
             .await
     }
 }

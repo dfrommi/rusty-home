@@ -37,21 +37,17 @@ impl AutomationModule {
         loop {
             tokio::select! {
                 _ = timer.tick() => {
-                    if let Some(snapshot) = &last_snapshot {
-                        plan_for_home(
-                            snapshot,
-                            &self.command_client,
-                            &self.trigger_client,
-                        ).await;
+                    if let Some(snapshot) = &last_snapshot
+                        && let Err(error) = plan_for_home(snapshot, &self.command_client, &self.trigger_client).await
+                    {
+                        tracing::error!("Error during planning: {:?}", error);
                     }
                 },
 
                 event = self.home_state_rx.recv() => if let Some(HomeStateEvent::SnapshotUpdated(new_snapshot)) = event {
-                    plan_for_home(
-                        &new_snapshot,
-                        &self.command_client,
-                        &self.trigger_client,
-                    ).await;
+                    if let Err(error) = plan_for_home(&new_snapshot, &self.command_client, &self.trigger_client).await {
+                        tracing::error!("Error during planning: {:?}", error);
+                    }
                     last_snapshot = Some(new_snapshot);
                 },
             };

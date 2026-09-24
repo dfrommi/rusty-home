@@ -1,6 +1,5 @@
 use anyhow::Result;
 use infrastructure::TraceContext;
-use tracing::Instrument;
 
 use crate::automation::{HomeAction, RuleEvaluationContext};
 use crate::command::{Command, CommandClient, CommandExecutionResult, CommandTarget};
@@ -26,6 +25,7 @@ impl PlanResult {
     }
 }
 
+#[tracing::instrument(name = "plan_for_home", skip_all)]
 pub async fn plan_for_home(
     snapshot: &StateSnapshot,
     command_client: &CommandClient,
@@ -36,7 +36,12 @@ pub async fn plan_for_home(
     }
 
     tracing::info!("Start planning");
-    Planner::new(snapshot, command_client, trigger_client).run().await?;
+    let result = Planner::new(snapshot, command_client, trigger_client).run().await;
+    if let Err(error) = &result {
+        TraceContext::current().set_error(error.to_string());
+    }
+    result?;
+
     tracing::info!("Planning done");
     Ok(())
 }
@@ -90,42 +95,46 @@ impl<'a> Planner<'a> {
         self.update_triggers().await
     }
 
+    #[tracing::instrument(
+        name = "process_resource",
+        skip(self, rules),
+        fields(resource = %resource, otel.name = %resource)
+    )]
     async fn evaluate_resource_plan(&self, resource: &CommandTarget, rules: &[HomeAction]) -> Result<PlanResult> {
         for action in rules {
-            let action_span = tracing::info_span!("process_action", resource = %resource, %action, otel.name = %action);
-            let result = action_span.in_scope(|| action.evaluate(&self.context));
-
-            match result {
-                Ok(ActionEvaluationResult::Execute(command, source)) => {
-                    let result = self
-                        .execute_command(None, command, source)
-                        .instrument(action_span.clone())
-                        .await;
-                    finalize_action_span(&action_span, action);
-                    return Ok(result);
-                }
-                Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
-                    let result = self
-                        .execute_command(Some(trigger_id), command, source)
-                        .instrument(action_span.clone())
-                        .await;
-                    finalize_action_span(&action_span, action);
-                    return Ok(result);
-                }
-                Ok(ActionEvaluationResult::Skip) => {
-                    finalize_action_span(&action_span, action);
-                }
+            match self.process_action(resource, action).await {
+                Ok(Some(result)) => return Ok(result),
+                Ok(None) => {}
                 Err(error) => {
-                    action_span.in_scope(|| {
-                        tracing::error!("Error evaluating action {}: {:?}", action, error);
-                        TraceContext::current().set_error(error.to_string());
-                    });
+                    TraceContext::current().set_error(error.to_string());
                     return Err(error);
                 }
             }
         }
 
         Ok(PlanResult::Skipped)
+    }
+
+    #[tracing::instrument(
+        name = "process_action",
+        skip(self, action),
+        fields(resource = %resource, action = %action, otel.name = %action)
+    )]
+    async fn process_action(&self, resource: &CommandTarget, action: &HomeAction) -> Result<Option<PlanResult>> {
+        match action.evaluate(&self.context) {
+            Ok(ActionEvaluationResult::Execute(command, source)) => {
+                Ok(Some(self.execute_command(None, command, source).await))
+            }
+            Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
+                Ok(Some(self.execute_command(Some(trigger_id), command, source).await))
+            }
+            Ok(ActionEvaluationResult::Skip) => Ok(None),
+            Err(error) => {
+                tracing::error!("Error evaluating action {}: {:?}", action, error);
+                TraceContext::current().set_error(error.to_string());
+                Err(error)
+            }
+        }
     }
 
     async fn execute_command(
@@ -171,8 +180,4 @@ impl<'a> Planner<'a> {
             .await
             .map(|_| ())
     }
-}
-
-fn finalize_action_span(span: &tracing::Span, action: &HomeAction) {
-    span.in_scope(|| TraceContext::current().set_span_name(action.to_string()));
 }

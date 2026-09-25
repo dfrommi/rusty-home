@@ -1,7 +1,6 @@
 mod adapter;
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use derive_more::derive::Display;
 use r#macro::{EnumVariants, Id};
@@ -9,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::command::{Notification, NotificationRecipient};
 
-use self::adapter::HomeAssistantNotificationExecutor;
+use self::adapter::{HomeAssistantNotificationExecutor, NotificationStateRepository};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
@@ -25,15 +24,9 @@ impl From<&Notification> for NotificationId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct NotificationKey {
-    recipient: NotificationRecipient,
-    notification: NotificationId,
-}
-
 struct NotificationService {
     executor: HomeAssistantNotificationExecutor,
-    active: RwLock<HashMap<NotificationKey, Notification>>,
+    state_repository: NotificationStateRepository,
 }
 
 pub struct NotificationModule {
@@ -51,7 +44,7 @@ impl NotificationModule {
         Self {
             service: Arc::new(NotificationService {
                 executor: HomeAssistantNotificationExecutor::new(url, token),
-                active: RwLock::new(HashMap::new()),
+                state_repository: NotificationStateRepository::default(),
             }),
         }
     }
@@ -64,32 +57,14 @@ impl NotificationModule {
 }
 
 impl NotificationClient {
-    pub fn is_delivered(&self, recipient: &NotificationRecipient, notification: &Notification) -> bool {
-        let key = NotificationKey {
-            recipient: recipient.clone(),
-            notification: NotificationId::from(notification),
-        };
-
-        let active = match self.service.active.read() {
-            Ok(active) => active,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-
-        active.get(&key) == Some(notification)
+    pub async fn is_active(&self, recipient: &NotificationRecipient, notification: &Notification) -> bool {
+        self.service.state_repository.is_active(recipient, notification).await
     }
 
     pub async fn notify(&self, recipient: &NotificationRecipient, notification: &Notification) -> anyhow::Result<()> {
         self.service.executor.notify(recipient, notification).await?;
 
-        let key = NotificationKey {
-            recipient: recipient.clone(),
-            notification: NotificationId::from(notification),
-        };
-        let mut active = match self.service.active.write() {
-            Ok(active) => active,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        active.insert(key, notification.clone());
+        self.service.state_repository.activate(recipient, notification).await;
 
         Ok(())
     }
@@ -97,15 +72,7 @@ impl NotificationClient {
     pub async fn dismiss(&self, recipient: &NotificationRecipient, notification: NotificationId) -> anyhow::Result<()> {
         self.service.executor.dismiss(recipient, notification).await?;
 
-        let key = NotificationKey {
-            recipient: recipient.clone(),
-            notification,
-        };
-        let mut active = match self.service.active.write() {
-            Ok(active) => active,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        active.remove(&key);
+        self.service.state_repository.deactivate(recipient, notification).await;
 
         Ok(())
     }
@@ -133,7 +100,7 @@ mod tests {
 
         client.notify(&recipient, &notification).await.unwrap();
 
-        assert!(client.is_delivered(&recipient, &notification));
+        assert!(client.is_active(&recipient, &notification).await);
     }
 
     #[tokio::test]
@@ -150,7 +117,7 @@ mod tests {
         let notification = Notification::WindowOpened;
 
         assert!(client.notify(&recipient, &notification).await.is_err());
-        assert!(!client.is_delivered(&recipient, &notification));
+        assert!(!client.is_active(&recipient, &notification).await);
     }
 
     #[tokio::test]
@@ -170,6 +137,6 @@ mod tests {
         client.notify(&recipient, &notification).await.unwrap();
         client.dismiss(&recipient, NotificationId::WindowOpened).await.unwrap();
 
-        assert!(!client.is_delivered(&recipient, &notification));
+        assert!(!client.is_active(&recipient, &notification).await);
     }
 }

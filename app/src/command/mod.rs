@@ -7,6 +7,7 @@ pub use domain::*;
 
 use std::sync::Arc;
 
+use adapter::CommandExecutionRepository;
 use dispatcher::CommandDispatcher;
 use infrastructure::{EventListener, Mqtt};
 pub use service::CommandExecutionResult;
@@ -57,7 +58,11 @@ impl CommandModule {
             ha_executor,
             notification_client.clone(),
         );
-        let service = Arc::new(CommandService::new(dispatcher, notification_client));
+        let service = Arc::new(CommandService::new(
+            dispatcher,
+            notification_client,
+            CommandExecutionRepository::default(),
+        ));
 
         Self {
             service,

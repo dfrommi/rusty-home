@@ -40,12 +40,7 @@ impl Command {
                 recipient,
                 notification,
                 action,
-            } => Ok(is_push_notify_reflected_in_state(
-                recipient,
-                notification,
-                action,
-                notification_client,
-            )),
+            } => Ok(is_push_notify_reflected_in_state(recipient, notification, action, notification_client).await),
             Command::SetEnergySaving { device, on } => is_set_energy_saving_reflected_in_state(device, *on, snapshot),
             Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
             Command::OpenDoor { .. } => {
@@ -90,17 +85,17 @@ fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapsho
     Ok(powered == power_on)
 }
 
-fn is_push_notify_reflected_in_state(
+async fn is_push_notify_reflected_in_state(
     recipient: &NotificationRecipient,
     notification: &Notification,
     action: &NotificationAction,
     notification_client: &NotificationClient,
 ) -> bool {
-    let is_delivered = notification_client.is_delivered(recipient, notification);
+    let is_active = notification_client.is_active(recipient, notification).await;
 
     match action {
-        NotificationAction::Notify => is_delivered,
-        NotificationAction::Dismiss => !is_delivered,
+        NotificationAction::Notify => is_active,
+        NotificationAction::Dismiss => !is_active,
     }
 }
 
@@ -135,7 +130,7 @@ mod tests {
     use crate::notification::{NotificationId, NotificationModule};
 
     #[tokio::test]
-    async fn push_notification_reflection_uses_notification_delivery_state() {
+    async fn push_notification_reflection_uses_notification_active_state() {
         let mut server = Server::new_async().await;
         let _mock = server
             .mock("POST", "/api/services/notify/mobile_app_jarvis")

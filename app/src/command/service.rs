@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-
 use infrastructure::TraceContext;
 use r#macro::Id;
-use tokio::sync::Mutex;
 
 use crate::{
-    command::{Command, CommandTarget},
-    core::{id::ExternalId, time::DateTime},
+    command::{Command, CommandTarget, adapter::CommandExecutionRepository},
+    core::id::ExternalId,
     home_state::StateSnapshot,
     notification::NotificationClient,
     observability::system_metric_increment,
@@ -23,27 +20,22 @@ pub enum CommandExecutionResult {
     Executed,
 }
 
-#[derive(Debug, Clone)]
-struct LastExecution {
-    command: Command,
-    source: ExternalId,
-    created: DateTime,
-}
-
-type LastExecutions = HashMap<CommandTarget, LastExecution>;
-
 pub struct CommandService {
     dispatcher: CommandDispatcher,
     notification_client: NotificationClient,
-    last_executions: Mutex<LastExecutions>,
+    execution_repository: CommandExecutionRepository,
 }
 
 impl CommandService {
-    pub fn new(dispatcher: CommandDispatcher, notification_client: NotificationClient) -> Self {
+    pub fn new(
+        dispatcher: CommandDispatcher,
+        notification_client: NotificationClient,
+        execution_repository: CommandExecutionRepository,
+    ) -> Self {
         Self {
             dispatcher,
             notification_client,
-            last_executions: Mutex::new(HashMap::new()),
+            execution_repository,
         }
     }
 
@@ -66,9 +58,7 @@ impl CommandService {
         user_trigger_id: Option<UserTriggerId>, //TODO correlation_id instead of DB id
         snapshot: &StateSnapshot,
     ) -> anyhow::Result<CommandExecutionResult> {
-        let mut last_executions = self.last_executions.lock().await;
-
-        let outcome = if let Some(last_execution) = last_execution_at(&command, &source, &last_executions)
+        let outcome = if let Some(last_execution) = self.execution_repository.last_execution_at(&command, &source).await
             && last_execution.elapsed() < t!(30 seconds)
         {
             Ok(CommandExecutionResult::Debounced)
@@ -79,20 +69,14 @@ impl CommandService {
                 Ok(false) => match self.dispatcher.dispatch(&command).await {
                     Err(error) => Err(error),
                     Ok(()) => {
-                        last_executions.insert(
-                            CommandTarget::from(&command),
-                            LastExecution {
-                                command: command.clone(),
-                                source: source.clone(),
-                                created: t!(now),
-                            },
-                        );
+                        self.execution_repository
+                            .record_execution(command.clone(), source.clone())
+                            .await;
                         Ok(CommandExecutionResult::Executed)
                     }
                 },
             }
         };
-        drop(last_executions);
 
         add_to_trace(&command, &source, user_trigger_id.is_some(), &outcome);
 
@@ -158,12 +142,4 @@ fn add_to_trace(
         ),
         Ok(CommandExecutionResult::Debounced | CommandExecutionResult::AlreadyReflected) => {}
     }
-}
-
-fn last_execution_at(command: &Command, source: &ExternalId, last_executions: &LastExecutions) -> Option<DateTime> {
-    let target: CommandTarget = command.into();
-    last_executions
-        .get(&target)
-        .filter(|execution| execution.source == *source && execution.command == *command)
-        .map(|execution| execution.created)
 }

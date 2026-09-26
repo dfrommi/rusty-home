@@ -8,7 +8,7 @@ pub mod z2m;
 pub use homeassistant::HomeAssistantCommandExecutor;
 pub use lgtv::LgTvCommandExecutor;
 pub use nuki::NukiCommandExecutor;
-pub use persistence::CommandExecutionRepository;
+pub use persistence::{CommandExecution, CommandExecutionRepository};
 pub use tasmota::TasmotaCommandExecutor;
 pub use z2m::Z2mCommandExecutor;
 

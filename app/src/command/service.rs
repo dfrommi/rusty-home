@@ -2,7 +2,10 @@ use infrastructure::TraceContext;
 use r#macro::Id;
 
 use crate::{
-    command::{Command, CommandTarget, adapter::CommandExecutionRepository},
+    command::{
+        Command, CommandTarget,
+        adapter::{CommandExecution, CommandExecutionRepository},
+    },
     core::id::ExternalId,
     home_state::StateSnapshot,
     notification::NotificationClient,
@@ -58,29 +61,70 @@ impl CommandService {
         user_trigger_id: Option<UserTriggerId>, //TODO correlation_id instead of DB id
         snapshot: &StateSnapshot,
     ) -> anyhow::Result<CommandExecutionResult> {
-        let outcome = if let Some(last_execution) = self.execution_repository.last_execution_at(&command, &source).await
-            && last_execution.elapsed() < t!(30 seconds)
+        let target = CommandTarget::from(&command);
+        let latest_execution = self.execution_repository.latest_for(&target).await;
+        let source_changed = source_changed(latest_execution.as_ref(), &source);
+
+        let outcome = if source_changed {
+            self.dispatch_and_record(&command, &source).await
+        } else if let Some(last_execution) = latest_execution.as_ref()
+            && last_execution.source == source
+            && last_execution.command == command
+            && last_execution.created.elapsed() < t!(30 seconds)
         {
             Ok(CommandExecutionResult::Debounced)
         } else {
             match command.is_reflected_in_state(snapshot, &self.notification_client).await {
                 Err(error) => Err(error),
                 Ok(true) => Ok(CommandExecutionResult::AlreadyReflected),
-                Ok(false) => match self.dispatcher.dispatch(&command).await {
-                    Err(error) => Err(error),
-                    Ok(()) => {
-                        self.execution_repository
-                            .record_execution(command.clone(), source.clone())
-                            .await;
-                        Ok(CommandExecutionResult::Executed)
-                    }
-                },
+                Ok(false) => self.dispatch_and_record(&command, &source).await,
             }
         };
 
         add_to_trace(&command, &source, user_trigger_id.is_some(), &outcome);
 
         outcome
+    }
+
+    async fn dispatch_and_record(
+        &self,
+        command: &Command,
+        source: &ExternalId,
+    ) -> anyhow::Result<CommandExecutionResult> {
+        self.dispatcher.dispatch(command).await?;
+        self.execution_repository
+            .record_execution(command.clone(), source.clone())
+            .await;
+        Ok(CommandExecutionResult::Executed)
+    }
+}
+
+fn source_changed(last_execution: Option<&CommandExecution>, source: &ExternalId) -> bool {
+    last_execution.is_some_and(|execution| execution.source != *source)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::PowerToggle;
+
+    #[test]
+    fn source_change_is_detected_within_the_debounce_window() {
+        let command = Command::SetPower {
+            device: PowerToggle::Dehumidifier,
+            power_on: true,
+        };
+        let previous_source = ExternalId::new_static("test", "previous");
+        let current_source = ExternalId::new_static("test", "current");
+        let last_execution = CommandExecution {
+            command,
+            source: previous_source.clone(),
+            created: crate::core::time::DateTime::now(),
+        };
+
+        assert!(source_changed(Some(&last_execution), &current_source));
+        assert!(!source_changed(Some(&last_execution), &previous_source));
+        assert!(!source_changed(None, &current_source));
     }
 }
 

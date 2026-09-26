@@ -21,9 +21,14 @@ use crate::{
     },
     device_state::{
         adapter::{
-            IncomingDataSource, db::DeviceStateRepository, energy_meter::EnergyMeterIncomingDataSource,
-            homeassistant::HomeAssistantIncomingDataSource, lgtv::LgtvIncomingDataSource, tado::TadoIncomingDataSource,
-            tasmota::TasmotaIncomingDataSource, z2m::Z2mIncomingDataSource,
+            IncomingDataSource,
+            db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository},
+            energy_meter::EnergyMeterIncomingDataSource,
+            homeassistant::HomeAssistantIncomingDataSource,
+            lgtv::LgtvIncomingDataSource,
+            tado::TadoIncomingDataSource,
+            tasmota::TasmotaIncomingDataSource,
+            z2m::Z2mIncomingDataSource,
         },
         service::DeviceStateService,
     },
@@ -152,7 +157,8 @@ impl DeviceStateModule {
         tado_home_id: &str,
         availability_config: DeviceAvailabilityConfig,
     ) -> anyhow::Result<Self> {
-        let repo = DeviceStateRepository::new(pool.clone(), availability_config);
+        let state_repo = CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool.clone()));
+        let availability_repo = DeviceAvailabilityRepository::new(pool.clone(), availability_config);
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
@@ -162,7 +168,7 @@ impl DeviceStateModule {
 
         let event_bus = EventBus::new(128);
 
-        let service = DeviceStateService::new(repo.clone(), event_bus.emitter());
+        let service = DeviceStateService::new(state_repo, availability_repo, event_bus.emitter());
 
         Ok(DeviceStateModule {
             service: Arc::new(service),

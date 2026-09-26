@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use infrastructure::EventEmitter;
-use moka::future::Cache;
 
 use crate::{
     core::{
@@ -10,29 +9,32 @@ use crate::{
     },
     device_state::{
         DeviceAvailability, DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId,
-        DeviceStateValue, adapter::db::DeviceStateRepository,
+        DeviceStateValue,
+        adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository},
     },
 };
 
 pub struct DeviceStateService {
-    repo: DeviceStateRepository,
+    state_repo: CachedDeviceStateRepository,
+    availability_repo: DeviceAvailabilityRepository,
     event_tx: EventEmitter<DeviceStateEvent>,
-    current_cache: Cache<DeviceStateId, DataPoint<DeviceStateValue>>,
 }
 
 impl DeviceStateService {
-    pub fn new(repo: DeviceStateRepository, event_tx: EventEmitter<DeviceStateEvent>) -> Self {
-        let current_cache = Cache::builder().max_capacity(10_000).build();
-
+    pub fn new(
+        state_repo: CachedDeviceStateRepository,
+        availability_repo: DeviceAvailabilityRepository,
+        event_tx: EventEmitter<DeviceStateEvent>,
+    ) -> Self {
         Self {
-            repo,
+            state_repo,
+            availability_repo,
             event_tx,
-            current_cache,
         }
     }
 
     pub async fn initialize_availability(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
-        self.repo.sync_item_availability(&items).await
+        self.availability_repo.sync_item_availability(&items).await
     }
 
     pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
@@ -43,7 +45,7 @@ impl DeviceStateService {
 
         let id = DeviceStateId::from(&dp.value);
 
-        let changed = match self.repo.save(dp.clone()).await {
+        let changed = match self.state_repo.save(dp.clone()).await {
             Ok(changed) => changed,
             Err(e) => {
                 tracing::error!("Error saving device state for {:?}: {:?}", id, e);
@@ -55,15 +57,14 @@ impl DeviceStateService {
 
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
         if changed {
-            //Only when changed to preserve timestamps (new one not to be used unless value is new)
-            self.current_cache.insert(id, dp.clone()).await;
-            self.event_tx.send(DeviceStateEvent::Changed(dp.clone()));
+            // Only when changed to preserve timestamps (new one not to be used unless value is new).
+            self.event_tx.send(DeviceStateEvent::Changed(dp));
         }
     }
 
     pub async fn handle_availability_update(&self, avail: DeviceAvailability) {
         match self
-            .repo
+            .availability_repo
             .update_device_availability(&avail.item.item, &avail.item.source, &avail.last_seen, avail.marked_offline)
             .await
         {
@@ -84,7 +85,7 @@ impl DeviceStateService {
         let mut res = HashMap::new();
 
         for id in DeviceStateId::variants() {
-            match self.get_latest_for_device(&id).await {
+            match self.state_repo.get_latest_for_device(&id).await {
                 Ok(Some(dp)) => {
                     res.insert(id, dp);
                 }
@@ -100,32 +101,14 @@ impl DeviceStateService {
         Ok(res)
     }
 
-    async fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
-        if DateTime::is_shifted() {
-            //TODO uncached bootstapping leads to a lot of db hits, improve this
-            return self.repo.get_latest_for_device(id).await;
-        }
-
-        if let Some(dp) = self.current_cache.get(id).await {
-            return Ok(Some(dp));
-        }
-
-        tracing::debug!("Cache miss for device state {:?}, fetching from repo", id);
-        let Some(dp) = self.repo.get_latest_for_device(id).await? else {
-            return Ok(None);
-        };
-        self.current_cache.insert(*id, dp.clone()).await;
-        Ok(Some(dp))
-    }
-
     pub async fn get_all_data_points_in_range(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
-        self.repo.get_all_data_points_in_range_ts_asc(range).await
+        self.state_repo.get_all_data_points_in_range_ts_asc(range).await
     }
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
-        self.repo.get_item_availabilities().await
+        self.availability_repo.get_item_availabilities().await
     }
 }

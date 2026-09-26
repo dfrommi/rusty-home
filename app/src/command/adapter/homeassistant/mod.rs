@@ -2,6 +2,7 @@ use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
 use super::metrics::*;
+use crate::command::{NotificationKind, NotificationOperation};
 use crate::core::unit::{FanAirflow, FanSpeed};
 use serde_json::json;
 
@@ -17,16 +18,56 @@ impl HomeAssistantCommandExecutor {
         Self { client: http_client }
     }
 
-    pub async fn set_light_power(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
-        let service = if power_on { "turn_on" } else { "turn_off" };
+    pub async fn notify_phone(
+        &self,
+        service: &str,
+        notification: NotificationKind,
+        operation: NotificationOperation,
+    ) -> anyhow::Result<()> {
+        match operation {
+            NotificationOperation::Show => {
+                let (title, message, tag) = notification_content(notification);
+                self.client
+                    .call_service(
+                        "notify",
+                        service,
+                        json!({
+                            "title": title,
+                            "message": message,
+                            "data": { "tag": tag }
+                        }),
+                    )
+                    .await?;
+            }
+            NotificationOperation::Dismiss => {
+                self.client
+                    .call_service(
+                        "notify",
+                        service,
+                        json!({
+                            "message": "clear_notification",
+                            "data": { "tag": notification_tag(notification) }
+                        }),
+                    )
+                    .await?;
+            }
+        }
+        record_executed(service);
+        Ok(())
+    }
+
+    pub async fn notify_light(
+        &self,
+        id: &str,
+        _notification: NotificationKind,
+        operation: NotificationOperation,
+    ) -> anyhow::Result<()> {
+        let service = match operation {
+            NotificationOperation::Show => "turn_on",
+            NotificationOperation::Dismiss => "turn_off",
+        };
         self.client
-            .call_service(
-                "light",
-                service,
-                json!({
-                    "entity_id": vec![id.to_string()],
-                }),
-            )
+            .call_service("light", service, json!({ "entity_id": [id] }))
             .await?;
         record_executed(id);
         Ok(())
@@ -117,6 +158,18 @@ impl HomeAssistantCommandExecutor {
     }
 }
 
+fn notification_content(notification: NotificationKind) -> (&'static str, &'static str, &'static str) {
+    match notification {
+        NotificationKind::WindowOpened => ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened"),
+    }
+}
+
+fn notification_tag(notification: NotificationKind) -> &'static str {
+    match notification {
+        NotificationKind::WindowOpened => "window_opened",
+    }
+}
+
 fn record_executed(id: &str) {
     CommandMetric::Executed {
         device_id: id.to_string(),
@@ -134,6 +187,7 @@ fn philips_air_purifier_preset(speed: &FanSpeed) -> &'static str {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -142,6 +196,77 @@ mod tests {
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Low), "speed_1");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Medium), "speed_2");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::High), "speed_3");
+    }
+
+    #[test]
+    fn window_open_notification_keeps_its_mobile_presentation() {
+        assert_eq!(
+            notification_content(NotificationKind::WindowOpened),
+            ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened")
+        );
+        assert_eq!(notification_tag(NotificationKind::WindowOpened), "window_opened");
+    }
+
+    #[tokio::test]
+    async fn sends_phone_notification_to_provided_home_assistant_service() {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("POST", "/api/services/notify/mobile_app_jarvis")
+            .with_status(200)
+            .expect(1)
+            .create_async()
+            .await;
+        let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
+
+        executor
+            .notify_phone("mobile_app_jarvis", NotificationKind::WindowOpened, NotificationOperation::Show)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sends_indicator_show_and_dismiss_to_provided_light() {
+        let mut server = mockito::Server::new_async().await;
+        let _on = server
+            .mock("POST", "/api/services/light/turn_on")
+            .with_status(200)
+            .expect(1)
+            .create_async()
+            .await;
+        let _off = server
+            .mock("POST", "/api/services/light/turn_off")
+            .with_status(200)
+            .expect(1)
+            .create_async()
+            .await;
+        let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
+        executor
+            .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Show)
+            .await
+            .unwrap();
+        executor
+            .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Dismiss)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn home_assistant_service_error_is_returned() {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("POST", "/api/services/light/turn_on")
+            .with_status(500)
+            .expect(1)
+            .create_async()
+            .await;
+        let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
+
+        assert!(
+            executor
+                .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Show)
+                .await
+                .is_err()
+        );
     }
 }
 
@@ -173,7 +298,13 @@ impl HaHttpClient {
         tracing::info!("Calling HA service {}: {:?}", url, serde_json::to_string(&service_data)?);
 
         let response = self.client.post(url).json(&service_data).send().await?;
-        tracing::info!("Response: {} - {}", response.status(), response.text().await?);
+        let status = response.status();
+        let body = response.text().await?;
+        tracing::info!("Response: {} - {}", status, body);
+
+        if !status.is_success() {
+            anyhow::bail!("Home Assistant service returned HTTP status {status}");
+        }
 
         Ok(())
     }

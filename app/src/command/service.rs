@@ -8,7 +8,6 @@ use crate::{
     },
     core::id::ExternalId,
     home_state::StateSnapshot,
-    notification::NotificationClient,
     observability::system_metric_increment,
     t,
     trigger::UserTriggerId,
@@ -20,24 +19,19 @@ use super::dispatcher::CommandDispatcher;
 pub enum CommandExecutionResult {
     Debounced,
     AlreadyReflected,
+    AlreadyExecuted,
     Executed,
 }
 
 pub struct CommandService {
     dispatcher: CommandDispatcher,
-    notification_client: NotificationClient,
     execution_repository: CommandExecutionRepository,
 }
 
 impl CommandService {
-    pub fn new(
-        dispatcher: CommandDispatcher,
-        notification_client: NotificationClient,
-        execution_repository: CommandExecutionRepository,
-    ) -> Self {
+    pub fn new(dispatcher: CommandDispatcher, execution_repository: CommandExecutionRepository) -> Self {
         Self {
             dispatcher,
-            notification_client,
             execution_repository,
         }
     }
@@ -63,22 +57,12 @@ impl CommandService {
     ) -> anyhow::Result<CommandExecutionResult> {
         let target = CommandTarget::from(&command);
         let latest_execution = self.execution_repository.latest_for(&target).await;
-        let source_changed = source_changed(latest_execution.as_ref(), &source);
-
-        let outcome = if source_changed {
-            self.dispatch_and_record(&command, &source).await
-        } else if let Some(last_execution) = latest_execution.as_ref()
-            && last_execution.source == source
-            && last_execution.command == command
-            && last_execution.created.elapsed() < t!(30 seconds)
-        {
-            Ok(CommandExecutionResult::Debounced)
-        } else {
-            match command.is_reflected_in_state(snapshot, &self.notification_client).await {
-                Err(error) => Err(error),
-                Ok(true) => Ok(CommandExecutionResult::AlreadyReflected),
-                Ok(false) => self.dispatch_and_record(&command, &source).await,
-            }
+        let reflection = command.is_reflected_in_state(snapshot)?;
+        let outcome = match execution_decision(&command, reflection, latest_execution.as_ref()) {
+            ExecutionDecision::Debounced => Ok(CommandExecutionResult::Debounced),
+            ExecutionDecision::AlreadyReflected => Ok(CommandExecutionResult::AlreadyReflected),
+            ExecutionDecision::AlreadyExecuted => Ok(CommandExecutionResult::AlreadyExecuted),
+            ExecutionDecision::Execute => self.dispatch_and_record(&command).await,
         };
 
         add_to_trace(&command, &source, user_trigger_id.is_some(), &outcome);
@@ -86,45 +70,120 @@ impl CommandService {
         outcome
     }
 
-    async fn dispatch_and_record(
-        &self,
-        command: &Command,
-        source: &ExternalId,
-    ) -> anyhow::Result<CommandExecutionResult> {
+    async fn dispatch_and_record(&self, command: &Command) -> anyhow::Result<CommandExecutionResult> {
         self.dispatcher.dispatch(command).await?;
-        self.execution_repository
-            .record_execution(command.clone(), source.clone())
-            .await;
+        self.execution_repository.record_execution(command.clone()).await;
         Ok(CommandExecutionResult::Executed)
     }
 }
 
-fn source_changed(last_execution: Option<&CommandExecution>, source: &ExternalId) -> bool {
-    last_execution.is_some_and(|execution| execution.source != *source)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExecutionDecision {
+    Debounced,
+    AlreadyReflected,
+    AlreadyExecuted,
+    Execute,
+}
+
+fn execution_decision(
+    command: &Command,
+    reflection: Option<bool>,
+    latest_execution: Option<&CommandExecution>,
+) -> ExecutionDecision {
+    let same_command = latest_execution.is_some_and(|execution| execution.command == *command);
+    let recent_same_command = latest_execution
+        .is_some_and(|execution| execution.command == *command && execution.created.elapsed() < t!(30 seconds));
+
+    match reflection {
+        Some(true) => ExecutionDecision::AlreadyReflected,
+        Some(false) if recent_same_command => ExecutionDecision::Debounced,
+        Some(false) => ExecutionDecision::Execute,
+        None if command.deduplicate_when_unobservable() && same_command => ExecutionDecision::AlreadyExecuted,
+        None if recent_same_command => ExecutionDecision::Debounced,
+        None => ExecutionDecision::Execute,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::PowerToggle;
+    use crate::command::{
+        NotificationDestination, NotificationKind, NotificationOperation, NotificationRecipient, PowerToggle,
+    };
+
+    fn execution(command: Command, elapsed: crate::core::time::Duration) -> CommandExecution {
+        CommandExecution {
+            command,
+            created: crate::core::time::DateTime::now() - elapsed,
+        }
+    }
+
+    fn phone_notification(operation: NotificationOperation) -> Command {
+        Command::Notify {
+            notification: NotificationKind::WindowOpened,
+            target: NotificationDestination::Phone {
+                recipient: NotificationRecipient::Dennis,
+            },
+            operation,
+        }
+    }
 
     #[test]
-    fn source_change_is_detected_within_the_debounce_window() {
+    fn reflected_state_takes_priority_over_recent_execution() {
         let command = Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
         };
-        let previous_source = ExternalId::new_static("test", "previous");
-        let current_source = ExternalId::new_static("test", "current");
-        let last_execution = CommandExecution {
-            command,
-            source: previous_source.clone(),
-            created: crate::core::time::DateTime::now(),
-        };
+        let recent = execution(command.clone(), crate::t!(1 seconds));
 
-        assert!(source_changed(Some(&last_execution), &current_source));
-        assert!(!source_changed(Some(&last_execution), &previous_source));
-        assert!(!source_changed(None, &current_source));
+        assert_eq!(
+            execution_decision(&command, Some(true), Some(&recent)),
+            ExecutionDecision::AlreadyReflected
+        );
+    }
+
+    #[test]
+    fn unreflected_state_retries_after_the_debounce_window() {
+        let command = Command::SetPower {
+            device: PowerToggle::Dehumidifier,
+            power_on: true,
+        };
+        let recent = execution(command.clone(), crate::t!(1 seconds));
+        let stale = execution(command.clone(), crate::t!(1 minutes));
+
+        assert_eq!(
+            execution_decision(&command, Some(false), Some(&recent)),
+            ExecutionDecision::Debounced
+        );
+        assert_eq!(
+            execution_decision(&command, Some(false), Some(&stale)),
+            ExecutionDecision::Execute
+        );
+    }
+
+    #[test]
+    fn unobservable_notification_deduplicates_by_successful_command_equality() {
+        let command = phone_notification(NotificationOperation::Show);
+        let previous = execution(command.clone(), crate::t!(1 minutes));
+        let dismiss = execution(phone_notification(NotificationOperation::Dismiss), crate::t!(1 minutes));
+
+        assert_eq!(
+            execution_decision(&command, None, Some(&previous)),
+            ExecutionDecision::AlreadyExecuted
+        );
+        assert_eq!(execution_decision(&command, None, Some(&dismiss)), ExecutionDecision::Execute);
+    }
+
+    #[test]
+    fn one_shot_commands_remain_retryable_after_debounce() {
+        let command = Command::OpenDoor {
+            device: crate::command::Lock::BuildingEntrance,
+        };
+        let recent = execution(command.clone(), crate::t!(1 seconds));
+        let stale = execution(command.clone(), crate::t!(1 minutes));
+
+        assert_eq!(execution_decision(&command, None, Some(&recent)), ExecutionDecision::Debounced);
+        assert_eq!(execution_decision(&command, None, Some(&stale)), ExecutionDecision::Execute);
     }
 }
 
@@ -184,6 +243,10 @@ fn add_to_trace(
             "Command execution failed: {}",
             e
         ),
-        Ok(CommandExecutionResult::Debounced | CommandExecutionResult::AlreadyReflected) => {}
+        Ok(
+            CommandExecutionResult::Debounced
+            | CommandExecutionResult::AlreadyReflected
+            | CommandExecutionResult::AlreadyExecuted,
+        ) => {}
     }
 }

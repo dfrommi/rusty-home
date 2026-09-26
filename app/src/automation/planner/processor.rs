@@ -153,7 +153,11 @@ impl<'a> Planner<'a> {
                 TraceContext::current().set_ok();
                 PlanResult::Executed(trigger_id)
             }
-            Ok(CommandExecutionResult::Debounced | CommandExecutionResult::AlreadyReflected) => {
+            Ok(
+                CommandExecutionResult::Debounced
+                | CommandExecutionResult::AlreadyReflected
+                | CommandExecutionResult::AlreadyExecuted,
+            ) => {
                 TraceContext::current().set_ok();
                 PlanResult::Active(trigger_id)
             }

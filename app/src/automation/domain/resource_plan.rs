@@ -2,7 +2,9 @@ use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
     InformWindowOpen, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
-use crate::command::{CommandTarget, EnergySavingDevice, Fan, Notification, NotificationRecipient, PowerToggle};
+use crate::command::{
+    CommandTarget, EnergySavingDevice, Fan, NotificationKind, NotificationLight, NotificationRecipient, PowerToggle,
+};
 use crate::core::domain::Radiator;
 use crate::home_state::FanActivity;
 use crate::trigger::{Door, OnOffDevice, UserTriggerTarget};
@@ -36,18 +38,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 AutoTurnOff::IrHeater.into(),
                 FollowDefaultSetting::new(CommandTarget::SetPower {
                     device: PowerToggle::InfraredHeater,
-                })
-                .into(),
-            ],
-        ),
-        (
-            CommandTarget::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-            },
-            vec![
-                InformWindowOpen::NotificationLightLivingRoom.into(),
-                FollowDefaultSetting::new(CommandTarget::SetPower {
-                    device: PowerToggle::LivingRoomNotificationLight,
                 })
                 .into(),
             ],
@@ -133,29 +123,41 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         ),
         // --- Notifications ---
         (
-            CommandTarget::PushNotify {
-                recipient: NotificationRecipient::Dennis,
-                notification: Notification::WindowOpened,
+            CommandTarget::NotifyLight {
+                device: NotificationLight::LivingRoom,
             },
             vec![
-                InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into(),
-                FollowDefaultSetting::new(CommandTarget::PushNotify {
-                    recipient: NotificationRecipient::Dennis,
-                    notification: Notification::WindowOpened,
+                InformWindowOpen::NotificationLightLivingRoom.into(),
+                FollowDefaultSetting::new(CommandTarget::NotifyLight {
+                    device: NotificationLight::LivingRoom,
                 })
                 .into(),
             ],
         ),
         (
-            CommandTarget::PushNotify {
+            CommandTarget::NotifyPhone {
+                recipient: NotificationRecipient::Dennis,
+                notification: NotificationKind::WindowOpened,
+            },
+            vec![
+                InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into(),
+                FollowDefaultSetting::new(CommandTarget::NotifyPhone {
+                    recipient: NotificationRecipient::Dennis,
+                    notification: NotificationKind::WindowOpened,
+                })
+                .into(),
+            ],
+        ),
+        (
+            CommandTarget::NotifyPhone {
                 recipient: NotificationRecipient::Sabine,
-                notification: Notification::WindowOpened,
+                notification: NotificationKind::WindowOpened,
             },
             vec![
                 InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into(),
-                FollowDefaultSetting::new(CommandTarget::PushNotify {
+                FollowDefaultSetting::new(CommandTarget::NotifyPhone {
                     recipient: NotificationRecipient::Sabine,
-                    notification: Notification::WindowOpened,
+                    notification: NotificationKind::WindowOpened,
                 })
                 .into(),
             ],
@@ -168,4 +170,41 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             vec![UserTriggerAction::new(UserTriggerTarget::OpenDoor(Door::Building)).into()],
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn notification_plans_are_keyed_by_their_lockable_targets() {
+        let plans = resource_plans();
+        let mut targets = HashSet::new();
+        for (target, _) in &plans {
+            assert!(targets.insert(target.clone()), "duplicate resource plan for {target}");
+        }
+
+        let light_target = CommandTarget::NotifyLight {
+            device: NotificationLight::LivingRoom,
+        };
+        let (_, light_rules) = plans
+            .iter()
+            .find(|(target, _)| target == &light_target)
+            .expect("living-room notification light plan");
+        assert!(matches!(
+            light_rules.first(),
+            Some(HomeAction::InformWindowOpen(InformWindowOpen::NotificationLightLivingRoom))
+        ));
+        assert!(matches!(light_rules.last(), Some(HomeAction::FollowDefaultSetting(_))));
+
+        for recipient in [NotificationRecipient::Dennis, NotificationRecipient::Sabine] {
+            let phone_target = CommandTarget::NotifyPhone {
+                recipient,
+                notification: NotificationKind::WindowOpened,
+            };
+            assert!(plans.iter().any(|(target, _)| target == &phone_target));
+        }
+    }
 }

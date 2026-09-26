@@ -1,13 +1,13 @@
 use crate::{
     command::{
-        Command, EnergySavingDevice, Fan, Lock, NotificationAction, PowerToggle,
+        Command, EnergySavingDevice, Fan, Lock, NotificationDestination, NotificationLight, NotificationRecipient,
+        PowerToggle,
         adapter::{
             HomeAssistantCommandExecutor, LgTvCommandExecutor, NukiCommandExecutor, TasmotaCommandExecutor,
             Z2mCommandExecutor,
         },
     },
     core::domain::Radiator,
-    notification::{NotificationClient, NotificationId},
 };
 
 pub struct CommandDispatcher {
@@ -16,7 +16,6 @@ pub struct CommandDispatcher {
     lgtv: LgTvCommandExecutor,
     nuki: NukiCommandExecutor,
     homeassistant: HomeAssistantCommandExecutor,
-    notifications: NotificationClient,
 }
 
 impl CommandDispatcher {
@@ -26,7 +25,6 @@ impl CommandDispatcher {
         lgtv: LgTvCommandExecutor,
         nuki: NukiCommandExecutor,
         homeassistant: HomeAssistantCommandExecutor,
-        notifications: NotificationClient,
     ) -> Self {
         Self {
             tasmota,
@@ -34,7 +32,6 @@ impl CommandDispatcher {
             lgtv,
             nuki,
             homeassistant,
-            notifications,
         }
     }
 
@@ -48,10 +45,6 @@ impl CommandDispatcher {
                 device: PowerToggle::Dehumidifier,
                 power_on,
             } => self.z2m.set_power("bathroom/dehumidifier_plug", *power_on).await,
-            Command::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on,
-            } => self.homeassistant.set_light_power("light.hue_go", *power_on).await,
             Command::SetHeating { device, target_state } => {
                 let device_id = match device {
                     Radiator::RoomOfRequirements => "room_of_requirements/radiator_thermostat_sonoff",
@@ -63,18 +56,24 @@ impl CommandDispatcher {
                 };
                 self.z2m.set_heating(device_id, target_state.clone()).await
             }
-            Command::PushNotify {
-                action,
+            Command::Notify {
                 notification,
-                recipient,
-            } => match action {
-                NotificationAction::Notify => self.notifications.notify(recipient, notification).await,
-                NotificationAction::Dismiss => {
-                    self.notifications
-                        .dismiss(recipient, NotificationId::from(notification))
-                        .await
-                }
-            },
+                target: NotificationDestination::Phone { recipient },
+                operation,
+            } => {
+                self.homeassistant
+                    .notify_phone(phone_service(*recipient), *notification, *operation)
+                    .await
+            }
+            Command::Notify {
+                notification,
+                target: NotificationDestination::Light { device },
+                operation,
+            } => {
+                self.homeassistant
+                    .notify_light(notification_light_entity(*device), *notification, *operation)
+                    .await
+            }
             Command::SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
                 on,
@@ -99,5 +98,30 @@ impl CommandDispatcher {
                 device: Lock::BuildingEntrance,
             } => self.nuki.open_door("1CC90CCA").await,
         }
+    }
+}
+
+fn phone_service(recipient: NotificationRecipient) -> &'static str {
+    match recipient {
+        NotificationRecipient::Dennis => "mobile_app_jarvis",
+        NotificationRecipient::Sabine => "mobile_app_simi_2",
+    }
+}
+
+fn notification_light_entity(device: NotificationLight) -> &'static str {
+    match device {
+        NotificationLight::LivingRoom => "light.hue_go",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn notification_targets_resolve_to_physical_home_assistant_ids() {
+        assert_eq!(phone_service(NotificationRecipient::Dennis), "mobile_app_jarvis");
+        assert_eq!(phone_service(NotificationRecipient::Sabine), "mobile_app_simi_2");
+        assert_eq!(notification_light_entity(NotificationLight::LivingRoom), "light.hue_go");
     }
 }

@@ -2,23 +2,18 @@ use crate::command::HeatingTargetState;
 use crate::core::range::Range;
 use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
 use crate::home_state::{FanActivity, HeatingDemandLimit, PowerAvailable, SetPoint, StateSnapshot};
-use crate::notification::NotificationClient;
 use anyhow::Result;
 
 use crate::home_state::EnergySaving;
 
-use super::{
-    Command, EnergySavingDevice, Fan, Notification, NotificationAction, NotificationRecipient, PowerToggle, Radiator,
-};
+use super::{Command, EnergySavingDevice, Fan, NotificationDestination, NotificationOperation, PowerToggle, Radiator};
 
 impl Command {
-    pub async fn is_reflected_in_state(
-        &self,
-        snapshot: &StateSnapshot,
-        notification_client: &NotificationClient,
-    ) -> Result<bool> {
+    pub fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
         match self {
-            Command::SetPower { device, power_on } => is_set_power_reflected_in_state(device, *power_on, snapshot),
+            Command::SetPower { device, power_on } => {
+                is_set_power_reflected_in_state(device, *power_on, snapshot).map(Some)
+            }
             Command::SetHeating {
                 device,
                 target_state: HeatingTargetState::Off,
@@ -27,7 +22,8 @@ impl Command {
                 &Range::new(DegreeCelsius(0.0), DegreeCelsius(0.0)),
                 &Range::new(Percent(0.0), Percent(0.0)),
                 snapshot,
-            ),
+            )
+            .map(Some),
             Command::SetHeating {
                 device,
                 target_state:
@@ -35,17 +31,19 @@ impl Command {
                         target_temperature,
                         demand_limit,
                     },
-            } => is_set_heating_reflected_in_state(device, target_temperature, demand_limit, snapshot),
-            Command::PushNotify {
-                recipient,
-                notification,
-                action,
-            } => Ok(is_push_notify_reflected_in_state(recipient, notification, action, notification_client).await),
-            Command::SetEnergySaving { device, on } => is_set_energy_saving_reflected_in_state(device, *on, snapshot),
-            Command::ControlFan { device, speed } => is_fan_control_reflected_in_state(device, speed, snapshot),
+            } => is_set_heating_reflected_in_state(device, target_temperature, demand_limit, snapshot).map(Some),
+            Command::Notify { target, operation, .. } => {
+                is_notification_reflected_in_state(target, *operation, snapshot)
+            }
+            Command::SetEnergySaving { device, on } => {
+                is_set_energy_saving_reflected_in_state(device, *on, snapshot).map(Some)
+            }
+            Command::ControlFan { device, speed } => {
+                is_fan_control_reflected_in_state(device, speed, snapshot).map(Some)
+            }
             Command::OpenDoor { .. } => {
-                //Only a short trigger, no permanent state change
-                Ok(false)
+                // One-shot action with no observable persistent state.
+                Ok(None)
             }
         }
     }
@@ -77,7 +75,6 @@ fn is_set_heating_reflected_in_state(
 fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapshot: &StateSnapshot) -> Result<bool> {
     let powered_item = match device {
         PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
-        PowerToggle::LivingRoomNotificationLight => PowerAvailable::LivingRoomNotificationLight,
         PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
     };
 
@@ -85,18 +82,25 @@ fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapsho
     Ok(powered == power_on)
 }
 
-async fn is_push_notify_reflected_in_state(
-    recipient: &NotificationRecipient,
-    notification: &Notification,
-    action: &NotificationAction,
-    notification_client: &NotificationClient,
-) -> bool {
-    let is_active = notification_client.is_active(recipient, notification).await;
-
-    match action {
-        NotificationAction::Notify => is_active,
-        NotificationAction::Dismiss => !is_active,
+fn is_notification_reflected_in_state(
+    target: &NotificationDestination,
+    operation: NotificationOperation,
+    snapshot: &StateSnapshot,
+) -> Result<Option<bool>> {
+    match target {
+        NotificationDestination::Phone { .. } => Ok(None),
+        NotificationDestination::Light { device } => {
+            let state_item = match device {
+                super::NotificationLight::LivingRoom => PowerAvailable::LivingRoomNotificationLight,
+            };
+            let powered = snapshot.try_get(state_item)?.value;
+            Ok(Some(notification_light_is_reflected(operation, powered)))
+        }
     }
+}
+
+fn notification_light_is_reflected(operation: NotificationOperation, powered: bool) -> bool {
+    powered == (operation == NotificationOperation::Show)
 }
 
 fn is_set_energy_saving_reflected_in_state(
@@ -122,43 +126,40 @@ fn is_fan_control_reflected_in_state(device: &Fan, airflow: &FanAirflow, snapsho
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
-    use mockito::Server;
-
     use super::*;
-    use crate::notification::{NotificationId, NotificationModule};
 
-    #[tokio::test]
-    async fn push_notification_reflection_uses_notification_active_state() {
-        let mut server = Server::new_async().await;
-        let _mock = server
-            .mock("POST", "/api/services/notify/mobile_app_jarvis")
-            .with_status(200)
-            .expect(2)
-            .create_async()
-            .await;
-        let module = NotificationModule::new(&server.url(), "token");
-        let client = module.client();
-        let recipient = NotificationRecipient::Dennis;
-        let notification = Notification::WindowOpened;
-        let snapshot = StateSnapshot::default();
-        let notify = Command::PushNotify {
-            action: NotificationAction::Notify,
-            notification: notification.clone(),
-            recipient: recipient.clone(),
-        };
-        let dismiss = Command::PushNotify {
-            action: NotificationAction::Dismiss,
-            notification: notification.clone(),
-            recipient: recipient.clone(),
+    #[test]
+    fn phone_notification_reflection_is_unknown() {
+        let command = Command::Notify {
+            notification: super::super::NotificationKind::WindowOpened,
+            target: NotificationDestination::Phone {
+                recipient: super::super::NotificationRecipient::Dennis,
+            },
+            operation: NotificationOperation::Show,
         };
 
-        assert!(!notify.is_reflected_in_state(&snapshot, &client).await.unwrap());
-        client.notify(&recipient, &notification).await.unwrap();
-        assert!(notify.is_reflected_in_state(&snapshot, &client).await.unwrap());
-        assert!(!dismiss.is_reflected_in_state(&snapshot, &client).await.unwrap());
-        client.dismiss(&recipient, NotificationId::WindowOpened).await.unwrap();
-        assert!(dismiss.is_reflected_in_state(&snapshot, &client).await.unwrap());
+        assert_eq!(command.is_reflected_in_state(&StateSnapshot::default()).unwrap(), None);
+    }
+
+    #[test]
+    fn light_notification_reflection_checks_power_state() {
+        assert!(notification_light_is_reflected(NotificationOperation::Show, true));
+        assert!(!notification_light_is_reflected(NotificationOperation::Show, false));
+        assert!(notification_light_is_reflected(NotificationOperation::Dismiss, false));
+        assert!(!notification_light_is_reflected(NotificationOperation::Dismiss, true));
+    }
+
+    #[test]
+    fn light_notification_requires_observed_power_state() {
+        let command = Command::Notify {
+            notification: super::super::NotificationKind::WindowOpened,
+            target: NotificationDestination::Light {
+                device: super::super::NotificationLight::LivingRoom,
+            },
+            operation: NotificationOperation::Show,
+        };
+
+        assert!(command.is_reflected_in_state(&StateSnapshot::default()).is_err());
     }
 }

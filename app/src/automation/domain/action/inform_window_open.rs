@@ -1,7 +1,9 @@
 use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::command::{Command, Notification, NotificationAction, NotificationRecipient, PowerToggle};
+use crate::command::{
+    Command, NotificationDestination, NotificationKind, NotificationLight, NotificationOperation, NotificationRecipient,
+};
 use crate::core::domain::RoomWithWindow;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
@@ -20,16 +22,19 @@ impl Rule for InformWindowOpen {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<super::RuleResult> {
         let command = match self {
             InformWindowOpen::PushNotification(recipient) if self.preconditions_fulfilled_push(recipient, ctx)? => {
-                Command::PushNotify {
-                    action: NotificationAction::Notify,
-                    notification: Notification::WindowOpened,
-                    recipient: recipient.clone(),
+                Command::Notify {
+                    notification: NotificationKind::WindowOpened,
+                    target: NotificationDestination::Phone { recipient: *recipient },
+                    operation: NotificationOperation::Show,
                 }
             }
             InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(ctx)? => {
-                Command::SetPower {
-                    device: PowerToggle::LivingRoomNotificationLight,
-                    power_on: true,
+                Command::Notify {
+                    notification: NotificationKind::WindowOpened,
+                    target: NotificationDestination::Light {
+                        device: NotificationLight::LivingRoom,
+                    },
+                    operation: NotificationOperation::Show,
                 }
             }
 

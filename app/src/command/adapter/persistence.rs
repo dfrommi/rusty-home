@@ -2,14 +2,13 @@ use moka::future::Cache;
 
 use crate::{
     command::{Command, CommandTarget},
-    core::{id::ExternalId, time::DateTime},
+    core::time::DateTime,
     t,
 };
 
 #[derive(Debug, Clone)]
 pub struct CommandExecution {
     pub command: Command,
-    pub source: ExternalId,
     pub created: DateTime,
 }
 
@@ -30,14 +29,13 @@ impl CommandExecutionRepository {
         self.last_executions.get(target).await
     }
 
-    pub async fn record_execution(&self, command: Command, source: ExternalId) {
+    pub async fn record_execution(&self, command: Command) {
         let target = CommandTarget::from(&command);
         self.last_executions
             .insert(
                 target,
                 CommandExecution {
                     command,
-                    source,
                     created: t!(now),
                 },
             )
@@ -51,16 +49,13 @@ mod tests {
     use crate::command::PowerToggle;
 
     #[tokio::test]
-    async fn latest_execution_is_loaded_by_target_with_its_command_and_source() {
+    async fn latest_execution_is_loaded_by_target_with_its_command() {
         let repository = CommandExecutionRepository::default();
         let command = Command::SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
         };
-        let source = ExternalId::new_static("test", "source");
-        let other_source = ExternalId::new_static("test", "other_source");
-
-        repository.record_execution(command.clone(), source.clone()).await;
+        repository.record_execution(command.clone()).await;
 
         let other_state = Command::SetPower {
             device: PowerToggle::Dehumidifier,
@@ -72,7 +67,5 @@ mod tests {
             .expect("execution was recorded");
 
         assert_eq!(latest.command, command);
-        assert_eq!(latest.source, source);
-        assert_ne!(latest.source, other_source);
     }
 }

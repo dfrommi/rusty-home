@@ -19,10 +19,10 @@ pub enum Command {
         target_state: HeatingTargetState,
     },
 
-    PushNotify {
-        action: NotificationAction,
-        notification: Notification,
-        recipient: NotificationRecipient,
+    Notify {
+        notification: NotificationKind,
+        target: NotificationDestination,
+        operation: NotificationOperation,
     },
     SetEnergySaving {
         device: EnergySavingDevice,
@@ -46,11 +46,14 @@ pub enum CommandTarget {
     #[display("SetHeating[{}]", device)]
     SetHeating { device: Radiator },
 
-    #[display("PushNotify[{} - {}]", notification, recipient)]
-    PushNotify {
+    #[display("NotifyPhone[{} @ {}]", notification, recipient)]
+    NotifyPhone {
+        notification: NotificationKind,
         recipient: NotificationRecipient,
-        notification: Notification,
     },
+
+    #[display("NotifyLight[{}]", device)]
+    NotifyLight { device: NotificationLight },
 
     #[display("SetEnergySaving[{}]", device)]
     SetEnergySaving { device: EnergySavingDevice },
@@ -73,14 +76,18 @@ impl From<&Command> for CommandTarget {
         match val {
             Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
             Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: *device },
-            Command::PushNotify {
-                recipient,
+            Command::Notify {
                 notification,
+                target: NotificationDestination::Phone { recipient },
                 ..
-            } => CommandTarget::PushNotify {
-                recipient: recipient.clone(),
-                notification: notification.clone(),
+            } => CommandTarget::NotifyPhone {
+                recipient: *recipient,
+                notification: *notification,
             },
+            Command::Notify {
+                target: NotificationDestination::Light { device },
+                ..
+            } => CommandTarget::NotifyLight { device: *device },
             Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving { device: device.clone() },
             Command::ControlFan { device, .. } => CommandTarget::ControlFan { device: device.clone() },
             Command::OpenDoor { device } => CommandTarget::OpenDoor { device: device.clone() },
@@ -108,14 +115,14 @@ impl Command {
                 target: device.to_string(),
                 state: target_state.to_string(),
             },
-            Command::PushNotify {
-                action,
+            Command::Notify {
                 notification,
-                recipient,
+                target,
+                operation,
             } => CommandDisplayParts {
-                command_type: "PushNotify",
-                target: format!("{notification} @ {recipient}"),
-                state: action.to_string(),
+                command_type: "Notify",
+                target: format!("{notification} @ {target}"),
+                state: operation.to_string(),
             },
             Command::SetEnergySaving { device, on } => CommandDisplayParts {
                 command_type: "SetEnergySaving",
@@ -134,6 +141,16 @@ impl Command {
             },
         }
     }
+
+    pub fn deduplicate_when_unobservable(&self) -> bool {
+        matches!(
+            self,
+            Command::Notify {
+                target: NotificationDestination::Phone { .. },
+                ..
+            }
+        )
+    }
 }
 
 //
@@ -144,7 +161,6 @@ impl Command {
 pub enum PowerToggle {
     Dehumidifier,
     InfraredHeater,
-    LivingRoomNotificationLight,
 }
 
 //
@@ -173,41 +189,41 @@ impl std::fmt::Display for HeatingTargetState {
 }
 
 //
-// SEND NOTIFICATION
+// NOTIFICATIONS
 //
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
-pub enum Notification {
+pub enum NotificationKind {
     WindowOpened,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationRecipient {
     Dennis,
     Sabine,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
-pub enum NotificationAction {
-    Notify,
+pub enum NotificationLight {
+    LivingRoom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum NotificationDestination {
+    #[display("Phone({recipient})")]
+    Phone { recipient: NotificationRecipient },
+    #[display("Light({device})")]
+    Light { device: NotificationLight },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationOperation {
+    Show,
     Dismiss,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Id)]
-pub struct NotificationTarget {
-    pub recipient: NotificationRecipient,
-    pub notification: Notification,
-}
-
-impl From<NotificationTarget> for CommandTarget {
-    fn from(val: NotificationTarget) -> Self {
-        CommandTarget::PushNotify {
-            recipient: val.recipient,
-            notification: val.notification,
-        }
-    }
 }
 
 //
@@ -246,17 +262,56 @@ mod test {
     use super::*;
 
     #[test]
-    fn set_power() {
+    fn notify_serializes_its_intent_and_destination() {
         assert_json_eq!(
-            Command::SetPower {
-                device: PowerToggle::LivingRoomNotificationLight,
-                power_on: true,
+            Command::Notify {
+                notification: NotificationKind::WindowOpened,
+                target: NotificationDestination::Light {
+                    device: NotificationLight::LivingRoom,
+                },
+                operation: NotificationOperation::Show,
             },
             json!({
-                "type": "set_power",
-                "device": "living_room_notification_light",
-                "power_on": true
+                "type": "notify",
+                "notification": "window_opened",
+                "target": {
+                    "type": "light",
+                    "device": "living_room"
+                },
+                "operation": "show"
             })
         );
+    }
+
+    #[test]
+    fn notification_command_targets_have_clear_ids_and_display() {
+        let phone_command = Command::Notify {
+            notification: NotificationKind::WindowOpened,
+            target: NotificationDestination::Phone {
+                recipient: NotificationRecipient::Dennis,
+            },
+            operation: NotificationOperation::Show,
+        };
+        let phone_target = CommandTarget::from(&phone_command);
+
+        assert_eq!(
+            phone_target.ext_id().to_string(),
+            "command_target::notify_phone::window_opened::dennis"
+        );
+        assert_eq!(phone_target.to_string(), "NotifyPhone[WindowOpened @ Dennis]");
+        assert_eq!(phone_command.display_parts().target, "WindowOpened @ Phone(Dennis)");
+        assert_eq!(phone_command.display_parts().state, "Show");
+
+        let light_command = Command::Notify {
+            notification: NotificationKind::WindowOpened,
+            target: NotificationDestination::Light {
+                device: NotificationLight::LivingRoom,
+            },
+            operation: NotificationOperation::Show,
+        };
+        let light_target = CommandTarget::from(&light_command);
+
+        assert_eq!(light_target.ext_id().to_string(), "command_target::notify_light::living_room");
+        assert_eq!(light_target.to_string(), "NotifyLight[LivingRoom]");
     }
 }

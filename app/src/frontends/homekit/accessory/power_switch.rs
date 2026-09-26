@@ -26,7 +26,6 @@ impl Accessory for PowerSwitch {
         let powered_item = match self.power_toggle {
             PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
             PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
-            PowerToggle::LivingRoomNotificationLight => PowerAvailable::LivingRoomNotificationLight,
         };
 
         match state {
@@ -46,10 +45,6 @@ impl Accessory for PowerSwitch {
             let on_off_device = match &self.power_toggle {
                 PowerToggle::Dehumidifier => OnOffDevice::Dehumidifier,
                 PowerToggle::InfraredHeater => OnOffDevice::InfraredHeater,
-                PowerToggle::LivingRoomNotificationLight => {
-                    tracing::error!("LivingRoomNotificationLight power toggle is not implemented in Homekit adapter");
-                    return None;
-                }
             };
             return Some(HomekitCommand::immediate(UserTrigger::DevicePower {
                 device: on_off_device,

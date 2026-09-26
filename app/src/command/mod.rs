@@ -13,9 +13,7 @@ use infrastructure::{EventListener, Mqtt};
 pub use service::CommandExecutionResult;
 use service::CommandService;
 
-use crate::{
-    core::id::ExternalId, home_state::HomeStateEvent, notification::NotificationClient, trigger::UserTriggerId,
-};
+use crate::{core::id::ExternalId, home_state::HomeStateEvent, trigger::UserTriggerId};
 
 pub struct CommandModule {
     service: Arc<CommandService>,
@@ -36,7 +34,6 @@ impl CommandModule {
         lgtv_base_topic: &str,
         ha_url: &str,
         ha_token: &str,
-        notification_client: NotificationClient,
         nuki_url: &str,
         nuki_token: &str,
         home_state_listener: EventListener<HomeStateEvent>,
@@ -50,19 +47,9 @@ impl CommandModule {
         let z2m_sensor_sync_runner =
             adapter::z2m::Z2mSensorSyncRunner::new(mqtt_client.sender(z2m_event_topic), home_state_listener);
 
-        let dispatcher = CommandDispatcher::new(
-            tasmota_executor,
-            z2m_executor,
-            lgtv_executor,
-            nuki_executor,
-            ha_executor,
-            notification_client.clone(),
-        );
-        let service = Arc::new(CommandService::new(
-            dispatcher,
-            notification_client,
-            CommandExecutionRepository::default(),
-        ));
+        let dispatcher =
+            CommandDispatcher::new(tasmota_executor, z2m_executor, lgtv_executor, nuki_executor, ha_executor);
+        let service = Arc::new(CommandService::new(dispatcher, CommandExecutionRepository::default()));
 
         Self {
             service,

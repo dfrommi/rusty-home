@@ -1,7 +1,7 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::command::{Command, CommandTarget, NotificationAction};
+use crate::command::{Command, CommandTarget, NotificationDestination, NotificationKind, NotificationOperation};
 use crate::core::unit::FanAirflow;
 
 #[derive(Debug, Clone, Id)]
@@ -21,13 +21,19 @@ impl Rule for FollowDefaultSetting {
                 device,
                 power_on: false,
             },
-            CommandTarget::PushNotify {
+            CommandTarget::NotifyPhone {
                 recipient,
                 notification,
-            } => Command::PushNotify {
-                action: NotificationAction::Dismiss,
+            } => Command::Notify {
                 notification,
-                recipient,
+                target: NotificationDestination::Phone { recipient },
+                operation: NotificationOperation::Dismiss,
+            },
+            CommandTarget::NotifyLight { device } => Command::Notify {
+                // The indicator has one configured notification kind today; dismissal clears the light output.
+                notification: NotificationKind::WindowOpened,
+                target: NotificationDestination::Light { device },
+                operation: NotificationOperation::Dismiss,
             },
             CommandTarget::SetEnergySaving { device } => Command::SetEnergySaving { device, on: true },
             CommandTarget::ControlFan { device } => Command::ControlFan {
@@ -45,5 +51,56 @@ impl Rule for FollowDefaultSetting {
         };
 
         Ok(RuleResult::Execute(command))
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::command::{NotificationLight, NotificationRecipient};
+    use crate::home_state::StateSnapshot;
+
+    fn evaluate_default(target: CommandTarget) -> anyhow::Result<Command> {
+        let rule = FollowDefaultSetting::new(target);
+        match rule.evaluate(&RuleEvaluationContext::new(StateSnapshot::default()))? {
+            RuleResult::Execute(command) => Ok(command),
+            RuleResult::ExecuteTrigger(_, _) | RuleResult::Skip => anyhow::bail!("expected a default command"),
+        }
+    }
+
+    #[test]
+    fn phone_notification_default_dismisses_its_notification_slot() {
+        assert_eq!(
+            evaluate_default(CommandTarget::NotifyPhone {
+                recipient: NotificationRecipient::Dennis,
+                notification: NotificationKind::WindowOpened,
+            })
+            .unwrap(),
+            Command::Notify {
+                notification: NotificationKind::WindowOpened,
+                target: NotificationDestination::Phone {
+                    recipient: NotificationRecipient::Dennis,
+                },
+                operation: NotificationOperation::Dismiss,
+            }
+        );
+    }
+
+    #[test]
+    fn light_notification_default_dismisses_the_light() {
+        assert_eq!(
+            evaluate_default(CommandTarget::NotifyLight {
+                device: NotificationLight::LivingRoom,
+            })
+            .unwrap(),
+            Command::Notify {
+                notification: NotificationKind::WindowOpened,
+                target: NotificationDestination::Light {
+                    device: NotificationLight::LivingRoom,
+                },
+                operation: NotificationOperation::Dismiss,
+            }
+        );
     }
 }

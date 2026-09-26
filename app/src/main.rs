@@ -16,7 +16,6 @@ mod core;
 mod device_state;
 mod frontends;
 mod home_state;
-mod notification;
 mod observability;
 mod settings;
 mod trigger;
@@ -57,9 +56,6 @@ pub async fn main() -> anyhow::Result<()> {
     device_state_module.initialize_availability().await?;
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
-    let notification_module =
-        notification::NotificationModule::new(&settings.homeassistant.url, &settings.homeassistant.token);
-
     let home_state_module = HomeStateModule::new(
         t!(25 hours),
         device_state_module.subscribe(),
@@ -75,7 +71,6 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.lgtv.base_topic,
         &settings.homeassistant.url,
         &settings.homeassistant.token,
-        notification_module.client(),
         &settings.nuki.url,
         &settings.nuki.token,
         home_state_module.subscribe(),

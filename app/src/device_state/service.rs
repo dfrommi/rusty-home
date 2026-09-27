@@ -10,7 +10,7 @@ use crate::{
     device_state::{
         DeviceAvailability, DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId,
         DeviceStateValue,
-        adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository},
+        adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, SaveOutcome},
     },
 };
 
@@ -45,19 +45,24 @@ impl DeviceStateService {
 
         let id = DeviceStateId::from(&dp.value);
 
-        let changed = match self.state_repo.save(dp.clone()).await {
-            Ok(changed) => changed,
+        let outcome = match self.state_repo.save(dp.clone()).await {
+            Ok(outcome) => outcome,
             Err(e) => {
                 tracing::error!("Error saving device state for {:?}: {:?}", id, e);
                 return;
             }
         };
 
-        tracing::info!("Device state update received (changed = {}): {:?}", changed, &dp.value);
+        if outcome == SaveOutcome::Stale {
+            tracing::debug!("Ignoring stale device state update for {:?}: {:?}", id, dp);
+            return;
+        }
+
+        tracing::info!("Device state update received ({:?}): {:?}", outcome, &dp.value);
 
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
-        if changed {
-            // Only when changed to preserve timestamps (new one not to be used unless value is new).
+        if outcome == SaveOutcome::Inserted {
+            // Only for new values, to preserve the time when the value became active.
             self.event_tx.send(DeviceStateEvent::Changed(dp));
         }
     }
@@ -110,5 +115,70 @@ impl DeviceStateService {
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         self.availability_repo.get_item_availabilities().await
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use infrastructure::EventBus;
+    use sqlx::PgPool;
+
+    use crate::{
+        core::{timeseries::DataPoint, unit::DegreeCelsius},
+        device_state::{
+            DeviceAvailabilityConfig, DeviceStateEvent, DeviceStateValue, Temperature,
+            adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository},
+        },
+        t,
+    };
+
+    use super::DeviceStateService;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn stale_updates_do_not_emit_events_but_duplicates_still_emit_updated(pool: PgPool) -> anyhow::Result<()> {
+        let event_bus = EventBus::new(8);
+        let mut events = event_bus.subscribe();
+        let service = DeviceStateService::new(
+            CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool.clone())),
+            DeviceAvailabilityRepository::new(
+                pool,
+                DeviceAvailabilityConfig {
+                    default_offline_after: t!(1 hours),
+                    overrides: vec![],
+                },
+            ),
+            event_bus.emitter(),
+        );
+        let latest = DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0)),
+            t!(now),
+        );
+
+        service.handle_state_update(latest.clone()).await;
+        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Updated(_))));
+        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Changed(_))));
+
+        service.handle_state_update(latest).await;
+        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Updated(_))));
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
+                .await
+                .is_err()
+        );
+
+        service
+            .handle_state_update(DataPoint::new(
+                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
+                t!(1 minutes ago),
+            ))
+            .await;
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
+                .await
+                .is_err()
+        );
+
+        Ok(())
     }
 }

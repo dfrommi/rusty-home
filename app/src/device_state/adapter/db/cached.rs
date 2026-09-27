@@ -9,7 +9,7 @@ use crate::{
     device_state::{DeviceStateId, DeviceStateValue},
 };
 
-use super::PostgresDeviceStateRepository;
+use super::{PostgresDeviceStateRepository, SaveOutcome};
 
 pub struct CachedDeviceStateRepository {
     postgres: PostgresDeviceStateRepository,
@@ -24,15 +24,15 @@ impl CachedDeviceStateRepository {
         }
     }
 
-    pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<bool> {
+    pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<SaveOutcome> {
         let id = DeviceStateId::from(&dp.value);
-        let changed = self.postgres.save(dp.clone()).await?;
+        let outcome = self.postgres.save(dp.clone()).await?;
 
-        if changed {
+        if outcome == SaveOutcome::Inserted {
             self.current_cache.insert(id, dp).await;
         }
 
-        Ok(changed)
+        Ok(outcome)
     }
 
     pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> Result<Option<DataPoint<DeviceStateValue>>> {

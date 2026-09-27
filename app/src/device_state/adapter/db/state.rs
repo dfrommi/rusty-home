@@ -9,6 +9,13 @@ use crate::{
     t,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveOutcome {
+    Inserted,
+    Duplicate,
+    Stale,
+}
+
 #[derive(Debug, Clone)]
 pub struct PostgresDeviceStateRepository {
     pool: PgPool,
@@ -23,29 +30,43 @@ impl PostgresDeviceStateRepository {
         }
     }
 
-    pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<bool> {
+    pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<SaveOutcome> {
         let fvalue = f64::from(&dp.value);
         let tag_id = self.get_tag_id(&dp.value.into()).await?;
+        let timestamp = dp.timestamp.into_db();
 
         let result = sqlx::query!(
             r#"WITH latest_value AS (
-                SELECT value
+                SELECT value, timestamp
                 FROM thing_value
                 WHERE tag_id = $1
                 ORDER BY timestamp DESC, id DESC
                 LIMIT 1
+            ), inserted AS (
+                INSERT INTO thing_value (tag_id, value, timestamp)
+                SELECT $1, $2, $3
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM latest_value
+                    WHERE value = $2 OR timestamp > $3
+                )
+                RETURNING 1
             )
-            INSERT INTO thing_value (tag_id, value, timestamp)
-            SELECT $1, $2, $3
-            WHERE NOT EXISTS ( SELECT 1 FROM latest_value WHERE value = $2)"#,
+            SELECT
+                EXISTS (SELECT 1 FROM inserted) AS "inserted!",
+                EXISTS (SELECT 1 FROM latest_value WHERE timestamp > $3) AS "stale!""#,
             tag_id as i32,
             fvalue,
-            dp.timestamp.into_db()
+            timestamp
         )
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(result.rows_affected() > 0)
+        Ok(match (result.inserted, result.stale) {
+            (true, _) => SaveOutcome::Inserted,
+            (false, true) => SaveOutcome::Stale,
+            (false, false) => SaveOutcome::Duplicate,
+        })
     }
 
     pub async fn get_latest_for_device(&self, id: &DeviceStateId) -> Result<Option<DataPoint<DeviceStateValue>>> {

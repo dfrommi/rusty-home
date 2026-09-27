@@ -4,7 +4,7 @@ mod state;
 
 pub use availability::DeviceAvailabilityRepository;
 pub use cached::CachedDeviceStateRepository;
-pub use state::PostgresDeviceStateRepository;
+pub use state::{PostgresDeviceStateRepository, SaveOutcome};
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -22,7 +22,9 @@ mod tests {
         t,
     };
 
-    use super::{CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository};
+    use super::{
+        CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository, SaveOutcome,
+    };
 
     fn default_availability_config() -> DeviceAvailabilityConfig {
         DeviceAvailabilityConfig {
@@ -107,12 +109,24 @@ mod tests {
             t!(1 hours ago),
         );
 
-        assert!(repo.save(first.clone()).await?);
-        assert!(repo.save(latest.clone()).await?);
+        assert_eq!(repo.save(first.clone()).await?, SaveOutcome::Inserted);
+        assert_eq!(repo.save(latest.clone()).await?, SaveOutcome::Inserted);
+        assert_eq!(repo.save(latest.clone()).await?, SaveOutcome::Duplicate);
+
+        let stale = DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(19.0)),
+            t!(75 minutes ago),
+        );
+        assert_eq!(repo.save(stale).await?, SaveOutcome::Stale);
 
         let cached = repo.get_latest_for_device(&id).await?.expect("latest value not found");
         assert_eq!(cached.value, latest.value);
         assert_eq!(cached.timestamp, latest.timestamp);
+
+        let points = repo
+            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(3 hours ago)))
+            .await?;
+        assert_eq!(points.len(), 2);
 
         let shifted_now = t!(90 minutes ago);
         let shifted = shifted_now

@@ -161,6 +161,7 @@ impl Command {
 pub enum PowerToggle {
     Dehumidifier,
     InfraredHeater,
+    LivingRoomTvAmbilight,
 }
 
 //

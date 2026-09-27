@@ -26,6 +26,7 @@ impl Accessory for PowerSwitch {
         let powered_item = match self.power_toggle {
             PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
             PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
+            PowerToggle::LivingRoomTvAmbilight => PowerAvailable::LivingRoomTvAmbilight,
         };
 
         match state {
@@ -45,6 +46,7 @@ impl Accessory for PowerSwitch {
             let on_off_device = match &self.power_toggle {
                 PowerToggle::Dehumidifier => OnOffDevice::Dehumidifier,
                 PowerToggle::InfraredHeater => OnOffDevice::InfraredHeater,
+                PowerToggle::LivingRoomTvAmbilight => OnOffDevice::LivingRoomTvAmbilight,
             };
             return Some(HomekitCommand::immediate(UserTrigger::DevicePower {
                 device: on_off_device,
@@ -53,5 +55,56 @@ impl Accessory for PowerSwitch {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::frontends::homekit::HomekitTarget;
+
+    fn switch() -> PowerSwitch {
+        PowerSwitch::new("Ambilight Wohnzimmer", PowerToggle::LivingRoomTvAmbilight)
+    }
+
+    #[test]
+    fn exports_reported_ambilight_state_to_homekit() {
+        let mut switch = switch();
+        let events = switch.export_state(&HomeStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, true));
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].target,
+            HomekitTarget::new(
+                "Ambilight Wohnzimmer".to_string(),
+                HomekitService::Switch,
+                HomekitCharacteristic::On,
+            )
+        );
+        assert_eq!(events[0].value, serde_json::json!(true));
+    }
+
+    #[test]
+    fn maps_homekit_switch_off_to_ambilight_power_trigger() {
+        let mut switch = switch();
+        let target = HomekitTarget::new(
+            "Ambilight Wohnzimmer".to_string(),
+            HomekitService::Switch,
+            HomekitCharacteristic::On,
+        );
+        let command = switch
+            .process_trigger(&HomekitEvent {
+                target,
+                value: serde_json::json!(false),
+            })
+            .expect("HomeKit switch command");
+
+        assert!(matches!(
+            command.trigger,
+            UserTrigger::DevicePower {
+                device: OnOffDevice::LivingRoomTvAmbilight,
+                on: false,
+            }
+        ));
     }
 }

@@ -62,16 +62,16 @@ impl UserTriggerAction {
         match self.target {
             UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater) => Some(t!(30 minutes)),
             UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier) => Some(t!(15 minutes)),
-            UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving) => {
-                match ctx.current_dp(PowerAvailable::LivingRoomTv) {
-                    Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
-                    Ok(_) => None,
-                    Err(e) => {
-                        tracing::error!("Error getting current state of living room tv: {:?}", e);
-                        None
-                    }
+            UserTriggerTarget::DevicePower(
+                OnOffDevice::LivingRoomTvEnergySaving | OnOffDevice::LivingRoomTvAmbilight,
+            ) => match ctx.current_dp(PowerAvailable::LivingRoomTv) {
+                Ok(dp) if dp.value => Some(dp.timestamp.elapsed()),
+                Ok(_) => None,
+                Err(e) => {
+                    tracing::error!("Error getting current state of living room tv: {:?}", e);
+                    None
                 }
-            }
+            },
             UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier) => Some(t!(1 hours)),
             UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier) => Some(t!(15 minutes)),
             UserTriggerTarget::Heating(HeatingZone::LivingRoom)
@@ -114,6 +114,13 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
             device: EnergySavingDevice::LivingRoomTv,
             on,
         }),
+        UserTrigger::DevicePower {
+            device: OnOffDevice::LivingRoomTvAmbilight,
+            on,
+        } => Some(Command::SetPower {
+            device: PowerToggle::LivingRoomTvAmbilight,
+            power_on: on,
+        }),
         UserTrigger::FanSpeed { fan, airflow } => {
             let device = match fan {
                 FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
@@ -129,5 +136,27 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         UserTrigger::OpenDoor { door: Door::Building } => Some(Command::OpenDoor {
             device: Lock::BuildingEntrance,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::PowerToggle;
+
+    #[test]
+    fn ambilight_power_trigger_maps_to_generic_power_command() {
+        let command = into_command(&UserTrigger::DevicePower {
+            device: OnOffDevice::LivingRoomTvAmbilight,
+            on: false,
+        });
+
+        assert_eq!(
+            command,
+            Some(Command::SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+                power_on: false,
+            })
+        );
     }
 }

@@ -21,6 +21,7 @@ pub enum OnOffDevice {
     Dehumidifier,
     InfraredHeater,
     LivingRoomTvEnergySaving,
+    LivingRoomTvAmbilight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

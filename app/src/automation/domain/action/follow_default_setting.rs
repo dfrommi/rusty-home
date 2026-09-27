@@ -58,7 +58,7 @@ impl Rule for FollowDefaultSetting {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::command::{NotificationLight, NotificationRecipient};
+    use crate::command::{NotificationLight, NotificationRecipient, PowerToggle};
     use crate::home_state::StateSnapshot;
 
     fn evaluate_default(target: CommandTarget) -> anyhow::Result<Command> {
@@ -67,6 +67,20 @@ mod tests {
             RuleResult::Execute(command) => Ok(command),
             RuleResult::ExecuteTrigger(_, _) | RuleResult::Skip => anyhow::bail!("expected a default command"),
         }
+    }
+
+    #[test]
+    fn ambilight_default_is_off() {
+        assert_eq!(
+            evaluate_default(CommandTarget::SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+            })
+            .unwrap(),
+            Command::SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+                power_on: false,
+            }
+        );
     }
 
     #[test]

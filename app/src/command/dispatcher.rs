@@ -45,6 +45,10 @@ impl CommandDispatcher {
                 device: PowerToggle::Dehumidifier,
                 power_on,
             } => self.z2m.set_power("bathroom/dehumidifier_plug", *power_on).await,
+            Command::SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+                power_on,
+            } => self.lgtv.set_piccap_power(*power_on).await,
             Command::SetHeating { device, target_state } => {
                 let device_id = match device {
                     Radiator::RoomOfRequirements => "room_of_requirements/radiator_thermostat_sonoff",

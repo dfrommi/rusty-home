@@ -42,6 +42,18 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 .into(),
             ],
         ),
+        (
+            CommandTarget::SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+            },
+            vec![
+                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvAmbilight)).into(),
+                FollowDefaultSetting::new(CommandTarget::SetPower {
+                    device: PowerToggle::LivingRoomTvAmbilight,
+                })
+                .into(),
+            ],
+        ),
         // --- Fan devices ---
         (
             CommandTarget::ControlFan {
@@ -206,5 +218,21 @@ mod tests {
             };
             assert!(plans.iter().any(|(target, _)| target == &phone_target));
         }
+    }
+
+    #[test]
+    fn ambilight_follows_user_requests_before_its_default() {
+        let target = CommandTarget::SetPower {
+            device: PowerToggle::LivingRoomTvAmbilight,
+        };
+        let (_, rules) = resource_plans()
+            .into_iter()
+            .find(|(candidate, _)| candidate == &target)
+            .expect("living-room Ambilight plan");
+
+        assert!(matches!(
+            rules.as_slice(),
+            [HomeAction::UserTriggerAction(_), HomeAction::FollowDefaultSetting(_)]
+        ));
     }
 }

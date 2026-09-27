@@ -24,19 +24,43 @@ impl LgTvCommandExecutor {
 
         Ok(())
     }
+
+    pub async fn set_piccap_power(&self, on: bool) -> anyhow::Result<()> {
+        self.sender
+            .send_transient("command/piccap/power", piccap_power_payload(on))
+            .await?;
+
+        CommandMetric::Executed {
+            device_id: "lgtv".to_string(),
+            system: CommandTargetSystem::LGTV,
+        }
+        .record();
+
+        Ok(())
+    }
 }
 
 fn energy_saving_payload(on: bool) -> String {
     if on { "auto" } else { "off" }.to_string()
 }
 
+fn piccap_power_payload(on: bool) -> String {
+    on.to_string()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::energy_saving_payload;
+    use super::{energy_saving_payload, piccap_power_payload};
 
     #[test]
     fn maps_energy_saving_state_to_lg_tv_command_payload() {
         assert_eq!(energy_saving_payload(true), "auto");
         assert_eq!(energy_saving_payload(false), "off");
+    }
+
+    #[test]
+    fn maps_ambilight_power_to_piccap_boolean_payload() {
+        assert_eq!(piccap_power_payload(true), "true");
+        assert_eq!(piccap_power_payload(false), "false");
     }
 }

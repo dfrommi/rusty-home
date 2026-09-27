@@ -16,7 +16,14 @@ pub struct LgtvIncomingDataSource {
 impl LgtvIncomingDataSource {
     pub async fn new(mqtt_client: &mut Mqtt, base_topic: &str) -> anyhow::Result<Self> {
         let mqtt_receiver = mqtt_client
-            .subscribe_all(base_topic, &["state/picture/energySaving", "state/power/systemOn"])
+            .subscribe_all(
+                base_topic,
+                &[
+                    "state/picture/energySaving",
+                    "state/power/systemOn",
+                    "state/piccap/isRunning",
+                ],
+            )
             .await
             .context("Error subscribing to LG TV MQTT topics")?;
 
@@ -67,6 +74,18 @@ fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Resu
 
         DataPoint::new(
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTv, powered),
+            timestamp,
+        )
+        .into()
+    } else if message.topic == "state/piccap/isRunning" {
+        let is_running = match message.payload.as_str() {
+            "true" => true,
+            "false" => false,
+            payload => bail!("Unexpected PicCap isRunning payload: {payload}"),
+        };
+
+        DataPoint::new(
+            DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, is_running),
             timestamp,
         )
         .into()
@@ -146,6 +165,23 @@ mod tests {
         assert_eq!(availability.item.source, AVAILABILITY_SOURCE);
         assert_eq!(availability.item.item, "lgtv");
         assert!(!availability.marked_offline);
+    }
+
+    #[test]
+    fn parses_piccap_running_values_as_ambilight_power() {
+        assert_eq!(
+            state_value(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "true")).unwrap()),
+            DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, true)
+        );
+        assert_eq!(
+            state_value(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "false")).unwrap()),
+            DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, false)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_piccap_running_values() {
+        assert!(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "on")).is_err());
     }
 
     #[test]

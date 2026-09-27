@@ -6,4 +6,5 @@ pub enum PowerAvailable {
     LivingRoomNotificationLight,
     InfraredHeater,
     LivingRoomTv,
+    LivingRoomTvAmbilight,
 }

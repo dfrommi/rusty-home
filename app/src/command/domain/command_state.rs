@@ -76,6 +76,7 @@ fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapsho
     let powered_item = match device {
         PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
         PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
+        PowerToggle::LivingRoomTvAmbilight => PowerAvailable::LivingRoomTvAmbilight,
     };
 
     let powered = snapshot.try_get(powered_item)?.value;

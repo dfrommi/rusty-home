@@ -152,18 +152,18 @@ impl DeviceStateModule {
         ha_url: &str,
         ha_token: &str,
         lgtv_base_topic: &str,
-        energy_reading_rx: EventListener<EnergyReading>,
+        energy_reading_rx: EventListener<DataPoint<EnergyReading>>,
         tado_url: &str,
         tado_home_id: &str,
         availability_config: DeviceAvailabilityConfig,
     ) -> anyhow::Result<Self> {
         let state_repo = CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool.clone()));
-        let availability_repo = DeviceAvailabilityRepository::new(pool.clone(), availability_config);
+        let availability_repo = DeviceAvailabilityRepository::new(pool, availability_config);
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
         let lgtv_ds = LgtvIncomingDataSource::new(mqtt_client, lgtv_base_topic).await?;
-        let energy_meter_ds = EnergyMeterIncomingDataSource::new(pool, energy_reading_rx);
+        let energy_meter_ds = EnergyMeterIncomingDataSource::new(energy_reading_rx);
         let tado_ds = TadoIncomingDataSource::new(tado_url, tado_home_id).context("Error creating Tado adapter")?;
 
         let event_bus = EventBus::new(128);

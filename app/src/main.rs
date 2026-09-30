@@ -54,6 +54,14 @@ pub async fn main() -> anyhow::Result<()> {
     )
     .await?;
     device_state_module.initialize_availability().await?;
+    if let Err(e) = frontends::energy_meter::EnergyMeter::publish_initial_readings(
+        infrastructure.db_pool.clone(),
+        &energy_meter_bus.emitter(),
+    )
+    .await
+    {
+        tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
+    }
 
     let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
     let home_state_module = HomeStateModule::new(
@@ -102,6 +110,7 @@ pub async fn main() -> anyhow::Result<()> {
 
     let http_server_exec = {
         let energy_reading_emitter = energy_meter_bus.emitter();
+        let energy_reading_pool = infrastructure.db_pool.clone();
         let metrics_export_api = observability_module.api();
 
         async move {
@@ -109,7 +118,10 @@ pub async fn main() -> anyhow::Result<()> {
                 .http_server
                 .run_server(move || {
                     vec![
-                        frontends::energy_meter::EnergyMeter::new_web_service(energy_reading_emitter.clone()),
+                        frontends::energy_meter::EnergyMeter::new_web_service(
+                            energy_reading_pool.clone(),
+                            energy_reading_emitter.clone(),
+                        ),
                         metrics_export_api.routes(),
                     ]
                 })

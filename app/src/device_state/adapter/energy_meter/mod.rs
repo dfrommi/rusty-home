@@ -1,11 +1,8 @@
-mod persistence;
-
 use crate::core::time::DateTime;
+use crate::core::timeseries::DataPoint;
 use crate::core::unit::HeatingUnit;
-use crate::device_state::adapter::energy_meter::persistence::EnergyReadingRepository;
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, TotalRadiatorConsumption};
-use crate::t;
 use infrastructure::EventListener;
 
 use crate::frontends::energy_meter::{EnergyMeterTarget, EnergyReading, Radiator};
@@ -13,26 +10,12 @@ use crate::frontends::energy_meter::{EnergyMeterTarget, EnergyReading, Radiator}
 const AVAILABILITY_SOURCE: &str = "EnergyMeter";
 
 pub struct EnergyMeterIncomingDataSource {
-    repo: EnergyReadingRepository,
-    rx: EventListener<EnergyReading>,
-    initial_load: Option<Vec<i64>>,
+    rx: EventListener<DataPoint<EnergyReading>>,
 }
 
 impl EnergyMeterIncomingDataSource {
-    pub fn new(pool: sqlx::PgPool, rx: EventListener<EnergyReading>) -> Self {
-        let repo = EnergyReadingRepository::new(pool);
-        Self {
-            repo,
-            rx,
-            initial_load: None,
-        }
-    }
-
-    async fn incoming_data_for_reading_id(&self, id: i64) -> anyhow::Result<Vec<IncomingData>> {
-        let dp = self.repo.get_total_reading_by_id(id).await?;
-        let availability = availability(&dp.value, dp.timestamp);
-
-        Ok(vec![IncomingData::StateValue(dp.map_value(|v| v.into())), availability])
+    pub fn new(rx: EventListener<DataPoint<EnergyReading>>) -> Self {
+        Self { rx }
     }
 }
 
@@ -45,36 +28,10 @@ impl IncomingDataSource for EnergyMeterIncomingDataSource {
     }
 
     async fn recv_multi(&mut self) -> Option<Vec<IncomingData>> {
-        loop {
-            if self.initial_load.is_none() {
-                self.initial_load = match self.repo.get_latest_total_readings_ids().await {
-                    Ok(ids) => Some(ids),
-                    Err(e) => {
-                        tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
-                        Some(vec![])
-                    }
-                };
-            }
+        let dp = self.rx.recv().await?;
+        let availability = availability(&dp.value, dp.timestamp);
 
-            if let Some(id) = self.initial_load.as_mut().and_then(|data| data.pop()) {
-                match self.incoming_data_for_reading_id(id).await {
-                    Ok(data) => return Some(data),
-                    Err(e) => {
-                        tracing::error!("Error loading Energy Reading with id {}: {:?}", id, e);
-                        continue;
-                    }
-                }
-            }
-
-            let msg = self.rx.recv().await?;
-            match self.repo.add_yearly_energy_reading(msg, t!(now)).await {
-                Ok(id) => match self.incoming_data_for_reading_id(id).await {
-                    Ok(data) => return Some(data),
-                    Err(e) => tracing::error!("Error loading Energy Reading with id {}: {:?}", id, e),
-                },
-                Err(e) => tracing::error!("Error saving Energy Reading: {:?}", e),
-            }
-        }
+        Some(vec![IncomingData::StateValue(dp.map_value(|v| v.into())), availability])
     }
 }
 
@@ -110,36 +67,39 @@ impl From<&EnergyReading> for DeviceStateValue {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use super::*;
     use infrastructure::EventBus;
 
-    use super::*;
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn live_reading_is_saved_then_emitted_as_total(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn cumulative_reading_is_mapped_without_changing_its_value_or_timestamp() {
         let bus = EventBus::new(8);
-        let mut ds = EnergyMeterIncomingDataSource::new(pool, bus.subscribe());
+        let mut ds = EnergyMeterIncomingDataSource::new(bus.subscribe());
+        let timestamp = DateTime::from_static_iso("2025-01-01T12:00:00Z");
 
-        bus.emitter().send(EnergyReading::Heating(Radiator::Bedroom, 12.5));
+        bus.emitter()
+            .send(DataPoint::new(EnergyReading::Heating(Radiator::Bedroom, 312.5), timestamp));
 
         let updates = ds.recv_multi().await.expect("energy meter source closed");
 
         assert_eq!(updates.len(), 2);
         match &updates[0] {
-            IncomingData::StateValue(dp) => assert_eq!(
-                dp.value,
-                DeviceStateValue::TotalRadiatorConsumption(TotalRadiatorConsumption::Bedroom, HeatingUnit(12.5))
-            ),
+            IncomingData::StateValue(dp) => {
+                assert_eq!(
+                    dp.value,
+                    DeviceStateValue::TotalRadiatorConsumption(TotalRadiatorConsumption::Bedroom, HeatingUnit(312.5))
+                );
+                assert_eq!(dp.timestamp, timestamp);
+            }
             IncomingData::ItemAvailability(_) => panic!("expected state value"),
         }
         match &updates[1] {
             IncomingData::ItemAvailability(availability) => {
                 assert_eq!(availability.item.source, AVAILABILITY_SOURCE);
                 assert_eq!(availability.item.item, "heating::bedroom");
+                assert_eq!(availability.last_seen, timestamp);
                 assert!(!availability.marked_offline);
             }
             IncomingData::StateValue(_) => panic!("expected availability"),
         }
-
-        Ok(())
     }
 }

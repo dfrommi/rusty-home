@@ -1,0 +1,5 @@
+error: Id derive requires structs to have at least one field
+ --> tests/ui/id_struct_unit_fail.rs:4:8
+  |
+4 | struct Marker;
+  |        ^^^^^^

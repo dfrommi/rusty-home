@@ -23,4 +23,4 @@ Cargo.lock
 !clippy.toml
 
 *.stderr
-
+!lib/macro/tests/ui/*.stderr

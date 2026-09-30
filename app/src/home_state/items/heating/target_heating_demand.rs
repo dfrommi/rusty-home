@@ -84,7 +84,7 @@ fn combined_demand(
 
     if !is_heating_now && adjustment <= AdjustmentDirection::Hold {
         tracing::debug!(
-            %radiator, 
+            %radiator,
             "Radiator {} already not heating currently and adjustment is down ({:?}) -> resetting output to barely warm {}", radiator, adjustment, limits.barely_warm);
         return Some(limits.barely_warm);
     }
@@ -97,7 +97,7 @@ fn combined_demand(
 
         if !is_heating_now && !heat_request_after_vent {
             tracing::debug!(
-                %radiator, 
+                %radiator,
                 "Radiator {} recently finished ventilation, no heat request since then -> forcing zero output", radiator);
             return Some(Percent(0.0));
         }
@@ -106,7 +106,7 @@ fn combined_demand(
     //Don't skip on mode change
     if !adjustment_needed(&adjustments, &reference_demand.timestamp, &mode) {
         tracing::debug!(
-            %radiator, 
+            %radiator,
             last_changed_at = reference_demand.timestamp.elapsed().to_iso_string(),
             "No adjustment needed for {:?}", radiator);
         return Some(reference_demand.value);
@@ -122,19 +122,19 @@ fn combined_demand(
         AdjustmentDirection::MustDecrease | AdjustmentDirection::ShouldDecrease => {
             output = output - limits.step;
             tracing::debug!(
-                %radiator, 
+                %radiator,
                 "Radiator {} decreasing output by {} to {}", radiator, limits.step, output);
         }
         AdjustmentDirection::MustIncrease => {
             if is_coldstart {
                 output = limits.barely_warm + limits.cold_start_must_factor * limits.step;
                 tracing::debug!(
-                    %radiator, 
-                    "Radiator {} forced cold-start starting at {} (barely warm {} + factor {} * step {})", 
+                    %radiator,
+                    "Radiator {} forced cold-start starting at {} (barely warm {} + factor {} * step {})",
                     radiator, output, limits.barely_warm, limits.cold_start_must_factor, limits.step);
             } else {
                 tracing::debug!(
-                    %radiator, 
+                    %radiator,
                     "Radiator {} must increasing output by {} to {}", radiator, limits.step, output + limits.step);
                 output = output + limits.step;
             };
@@ -143,12 +143,12 @@ fn combined_demand(
             if is_coldstart {
                 output = limits.barely_warm + limits.cold_start_should_factor * limits.step;
                 tracing::debug!(
-                    %radiator, 
-                    "Radiator {} gentle cold-start starting at {} (barely warm {} + factor {} * step {})", 
+                    %radiator,
+                    "Radiator {} gentle cold-start starting at {} (barely warm {} + factor {} * step {})",
                     radiator, output, limits.barely_warm, limits.cold_start_should_factor, limits.step);
             } else {
                 tracing::debug!(
-                    %radiator, 
+                    %radiator,
                     "Radiator {} should increasing output by {} to {}", radiator, limits.step, output + limits.step);
                 output = output + limits.step;
             };

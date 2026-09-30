@@ -1,0 +1,27 @@
+# Import handling
+
+#https://rust-lang.github.io/rustfmt/?version=v1.8.0&search=#imports_granularity
+#unstable. uncomment when stable
+#imports_granularity = "Item"
+#group_imports = "StdExternalCrate"
+
+# Readability
+max_width = 120
+#hard_tabs = false
+#use_small_heuristics = "Max"
+
+# Trailing commas
+#trailing_comma = "Always"
+
+# Brace style
+#brace_style = "SameLineWhere"
+
+# Method chain handling
+#chain_width = 60
+
+# Struct field alignment
+#struct_field_align_threshold = 20
+
+# Function argument handling
+#fn_params_layout = "Compressed"
+fn_call_width = 80

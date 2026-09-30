@@ -21,6 +21,7 @@ Cargo.lock
 /*.toml
 !Cargo.toml
 !clippy.toml
+!rustfmt.toml
 
 *.stderr
 !lib/macro/tests/ui/*.stderr

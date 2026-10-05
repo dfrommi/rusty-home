@@ -62,6 +62,16 @@ impl DeviceStateService {
 
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
         if outcome == SaveOutcome::Inserted {
+            tracing::info!(
+                event = "device_state_changed",
+                device_type = id.ext_id().type_name(),
+                device_id = id.ext_id().variant_name(),
+                value = f64::from(&dp.value),
+                "Device state changed for {:?}: {:?}",
+                id,
+                &dp.value
+            );
+
             // Only for new values, to preserve the time when the value became active.
             self.event_tx.send(DeviceStateEvent::Changed(dp));
         }

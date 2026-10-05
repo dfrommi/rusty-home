@@ -45,7 +45,7 @@ fn energy_saving_payload(on: bool) -> String {
 }
 
 fn piccap_power_payload(on: bool) -> String {
-    on.to_string()
+    if on { "ON" } else { "OFF" }.to_string()
 }
 
 #[cfg(test)]

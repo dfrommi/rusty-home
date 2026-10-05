@@ -21,7 +21,7 @@ impl LgtvIncomingDataSource {
                 &[
                     "state/picture/energySaving",
                     "state/power/systemOn",
-                    "state/piccap/isRunning",
+                    "state/piccap/power",
                 ],
             )
             .await
@@ -77,15 +77,15 @@ fn parse_lgtv_message(base_topic: &str, message: &MqttInMessage) -> anyhow::Resu
             timestamp,
         )
         .into()
-    } else if message.topic == "state/piccap/isRunning" {
-        let is_running = match message.payload.as_str() {
-            "true" => true,
-            "false" => false,
-            payload => bail!("Unexpected PicCap isRunning payload: {payload}"),
+    } else if message.topic == "state/piccap/power" {
+        let powered_on = match message.payload.as_str() {
+            "ON" => true,
+            "OFF" => false,
+            payload => bail!("Unexpected PicCap power payload: {payload}"),
         };
 
         DataPoint::new(
-            DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, is_running),
+            DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, powered_on),
             timestamp,
         )
         .into()

@@ -108,7 +108,7 @@ impl CommandDispatcher {
 fn phone_service(recipient: NotificationRecipient) -> &'static str {
     match recipient {
         NotificationRecipient::Dennis => "mobile_app_jarvis",
-        NotificationRecipient::Sabine => "mobile_app_simi_2",
+        NotificationRecipient::Sabine => "mobile_app_simi",
     }
 }
 
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn notification_targets_resolve_to_physical_home_assistant_ids() {
         assert_eq!(phone_service(NotificationRecipient::Dennis), "mobile_app_jarvis");
-        assert_eq!(phone_service(NotificationRecipient::Sabine), "mobile_app_simi_2");
+        assert_eq!(phone_service(NotificationRecipient::Sabine), "mobile_app_simi");
         assert_eq!(notification_light_entity(NotificationLight::LivingRoom), "light.hue_go");
     }
 }

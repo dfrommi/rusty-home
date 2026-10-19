@@ -13,7 +13,7 @@ use crate::{
     trigger::UserTriggerId,
 };
 
-use super::dispatcher::CommandDispatcher;
+use super::CommandDispatcher;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Id)]
 pub enum CommandExecutionResult {
@@ -104,6 +104,70 @@ fn execution_decision(
     }
 }
 
+fn add_to_trace(
+    command: &Command,
+    source: &ExternalId,
+    user_generated: bool,
+    outcome: &anyhow::Result<CommandExecutionResult>,
+) {
+    let target = CommandTarget::from(command);
+    let display_parts = command.display_parts();
+
+    let current_trace = TraceContext::current();
+
+    let result = match &outcome {
+        Ok(result) => result.ext_id().variant_name().to_owned(),
+        Err(_) => "error".to_owned(),
+    };
+
+    current_trace
+        .record("command_type", display_parts.command_type)
+        .record("command_target", &display_parts.target)
+        .record("state", &display_parts.state)
+        .record("source", source.to_string())
+        .record("user_generated", user_generated.to_string())
+        .record("outcome", result.as_str())
+        .record_json("command", &serde_json::json!(command));
+
+    match &outcome {
+        Ok(_) => current_trace.set_ok(),
+        Err(error) => current_trace.set_error(error.to_string()),
+    }
+
+    let metric_target = target.to_string();
+    system_metric_increment(
+        "command_execution",
+        &[("target", metric_target.as_str()), ("result", result.as_str())],
+    );
+
+    match &outcome {
+        Ok(CommandExecutionResult::Executed) => tracing::info!(
+            event = "command_executed",
+            command_type = display_parts.command_type,
+            command_target = display_parts.target,
+            state = display_parts.state,
+            user_generated = user_generated,
+            source = source.to_string(),
+            "Command executed"
+        ),
+        Err(e) => tracing::error!(
+            event = "command_error",
+            command_type = display_parts.command_type,
+            command_target = display_parts.target,
+            state = display_parts.state,
+            user_generated = user_generated,
+            source = source.to_string(),
+            "Command execution failed: {}",
+            e
+        ),
+        Ok(
+            CommandExecutionResult::Debounced
+            | CommandExecutionResult::AlreadyReflected
+            | CommandExecutionResult::AlreadyExecuted,
+        ) => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,69 +248,5 @@ mod tests {
 
         assert_eq!(execution_decision(&command, None, Some(&recent)), ExecutionDecision::Debounced);
         assert_eq!(execution_decision(&command, None, Some(&stale)), ExecutionDecision::Execute);
-    }
-}
-
-fn add_to_trace(
-    command: &Command,
-    source: &ExternalId,
-    user_generated: bool,
-    outcome: &anyhow::Result<CommandExecutionResult>,
-) {
-    let target = CommandTarget::from(command);
-    let display_parts = command.display_parts();
-
-    let current_trace = TraceContext::current();
-
-    let result = match &outcome {
-        Ok(result) => result.ext_id().variant_name().to_owned(),
-        Err(_) => "error".to_owned(),
-    };
-
-    current_trace
-        .record("command_type", display_parts.command_type)
-        .record("command_target", &display_parts.target)
-        .record("state", &display_parts.state)
-        .record("source", source.to_string())
-        .record("user_generated", user_generated.to_string())
-        .record("outcome", result.as_str())
-        .record_json("command", &serde_json::json!(command));
-
-    match &outcome {
-        Ok(_) => current_trace.set_ok(),
-        Err(error) => current_trace.set_error(error.to_string()),
-    }
-
-    let metric_target = target.to_string();
-    system_metric_increment(
-        "command_execution",
-        &[("target", metric_target.as_str()), ("result", result.as_str())],
-    );
-
-    match &outcome {
-        Ok(CommandExecutionResult::Executed) => tracing::info!(
-            event = "command_executed",
-            command_type = display_parts.command_type,
-            command_target = display_parts.target,
-            state = display_parts.state,
-            user_generated = user_generated,
-            source = source.to_string(),
-            "Command executed"
-        ),
-        Err(e) => tracing::error!(
-            event = "command_error",
-            command_type = display_parts.command_type,
-            command_target = display_parts.target,
-            state = display_parts.state,
-            user_generated = user_generated,
-            source = source.to_string(),
-            "Command execution failed: {}",
-            e
-        ),
-        Ok(
-            CommandExecutionResult::Debounced
-            | CommandExecutionResult::AlreadyReflected
-            | CommandExecutionResult::AlreadyExecuted,
-        ) => {}
     }
 }

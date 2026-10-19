@@ -7,7 +7,7 @@ use crate::core::{id::ExternalId, time::DateTime};
 use crate::home_state::StateSnapshot;
 use crate::trigger::{TriggerClient, UserTriggerId};
 
-use super::action::ActionEvaluationResult;
+use super::ActionEvaluationResult;
 
 #[derive(Debug)]
 enum PlanResult {

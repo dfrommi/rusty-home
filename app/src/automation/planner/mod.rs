@@ -1,5 +1,15 @@
-mod action;
 mod processor;
 
-pub use action::ActionEvaluationResult;
+use crate::command::Command;
+use crate::core::id::ExternalId;
+
+use crate::trigger::UserTriggerId;
+
 pub use processor::plan_for_home;
+
+#[derive(Debug, Clone)]
+pub enum ActionEvaluationResult {
+    Execute(Command, ExternalId),
+    ExecuteTrigger(Command, ExternalId, UserTriggerId),
+    Skip,
+}

@@ -1,5 +1,4 @@
 mod adapter;
-mod dispatcher;
 mod domain;
 mod service;
 
@@ -7,8 +6,8 @@ pub use domain::*;
 
 use std::sync::Arc;
 
+use adapter::CommandDispatcher;
 use adapter::CommandExecutionRepository;
-use dispatcher::CommandDispatcher;
 use infrastructure::{EventListener, Mqtt};
 pub use service::CommandExecutionResult;
 use service::CommandService;

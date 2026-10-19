@@ -3,12 +3,12 @@ mod items;
 
 use std::collections::HashMap;
 
-pub use calc::{StateSnapshot, StateSnapshotIterator};
+pub use calc::StateSnapshot;
 use infrastructure::EventEmitter;
 use infrastructure::{EventBus, EventListener};
 pub use items::*;
 
-use crate::core::time::{DateTimeRange, Duration};
+use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
@@ -37,13 +37,6 @@ pub struct HomeStateModule {
     event_emitter: EventEmitter<HomeStateEvent>,
 }
 
-#[derive(Clone)]
-pub struct HomeStateClient {
-    keep: Duration,
-    trigger_client: TriggerClient,
-    device_state: DeviceStateClient,
-}
-
 impl HomeStateModule {
     pub fn new(
         duration: Duration,
@@ -66,14 +59,6 @@ impl HomeStateModule {
 
     pub fn subscribe(&self) -> EventListener<HomeStateEvent> {
         self.event_bus.subscribe()
-    }
-
-    pub fn client(&self) -> HomeStateClient {
-        HomeStateClient {
-            keep: self.duration.clone(),
-            trigger_client: self.trigger_client.clone(),
-            device_state: self.device_state.clone(),
-        }
     }
 
     #[allow(clippy::expect_used)]
@@ -180,17 +165,5 @@ impl HomeStateModule {
         }
 
         self.event_emitter.send(HomeStateEvent::SnapshotUpdated(new_snapshot));
-    }
-}
-
-impl HomeStateClient {
-    pub fn snapshot_iter(&self, range: DateTimeRange) -> StateSnapshotIterator {
-        StateSnapshotIterator::new(
-            range,
-            self.keep.clone(),
-            self.device_state.clone(),
-            self.trigger_client.clone(),
-            false,
-        )
     }
 }

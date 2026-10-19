@@ -3,12 +3,9 @@ use std::collections::HashMap;
 use crate::{
     core::time::{DateTime, DateTimeRange, Duration},
     device_state::DeviceStateClient,
-    home_state::{
-        StateSnapshot,
-        calc::{
-            StateCalculationContext, StateCalculationResult,
-            datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
-        },
+    home_state::calc::{
+        StateCalculationContext, StateCalculationResult,
+        datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
     },
     t,
     trigger::{TriggerClient, UserTriggerExecution},
@@ -132,37 +129,5 @@ impl StateCalculationResultIterator {
             acc
         });
         Ok(PreloadedUserTriggerProvider::new(trigger_map))
-    }
-}
-
-pub struct StateSnapshotIterator {
-    inner: StateCalculationResultIterator,
-}
-
-impl StateSnapshotIterator {
-    pub fn new(
-        full_range: DateTimeRange,
-        keep_duration: Duration,
-        device_client: DeviceStateClient,
-        trigger_client: TriggerClient,
-        enable_tracing: bool,
-    ) -> Self {
-        Self {
-            inner: StateCalculationResultIterator::new(
-                full_range,
-                keep_duration,
-                device_client,
-                trigger_client,
-                enable_tracing,
-            ),
-        }
-    }
-
-    pub async fn next(&mut self) -> anyhow::Result<Option<StateSnapshot>> {
-        match self.inner.next().await? {
-            //TODO avoid clone
-            Some(res) => Ok(Some(StateSnapshot::new(res.clone()))),
-            None => Ok(None),
-        }
     }
 }

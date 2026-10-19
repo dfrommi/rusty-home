@@ -105,25 +105,20 @@ pub async fn main() -> anyhow::Result<()> {
         device_state_module.subscribe(),
         home_state_module.subscribe(),
         device_state_module.client(),
-        home_state_module.client(),
     );
 
     let http_server_exec = {
         let energy_reading_emitter = energy_meter_bus.emitter();
         let energy_reading_pool = infrastructure.db_pool.clone();
-        let metrics_export_api = observability_module.api();
 
         async move {
             settings
                 .http_server
                 .run_server(move || {
-                    vec![
-                        frontends::energy_meter::EnergyMeter::new_web_service(
-                            energy_reading_pool.clone(),
-                            energy_reading_emitter.clone(),
-                        ),
-                        metrics_export_api.routes(),
-                    ]
+                    vec![frontends::energy_meter::EnergyMeter::new_web_service(
+                        energy_reading_pool.clone(),
+                        energy_reading_emitter.clone(),
+                    )]
                 })
                 .await
                 .expect("HTTP server execution failed");

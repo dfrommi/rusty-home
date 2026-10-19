@@ -14,7 +14,7 @@ pub use context::StateCalculationContext;
 pub use context::StateCalculationResult;
 pub use datasource::CurrentDeviceStateProvider;
 pub use datasource::CurrentUserTriggerProvider;
-pub use iter::StateSnapshotIterator;
+
 pub use snapshot::StateSnapshot;
 
 pub async fn bootstrap_context(

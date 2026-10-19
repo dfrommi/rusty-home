@@ -1,6 +1,6 @@
 use reqwest::Client;
 
-use crate::observability::domain::{Metric, MetricId};
+use crate::observability::domain::Metric;
 
 pub struct VictoriaRepository {
     client: Client,
@@ -36,27 +36,16 @@ impl VictoriaRepository {
         resp.error_for_status_ref()?;
         Ok(())
     }
-
-    pub async fn delete_series(&self, metric: MetricId) -> anyhow::Result<()> {
-        let form = vec![("match[]".to_string(), metric.to_string())];
-
-        let resp = self
-            .client
-            .post(format!("{}/api/v1/admin/tsdb/delete_series", self.base_url))
-            .form(&form)
-            .send()
-            .await?;
-
-        resp.error_for_status_ref()?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::{core::time::DateTime, observability::domain::MetricLabel};
+    use crate::{
+        core::time::DateTime,
+        observability::domain::{MetricId, MetricLabel},
+    };
     use mockito::Server;
 
     fn metric(name: &str, variant: Option<&str>, value: f64, timestamp: DateTime) -> Metric {
@@ -69,15 +58,6 @@ mod tests {
             },
             value,
             timestamp,
-        }
-    }
-
-    fn metric_id(name: &str, variant: Option<&str>) -> MetricId {
-        MetricId {
-            name: name.to_string(),
-            labels: variant
-                .map(|v| vec![MetricLabel::Variant(v.to_string())])
-                .unwrap_or_default(),
         }
     }
 
@@ -106,25 +86,6 @@ mod tests {
 
         let repository = VictoriaRepository::new(server.url());
         repository.push(&metrics).await.unwrap();
-        mock.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn delete_series_sends_form_encoded_matcher() {
-        let mut server = Server::new_async().await;
-        let metric_id = metric_id("temperature", Some("outside"));
-        let encoded_body = "match%5B%5D=temperature%7Bitem%3D%22outside%22%7D";
-
-        let mock = server
-            .mock("POST", "/api/v1/admin/tsdb/delete_series")
-            .match_body(encoded_body)
-            .with_status(204)
-            .create_async()
-            .await;
-
-        let repository = VictoriaRepository::new(server.url());
-        repository.delete_series(metric_id).await.unwrap();
-
         mock.assert_async().await;
     }
 }

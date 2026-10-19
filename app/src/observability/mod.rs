@@ -10,8 +10,8 @@ use infrastructure::EventListener;
 
 use crate::{
     device_state::{DeviceStateClient, DeviceStateEvent},
-    home_state::{HomeStateClient, HomeStateEvent},
-    observability::adapter::{MetricsAdapter as _, api::MetricsExportApi, repository::VictoriaRepository},
+    home_state::HomeStateEvent,
+    observability::adapter::{MetricsAdapter as _, repository::VictoriaRepository},
     t,
 };
 
@@ -25,7 +25,6 @@ pub struct ObservabilityModule {
     device_state_events: EventListener<DeviceStateEvent>,
     home_state_events: EventListener<HomeStateEvent>,
     device_state_client: DeviceStateClient,
-    home_state_client: HomeStateClient,
     home_metrics_adapter: HomeMetricsAdapter,
     device_metrics_adapter: DeviceMetricsAdapter,
     availability_metrics_adapter: AvailabilityMetricsAdapter,
@@ -37,7 +36,6 @@ impl ObservabilityModule {
         device_state_events: EventListener<DeviceStateEvent>,
         home_state_events: EventListener<HomeStateEvent>,
         device_state_client: DeviceStateClient,
-        home_state_client: HomeStateClient,
     ) -> Self {
         let repo = Arc::new(VictoriaRepository::new(victoria_url));
 
@@ -46,19 +44,10 @@ impl ObservabilityModule {
             device_state_events,
             home_state_events,
             device_state_client,
-            home_state_client,
             home_metrics_adapter: HomeMetricsAdapter,
             device_metrics_adapter: DeviceMetricsAdapter,
             availability_metrics_adapter: AvailabilityMetricsAdapter,
         }
-    }
-
-    pub fn api(&self) -> MetricsExportApi {
-        MetricsExportApi::new(
-            self.repo.clone(),
-            self.device_state_client.clone(),
-            self.home_state_client.clone(),
-        )
     }
 
     pub async fn run(mut self) {

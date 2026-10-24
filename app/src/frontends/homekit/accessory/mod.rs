@@ -156,6 +156,7 @@ fn config() -> Vec<Box<dyn Accessory>> {
         Box::new(Thermostat::new("Thermostat Küche", HeatingZone::Kitchen)),
         Box::new(Thermostat::new("Thermostat Bad", HeatingZone::Bathroom)),
         Box::new(DoorLock::new("Haustür", Door::Building)),
+        Box::new(PowerSwitch::new("Luftreiniger Schlafzimmer", PowerToggle::BedroomAirPurifier)),
         Box::new(PowerSwitch::new("Luftentfeuchter", PowerToggle::Dehumidifier)),
         Box::new(PowerSwitch::new("Infrarotheizung", PowerToggle::InfraredHeater)),
         Box::new(PowerSwitch::new("Ambilight Wohnzimmer", PowerToggle::LivingRoomTvAmbilight)),

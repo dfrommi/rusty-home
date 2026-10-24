@@ -60,6 +60,7 @@ impl Rule for UserTriggerAction {
 impl UserTriggerAction {
     fn default_duration(&self, ctx: &RuleEvaluationContext) -> Option<Duration> {
         match self.target {
+            UserTriggerTarget::DevicePower(OnOffDevice::BedroomAirPurifier) => Some(t!(15 minutes)),
             UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater) => Some(t!(30 minutes)),
             UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier) => Some(t!(15 minutes)),
             UserTriggerTarget::DevicePower(
@@ -93,6 +94,13 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
     use crate::command::*;
 
     match trigger.clone() {
+        UserTrigger::DevicePower {
+            device: OnOffDevice::BedroomAirPurifier,
+            on,
+        } => Some(Command::SetPower {
+            device: PowerToggle::BedroomAirPurifier,
+            power_on: on,
+        }),
         UserTrigger::DevicePower {
             device: OnOffDevice::InfraredHeater,
             on,

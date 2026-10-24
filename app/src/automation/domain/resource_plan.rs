@@ -16,6 +16,20 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         // --- Power devices ---
         (
             CommandTarget::SetPower {
+                device: PowerToggle::BedroomAirPurifier,
+            },
+            vec![
+                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::BedroomAirPurifier)).into(),
+                PurifyAir::BedroomSleepPreparation.into(),
+                PurifyAir::BedroomAfterVentilation.into(),
+                FollowDefaultSetting::new(CommandTarget::SetPower {
+                    device: PowerToggle::BedroomAirPurifier,
+                })
+                .into(),
+            ],
+        ),
+        (
+            CommandTarget::SetPower {
                 device: PowerToggle::Dehumidifier,
             },
             vec![

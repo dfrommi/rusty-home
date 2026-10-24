@@ -48,6 +48,14 @@ impl CommandDispatcher {
     pub async fn dispatch(&self, command: &Command) -> anyhow::Result<()> {
         match command {
             Command::SetPower {
+                device: PowerToggle::BedroomAirPurifier,
+                power_on,
+            } => {
+                self.homeassistant
+                    .set_power("switch.zhimi_de_974125313_rmb1_on_p_2_1", *power_on)
+                    .await
+            }
+            Command::SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on,
             } => self.tasmota.set_power("irheater", *power_on).await,

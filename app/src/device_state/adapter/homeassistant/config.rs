@@ -29,8 +29,12 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),
         ),
         //
-        //POWERED STATE
+        // POWERED STATE
         //
+        (
+            "switch.zhimi_de_974125313_rmb1_on_p_2_1",
+            HaChannel::Powered(PowerAvailable::BedroomAirPurifier),
+        ),
         ("light.hue_go", HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight)),
         //
         // PRESENCE

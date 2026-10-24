@@ -74,6 +74,7 @@ fn is_set_heating_reflected_in_state(
 
 fn is_set_power_reflected_in_state(device: &PowerToggle, power_on: bool, snapshot: &StateSnapshot) -> Result<bool> {
     let powered_item = match device {
+        PowerToggle::BedroomAirPurifier => PowerAvailable::BedroomAirPurifier,
         PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
         PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
         PowerToggle::LivingRoomTvAmbilight => PowerAvailable::LivingRoomTvAmbilight,

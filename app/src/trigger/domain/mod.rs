@@ -18,6 +18,7 @@ pub struct UserTriggerId(i64);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id)]
 #[serde(rename_all = "snake_case")]
 pub enum OnOffDevice {
+    BedroomAirPurifier,
     Dehumidifier,
     InfraredHeater,
     LivingRoomTvEnergySaving,

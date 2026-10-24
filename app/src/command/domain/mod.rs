@@ -159,6 +159,7 @@ impl Command {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum PowerToggle {
+    BedroomAirPurifier,
     Dehumidifier,
     InfraredHeater,
     LivingRoomTvAmbilight,

@@ -4,6 +4,7 @@ use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, EnumVariants, Id)]
 pub enum PowerAvailable {
+    BedroomAirPurifier,
     Dehumidifier,
     LivingRoomNotificationLight,
     InfraredHeater,
@@ -18,6 +19,7 @@ impl DerivedStateProvider<PowerAvailable, bool> for PowerAvailableStateProvider 
         use crate::device_state::PowerAvailable as DevicePowerAvailable;
 
         ctx.device_state(match id {
+            PowerAvailable::BedroomAirPurifier => DevicePowerAvailable::BedroomAirPurifier,
             PowerAvailable::Dehumidifier => DevicePowerAvailable::Dehumidifier,
             PowerAvailable::LivingRoomNotificationLight => DevicePowerAvailable::LivingRoomNotificationLight,
             PowerAvailable::InfraredHeater => DevicePowerAvailable::InfraredHeater,

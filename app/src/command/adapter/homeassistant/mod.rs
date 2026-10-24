@@ -56,6 +56,15 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
+    pub async fn set_power(&self, id: &str, power_on: bool) -> anyhow::Result<()> {
+        let service = if power_on { "turn_on" } else { "turn_off" };
+        self.client
+            .call_service("switch", service, json!({ "entity_id": [id] }))
+            .await?;
+        record_executed(id);
+        Ok(())
+    }
+
     pub async fn notify_light(
         &self,
         id: &str,

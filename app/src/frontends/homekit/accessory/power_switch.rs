@@ -24,6 +24,7 @@ impl Accessory for PowerSwitch {
 
     fn export_state(&mut self, state: &HomeStateValue) -> Vec<HomekitEvent> {
         let powered_item = match self.power_toggle {
+            PowerToggle::BedroomAirPurifier => PowerAvailable::BedroomAirPurifier,
             PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
             PowerToggle::InfraredHeater => PowerAvailable::InfraredHeater,
             PowerToggle::LivingRoomTvAmbilight => PowerAvailable::LivingRoomTvAmbilight,
@@ -44,6 +45,7 @@ impl Accessory for PowerSwitch {
             && let Some(is_on) = trigger.value.as_bool()
         {
             let on_off_device = match &self.power_toggle {
+                PowerToggle::BedroomAirPurifier => OnOffDevice::BedroomAirPurifier,
                 PowerToggle::Dehumidifier => OnOffDevice::Dehumidifier,
                 PowerToggle::InfraredHeater => OnOffDevice::InfraredHeater,
                 PowerToggle::LivingRoomTvAmbilight => OnOffDevice::LivingRoomTvAmbilight,
@@ -65,6 +67,32 @@ mod tests {
 
     fn switch() -> PowerSwitch {
         PowerSwitch::new("Ambilight Wohnzimmer", PowerToggle::LivingRoomTvAmbilight)
+    }
+
+    #[test]
+    fn bedroom_air_purifier_uses_power_switch_state_and_trigger() {
+        let mut switch = PowerSwitch::new("Luftreiniger Schlafzimmer", PowerToggle::BedroomAirPurifier);
+        let events = switch.export_state(&HomeStateValue::PowerAvailable(PowerAvailable::BedroomAirPurifier, true));
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].value, serde_json::json!(true));
+
+        let command = switch.process_trigger(&HomekitEvent {
+            target: HomekitTarget::new(
+                "Luftreiniger Schlafzimmer".to_string(),
+                HomekitService::Switch,
+                HomekitCharacteristic::On,
+            ),
+            value: serde_json::json!(false),
+        });
+
+        assert!(matches!(
+            command.map(|command| command.trigger),
+            Some(UserTrigger::DevicePower {
+                device: OnOffDevice::BedroomAirPurifier,
+                on: false,
+            })
+        ));
     }
 
     #[test]

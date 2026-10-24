@@ -14,16 +14,28 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             HaChannel::AllergenIndex(AllergenIndex::LivingRoom),
         ),
         (
+            "sensor.zhimi_de_974125313_rmb1_pm2_5_density_p_3_4",
+            HaChannel::ParticulateMatter(ParticulateMatter::BedroomAirPurifierPM25),
+        ),
+        (
             "sensor.wohnzimmer_pm2_5",
             HaChannel::ParticulateMatter(ParticulateMatter::LivingRoomPM25),
         ),
         //
         // TEMPERATURE
         //
+        (
+            "sensor.zhimi_de_974125313_rmb1_temperature_p_3_7",
+            HaChannel::Temperature(Temperature::BedroomAirPurifier),
+        ),
         ("sensor.home_temperature", HaChannel::Temperature(Temperature::Outside)),
         //
         // HUMIDITY
         //
+        (
+            "sensor.zhimi_de_974125313_rmb1_relative_humidity_p_3_1",
+            HaChannel::RelativeHumidity(RelativeHumidity::BedroomAirPurifier),
+        ),
         (
             "sensor.home_relative_humidity",
             HaChannel::RelativeHumidity(RelativeHumidity::Outside),

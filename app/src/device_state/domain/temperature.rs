@@ -8,6 +8,7 @@ pub enum Temperature {
     LivingRoom,
     RoomOfRequirements,
     Bedroom,
+    BedroomAirPurifier,
     BedroomOuterWall,
     Kitchen,
     KitchenOuterWall,

@@ -8,6 +8,7 @@ pub enum RelativeHumidity {
     LivingRoom,
     RoomOfRequirements,
     Bedroom,
+    BedroomAirPurifier,
     BedroomOuterWall,
     Kitchen,
     KitchenOuterWall,

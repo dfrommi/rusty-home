@@ -33,6 +33,8 @@ impl AutomationModule {
 
     pub async fn run(mut self) {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        // Planning reconciles the latest state. Missed ticks are stale and must not create a recovery burst.
+        timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut last_snapshot: Option<StateSnapshot> = None;
         loop {
             tokio::select! {

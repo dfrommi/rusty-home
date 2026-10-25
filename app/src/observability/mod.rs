@@ -55,6 +55,9 @@ impl ObservabilityModule {
 
         let mut device_state_timer = tokio::time::interval(std::time::Duration::from_secs(30));
         let mut availability_timer = tokio::time::interval(std::time::Duration::from_secs(60));
+        // Missed metric polls are stale and must not create a database/export burst after recovery.
+        device_state_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        availability_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut buffer = Vec::with_capacity(MAX_BATCH);
         let mut last_flush = t!(now);
 

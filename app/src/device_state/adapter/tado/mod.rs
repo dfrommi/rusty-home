@@ -75,7 +75,9 @@ impl IncomingDataSource for TadoIncomingDataSource {
                 match self.poll_zones().await {
                     Ok(mut zone_events) => {
                         let jitter = rand::random::<u64>() % 60;
-                        self.next_zones_poll += tokio::time::Duration::from_secs(3600 + jitter);
+                        // Schedule from now so delayed polls do not catch up in a tight loop.
+                        self.next_zones_poll =
+                            tokio::time::Instant::now() + tokio::time::Duration::from_secs(3600 + jitter);
                         events.append(&mut zone_events);
                     }
                     Err(e) => {
@@ -89,7 +91,9 @@ impl IncomingDataSource for TadoIncomingDataSource {
                 match self.poll_api().await {
                     Ok(mut state_events) => {
                         let jitter = rand::random::<u64>() % 30;
-                        self.next_zone_states_poll += tokio::time::Duration::from_secs(90 + jitter);
+                        // Schedule from now so delayed polls do not catch up in a tight loop.
+                        self.next_zone_states_poll =
+                            tokio::time::Instant::now() + tokio::time::Duration::from_secs(90 + jitter);
                         events.append(&mut state_events);
                     }
                     Err(e) => {

@@ -70,9 +70,10 @@ impl ObservabilityModule {
 
                 _ = device_state_timer.tick() => match self.device_state_client.get_current_for_all().await {
                     Ok(states) => {
-                        states.into_iter().flat_map(|(_, dp)| {
-                            self.device_metrics_adapter.to_metrics(dp)
-                        }).collect()
+                        states
+                            .into_values()
+                            .flat_map(|dp| self.device_metrics_adapter.to_metrics(dp))
+                            .collect()
                     },
                     Err(e) => {
                         tracing::error!("Error fetching current device states for metrics export: {:?}", e);

@@ -79,7 +79,7 @@ impl StateCalculationResult {
     }
 
     fn truncate_to(&mut self, cutoff: DateTime) {
-        for (_, df) in self.data.iter_mut() {
+        for df in self.data.values_mut() {
             df.remove_before_keep_one_more(cutoff);
         }
 

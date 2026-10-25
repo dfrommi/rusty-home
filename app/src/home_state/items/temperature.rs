@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::core::domain::{Radiator, Room};
-use crate::core::unit::DegreeCelsius;
+use crate::core::unit::{DegreeCelsius, Meter};
 use crate::home_state::TemperatureChange;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::t;
@@ -35,7 +35,11 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
             Temperature::Room(room) => match room {
                 Room::LivingRoom => ctx.device_state(DeviceTemperature::LivingRoomTado)?.value,
                 Room::RoomOfRequirements => ctx.device_state(DeviceTemperature::RoomOfRequirementsTado)?.value,
-                Room::Bedroom => ctx.device_state(DeviceTemperature::BedroomTado)?.value,
+                //estimate temperature in the middle of the bed
+                Room::Bedroom => calculate_weighted_temperature(&[
+                    (ctx.device_state(DeviceTemperature::BedroomTado)?.value, Meter(2.4)),
+                    (ctx.device_state(DeviceTemperature::Bedroom)?.value, Meter(0.8)),
+                ])?,
                 Room::Kitchen => ctx.device_state(DeviceTemperature::Kitchen)?.value,
                 Room::Bathroom => {
                     let shower = ctx.device_state(DeviceTemperature::BathroomShower);
@@ -91,5 +95,62 @@ impl DerivedStateProvider<Temperature, DegreeCelsius> for TemperatureStateProvid
             }
         }
         .into()
+    }
+}
+
+//TODO make more generic for any value with distance weighting
+fn calculate_weighted_temperature(sensors: &[(DegreeCelsius, Meter)]) -> Option<DegreeCelsius> {
+    let mut weighted_sum = 0.0;
+    let mut total_weight = 0.0;
+
+    for (temperature, distance) in sensors {
+        if !distance.0.is_finite() || distance.0 <= 0.0 {
+            return None;
+        }
+
+        let weight = 1.0 / distance.0;
+        weighted_sum += temperature.0 * weight;
+        total_weight += weight;
+    }
+
+    (total_weight > 0.0).then_some(DegreeCelsius(weighted_sum / total_weight))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculates_inverse_distance_weighted_temperature() {
+        let Some(temperature) = calculate_weighted_temperature(&[
+            (DegreeCelsius(17.34), Meter(1.0)),
+            (DegreeCelsius(16.64), Meter(1.5)),
+            (DegreeCelsius(17.91), Meter(2.0)),
+        ]) else {
+            panic!("valid distances must produce a temperature");
+        };
+
+        assert!((temperature.0 - 17.256_153_846_153_85).abs() < 1e-12);
+    }
+
+    #[test]
+    fn accepts_any_number_of_sensors() {
+        let Some(temperature) = calculate_weighted_temperature(&[
+            (DegreeCelsius(10.0), Meter(1.0)),
+            (DegreeCelsius(20.0), Meter(2.0)),
+            (DegreeCelsius(30.0), Meter(4.0)),
+            (DegreeCelsius(40.0), Meter(8.0)),
+        ]) else {
+            panic!("valid distances must produce a temperature");
+        };
+
+        assert!((temperature.0 - 17.333_333_333_333_332).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_empty_or_invalid_sensor_distances() {
+        assert_eq!(calculate_weighted_temperature(&[]), None);
+        assert_eq!(calculate_weighted_temperature(&[(DegreeCelsius(20.0), Meter(0.0))]), None);
+        assert_eq!(calculate_weighted_temperature(&[(DegreeCelsius(20.0), Meter(-1.0))]), None);
     }
 }

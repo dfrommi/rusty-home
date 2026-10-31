@@ -1,6 +1,6 @@
 use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
-    InformWindowOpen, PurifyAir, RemoteTurnOff, UserTriggerAction,
+    InformWindowOpen, PauseHeatingForVentilation, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{
     CommandTarget, EnergySavingDevice, Fan, NotificationKind, NotificationLight, NotificationRecipient, PowerToggle,
@@ -102,37 +102,55 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             CommandTarget::SetHeating {
                 device: Radiator::LivingRoomBig,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::LivingRoomBig).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::LivingRoomBig).into(),
+                FollowTargetHeatingDemand::new(Radiator::LivingRoomBig).into(),
+            ],
         ),
         (
             CommandTarget::SetHeating {
                 device: Radiator::LivingRoomSmall,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::LivingRoomSmall).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::LivingRoomSmall).into(),
+                FollowTargetHeatingDemand::new(Radiator::LivingRoomSmall).into(),
+            ],
         ),
         (
             CommandTarget::SetHeating {
                 device: Radiator::Bedroom,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::Bedroom).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::Bedroom).into(),
+                FollowTargetHeatingDemand::new(Radiator::Bedroom).into(),
+            ],
         ),
         (
             CommandTarget::SetHeating {
                 device: Radiator::Kitchen,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::Kitchen).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::Kitchen).into(),
+                FollowTargetHeatingDemand::new(Radiator::Kitchen).into(),
+            ],
         ),
         (
             CommandTarget::SetHeating {
                 device: Radiator::RoomOfRequirements,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::RoomOfRequirements).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::RoomOfRequirements).into(),
+                FollowTargetHeatingDemand::new(Radiator::RoomOfRequirements).into(),
+            ],
         ),
         (
             CommandTarget::SetHeating {
                 device: Radiator::Bathroom,
             },
-            vec![FollowTargetHeatingDemand::new(Radiator::Bathroom).into()],
+            vec![
+                PauseHeatingForVentilation::new(Radiator::Bathroom).into(),
+                FollowTargetHeatingDemand::new(Radiator::Bathroom).into(),
+            ],
         ),
         // --- Energy saving ---
         (
@@ -203,6 +221,26 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
+    use crate::core::domain::{HeatingZone, RoomWithWindow};
+
+    #[test]
+    fn every_radiator_pauses_for_ventilation_before_following_its_target() {
+        for radiator in Radiator::variants() {
+            let target = CommandTarget::SetHeating { device: *radiator };
+            let (_, rules) = resource_plans()
+                .into_iter()
+                .find(|(candidate, _)| candidate == &target)
+                .expect("radiator heating plan");
+            assert!(matches!(
+                rules.as_slice(),
+                [
+                    HomeAction::PauseHeatingForVentilation(_),
+                    HomeAction::FollowTargetHeatingDemand(_)
+                ]
+            ));
+        }
+        assert_eq!(HeatingZone::Bathroom.room_with_window(), RoomWithWindow::Bedroom);
+    }
 
     #[test]
     fn notification_plans_are_keyed_by_their_lockable_targets() {

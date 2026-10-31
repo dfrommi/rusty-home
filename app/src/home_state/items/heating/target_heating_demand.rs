@@ -27,14 +27,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
     fn calculate_current(&self, id: TargetHeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
         let TargetHeatingDemand::ControlAndObserve(radiator) = id;
 
-        let Some(modes) = ctx.all_since(TargetHeatingMode::from_radiator(radiator), t!(3 hours ago)) else {
-            tracing::warn!(%radiator, "No mode found for radiator {} in the last 3 hours, cannot calculate target heating demand", radiator);
-            return None;
-        };
-        let Some(mode) = modes.last() else {
-            tracing::warn!(%radiator, "No mode found for radiator {} in the last 3 hours, cannot calculate target heating demand", radiator);
-            return None;
-        };
+        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
 
         let reference_demand = ctx.get(HeatingDemandLimit::Current(radiator))?;
         let last_change_time = reference_demand.timestamp;
@@ -48,14 +41,12 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             .get(radiator.current_heating_demand())
             .map(|d| d.value > Percent(0.0))
             .unwrap_or(false);
-        let recent_ventilation_finished = modes.fulfilled_since(|dp| dp.value != HeatingMode::Ventilation);
 
         combined_demand(
             radiator,
-            mode.clone(),
+            mode,
             adjustments,
             is_heating_now,
-            recent_ventilation_finished,
             barely_warm_output,
             reference_demand,
         )
@@ -67,7 +58,7 @@ fn combined_demand(
     mode: DataPoint<HeatingMode>,
     adjustments: DataFrame<AdjustmentDirection>,
     is_heating_now: bool,
-    recent_ventilation_finished: Option<DateTime>,
+
     barely_warm_output: Percent,
     reference_demand: DataPoint<Percent>,
 ) -> Option<Percent> {
@@ -85,20 +76,6 @@ fn combined_demand(
             %radiator,
             "Radiator {} already not heating currently and adjustment is down ({:?}) -> resetting output to barely warm {}", radiator, adjustment, limits.barely_warm);
         return Some(limits.barely_warm);
-    }
-
-    if let Some(ventilation_finished) = recent_ventilation_finished {
-        let heat_request_after_vent = adjustments
-            .latest_where(|dp| dp.value >= AdjustmentDirection::Hold)
-            .take_if(|dp| dp.timestamp >= ventilation_finished)
-            .is_some();
-
-        if !is_heating_now && !heat_request_after_vent {
-            tracing::debug!(
-                %radiator,
-                "Radiator {} recently finished ventilation, no heat request since then -> forcing zero output", radiator);
-            return Some(Percent(0.0));
-        }
     }
 
     //Don't skip on mode change
@@ -242,7 +219,6 @@ mod tests {
                     DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
                     DataFrame::new([DataPoint::new(adjustment, t!(now))]),
                     true,
-                    None,
                     Percent(20.0),
                     DataPoint::new(Percent(current), t!(11 minutes ago)),
                 );
@@ -262,7 +238,6 @@ mod tests {
                     DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
                     DataFrame::new([DataPoint::new(adjustment, t!(now))]),
                     false,
-                    None,
                     Percent(20.0),
                     DataPoint::new(Percent(35.0), t!(now)),
                 );
@@ -282,30 +257,11 @@ mod tests {
                     DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
                     DataFrame::new([DataPoint::new(adjustment, t!(20 minutes ago))]),
                     false,
-                    None,
                     Percent(20.0),
                     DataPoint::new(Percent(35.0), t!(11 minutes ago)),
                 );
                 assert_eq!(demand, Some(Percent(expected)));
             }
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn retained_pre_ventilation_heat_request_does_not_restart_heating() {
-        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
-        now.eval_timeshifted(async {
-            let demand = combined_demand(
-                Radiator::LivingRoomBig,
-                DataPoint::new(HeatingMode::Comfort, t!(10 minutes ago)),
-                DataFrame::new([DataPoint::new(MustIncrease, t!(20 minutes ago))]),
-                false,
-                Some(t!(10 minutes ago)),
-                Percent(20.0),
-                DataPoint::new(Percent(35.0), t!(11 minutes ago)),
-            );
-            assert_eq!(demand, Some(Percent(0.0)));
         })
         .await;
     }

@@ -70,6 +70,15 @@ impl HeatingZone {
         }
     }
 
+    pub fn room_with_window(&self) -> RoomWithWindow {
+        match self {
+            HeatingZone::LivingRoom => RoomWithWindow::LivingRoom,
+            HeatingZone::Bedroom | HeatingZone::Bathroom => RoomWithWindow::Bedroom,
+            HeatingZone::Kitchen => RoomWithWindow::Kitchen,
+            HeatingZone::RoomOfRequirements => RoomWithWindow::RoomOfRequirements,
+        }
+    }
+
     pub fn radiators(&self) -> Vec<Radiator> {
         match self {
             HeatingZone::LivingRoom => vec![Radiator::LivingRoomBig, Radiator::LivingRoomSmall],

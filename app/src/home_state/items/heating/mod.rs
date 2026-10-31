@@ -75,7 +75,6 @@ impl ControlLimits {
             },
             min_output,
             max_output: match mode {
-                HeatingMode::Ventilation => Percent(0.0),
                 HeatingMode::EnergySaving => Percent(40.0),
                 HeatingMode::Comfort => Percent(50.0),
                 HeatingMode::Manual(_, _) => Percent(60.0),
@@ -105,7 +104,7 @@ fn radiator_strategy(current_room_temperature: DegreeCelsius, mode: HeatingMode)
         HeatingMode::Comfort => 11.0,
         HeatingMode::EnergySaving => 8.0,
         HeatingMode::Sleep => 8.0,
-        HeatingMode::Ventilation => 3.0,
+
         HeatingMode::Away => 6.0,
     };
 
@@ -124,7 +123,7 @@ fn setpoint_strategy(setpoint: Range<DegreeCelsius>, mode: HeatingMode) -> Heati
     let min_heatup_per_hour = match mode {
         HeatingMode::Manual(_, _) | HeatingMode::Comfort => 0.75,
         HeatingMode::EnergySaving | HeatingMode::Sleep => 0.5,
-        HeatingMode::Ventilation => 0.2,
+
         HeatingMode::Away => 0.2,
     };
 
@@ -145,7 +144,7 @@ fn setpoint_for_mode(radiator: Radiator, mode: &HeatingMode) -> Range<DegreeCels
 
     let t = match (radiator, mode) {
         (_, Manual(t, _)) => t.0,
-        (_, Ventilation) => 0.0,
+
         (_, _) if is_warmish_outside => 15.0,
         (LivingRoomBig, EnergySaving) | (LivingRoomSmall, EnergySaving) => 19.0,
         (LivingRoomBig, Sleep) | (LivingRoomSmall, Sleep) => 18.5,
@@ -170,7 +169,7 @@ fn setpoint_for_mode(radiator: Radiator, mode: &HeatingMode) -> Range<DegreeCels
     let offset = match (radiator, mode) {
         (Bedroom, Sleep) => 0.6,
         (_, Comfort) | (_, Manual(_, _)) => 0.4,
-        (_, EnergySaving) | (_, Ventilation) | (_, Sleep) | (_, Away) => 1.0,
+        (_, EnergySaving) | (_, Sleep) | (_, Away) => 1.0,
     };
 
     Range::new(DegreeCelsius(t), DegreeCelsius(t - offset))

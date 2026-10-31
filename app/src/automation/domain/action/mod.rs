@@ -151,6 +151,7 @@ pub enum HomeAction {
     FollowDefaultSetting(FollowDefaultSetting),
     UserTriggerAction(UserTriggerAction),
     FollowTargetHeatingDemand(FollowTargetHeatingDemand),
+    PauseHeatingForVentilation(PauseHeatingForVentilation),
     BlockAutomation(BlockAutomation),
     RemoteTurnOff(RemoteTurnOff),
 }
@@ -172,6 +173,7 @@ impl HomeAction {
             HomeAction::FollowDefaultSetting(r) => (r, r.ext_id()),
             HomeAction::UserTriggerAction(r) => (r, r.ext_id()),
             HomeAction::FollowTargetHeatingDemand(r) => (r, r.ext_id()),
+            HomeAction::PauseHeatingForVentilation(r) => (r, r.ext_id()),
             HomeAction::BlockAutomation(r) => (r, r.ext_id()),
             HomeAction::RemoteTurnOff(r) => (r, r.ext_id()),
         }

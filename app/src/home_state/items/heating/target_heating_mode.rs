@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::{
-    core::domain::{HeatingZone, Radiator, RoomWithWindow},
+    core::domain::{HeatingZone, Radiator},
     home_state::{
         Occupancy, Presence, Ventilation,
         calc::{DerivedStateProvider, StateCalculationContext},
@@ -22,8 +22,6 @@ pub enum HeatingMode {
     EnergySaving,
     Comfort,
     Sleep,
-
-    Ventilation,
 
     Away,
 
@@ -58,12 +56,7 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
             .and_then(|item| ctx.all_since(item, t!(1 hours ago)))
             .unwrap_or(DataFrame::empty());
 
-        let ventilation_item = Ventilation::Room(match heating_zone {
-            HeatingZone::LivingRoom => RoomWithWindow::LivingRoom,
-            HeatingZone::Bedroom | HeatingZone::Bathroom => RoomWithWindow::Bedroom,
-            HeatingZone::Kitchen => RoomWithWindow::Kitchen,
-            HeatingZone::RoomOfRequirements => RoomWithWindow::RoomOfRequirements,
-        });
+        let ventilation_item = Ventilation::Room(heating_zone.room_with_window());
 
         let result = calculate_heating_mode(
             &id,
@@ -140,12 +133,6 @@ fn calculate_heating_mode(
         return HeatingMode::Away;
     }
 
-    //Or cold-air coming in?
-    if ventilation.value {
-        tracing::trace!("Heating in ventilation mode as window is open");
-        return HeatingMode::Ventilation;
-    }
-
     if let Some(user_override) = user_override {
         if user_override.timestamp.elapsed() > t!(1 hours) {
             tracing::trace!(
@@ -219,4 +206,70 @@ struct UserHeatingOverride {
     timestamp: DateTime,
     target_temperature: DegreeCelsius,
     trigger_id: UserTriggerId,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn ventilation_does_not_replace_the_manual_target_used_to_calculate_demand() {
+        DateTime::from_static_iso("2026-01-01T12:00:00Z")
+            .eval_timeshifted(async {
+                let zone = TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom);
+                for requested in [t!(20 minutes ago), t!(1 minutes ago)] {
+                    for target in [DegreeCelsius(0.0), DegreeCelsius(21.0)] {
+                        let trigger_id = UserTriggerId::from(1_i64);
+                        let result = calculate_heating_mode(
+                            &zone,
+                            DataPoint::new(false, t!(1 hours ago)),
+                            DataPoint::new(true, t!(10 minutes ago)),
+                            DataFrame::empty(),
+                            Some(UserHeatingOverride {
+                                timestamp: requested,
+                                target_temperature: target,
+                                trigger_id: trigger_id.clone(),
+                            }),
+                        );
+                        assert_eq!(result, HeatingMode::Manual(target, trigger_id));
+                    }
+                }
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn automatic_intent_and_manual_expiry_do_not_depend_on_the_ventilation_pause() {
+        DateTime::from_static_iso("2026-01-01T12:00:00Z")
+            .eval_timeshifted(async {
+                let zone = TargetHeatingMode::HeatingZone(HeatingZone::LivingRoom);
+                let ventilation = DataPoint::new(true, t!(10 minutes ago));
+                let occupancy = DataFrame::new([DataPoint::new(p(0.9), t!(now))]);
+                assert_eq!(
+                    calculate_heating_mode(
+                        &zone,
+                        DataPoint::new(true, t!(1 hours ago)),
+                        ventilation.clone(),
+                        occupancy.clone(),
+                        None,
+                    ),
+                    HeatingMode::Away,
+                );
+                assert_eq!(
+                    calculate_heating_mode(
+                        &zone,
+                        DataPoint::new(false, t!(1 hours ago)),
+                        ventilation,
+                        occupancy,
+                        Some(UserHeatingOverride {
+                            timestamp: t!(61 minutes ago),
+                            target_temperature: DegreeCelsius(21.0),
+                            trigger_id: UserTriggerId::from(1_i64),
+                        }),
+                    ),
+                    HeatingMode::Comfort,
+                );
+            })
+            .await;
+    }
 }

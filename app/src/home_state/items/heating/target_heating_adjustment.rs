@@ -4,10 +4,9 @@ use crate::{
     core::domain::Radiator,
     core::unit::{DegreeCelsius, Percent, RateOfChange},
     home_state::{
-        HeatingDemand, HeatingMode, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
+        HeatingDemand, SetPoint, TargetHeatingMode, Temperature, TemperatureChange,
         calc::{DerivedStateProvider, StateCalculationContext},
     },
-    t,
 };
 
 use super::{radiator_strategy, setpoint_strategy};
@@ -53,25 +52,9 @@ impl DerivedStateProvider<TargetHeatingAdjustment, AdjustmentDirection> for Targ
             TargetHeatingAdjustment::HeatingDemand(radiator) => radiator,
         };
         let heating_zone = radiator.heating_zone();
-        let Some(modes) = ctx.all_since(TargetHeatingMode::from_radiator(radiator), t!(3 hours ago)) else {
-            tracing::warn!(
-                "No heating mode data available for radiator {:?}, cannot calculate TargetHeatingAdjustment",
-                radiator
-            );
-            return None;
-        };
-        let mode = modes.last()?.clone();
-        let last_ventilation_finished_within_5_min = modes
-            .fulfilled_since(|dp| dp.value != HeatingMode::Ventilation)
-            .map(|ts| ts.elapsed() < t!(5 minutes))
-            .unwrap_or(false);
+        let mode = ctx.get(TargetHeatingMode::from_radiator(radiator))?;
 
         match id {
-            //Force ventilation always into full off
-            _ if mode.value == HeatingMode::Ventilation => Some(AdjustmentDirection::MustOff),
-            //give post-ventilation some time to settle
-            _ if last_ventilation_finished_within_5_min => Some(AdjustmentDirection::MustOff),
-
             TargetHeatingAdjustment::Radiator(radiator) => {
                 let radiator_temperature = ctx.get(radiator.surface_temperature())?.value;
                 let radiator_roc = ctx.get(TemperatureChange::Radiator(radiator))?.value;

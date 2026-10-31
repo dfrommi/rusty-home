@@ -36,9 +36,7 @@ impl DerivedStateProvider<TargetHeatingDemand, Percent> for HeatingDemandStatePr
             return None;
         };
 
-        let reference_demand = ctx
-            .get(HeatingDemandLimit::Current(radiator))
-            .map(|limit| DataPoint::new(*limit.value.to(), limit.timestamp))?;
+        let reference_demand = ctx.get(HeatingDemandLimit::Current(radiator))?;
         let last_change_time = reference_demand.timestamp;
         let adjustments = ctx.all_since(
             TargetHeatingAdjustment::HeatingDemand(radiator),
@@ -209,10 +207,6 @@ fn adjustment_needed(
         {
             new_adjustment_in_same_direction = true;
         }
-
-        if previous.value == MustOff && latest.value == MustOff {
-            new_adjustment_in_same_direction = true;
-        }
     }
 
     if new_adjustment_after_last_change && !new_adjustment_in_same_direction {
@@ -223,4 +217,96 @@ fn adjustment_needed(
     tracing::debug!("No new adjustment needed since last change.");
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use AdjustmentDirection::*;
+
+    #[tokio::test]
+    async fn active_demand_keeps_the_steps_limits_and_immediate_off() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        now.eval_timeshifted(async {
+            for (adjustment, current, expected) in [
+                (MustIncrease, 20.0, 25.0),
+                (ShouldIncrease, 20.0, 25.0),
+                (ShouldDecrease, 20.0, 15.0),
+                (MustDecrease, 12.0, 12.0),
+                (MustIncrease, 50.0, 50.0),
+                (MustOff, 50.0, 0.0),
+                (Hold, 20.0, 20.0),
+            ] {
+                let demand = combined_demand(
+                    Radiator::LivingRoomBig,
+                    DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
+                    DataFrame::new([DataPoint::new(adjustment, t!(now))]),
+                    true,
+                    None,
+                    Percent(20.0),
+                    DataPoint::new(Percent(current), t!(11 minutes ago)),
+                );
+                assert_eq!(demand, Some(Percent(expected)));
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn idle_radiator_arms_the_barely_warm_on_position() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        now.eval_timeshifted(async {
+            for adjustment in [MustDecrease, ShouldDecrease, Hold] {
+                let demand = combined_demand(
+                    Radiator::LivingRoomBig,
+                    DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
+                    DataFrame::new([DataPoint::new(adjustment, t!(now))]),
+                    false,
+                    None,
+                    Percent(20.0),
+                    DataPoint::new(Percent(35.0), t!(now)),
+                );
+                assert_eq!(demand, Some(Percent(20.0)));
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn retained_increase_adjustments_still_use_cold_start_factors() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        now.eval_timeshifted(async {
+            for (adjustment, expected) in [(MustIncrease, 30.0), (ShouldIncrease, 25.0)] {
+                let demand = combined_demand(
+                    Radiator::LivingRoomBig,
+                    DataPoint::new(HeatingMode::Comfort, t!(1 hours ago)),
+                    DataFrame::new([DataPoint::new(adjustment, t!(20 minutes ago))]),
+                    false,
+                    None,
+                    Percent(20.0),
+                    DataPoint::new(Percent(35.0), t!(11 minutes ago)),
+                );
+                assert_eq!(demand, Some(Percent(expected)));
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn retained_pre_ventilation_heat_request_does_not_restart_heating() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        now.eval_timeshifted(async {
+            let demand = combined_demand(
+                Radiator::LivingRoomBig,
+                DataPoint::new(HeatingMode::Comfort, t!(10 minutes ago)),
+                DataFrame::new([DataPoint::new(MustIncrease, t!(20 minutes ago))]),
+                false,
+                Some(t!(10 minutes ago)),
+                Percent(20.0),
+                DataPoint::new(Percent(35.0), t!(11 minutes ago)),
+            );
+            assert_eq!(demand, Some(Percent(0.0)));
+        })
+        .await;
+    }
 }

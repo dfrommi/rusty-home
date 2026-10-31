@@ -70,7 +70,7 @@ pub enum HomeStateValue {
     EnergySaving(EnergySaving, bool),
     FanActivity(FanActivity, FanAirflow),
     HeatingDemand(HeatingDemand, Percent),
-    HeatingDemandLimit(HeatingDemandLimit, Range<Percent>),
+    HeatingDemandLimit(HeatingDemandLimit, Percent),
     PowerAvailable(PowerAvailable, bool),
     Presence(Presence, bool),
     RelativeHumidity(RelativeHumidity, Percent),

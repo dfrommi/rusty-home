@@ -25,21 +25,15 @@ pub struct HeatingDemandStateProvider;
 impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider {
     fn calculate_current(&self, id: HeatingDemand, ctx: &StateCalculationContext) -> Option<Percent> {
         match id {
-            HeatingDemand::Radiator(radiator) if DateTime::from_static_iso("2026-02-08T16:08:00+01:00").is_passed() => {
+            HeatingDemand::Radiator(radiator) => {
                 let setpoint_range = ctx.get(SetPoint::Current(radiator))?;
                 let is_heating = guess_is_heating_from_hyserisis(
-                    ctx.get(SetPoint::Current(radiator))?,
+                    setpoint_range.clone(),
                     ctx.all_since(Temperature::RadiatorExternalTempSensor(radiator), setpoint_range.timestamp)?,
                 );
-                let current_demand_limit = ctx.get(HeatingDemandLimit::Current(radiator))?.value;
-                if is_heating {
-                    *current_demand_limit.to()
-                } else {
-                    *current_demand_limit.from()
-                }
+                let current_demand = ctx.get(HeatingDemandLimit::Current(radiator))?.value;
+                if is_heating { current_demand } else { Percent(0.0) }
             }
-
-            HeatingDemand::Radiator(radiator) => trust_device_reading(radiator, ctx)?,
 
             HeatingDemand::BarelyWarmSurface(radiator) => {
                 let radiator_temperatures = ctx.all_since(radiator.surface_temperature(), t!(3 hours ago))?;
@@ -50,20 +44,6 @@ impl DerivedStateProvider<HeatingDemand, Percent> for HeatingDemandStateProvider
         }
         .into()
     }
-}
-
-fn trust_device_reading(radiator: Radiator, ctx: &StateCalculationContext) -> Option<Percent> {
-    use crate::device_state::HeatingDemand as DeviceHeatingDemand;
-
-    match radiator {
-        Radiator::LivingRoomBig => ctx.device_state(DeviceHeatingDemand::LivingRoomBig),
-        Radiator::LivingRoomSmall => ctx.device_state(DeviceHeatingDemand::LivingRoomSmall),
-        Radiator::Bedroom => ctx.device_state(DeviceHeatingDemand::Bedroom),
-        Radiator::Kitchen => ctx.device_state(DeviceHeatingDemand::Kitchen),
-        Radiator::RoomOfRequirements => ctx.device_state(DeviceHeatingDemand::RoomOfRequirements),
-        Radiator::Bathroom => ctx.device_state(DeviceHeatingDemand::Bathroom),
-    }
-    .map(|d| d.value)
 }
 
 fn guess_is_heating_from_hyserisis(
@@ -185,5 +165,48 @@ fn estimate_barely_warm_surface(
         Radiator::LivingRoomBig | Radiator::LivingRoomSmall | Radiator::RoomOfRequirements => Percent(20.0),
         Radiator::Bedroom | Radiator::Kitchen => Percent(8.0),
         Radiator::Bathroom => Percent(20.0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hysteresis_switches_at_the_setpoint_boundaries() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        let setpoints = DataPoint::new(Range::new(DegreeCelsius(19.0), DegreeCelsius(20.0)), now);
+
+        for (temperature, expected) in [(18.0, true), (19.0, true), (20.0, false), (21.0, false)] {
+            let temperatures = DataFrame::new([DataPoint::new(DegreeCelsius(temperature), now)]);
+            assert_eq!(guess_is_heating_from_hyserisis(setpoints.clone(), temperatures), expected);
+        }
+        assert!(!guess_is_heating_from_hyserisis(setpoints, DataFrame::empty()));
+    }
+
+    #[test]
+    fn hysteresis_preserves_the_last_switch_inside_the_band() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        let setpoints = DataPoint::new(Range::new(DegreeCelsius(19.0), DegreeCelsius(20.0)), now - t!(1 hours));
+
+        for (previous_temperature, expected) in [(18.0, true), (21.0, false)] {
+            let temperatures = DataFrame::new([
+                DataPoint::new(DegreeCelsius(previous_temperature), now - t!(30 minutes)),
+                DataPoint::new(DegreeCelsius(19.5), now),
+            ]);
+            assert_eq!(guess_is_heating_from_hyserisis(setpoints.clone(), temperatures), expected);
+        }
+    }
+
+    #[test]
+    fn setpoint_change_ignores_older_switches_and_arms_heating_inside_the_band() {
+        let now = DateTime::from_static_iso("2026-01-01T12:00:00Z");
+        let setpoints = DataPoint::new(Range::new(DegreeCelsius(19.0), DegreeCelsius(20.0)), now);
+        let temperatures = DataFrame::new([
+            DataPoint::new(DegreeCelsius(21.0), now - t!(30 minutes)),
+            DataPoint::new(DegreeCelsius(19.5), now),
+        ]);
+
+        assert!(guess_is_heating_from_hyserisis(setpoints, temperatures));
     }
 }

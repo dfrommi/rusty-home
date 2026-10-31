@@ -1,6 +1,6 @@
 use crate::{
     core::timeseries::DataPoint,
-    device_state::{CurrentPowerUsage, DeviceStateId, DeviceStateValue, HeatingDemand, TotalEnergyConsumption},
+    device_state::{CurrentPowerUsage, DeviceStateId, DeviceStateValue, TotalEnergyConsumption},
 };
 
 use super::{Metric, MetricId, MetricLabel};
@@ -47,20 +47,11 @@ impl From<&DeviceStateId> for MetricId {
 fn derived_metrics(metric: &Metric, state: DeviceStateId) -> Vec<Metric> {
     let mut metrics = Vec::new();
 
-    match state {
-        DeviceStateId::HeatingDemand(demand) => {
-            let mut scaled_metric = metric.clone();
-            scaled_metric.id.name = format!("{}_scaled", metric.id.name);
-            scaled_metric.value = metric.value * demand.scaling_factor();
-            metrics.push(scaled_metric);
-        }
-        DeviceStateId::TotalRadiatorConsumption(consumption) => {
-            let mut scaled_metric = metric.clone();
-            scaled_metric.id.name = format!("{}_scaled", metric.id.name);
-            scaled_metric.value = metric.value * consumption.scaling_factor();
-            metrics.push(scaled_metric);
-        }
-        _ => (),
+    if let DeviceStateId::TotalRadiatorConsumption(consumption) = state {
+        let mut scaled_metric = metric.clone();
+        scaled_metric.id.name = format!("{}_scaled", metric.id.name);
+        scaled_metric.value = metric.value * consumption.scaling_factor();
+        metrics.push(scaled_metric);
     }
 
     metrics
@@ -117,14 +108,6 @@ fn friendly_name(state: &DeviceStateId) -> Option<&'static str> {
             TotalEnergyConsumption::CouchPlug => "Couch-Stecker",
             TotalEnergyConsumption::RoomOfRequirementsDesk => "Schreibtisch",
             TotalEnergyConsumption::RoomOfRequirementsMonitor => "Monitor",
-        }),
-        DeviceStateId::HeatingDemand(s) => Some(match s {
-            HeatingDemand::LivingRoomBig => "Wohnzimmer (groß)",
-            HeatingDemand::LivingRoomSmall => "Wohnzimmer (klein)",
-            HeatingDemand::Bedroom => "Schlafzimmer",
-            HeatingDemand::RoomOfRequirements => "Room of Requirements",
-            HeatingDemand::Kitchen => "Küche",
-            HeatingDemand::Bathroom => "Bad",
         }),
         _ => None,
     }

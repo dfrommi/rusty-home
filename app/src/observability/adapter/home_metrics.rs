@@ -36,20 +36,11 @@ impl super::MetricsAdapter<DataPoint<HomeStateValue>> for HomeMetricsAdapter {
             HomeStateValue::EnergySaving(_, v) => default_with(v.into()),
             HomeStateValue::FanActivity(_, v) => default_with(f64::from(&v)),
             HomeStateValue::HeatingDemand(_, v) => default_with(f64::from(&v)),
-            HomeStateValue::HeatingDemandLimit(_, v) => {
-                vec![
-                    Metric {
-                        id: metric_id(&home_state_id, "min", vec![]),
-                        timestamp,
-                        value: f64::from(v.from()),
-                    },
-                    Metric {
-                        id: metric_id(&home_state_id, "max", vec![]),
-                        timestamp,
-                        value: f64::from(v.to()),
-                    },
-                ]
-            }
+            HomeStateValue::HeatingDemandLimit(_, v) => vec![Metric {
+                id: metric_id(&home_state_id, "max", vec![]),
+                timestamp,
+                value: f64::from(&v),
+            }],
             HomeStateValue::PowerAvailable(_, v) => default_with(v.into()),
             HomeStateValue::Presence(_, v) => default_with(v.into()),
             HomeStateValue::RelativeHumidity(_, v) => default_with(f64::from(&v)),
@@ -144,5 +135,29 @@ impl From<&HomeStateId> for MetricId {
             name: external_id.type_name().to_string(),
             labels: super::get_common_tags(&external_id),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        core::{domain::Radiator, unit::Percent},
+        home_state::HeatingDemandLimit,
+        observability::adapter::MetricsAdapter,
+    };
+
+    #[test]
+    fn current_opening_keeps_its_existing_max_metric_without_a_min_metric() {
+        let dp = DataPoint::new(
+            HomeStateValue::HeatingDemandLimit(HeatingDemandLimit::Current(Radiator::Bedroom), Percent(35.0)),
+            t!(now),
+        );
+        let metrics = HomeMetricsAdapter.to_metrics(dp.clone());
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].id.name, "heating_demand_limit_max");
+        assert_eq!(metrics[0].value, 35.0);
+        assert_eq!(metrics[0].timestamp, dp.timestamp);
     }
 }

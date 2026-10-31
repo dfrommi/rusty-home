@@ -174,7 +174,7 @@ pub enum HeatingTargetState {
     Off,
     Heat {
         target_temperature: Range<DegreeCelsius>,
-        demand_limit: Range<Percent>,
+        demand: Percent,
     },
 }
 
@@ -184,8 +184,8 @@ impl std::fmt::Display for HeatingTargetState {
             HeatingTargetState::Off => write!(f, "Off"),
             HeatingTargetState::Heat {
                 target_temperature,
-                demand_limit,
-            } => write!(f, "Heat {} ({})", target_temperature, demand_limit),
+                demand,
+            } => write!(f, "Heat {} ({})", target_temperature, demand),
         }
     }
 }

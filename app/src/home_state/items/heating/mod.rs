@@ -22,8 +22,6 @@ use crate::{
 };
 
 struct HeatingAdjustmentStrategy {
-    #[allow(dead_code)] //offloaded for now to the device, but keep it for now as algos will change
-    min: DegreeCelsius,
     max: DegreeCelsius,
     min_heatup: Option<RateOfChange<DegreeCelsius>>,
     band: DegreeCelsius,
@@ -37,7 +35,6 @@ impl HeatingAdjustmentStrategy {
         max_overshoot: DegreeCelsius,
     ) -> Self {
         Self {
-            min: range.0,
             max: range.1,
             band: (range.1 - range.0) * 1.0 / 3.0,
             min_heatup,

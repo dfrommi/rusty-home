@@ -20,7 +20,7 @@ impl Command {
             } => is_set_heating_reflected_in_state(
                 device,
                 &Range::new(DegreeCelsius(0.0), DegreeCelsius(0.0)),
-                &Range::new(Percent(0.0), Percent(0.0)),
+                &Percent(0.0),
                 snapshot,
             )
             .map(Some),
@@ -29,9 +29,9 @@ impl Command {
                 target_state:
                     HeatingTargetState::Heat {
                         target_temperature,
-                        demand_limit,
+                        demand,
                     },
-            } => is_set_heating_reflected_in_state(device, target_temperature, demand_limit, snapshot).map(Some),
+            } => is_set_heating_reflected_in_state(device, target_temperature, demand, snapshot).map(Some),
             Command::Notify { target, operation, .. } => {
                 is_notification_reflected_in_state(target, *operation, snapshot)
             }
@@ -52,20 +52,20 @@ impl Command {
 fn is_set_heating_reflected_in_state(
     device: &Radiator,
     target_temperature: &Range<DegreeCelsius>,
-    demand_limit: &Range<Percent>,
+    demand: &Percent,
     snapshot: &StateSnapshot,
 ) -> Result<bool> {
     let current_setpoint_range = snapshot.try_get(SetPoint::Current(*device))?.value;
-    let current_demand_limit = snapshot.try_get(HeatingDemandLimit::Current(*device))?.value;
-    let is_reflected = current_setpoint_range == *target_temperature && current_demand_limit == *demand_limit;
+    let current_demand = snapshot.try_get(HeatingDemandLimit::Current(*device))?.value;
+    let is_reflected = current_setpoint_range == *target_temperature && current_demand == *demand;
 
     tracing::debug!(
-        "Checking if SetHeating command for device {:?} is reflected in state: current setpoint range: {:?}, target setpoint range: {:?}, current demand limit: {:?}, target demand limit: {:?}, is_reflected: {}",
+        "Checking if SetHeating command for device {:?} is reflected in state: current setpoint range: {:?}, target setpoint range: {:?}, current on-position: {:?}, target on-position: {:?}, is_reflected: {}",
         device,
         current_setpoint_range,
         target_temperature,
-        current_demand_limit,
-        demand_limit,
+        current_demand,
+        demand,
         is_reflected
     );
 

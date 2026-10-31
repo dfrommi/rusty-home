@@ -214,43 +214,25 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
         availability(device_id, payload.last_seen),
     ];
 
-    let (setpoint_lower, setpoint_upper, demand_lower, demand_upper) = match thermostat {
+    let (setpoint_lower, setpoint_upper, demand_upper) = match thermostat {
         Radiator::LivingRoomBig => (
             SetPoint::LivingRoomBigLower,
             SetPoint::LivingRoomBig,
-            HeatingDemandLimit::LivingRoomBigLower,
             HeatingDemandLimit::LivingRoomBigUpper,
         ),
         Radiator::LivingRoomSmall => (
             SetPoint::LivingRoomSmallLower,
             SetPoint::LivingRoomSmall,
-            HeatingDemandLimit::LivingRoomSmallLower,
             HeatingDemandLimit::LivingRoomSmallUpper,
         ),
-        Radiator::Bedroom => (
-            SetPoint::BedroomLower,
-            SetPoint::Bedroom,
-            HeatingDemandLimit::BedroomLower,
-            HeatingDemandLimit::BedroomUpper,
-        ),
-        Radiator::Kitchen => (
-            SetPoint::KitchenLower,
-            SetPoint::Kitchen,
-            HeatingDemandLimit::KitchenLower,
-            HeatingDemandLimit::KitchenUpper,
-        ),
+        Radiator::Bedroom => (SetPoint::BedroomLower, SetPoint::Bedroom, HeatingDemandLimit::BedroomUpper),
+        Radiator::Kitchen => (SetPoint::KitchenLower, SetPoint::Kitchen, HeatingDemandLimit::KitchenUpper),
         Radiator::RoomOfRequirements => (
             SetPoint::RoomOfRequirementsLower,
             SetPoint::RoomOfRequirements,
-            HeatingDemandLimit::RoomOfRequirementsLower,
             HeatingDemandLimit::RoomOfRequirementsUpper,
         ),
-        Radiator::Bathroom => (
-            SetPoint::BathroomLower,
-            SetPoint::Bathroom,
-            HeatingDemandLimit::BathroomLower,
-            HeatingDemandLimit::BathroomUpper,
-        ),
+        Radiator::Bathroom => (SetPoint::BathroomLower, SetPoint::Bathroom, HeatingDemandLimit::BathroomUpper),
     };
 
     let is_off = payload.system_mode.as_deref() == Some("off");
@@ -282,14 +264,6 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
     result.push(
         DataPoint::new(
             DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(payload.valve_opening_degree).clamp()),
-            payload.last_seen,
-        )
-        .into(),
-    );
-
-    result.push(
-        DataPoint::new(
-            DeviceStateValue::HeatingDemandLimit(demand_lower, Percent(100.0 - payload.valve_closing_degree).clamp()),
             payload.last_seen,
         )
         .into(),
@@ -337,7 +311,6 @@ struct PowerPlug {
 struct SonoffThermostatPayload {
     system_mode: Option<String>,
     valve_opening_degree: f64,
-    valve_closing_degree: f64,
     occupied_heating_setpoint: f64,
     temperature_accuracy: f64, //negative
     local_temperature: f64,
@@ -400,6 +373,43 @@ mod tests {
                 IncomingData::ItemAvailability(_) => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn sonoff_reports_only_the_on_amplitude_without_requiring_closing_feedback() -> anyhow::Result<()> {
+        let mut payload = serde_json::json!({
+            "system_mode": "heat",
+            "valve_opening_degree": 35,
+            "occupied_heating_setpoint": 20,
+            "temperature_accuracy": -0.4,
+            "local_temperature": 22,
+            "external_temperature_input": 19,
+            "last_seen": "2026-01-01T12:00:00Z",
+        });
+        let radiators = [
+            (Radiator::LivingRoomBig, HeatingDemandLimit::LivingRoomBigUpper),
+            (Radiator::LivingRoomSmall, HeatingDemandLimit::LivingRoomSmallUpper),
+            (Radiator::Bedroom, HeatingDemandLimit::BedroomUpper),
+            (Radiator::Kitchen, HeatingDemandLimit::KitchenUpper),
+            (Radiator::RoomOfRequirements, HeatingDemandLimit::RoomOfRequirementsUpper),
+            (Radiator::Bathroom, HeatingDemandLimit::BathroomUpper),
+        ];
+
+        for closing_degree in [None, Some(83)] {
+            if let Some(closing_degree) = closing_degree {
+                payload["valve_closing_degree"] = closing_degree.into();
+            }
+            for (radiator, expected_id) in radiators {
+                let values = state_values(parse_sonoff_thermostat("radiator", radiator, &payload.to_string())?);
+                let demands: Vec<_> = values
+                    .into_iter()
+                    .filter(|value| matches!(value, DeviceStateValue::HeatingDemandLimit(_, _)))
+                    .collect();
+
+                assert_eq!(demands, vec![DeviceStateValue::HeatingDemandLimit(expected_id, Percent(35.0))]);
+            }
+        }
+        Ok(())
     }
 
     #[test]

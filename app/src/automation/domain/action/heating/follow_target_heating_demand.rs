@@ -2,7 +2,7 @@ use crate::{
     command::{Command, HeatingTargetState},
     core::domain::Radiator,
     core::unit::DegreeCelsius,
-    home_state::{HeatingDemandLimit, HeatingMode, SetPoint, TargetHeatingMode},
+    home_state::{HeatingMode, SetPoint, TargetHeatingDemand, TargetHeatingMode},
 };
 use r#macro::Id;
 
@@ -22,13 +22,13 @@ impl FollowTargetHeatingDemand {
 impl Rule for FollowTargetHeatingDemand {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
         let setpoints = ctx.current(SetPoint::Target(self.radiator))?;
-        let demand_limit = ctx.current(HeatingDemandLimit::Target(self.radiator))?;
+        let demand = ctx.current(TargetHeatingDemand::ControlAndObserve(self.radiator))?;
         let target_state = if setpoints.contains(&DegreeCelsius(0.0)) {
             HeatingTargetState::Off
         } else {
             HeatingTargetState::Heat {
                 target_temperature: setpoints,
-                demand_limit,
+                demand,
             }
         };
 

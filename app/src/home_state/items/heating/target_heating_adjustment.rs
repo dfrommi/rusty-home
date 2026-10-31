@@ -201,12 +201,6 @@ impl super::HeatingAdjustmentStrategy {
             return AdjustmentDirection::MustIncrease;
         }
 
-        //=> not relevant anymore as heating is off until below min
-        //In lower band -> increase to avoid undershoot
-        // if current_temp >= self.min && current_temp <= self.min + self.band && !is_heating {
-        //     return AdjustmentDirection::ShouldIncrease;
-        // }
-
         //no rule for center area -> hold
 
         //In upper band -> decrease to avoid overshoot

@@ -70,7 +70,7 @@ impl SonoffThermostatExtTempSync {
                 tracing::debug!(device_id = %self.device_id, "External temperature update for {}: temperature {}", self.device_id, temp);
                 let payload = serde_json::json!({
                     "external_temperature_input": temp,
-                    "temperature_sensor_select": "external"
+                    "temperature_sensor_select": "remote_temperature"
                 });
 
                 self.mqtt_sender.send_transient(&self.set_topic, payload.to_string()).await.unwrap_or_else(|e| {

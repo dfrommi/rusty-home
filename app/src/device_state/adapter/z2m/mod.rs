@@ -271,6 +271,7 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
 
     //Current demand not exposed directly at running state is not reliable and no other
     //way of reading the current demand exists.
+    //Calculating it in home-state heating demand.
 
     Ok(result)
 }
@@ -336,12 +337,13 @@ fn emit_debug_metrics(device_id: &str, payload: &str) {
             Some(if b { 1.0 } else { 0.0 })
         } else if let Some(s) = value.as_str() {
             match s.to_lowercase().as_str() {
-                "off" | "unlock" | "internal" => Some(0.0),
+                "off" | "unlock" | "idle" | "local_temperature" => Some(0.0),
                 "on" | "heat" | "lock" => Some(1.0),
                 "auto" => Some(2.0),
                 "timer" => Some(3.0),
                 "boost" => Some(5.0),
-                _ if s.starts_with("external") => Some(1.0),
+                "remote_temperature" => Some(1.0),
+                "remote_source_offline" => Some(-1.0),
                 _ if key == "last_seen" => DateTime::from_iso(s).ok().map(|dt| dt.elapsed().as_minutes_f64()),
                 _ => None,
             }

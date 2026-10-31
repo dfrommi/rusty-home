@@ -58,7 +58,6 @@ fn combined_demand(
     mode: DataPoint<HeatingMode>,
     adjustments: DataFrame<AdjustmentDirection>,
     is_heating_now: bool,
-
     barely_warm_output: Percent,
     reference_demand: DataPoint<Percent>,
 ) -> Option<Percent> {

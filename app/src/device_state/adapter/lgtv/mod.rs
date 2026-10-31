@@ -168,20 +168,20 @@ mod tests {
     }
 
     #[test]
-    fn parses_piccap_running_values_as_ambilight_power() {
+    fn parses_piccap_power_values_as_ambilight_power() {
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "true")).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/piccap/power", "ON")).unwrap()),
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, true)
         );
         assert_eq!(
-            state_value(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "false")).unwrap()),
+            state_value(parse_lgtv_message("lgtv", &message("state/piccap/power", "OFF")).unwrap()),
             DeviceStateValue::PowerAvailable(PowerAvailable::LivingRoomTvAmbilight, false)
         );
     }
 
     #[test]
-    fn rejects_invalid_piccap_running_values() {
-        assert!(parse_lgtv_message("lgtv", &message("state/piccap/isRunning", "on")).is_err());
+    fn rejects_invalid_piccap_power_values() {
+        assert!(parse_lgtv_message("lgtv", &message("state/piccap/power", "on")).is_err());
     }
 
     #[test]

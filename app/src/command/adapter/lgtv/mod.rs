@@ -59,8 +59,8 @@ mod tests {
     }
 
     #[test]
-    fn maps_ambilight_power_to_piccap_boolean_payload() {
-        assert_eq!(piccap_power_payload(true), "true");
-        assert_eq!(piccap_power_payload(false), "false");
+    fn maps_ambilight_power_to_piccap_payload() {
+        assert_eq!(piccap_power_payload(true), "ON");
+        assert_eq!(piccap_power_payload(false), "OFF");
     }
 }

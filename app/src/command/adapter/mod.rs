@@ -72,9 +72,9 @@ impl CommandDispatcher {
                     Radiator::RoomOfRequirements => "room_of_requirements/radiator_thermostat_sonoff",
                     Radiator::Bathroom => "bathroom/radiator_thermostat_sonoff",
                     Radiator::LivingRoomBig => "living_room/radiator_thermostat_big_sonoff",
-                    Radiator::LivingRoomSmall => "living_room/radiator_thermostat_small_sonoff",
+                    Radiator::LivingRoomSmall => "living_room/radiator_thermostat_small_sonoff_v2",
                     Radiator::Bedroom => "bedroom/radiator_thermostat_sonoff",
-                    Radiator::Kitchen => "kitchen/radiator_thermostat_sonoff",
+                    Radiator::Kitchen => "kitchen/radiator_thermostat_sonoff_v2",
                 };
                 self.z2m.set_heating(device_id, target_state.clone()).await
             }

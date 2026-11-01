@@ -90,11 +90,11 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             Z2mChannel::SonoffThermostat(Radiator::LivingRoomBig),
         ),
         (
-            "living_room/radiator_thermostat_small_sonoff",
+            "living_room/radiator_thermostat_small_sonoff_v2",
             Z2mChannel::SonoffThermostat(Radiator::LivingRoomSmall),
         ),
         (
-            "kitchen/radiator_thermostat_sonoff",
+            "kitchen/radiator_thermostat_sonoff_v2",
             Z2mChannel::SonoffThermostat(Radiator::Kitchen),
         ),
         (

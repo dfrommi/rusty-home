@@ -261,13 +261,25 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
         .into(),
     );
 
-    result.push(
-        DataPoint::new(
-            DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(payload.valve_opening_degree).clamp()),
-            payload.last_seen,
-        )
-        .into(),
-    );
+    if let Some(valve_opening_degree) = payload.valve_opening_degree {
+        result.push(
+            DataPoint::new(
+                DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(valve_opening_degree).clamp()),
+                payload.last_seen,
+            )
+            .into(),
+        );
+    }
+
+    if let Some(heating_valve_position) = payload.heating_valve_position {
+        result.push(
+            DataPoint::new(
+                DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(heating_valve_position).clamp()),
+                payload.last_seen,
+            )
+            .into(),
+        );
+    }
 
     //Current demand not exposed directly at running state is not reliable and no other
     //way of reading the current demand exists.
@@ -311,7 +323,8 @@ struct PowerPlug {
 #[derive(Debug, Clone, serde::Deserialize)]
 struct SonoffThermostatPayload {
     system_mode: Option<String>,
-    valve_opening_degree: f64,
+    valve_opening_degree: Option<f64>,
+    heating_valve_position: Option<f64>,
     occupied_heating_setpoint: f64,
     temperature_accuracy: f64, //negative
     local_temperature: f64,

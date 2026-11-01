@@ -29,7 +29,7 @@ impl Z2mCommandExecutor {
     pub async fn set_heating(&self, device_id: &str, state: HeatingTargetState) -> anyhow::Result<()> {
         let set_topic = format!("{}/set", device_id);
         self.sender
-            .send_transient(set_topic, heating_payload(state).to_string())
+            .send_transient(set_topic, heating_payload(device_id, state).to_string())
             .await?;
 
         self.record_executed(device_id);
@@ -55,7 +55,15 @@ impl Z2mCommandExecutor {
     }
 }
 
-fn heating_payload(state: HeatingTargetState) -> serde_json::Value {
+fn heating_payload(device_id: &str, state: HeatingTargetState) -> serde_json::Value {
+    if device_id.ends_with("v2") {
+        heating_payload_v2(state)
+    } else {
+        heating_payload_v1(state)
+    }
+}
+
+fn heating_payload_v1(state: HeatingTargetState) -> serde_json::Value {
     match state {
         HeatingTargetState::Off => json!({
             "system_mode": "off",
@@ -82,6 +90,33 @@ fn heating_payload(state: HeatingTargetState) -> serde_json::Value {
     }
 }
 
+fn heating_payload_v2(state: HeatingTargetState) -> serde_json::Value {
+    match state {
+        HeatingTargetState::Off => json!({
+            "system_mode": "off",
+            "occupied_heating_setpoint": 7,
+            "idle_valve_position": 0,
+            "heating_valve_position": 0,
+            "temperature_accuracy": -1,
+        }),
+        HeatingTargetState::Heat {
+            target_temperature,
+            demand,
+        } => {
+            let temperature_accuracy =
+                round_to_one_decimal((target_temperature.to().0 - target_temperature.from().0).clamp(0.2, 1.0));
+
+            json!({
+                "system_mode": "heat",
+                "occupied_heating_setpoint": json_no_fraction_if_zero(target_temperature.to().0),
+                "idle_valve_position": 0,
+                "heating_valve_position": demand.0.round() as i64,
+                "temperature_accuracy": json_no_fraction_if_zero(-temperature_accuracy),
+            })
+        }
+    }
+}
+
 fn json_no_fraction_if_zero(value: f64) -> serde_json::Value {
     if value.fract() == 0.0 {
         serde_json::json!(value as i64)
@@ -92,6 +127,8 @@ fn json_no_fraction_if_zero(value: f64) -> serde_json::Value {
 
 #[cfg(test)]
 mod tests {
+    use assert_json_diff::assert_json_eq;
+
     use super::*;
     use crate::core::{
         range::Range,
@@ -99,15 +136,15 @@ mod tests {
     };
 
     #[test]
-    fn heat_commands_preserve_the_on_amplitude_and_force_full_closing() {
+    fn heat_commands_preserve_the_on_amplitude_and_force_full_closing_v1() {
         for (demand, opening) in [(0.0, 0), (35.6, 36), (100.0, 100)] {
             let state = HeatingTargetState::Heat {
                 target_temperature: Range::new(DegreeCelsius(19.6), DegreeCelsius(20.0)),
                 demand: Percent(demand),
             };
 
-            assert_eq!(
-                heating_payload(state),
+            assert_json_eq!(
+                heating_payload_v1(state),
                 json!({
                     "system_mode": "heat",
                     "occupied_heating_setpoint": 20,
@@ -120,14 +157,49 @@ mod tests {
     }
 
     #[test]
-    fn off_commands_force_full_closing_and_zero_opening() {
-        assert_eq!(
-            heating_payload(HeatingTargetState::Off),
+    fn off_commands_force_full_closing_and_zero_opening_v1() {
+        assert_json_eq!(
+            heating_payload_v1(HeatingTargetState::Off),
             json!({
                 "system_mode": "off",
                 "occupied_heating_setpoint": 7,
                 "valve_opening_degree": 0,
                 "valve_closing_degree": 100,
+                "temperature_accuracy": -1,
+            })
+        );
+    }
+
+    #[test]
+    fn heat_commands_preserve_the_on_amplitude_and_force_full_closing_v2() {
+        for (demand, opening) in [(0.0, 0), (35.6, 36), (100.0, 100)] {
+            let state = HeatingTargetState::Heat {
+                target_temperature: Range::new(DegreeCelsius(19.6), DegreeCelsius(20.0)),
+                demand: Percent(demand),
+            };
+
+            assert_json_eq!(
+                heating_payload_v2(state),
+                json!({
+                    "system_mode": "heat",
+                    "occupied_heating_setpoint": 20,
+                    "idle_valve_position": 0,
+                    "heating_valve_position": opening,
+                    "temperature_accuracy": -0.4,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn off_commands_force_full_closing_and_zero_opening_v2() {
+        assert_json_eq!(
+            heating_payload_v2(HeatingTargetState::Off),
+            json!({
+                "system_mode": "off",
+                "occupied_heating_setpoint": 7,
+                "idle_valve_position": 0,
+                "heating_valve_position": 0,
                 "temperature_accuracy": -1,
             })
         );

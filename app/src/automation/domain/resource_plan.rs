@@ -24,6 +24,7 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             vec![
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::BedroomAirPurifier)).into(),
                 PurifyAir::BedroomSleepPreparation.into(),
+                BlockAutomation::AtNight.into(),
                 PurifyAir::BedroomAfterVentilation.into(),
             ],
         ),
@@ -33,8 +34,8 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             }
             .into(),
             vec![
-                BlockAutomation::BathroomDehumidifier.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier)).into(),
+                BlockAutomation::AtNight.into(),
                 Dehumidify::Bathroom.into(),
             ],
         ),
@@ -44,9 +45,9 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             }
             .into(),
             vec![
+                AutoTurnOff::IrHeater.into(),
                 RemoteTurnOff::InfraredHeater.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater)).into(),
-                AutoTurnOff::IrHeater.into(),
             ],
         ),
         (
@@ -63,9 +64,9 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             }
             .into(),
             vec![
-                BlockAutomation::BedroomDehumidifier.into(),
                 RemoteTurnOff::BedroomDehumidifier.into(),
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier)).into(),
+                BlockAutomation::AtNight.into(),
                 Dehumidify::Bedroom.into(),
             ],
         ),
@@ -76,6 +77,7 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             .into(),
             vec![
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
+                BlockAutomation::AtNight.into(),
                 PurifyAir::LivingRoom.into(),
             ],
         ),
@@ -248,6 +250,48 @@ mod tests {
             .into();
             assert!(plans.iter().any(|(target, _)| target == &phone_target));
         }
+    }
+
+    #[test]
+    fn dehumidifier_overrides_precede_the_night_block() {
+        let plans = resource_plans();
+
+        let bathroom_target: CommandTarget = SetPowerTarget {
+            device: PowerToggle::Dehumidifier,
+        }
+        .into();
+        let (_, bathroom_rules) = plans
+            .iter()
+            .find(|(target, _)| target == &bathroom_target)
+            .expect("bathroom dehumidifier plan");
+        assert!(matches!(
+            bathroom_rules.as_slice(),
+            [
+                HomeAction::UserTriggerAction(_),
+                HomeAction::BlockAutomation(BlockAutomation::AtNight),
+                HomeAction::Dehumidify(Dehumidify::Bathroom),
+                HomeAction::FollowDefaultSetting(_),
+            ]
+        ));
+
+        let bedroom_target: CommandTarget = ControlFanTarget {
+            device: Fan::BedroomDehumidifier,
+        }
+        .into();
+        let (_, bedroom_rules) = plans
+            .iter()
+            .find(|(target, _)| target == &bedroom_target)
+            .expect("bedroom dehumidifier plan");
+        assert!(matches!(
+            bedroom_rules.as_slice(),
+            [
+                HomeAction::RemoteTurnOff(RemoteTurnOff::BedroomDehumidifier),
+                HomeAction::UserTriggerAction(_),
+                HomeAction::BlockAutomation(BlockAutomation::AtNight),
+                HomeAction::Dehumidify(Dehumidify::Bedroom),
+                HomeAction::FollowDefaultSetting(_),
+            ]
+        ));
     }
 
     #[test]

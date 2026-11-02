@@ -6,6 +6,7 @@ use anyhow::Context;
 
 use crate::core::DeviceConfig;
 use crate::core::domain::Radiator;
+use crate::core::id::ExternalId;
 use crate::core::time::DateTime;
 use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
@@ -109,8 +110,6 @@ fn parse_configured_channels(device_id: &str, channels: &[Z2mChannel], msg: &Mqt
 }
 
 fn parse_z2m_channel(device_id: &str, channel: &Z2mChannel, payload: &str) -> anyhow::Result<Vec<IncomingData>> {
-    emit_debug_metrics(device_id, payload);
-
     match channel {
         Z2mChannel::ClimateSensor(temperature, humidity) => {
             parse_climate_sensor(device_id, *temperature, *humidity, payload)
@@ -119,7 +118,10 @@ fn parse_z2m_channel(device_id: &str, channel: &Z2mChannel, payload: &str) -> an
         Z2mChannel::PowerPlug(power, energy, energy_offset, power_available) => {
             parse_power_plug(device_id, *power, *energy, *energy_offset, *power_available, payload)
         }
-        Z2mChannel::SonoffThermostat(thermostat) => parse_sonoff_thermostat(device_id, *thermostat, payload),
+        Z2mChannel::SonoffThermostat(thermostat) => {
+            emit_debug_metrics(device_id, payload, thermostat.ext_id());
+            parse_sonoff_thermostat(device_id, *thermostat, payload)
+        }
     }
 }
 
@@ -332,7 +334,7 @@ struct SonoffThermostatPayload {
     last_seen: DateTime,
 }
 
-fn emit_debug_metrics(device_id: &str, payload: &str) {
+fn emit_debug_metrics(device_id: &str, payload: &str, entity: ExternalId) {
     let parsed: HashMap<String, serde_json::Value> = match serde_json::from_str(payload) {
         Ok(p) => p,
         Err(e) => {
@@ -370,7 +372,11 @@ fn emit_debug_metrics(device_id: &str, payload: &str) {
             crate::observability::system_metric_set(
                 METRIC_NAME,
                 f_value,
-                &[("item", key.as_str()), ("device_id", device_id)],
+                &[
+                    ("item", key.as_str()),
+                    ("device_id", device_id),
+                    ("entity", &entity.to_string()),
+                ],
             );
         }
     }

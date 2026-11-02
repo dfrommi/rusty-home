@@ -12,7 +12,7 @@ use crate::trigger::{Door, OnOffDevice, UserTriggerTarget};
 /// Single source of truth: what controls each device and in what order.
 /// Rules are listed in priority order per resource — first non-Skip wins.
 pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
-    vec![
+    let mut plan: Vec<(CommandTarget, Vec<HomeAction>)> = vec![
         // --- Power devices ---
         (
             CommandTarget::SetPower {
@@ -22,10 +22,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::BedroomAirPurifier)).into(),
                 PurifyAir::BedroomSleepPreparation.into(),
                 PurifyAir::BedroomAfterVentilation.into(),
-                FollowDefaultSetting::new(CommandTarget::SetPower {
-                    device: PowerToggle::BedroomAirPurifier,
-                })
-                .into(),
             ],
         ),
         (
@@ -36,10 +32,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 BlockAutomation::BathroomDehumidifier.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier)).into(),
                 Dehumidify::Bathroom.into(),
-                FollowDefaultSetting::new(CommandTarget::SetPower {
-                    device: PowerToggle::Dehumidifier,
-                })
-                .into(),
             ],
         ),
         (
@@ -50,23 +42,13 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 RemoteTurnOff::InfraredHeater.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater)).into(),
                 AutoTurnOff::IrHeater.into(),
-                FollowDefaultSetting::new(CommandTarget::SetPower {
-                    device: PowerToggle::InfraredHeater,
-                })
-                .into(),
             ],
         ),
         (
             CommandTarget::SetPower {
                 device: PowerToggle::LivingRoomTvAmbilight,
             },
-            vec![
-                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvAmbilight)).into(),
-                FollowDefaultSetting::new(CommandTarget::SetPower {
-                    device: PowerToggle::LivingRoomTvAmbilight,
-                })
-                .into(),
-            ],
+            vec![UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvAmbilight)).into()],
         ),
         // --- Fan devices ---
         (
@@ -78,10 +60,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
                 RemoteTurnOff::BedroomDehumidifier.into(),
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::BedroomDehumidifier)).into(),
                 Dehumidify::Bedroom.into(),
-                FollowDefaultSetting::new(CommandTarget::ControlFan {
-                    device: Fan::BedroomDehumidifier,
-                })
-                .into(),
             ],
         ),
         (
@@ -91,10 +69,6 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             vec![
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
                 PurifyAir::LivingRoom.into(),
-                FollowDefaultSetting::new(CommandTarget::ControlFan {
-                    device: Fan::LivingRoomAirPurifier,
-                })
-                .into(),
             ],
         ),
         // --- Heating devices (one per radiator) ---
@@ -157,54 +131,28 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             CommandTarget::SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
             },
-            vec![
-                UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving)).into(),
-                FollowDefaultSetting::new(CommandTarget::SetEnergySaving {
-                    device: EnergySavingDevice::LivingRoomTv,
-                })
-                .into(),
-            ],
+            vec![UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving)).into()],
         ),
         // --- Notifications ---
         (
             CommandTarget::NotifyLight {
                 device: NotificationLight::LivingRoom,
             },
-            vec![
-                InformWindowOpen::NotificationLightLivingRoom.into(),
-                FollowDefaultSetting::new(CommandTarget::NotifyLight {
-                    device: NotificationLight::LivingRoom,
-                })
-                .into(),
-            ],
+            vec![InformWindowOpen::NotificationLightLivingRoom.into()],
         ),
         (
             CommandTarget::NotifyPhone {
                 recipient: NotificationRecipient::Dennis,
                 notification: NotificationKind::WindowOpened,
             },
-            vec![
-                InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into(),
-                FollowDefaultSetting::new(CommandTarget::NotifyPhone {
-                    recipient: NotificationRecipient::Dennis,
-                    notification: NotificationKind::WindowOpened,
-                })
-                .into(),
-            ],
+            vec![InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into()],
         ),
         (
             CommandTarget::NotifyPhone {
                 recipient: NotificationRecipient::Sabine,
                 notification: NotificationKind::WindowOpened,
             },
-            vec![
-                InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into(),
-                FollowDefaultSetting::new(CommandTarget::NotifyPhone {
-                    recipient: NotificationRecipient::Sabine,
-                    notification: NotificationKind::WindowOpened,
-                })
-                .into(),
-            ],
+            vec![InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into()],
         ),
         // --- Door ---
         (
@@ -213,7 +161,15 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             },
             vec![UserTriggerAction::new(UserTriggerTarget::OpenDoor(Door::Building)).into()],
         ),
-    ]
+    ];
+
+    for (_, rules) in &mut plan {
+        if !matches!(rules.last(), Some(HomeAction::FollowDefaultSetting(_))) {
+            rules.push(FollowDefaultSetting::GlobalDefault.into());
+        }
+    }
+
+    plan
 }
 
 #[cfg(test)]
@@ -235,7 +191,8 @@ mod tests {
                 rules.as_slice(),
                 [
                     HomeAction::PauseHeatingForVentilation(_),
-                    HomeAction::FollowTargetHeatingDemand(_)
+                    HomeAction::FollowTargetHeatingDemand(_),
+                    HomeAction::FollowDefaultSetting(_),
                 ]
             ));
         }

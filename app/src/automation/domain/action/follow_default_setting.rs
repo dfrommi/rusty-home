@@ -1,15 +1,10 @@
 use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::command::CommandTarget;
 
 #[derive(Debug, Clone, Id)]
-pub struct FollowDefaultSetting(CommandTarget);
-
-impl FollowDefaultSetting {
-    pub fn new(target: CommandTarget) -> Self {
-        Self(target)
-    }
+pub enum FollowDefaultSetting {
+    GlobalDefault,
 }
 
 impl Rule for FollowDefaultSetting {

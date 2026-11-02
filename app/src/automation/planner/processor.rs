@@ -121,6 +121,13 @@ impl<'a> Planner<'a> {
     async fn process_action(&self, resource: &CommandTarget, action: &HomeAction) -> Result<Option<PlanResult>> {
         let trace = TraceContext::current();
         match action.evaluate(&self.context) {
+            Ok(ActionEvaluationResult::ExecuteDefault) => {
+                trace.set_ok();
+                Ok(Some(
+                    self.execute_command(None, resource.to_default_command(), action.ext_id())
+                        .await,
+                ))
+            }
             Ok(ActionEvaluationResult::Execute(command, source)) => {
                 trace.set_ok();
                 Ok(Some(self.execute_command(None, command, source).await))

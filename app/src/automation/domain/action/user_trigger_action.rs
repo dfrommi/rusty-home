@@ -143,6 +143,7 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => None,
         UserTrigger::OpenDoor { door: Door::Building } => Some(Command::OpenDoor {
             device: Lock::BuildingEntrance,
+            open: false,
         }),
     }
 }

@@ -9,6 +9,7 @@ pub use processor::plan_for_home;
 
 #[derive(Debug, Clone)]
 pub enum ActionEvaluationResult {
+    ExecuteDefault,
     Execute(Command, ExternalId),
     ExecuteTrigger(Command, ExternalId, UserTriggerId),
     Skip,

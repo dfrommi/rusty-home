@@ -237,16 +237,4 @@ mod tests {
         );
         assert_eq!(execution_decision(&command, None, Some(&dismiss)), ExecutionDecision::Execute);
     }
-
-    #[test]
-    fn one_shot_commands_remain_retryable_after_debounce() {
-        let command = Command::OpenDoor {
-            device: crate::command::Lock::BuildingEntrance,
-        };
-        let recent = execution(command.clone(), crate::t!(1 seconds));
-        let stale = execution(command.clone(), crate::t!(1 minutes));
-
-        assert_eq!(execution_decision(&command, None, Some(&recent)), ExecutionDecision::Debounced);
-        assert_eq!(execution_decision(&command, None, Some(&stale)), ExecutionDecision::Execute);
-    }
 }

@@ -34,6 +34,7 @@ use crate::home_state::*;
 
 #[derive(Debug, Clone)]
 pub enum RuleResult {
+    ExecuteDefault,
     Execute(Command),
     ExecuteTrigger(Command, UserTriggerId),
     Skip,
@@ -182,6 +183,7 @@ impl HomeAction {
     pub fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
         let (rule, ext_id) = self.as_rule();
         match rule.evaluate(ctx)? {
+            RuleResult::ExecuteDefault => Ok(ActionEvaluationResult::ExecuteDefault),
             RuleResult::Execute(command) => Ok(ActionEvaluationResult::Execute(command, ext_id)),
             RuleResult::ExecuteTrigger(command, user_trigger_id) => {
                 Ok(ActionEvaluationResult::ExecuteTrigger(command, ext_id, user_trigger_id))

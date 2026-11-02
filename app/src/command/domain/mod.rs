@@ -34,6 +34,7 @@ pub enum Command {
     },
     OpenDoor {
         device: Lock,
+        open: bool,
     },
 }
 
@@ -90,7 +91,47 @@ impl From<&Command> for CommandTarget {
             } => CommandTarget::NotifyLight { device: *device },
             Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving { device: device.clone() },
             Command::ControlFan { device, .. } => CommandTarget::ControlFan { device: device.clone() },
-            Command::OpenDoor { device } => CommandTarget::OpenDoor { device: device.clone() },
+            Command::OpenDoor { device, .. } => CommandTarget::OpenDoor { device: device.clone() },
+        }
+    }
+}
+
+impl CommandTarget {
+    pub fn to_default_command(&self) -> Command {
+        match self {
+            CommandTarget::SetPower { device } => Command::SetPower {
+                device: device.clone(),
+                power_on: false,
+            },
+            CommandTarget::SetHeating { device } => Command::SetHeating {
+                device: *device,
+                target_state: HeatingTargetState::Off,
+            },
+            CommandTarget::NotifyPhone {
+                recipient,
+                notification,
+            } => Command::Notify {
+                notification: *notification,
+                target: NotificationDestination::Phone { recipient: *recipient },
+                operation: NotificationOperation::Dismiss,
+            },
+            CommandTarget::NotifyLight { device } => Command::Notify {
+                notification: NotificationKind::WindowOpened, // Assuming a default notification kind
+                target: NotificationDestination::Light { device: *device },
+                operation: NotificationOperation::Dismiss,
+            },
+            CommandTarget::SetEnergySaving { device } => Command::SetEnergySaving {
+                device: device.clone(),
+                on: true,
+            },
+            CommandTarget::ControlFan { device } => Command::ControlFan {
+                device: device.clone(),
+                speed: FanAirflow::Off,
+            },
+            CommandTarget::OpenDoor { device } => Command::OpenDoor {
+                device: device.clone(),
+                open: false,
+            },
         }
     }
 }
@@ -134,10 +175,10 @@ impl Command {
                 target: device.to_string(),
                 state: speed.to_string(),
             },
-            Command::OpenDoor { device } => CommandDisplayParts {
+            Command::OpenDoor { device, open } => CommandDisplayParts {
                 command_type: "OpenDoor",
                 target: device.to_string(),
-                state: "open".to_string(),
+                state: if *open { "open".to_string() } else { "close".to_string() },
             },
         }
     }

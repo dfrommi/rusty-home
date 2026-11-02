@@ -118,7 +118,15 @@ impl CommandDispatcher {
             }
             Command::OpenDoor {
                 device: Lock::BuildingEntrance,
-            } => self.nuki.open_door("1CC90CCA").await,
+                open,
+            } => {
+                if *open {
+                    self.nuki.open_door("1CC90CCA").await
+                } else {
+                    //Nothing to do to close it, just leave as is
+                    Ok(())
+                }
+            }
         }
     }
 }

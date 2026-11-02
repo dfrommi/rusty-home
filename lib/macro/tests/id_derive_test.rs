@@ -129,21 +129,28 @@ fn single_nested_variant_supports_try_from() -> Result<()> {
 }
 
 #[test]
-fn tuple_struct_concatenates_parameter_names() {
-    let ext = TupleStruct(Parameter::Kitchen, Parameter::LivingRoom).ext_id();
+fn tuple_struct_round_trips_external_ids() -> Result<()> {
+    let value = TupleStruct(Parameter::Kitchen, Parameter::LivingRoom);
+    let ext = value.ext_id();
+
     assert_eq!(ext.type_name(), "tuple_struct");
     assert_eq!(ext.variant_name(), "kitchen::living_room");
+    assert_eq!(TupleStruct::try_from(ext)?, value);
 
-    // No TryFrom is generated for structs; compile-time coverage is handled in trybuild tests.
+    Ok(())
 }
 
 #[test]
-fn named_struct_concatenates_parameter_names() {
-    let ext = NamedStruct {
+fn named_struct_round_trips_external_ids() -> Result<()> {
+    let value = NamedStruct {
         primary: Parameter::Bedroom,
         secondary: Parameter::Kitchen,
-    }
-    .ext_id();
+    };
+    let ext = value.ext_id();
+
     assert_eq!(ext.type_name(), "named_struct");
     assert_eq!(ext.variant_name(), "bedroom::kitchen");
+    assert_eq!(NamedStruct::try_from(ext)?, value);
+
+    Ok(())
 }

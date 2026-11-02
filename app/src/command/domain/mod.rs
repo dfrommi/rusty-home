@@ -1,137 +1,172 @@
-mod command_state;
+mod control_fan;
+mod open_door;
+mod push_notify;
+mod set_energy_saving;
+mod set_heating;
+mod set_light_notification;
+mod set_power;
 
-use crate::core::domain::Radiator;
-use crate::core::range::Range;
-use crate::core::unit::{DegreeCelsius, FanAirflow, Percent};
-use derive_more::derive::{Display, From};
-use r#macro::{EnumVariants, Id};
-use serde::{Deserialize, Serialize};
+pub use control_fan::{ControlFan, ControlFanTarget, Fan};
+pub use open_door::{Lock, OpenDoor, OpenDoorTarget};
+pub use push_notify::{PushNotification, PushNotify, PushNotifyOperation, PushNotifyTarget, PushRecipient};
+pub use set_energy_saving::{EnergySavingDevice, SetEnergySaving, SetEnergySavingTarget};
+pub use set_heating::{HeatingTargetState, SetHeating, SetHeatingTarget};
+pub use set_light_notification::{LightSignal, NotificationLight, SetLightNotification, SetLightNotificationTarget};
+pub use set_power::{PowerToggle, SetPower, SetPowerTarget};
 
-#[derive(Debug, Clone, PartialEq, From, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Command {
-    SetPower {
-        device: PowerToggle,
-        power_on: bool,
-    },
-    SetHeating {
-        device: Radiator,
-        target_state: HeatingTargetState,
-    },
+use derive_more::derive::From;
+use serde::Serialize;
 
-    Notify {
-        notification: NotificationKind,
-        target: NotificationDestination,
-        operation: NotificationOperation,
-    },
-    SetEnergySaving {
-        device: EnergySavingDevice,
-        on: bool,
-    },
-    ControlFan {
-        device: Fan,
-        speed: FanAirflow,
-    },
-    OpenDoor {
-        device: Lock,
-        open: bool,
-    },
+pub trait CommandBehavior: Clone + PartialEq + Sized {
+    type Target: CommandTargetBehavior<Command = Self>;
+
+    fn target(&self) -> Self::Target;
+    fn display_parts(&self) -> CommandDisplayParts;
+    fn deduplicate_when_unobservable(&self) -> bool {
+        false
+    }
+    fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id)]
-#[serde(tag = "type", rename_all = "snake_case")]
+pub trait CommandTargetBehavior: Clone + Eq + std::hash::Hash + Sized {
+    type Command: CommandBehavior<Target = Self>;
+
+    fn to_default_command(&self) -> Self::Command;
+}
+
+#[derive(Debug, Clone, PartialEq, From, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Command {
+    SetPower(SetPower),
+    SetHeating(SetHeating),
+    PushNotify(PushNotify),
+    SetLightNotification(SetLightNotification),
+    SetEnergySaving(SetEnergySaving),
+    ControlFan(ControlFan),
+    OpenDoor(OpenDoor),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, From, r#macro::IdDelegation)]
 pub enum CommandTarget {
-    #[display("SetPower[{}]", device)]
-    SetPower { device: PowerToggle },
+    SetPower(SetPowerTarget),
+    SetHeating(SetHeatingTarget),
+    PushNotify(PushNotifyTarget),
+    SetLightNotification(SetLightNotificationTarget),
+    SetEnergySaving(SetEnergySavingTarget),
+    ControlFan(ControlFanTarget),
+    OpenDoor(OpenDoorTarget),
+}
 
-    #[display("SetHeating[{}]", device)]
-    SetHeating { device: Radiator },
+impl CommandBehavior for Command {
+    type Target = CommandTarget;
 
-    #[display("NotifyPhone[{} @ {}]", notification, recipient)]
-    NotifyPhone {
-        notification: NotificationKind,
-        recipient: NotificationRecipient,
-    },
+    fn target(&self) -> Self::Target {
+        match self {
+            Command::SetPower(command) => CommandTarget::SetPower(command.target()),
+            Command::SetHeating(command) => CommandTarget::SetHeating(command.target()),
+            Command::PushNotify(command) => CommandTarget::PushNotify(command.target()),
+            Command::SetLightNotification(command) => CommandTarget::SetLightNotification(command.target()),
+            Command::SetEnergySaving(command) => CommandTarget::SetEnergySaving(command.target()),
+            Command::ControlFan(command) => CommandTarget::ControlFan(command.target()),
+            Command::OpenDoor(command) => CommandTarget::OpenDoor(command.target()),
+        }
+    }
 
-    #[display("NotifyLight[{}]", device)]
-    NotifyLight { device: NotificationLight },
+    fn display_parts(&self) -> CommandDisplayParts {
+        match self {
+            Command::SetPower(command) => command.display_parts(),
+            Command::SetHeating(command) => command.display_parts(),
+            Command::PushNotify(command) => command.display_parts(),
+            Command::SetLightNotification(command) => command.display_parts(),
+            Command::SetEnergySaving(command) => command.display_parts(),
+            Command::ControlFan(command) => command.display_parts(),
+            Command::OpenDoor(command) => command.display_parts(),
+        }
+    }
 
-    #[display("SetEnergySaving[{}]", device)]
-    SetEnergySaving { device: EnergySavingDevice },
+    fn deduplicate_when_unobservable(&self) -> bool {
+        match self {
+            Command::SetPower(command) => command.deduplicate_when_unobservable(),
+            Command::SetHeating(command) => command.deduplicate_when_unobservable(),
+            Command::PushNotify(command) => command.deduplicate_when_unobservable(),
+            Command::SetLightNotification(command) => command.deduplicate_when_unobservable(),
+            Command::SetEnergySaving(command) => command.deduplicate_when_unobservable(),
+            Command::ControlFan(command) => command.deduplicate_when_unobservable(),
+            Command::OpenDoor(command) => command.deduplicate_when_unobservable(),
+        }
+    }
 
-    #[display("ControlFan[{}]", device)]
-    ControlFan { device: Fan },
+    fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>> {
+        match self {
+            Command::SetPower(command) => command.is_reflected_in_state(snapshot),
+            Command::SetHeating(command) => command.is_reflected_in_state(snapshot),
+            Command::PushNotify(command) => command.is_reflected_in_state(snapshot),
+            Command::SetLightNotification(command) => command.is_reflected_in_state(snapshot),
+            Command::SetEnergySaving(command) => command.is_reflected_in_state(snapshot),
+            Command::ControlFan(command) => command.is_reflected_in_state(snapshot),
+            Command::OpenDoor(command) => command.is_reflected_in_state(snapshot),
+        }
+    }
+}
 
-    #[display("OpenDoor[{}]", device)]
-    OpenDoor { device: Lock },
+impl CommandTargetBehavior for CommandTarget {
+    type Command = Command;
+
+    fn to_default_command(&self) -> Self::Command {
+        match self {
+            CommandTarget::SetPower(target) => target.to_default_command().into(),
+            CommandTarget::SetHeating(target) => target.to_default_command().into(),
+            CommandTarget::PushNotify(target) => target.to_default_command().into(),
+            CommandTarget::SetLightNotification(target) => target.to_default_command().into(),
+            CommandTarget::SetEnergySaving(target) => target.to_default_command().into(),
+            CommandTarget::ControlFan(target) => target.to_default_command().into(),
+            CommandTarget::OpenDoor(target) => target.to_default_command().into(),
+        }
+    }
 }
 
 impl From<Command> for CommandTarget {
-    fn from(val: Command) -> Self {
-        CommandTarget::from(&val)
+    fn from(command: Command) -> Self {
+        CommandTarget::from(&command)
     }
 }
 
 impl From<&Command> for CommandTarget {
-    fn from(val: &Command) -> Self {
-        match val {
-            Command::SetPower { device, .. } => CommandTarget::SetPower { device: device.clone() },
-            Command::SetHeating { device, .. } => CommandTarget::SetHeating { device: *device },
-            Command::Notify {
-                notification,
-                target: NotificationDestination::Phone { recipient },
-                ..
-            } => CommandTarget::NotifyPhone {
-                recipient: *recipient,
-                notification: *notification,
-            },
-            Command::Notify {
-                target: NotificationDestination::Light { device },
-                ..
-            } => CommandTarget::NotifyLight { device: *device },
-            Command::SetEnergySaving { device, .. } => CommandTarget::SetEnergySaving { device: device.clone() },
-            Command::ControlFan { device, .. } => CommandTarget::ControlFan { device: device.clone() },
-            Command::OpenDoor { device, .. } => CommandTarget::OpenDoor { device: device.clone() },
-        }
+    fn from(command: &Command) -> Self {
+        command.target()
+    }
+}
+
+impl Command {
+    pub fn display_parts(&self) -> CommandDisplayParts {
+        CommandBehavior::display_parts(self)
+    }
+
+    pub fn deduplicate_when_unobservable(&self) -> bool {
+        CommandBehavior::deduplicate_when_unobservable(self)
+    }
+
+    pub fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>> {
+        CommandBehavior::is_reflected_in_state(self, snapshot)
     }
 }
 
 impl CommandTarget {
     pub fn to_default_command(&self) -> Command {
+        CommandTargetBehavior::to_default_command(self)
+    }
+}
+
+impl std::fmt::Display for CommandTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CommandTarget::SetPower { device } => Command::SetPower {
-                device: device.clone(),
-                power_on: false,
-            },
-            CommandTarget::SetHeating { device } => Command::SetHeating {
-                device: *device,
-                target_state: HeatingTargetState::Off,
-            },
-            CommandTarget::NotifyPhone {
-                recipient,
-                notification,
-            } => Command::Notify {
-                notification: *notification,
-                target: NotificationDestination::Phone { recipient: *recipient },
-                operation: NotificationOperation::Dismiss,
-            },
-            CommandTarget::NotifyLight { device } => Command::Notify {
-                notification: NotificationKind::WindowOpened, // Assuming a default notification kind
-                target: NotificationDestination::Light { device: *device },
-                operation: NotificationOperation::Dismiss,
-            },
-            CommandTarget::SetEnergySaving { device } => Command::SetEnergySaving {
-                device: device.clone(),
-                on: true,
-            },
-            CommandTarget::ControlFan { device } => Command::ControlFan {
-                device: device.clone(),
-                speed: FanAirflow::Off,
-            },
-            CommandTarget::OpenDoor { device } => Command::OpenDoor {
-                device: device.clone(),
-                open: false,
-            },
+            CommandTarget::SetPower(target) => target.fmt(f),
+            CommandTarget::SetHeating(target) => target.fmt(f),
+            CommandTarget::PushNotify(target) => target.fmt(f),
+            CommandTarget::SetLightNotification(target) => target.fmt(f),
+            CommandTarget::SetEnergySaving(target) => target.fmt(f),
+            CommandTarget::ControlFan(target) => target.fmt(f),
+            CommandTarget::OpenDoor(target) => target.fmt(f),
         }
     }
 }
@@ -143,160 +178,6 @@ pub struct CommandDisplayParts {
     pub state: String,
 }
 
-impl Command {
-    pub fn display_parts(&self) -> CommandDisplayParts {
-        match self {
-            Command::SetPower { device, power_on } => CommandDisplayParts {
-                command_type: "SetPower",
-                target: device.to_string(),
-                state: if *power_on { "on".to_string() } else { "off".to_string() },
-            },
-            Command::SetHeating { device, target_state } => CommandDisplayParts {
-                command_type: "SetHeating",
-                target: device.to_string(),
-                state: target_state.to_string(),
-            },
-            Command::Notify {
-                notification,
-                target,
-                operation,
-            } => CommandDisplayParts {
-                command_type: "Notify",
-                target: format!("{notification} @ {target}"),
-                state: operation.to_string(),
-            },
-            Command::SetEnergySaving { device, on } => CommandDisplayParts {
-                command_type: "SetEnergySaving",
-                target: device.to_string(),
-                state: if *on { "on" } else { "off" }.to_string(),
-            },
-            Command::ControlFan { device, speed } => CommandDisplayParts {
-                command_type: "ControlFan",
-                target: device.to_string(),
-                state: speed.to_string(),
-            },
-            Command::OpenDoor { device, open } => CommandDisplayParts {
-                command_type: "OpenDoor",
-                target: device.to_string(),
-                state: if *open { "open".to_string() } else { "close".to_string() },
-            },
-        }
-    }
-
-    pub fn deduplicate_when_unobservable(&self) -> bool {
-        matches!(
-            self,
-            Command::Notify {
-                target: NotificationDestination::Phone { .. },
-                ..
-            }
-        )
-    }
-}
-
-//
-// SET POWER
-//
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum PowerToggle {
-    BedroomAirPurifier,
-    Dehumidifier,
-    InfraredHeater,
-    LivingRoomTvAmbilight,
-}
-
-//
-// SET HEATING
-//
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-pub enum HeatingTargetState {
-    Off,
-    Heat {
-        target_temperature: Range<DegreeCelsius>,
-        demand: Percent,
-    },
-}
-
-impl std::fmt::Display for HeatingTargetState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HeatingTargetState::Off => write!(f, "Off"),
-            HeatingTargetState::Heat {
-                target_temperature,
-                demand,
-            } => write!(f, "Heat {} ({})", target_temperature, demand),
-        }
-    }
-}
-
-//
-// NOTIFICATIONS
-//
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationKind {
-    WindowOpened,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationRecipient {
-    Dennis,
-    Sabine,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationLight {
-    LivingRoom,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum NotificationDestination {
-    #[display("Phone({recipient})")]
-    Phone { recipient: NotificationRecipient },
-    #[display("Light({device})")]
-    Light { device: NotificationLight },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationOperation {
-    Show,
-    Dismiss,
-}
-
-//
-// SET ENERGY SAVING
-//
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum EnergySavingDevice {
-    LivingRoomTv,
-}
-
-//
-// FAN CONTROL
-//
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum Fan {
-    BedroomDehumidifier,
-    LivingRoomAirPurifier,
-}
-
-//
-// OPEN DOOR
-//
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Display, Id, EnumVariants)]
-#[serde(rename_all = "snake_case")]
-pub enum Lock {
-    BuildingEntrance,
-}
-
 #[cfg(test)]
 mod test {
     use assert_json_diff::assert_json_eq;
@@ -305,56 +186,45 @@ mod test {
     use super::*;
 
     #[test]
-    fn notify_serializes_its_intent_and_destination() {
+    fn light_notification_serializes_its_signal_and_state() {
         assert_json_eq!(
-            Command::Notify {
-                notification: NotificationKind::WindowOpened,
-                target: NotificationDestination::Light {
-                    device: NotificationLight::LivingRoom,
-                },
-                operation: NotificationOperation::Show,
-            },
+            Command::SetLightNotification(SetLightNotification {
+                device: NotificationLight::LivingRoom,
+                signal: LightSignal::WindowOpened,
+                on: true,
+            }),
             json!({
-                "type": "notify",
-                "notification": "window_opened",
-                "target": {
-                    "type": "light",
-                    "device": "living_room"
-                },
-                "operation": "show"
+                "set_light_notification": {
+                    "device": "living_room",
+                    "signal": "window_opened",
+                    "on": true
+                }
             })
         );
     }
 
     #[test]
-    fn notification_command_targets_have_clear_ids_and_display() {
-        let phone_command = Command::Notify {
-            notification: NotificationKind::WindowOpened,
-            target: NotificationDestination::Phone {
-                recipient: NotificationRecipient::Dennis,
-            },
-            operation: NotificationOperation::Show,
-        };
-        let phone_target = CommandTarget::from(&phone_command);
+    fn notification_targets_have_clear_ids_and_display() {
+        let push_command = Command::PushNotify(PushNotify {
+            notification: PushNotification::WindowOpened,
+            recipient: PushRecipient::Dennis,
+            operation: PushNotifyOperation::Show,
+        });
+        let push_target = CommandTarget::from(&push_command);
 
-        assert_eq!(
-            phone_target.ext_id().to_string(),
-            "command_target::notify_phone::window_opened::dennis"
-        );
-        assert_eq!(phone_target.to_string(), "NotifyPhone[WindowOpened @ Dennis]");
-        assert_eq!(phone_command.display_parts().target, "WindowOpened @ Phone(Dennis)");
-        assert_eq!(phone_command.display_parts().state, "Show");
+        assert_eq!(push_target.ext_id().to_string(), "push_notify_target::window_opened::dennis");
+        assert_eq!(push_target.to_string(), "PushNotify[WindowOpened @ Dennis]");
+        assert_eq!(push_command.display_parts().target, "WindowOpened @ Dennis");
+        assert_eq!(push_command.display_parts().state, "Show");
 
-        let light_command = Command::Notify {
-            notification: NotificationKind::WindowOpened,
-            target: NotificationDestination::Light {
-                device: NotificationLight::LivingRoom,
-            },
-            operation: NotificationOperation::Show,
-        };
+        let light_command = Command::SetLightNotification(SetLightNotification {
+            device: NotificationLight::LivingRoom,
+            signal: LightSignal::WindowOpened,
+            on: true,
+        });
         let light_target = CommandTarget::from(&light_command);
 
-        assert_eq!(light_target.ext_id().to_string(), "command_target::notify_light::living_room");
-        assert_eq!(light_target.to_string(), "NotifyLight[LivingRoom]");
+        assert_eq!(light_target.ext_id().to_string(), "set_light_notification_target::living_room");
+        assert_eq!(light_target.to_string(), "SetLightNotification[LivingRoom]");
     }
 }

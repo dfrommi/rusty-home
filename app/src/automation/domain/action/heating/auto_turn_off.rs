@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::command::{Command, PowerToggle};
+use crate::command::{PowerToggle, SetPower};
 use crate::core::time::Duration;
 use crate::home_state::PowerAvailable;
 use crate::t;
@@ -19,10 +19,13 @@ impl Rule for AutoTurnOff {
 
         if should_turn_off {
             tracing::info!("Infrared heater on for more than 1 hour; turning off");
-            Ok(RuleResult::Execute(Command::SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            }))
+            Ok(RuleResult::Execute(
+                SetPower {
+                    device: PowerToggle::InfraredHeater,
+                    power_on: false,
+                }
+                .into(),
+            ))
         } else {
             tracing::info!("Infrared heater not on for more than 1 hour; skipping");
             Ok(RuleResult::Skip)

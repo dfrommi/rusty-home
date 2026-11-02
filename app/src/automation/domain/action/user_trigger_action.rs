@@ -97,62 +97,79 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         UserTrigger::DevicePower {
             device: OnOffDevice::BedroomAirPurifier,
             on,
-        } => Some(Command::SetPower {
-            device: PowerToggle::BedroomAirPurifier,
-            power_on: on,
-        }),
+        } => Some(
+            SetPower {
+                device: PowerToggle::BedroomAirPurifier,
+                power_on: on,
+            }
+            .into(),
+        ),
         UserTrigger::DevicePower {
             device: OnOffDevice::InfraredHeater,
             on,
-        } => Some(Command::SetPower {
-            device: PowerToggle::InfraredHeater,
-            power_on: on,
-        }),
+        } => Some(
+            SetPower {
+                device: PowerToggle::InfraredHeater,
+                power_on: on,
+            }
+            .into(),
+        ),
         UserTrigger::DevicePower {
             device: OnOffDevice::Dehumidifier,
             on,
-        } => Some(Command::SetPower {
-            device: PowerToggle::Dehumidifier,
-            power_on: on,
-        }),
+        } => Some(
+            SetPower {
+                device: PowerToggle::Dehumidifier,
+                power_on: on,
+            }
+            .into(),
+        ),
         UserTrigger::DevicePower {
             device: OnOffDevice::LivingRoomTvEnergySaving,
             on,
-        } => Some(Command::SetEnergySaving {
-            device: EnergySavingDevice::LivingRoomTv,
-            on,
-        }),
+        } => Some(
+            SetEnergySaving {
+                device: EnergySavingDevice::LivingRoomTv,
+                on,
+            }
+            .into(),
+        ),
         UserTrigger::DevicePower {
             device: OnOffDevice::LivingRoomTvAmbilight,
             on,
-        } => Some(Command::SetPower {
-            device: PowerToggle::LivingRoomTvAmbilight,
-            power_on: on,
-        }),
+        } => Some(
+            SetPower {
+                device: PowerToggle::LivingRoomTvAmbilight,
+                power_on: on,
+            }
+            .into(),
+        ),
         UserTrigger::FanSpeed { fan, airflow } => {
             let device = match fan {
                 FanActivity::BedroomDehumidifier => Fan::BedroomDehumidifier,
                 FanActivity::LivingRoomAirPurifier => Fan::LivingRoomAirPurifier,
             };
-            Some(Command::ControlFan { device, speed: airflow })
+            Some(ControlFan { device, speed: airflow }.into())
         }
         UserTrigger::Heating { .. } => {
             tracing::info!("Heating state trigger handled elsewhere, skipping");
             None
         }
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => None,
-        UserTrigger::OpenDoor { door: Door::Building } => Some(Command::OpenDoor {
-            device: Lock::BuildingEntrance,
-            open: false,
-        }),
+        UserTrigger::OpenDoor { door: Door::Building } => Some(
+            OpenDoor {
+                device: Lock::BuildingEntrance,
+                open: false,
+            }
+            .into(),
+        ),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::PowerToggle;
-
+    use crate::command::{PowerToggle, SetPower};
     #[test]
     fn ambilight_power_trigger_maps_to_generic_power_command() {
         let command = into_command(&UserTrigger::DevicePower {
@@ -162,10 +179,13 @@ mod tests {
 
         assert_eq!(
             command,
-            Some(Command::SetPower {
-                device: PowerToggle::LivingRoomTvAmbilight,
-                power_on: false,
-            })
+            Some(
+                SetPower {
+                    device: PowerToggle::LivingRoomTvAmbilight,
+                    power_on: false,
+                }
+                .into(),
+            )
         );
     }
 }

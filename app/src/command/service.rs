@@ -171,9 +171,7 @@ fn add_to_trace(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::{
-        NotificationDestination, NotificationKind, NotificationOperation, NotificationRecipient, PowerToggle,
-    };
+    use crate::command::{PowerToggle, PushNotification, PushNotify, PushNotifyOperation, PushRecipient, SetPower};
 
     fn execution(command: Command, elapsed: crate::core::time::Duration) -> CommandExecution {
         CommandExecution {
@@ -182,22 +180,21 @@ mod tests {
         }
     }
 
-    fn phone_notification(operation: NotificationOperation) -> Command {
-        Command::Notify {
-            notification: NotificationKind::WindowOpened,
-            target: NotificationDestination::Phone {
-                recipient: NotificationRecipient::Dennis,
-            },
+    fn phone_notification(operation: PushNotifyOperation) -> Command {
+        PushNotify {
+            notification: PushNotification::WindowOpened,
+            recipient: PushRecipient::Dennis,
             operation,
         }
+        .into()
     }
 
     #[test]
     fn reflected_state_takes_priority_over_recent_execution() {
-        let command = Command::SetPower {
+        let command = Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
-        };
+        });
         let recent = execution(command.clone(), crate::t!(1 seconds));
 
         assert_eq!(
@@ -208,10 +205,10 @@ mod tests {
 
     #[test]
     fn unreflected_state_retries_after_the_debounce_window() {
-        let command = Command::SetPower {
+        let command = Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
-        };
+        });
         let recent = execution(command.clone(), crate::t!(1 seconds));
         let stale = execution(command.clone(), crate::t!(1 minutes));
 
@@ -227,9 +224,9 @@ mod tests {
 
     #[test]
     fn unobservable_notification_deduplicates_by_successful_command_equality() {
-        let command = phone_notification(NotificationOperation::Show);
+        let command = phone_notification(PushNotifyOperation::Show);
         let previous = execution(command.clone(), crate::t!(1 minutes));
-        let dismiss = execution(phone_notification(NotificationOperation::Dismiss), crate::t!(1 minutes));
+        let dismiss = execution(phone_notification(PushNotifyOperation::Dismiss), crate::t!(1 minutes));
 
         assert_eq!(
             execution_decision(&command, None, Some(&previous)),

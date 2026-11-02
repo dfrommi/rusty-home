@@ -2,7 +2,7 @@ use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
 use super::metrics::*;
-use crate::command::{NotificationKind, NotificationOperation};
+use crate::command::{LightSignal, PushNotification, PushNotifyOperation};
 use crate::core::unit::{FanAirflow, FanSpeed};
 use serde_json::json;
 
@@ -18,14 +18,14 @@ impl HomeAssistantCommandExecutor {
         Self { client: http_client }
     }
 
-    pub async fn notify_phone(
+    pub async fn push_notify(
         &self,
         service: &str,
-        notification: NotificationKind,
-        operation: NotificationOperation,
+        notification: PushNotification,
+        operation: PushNotifyOperation,
     ) -> anyhow::Result<()> {
         match operation {
-            NotificationOperation::Show => {
+            PushNotifyOperation::Show => {
                 let (title, message, tag) = notification_content(notification);
                 self.client
                     .call_service(
@@ -39,7 +39,7 @@ impl HomeAssistantCommandExecutor {
                     )
                     .await?;
             }
-            NotificationOperation::Dismiss => {
+            PushNotifyOperation::Dismiss => {
                 self.client
                     .call_service(
                         "notify",
@@ -65,16 +65,8 @@ impl HomeAssistantCommandExecutor {
         Ok(())
     }
 
-    pub async fn notify_light(
-        &self,
-        id: &str,
-        _notification: NotificationKind,
-        operation: NotificationOperation,
-    ) -> anyhow::Result<()> {
-        let service = match operation {
-            NotificationOperation::Show => "turn_on",
-            NotificationOperation::Dismiss => "turn_off",
-        };
+    pub async fn set_light_notification(&self, id: &str, _signal: LightSignal, on: bool) -> anyhow::Result<()> {
+        let service = if on { "turn_on" } else { "turn_off" };
         self.client
             .call_service("light", service, json!({ "entity_id": [id] }))
             .await?;
@@ -167,15 +159,15 @@ impl HomeAssistantCommandExecutor {
     }
 }
 
-fn notification_content(notification: NotificationKind) -> (&'static str, &'static str, &'static str) {
+fn notification_content(notification: PushNotification) -> (&'static str, &'static str, &'static str) {
     match notification {
-        NotificationKind::WindowOpened => ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened"),
+        PushNotification::WindowOpened => ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened"),
     }
 }
 
-fn notification_tag(notification: NotificationKind) -> &'static str {
+fn notification_tag(notification: PushNotification) -> &'static str {
     match notification {
-        NotificationKind::WindowOpened => "window_opened",
+        PushNotification::WindowOpened => "window_opened",
     }
 }
 
@@ -210,10 +202,10 @@ mod tests {
     #[test]
     fn window_open_notification_keeps_its_mobile_presentation() {
         assert_eq!(
-            notification_content(NotificationKind::WindowOpened),
+            notification_content(PushNotification::WindowOpened),
             ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened")
         );
-        assert_eq!(notification_tag(NotificationKind::WindowOpened), "window_opened");
+        assert_eq!(notification_tag(PushNotification::WindowOpened), "window_opened");
     }
 
     #[tokio::test]
@@ -228,7 +220,7 @@ mod tests {
         let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
 
         executor
-            .notify_phone("mobile_app_jarvis", NotificationKind::WindowOpened, NotificationOperation::Show)
+            .push_notify("mobile_app_jarvis", PushNotification::WindowOpened, PushNotifyOperation::Show)
             .await
             .unwrap();
     }
@@ -250,11 +242,11 @@ mod tests {
             .await;
         let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
         executor
-            .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Show)
+            .set_light_notification("light.hue_go", LightSignal::WindowOpened, true)
             .await
             .unwrap();
         executor
-            .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Dismiss)
+            .set_light_notification("light.hue_go", LightSignal::WindowOpened, false)
             .await
             .unwrap();
     }
@@ -272,7 +264,7 @@ mod tests {
 
         assert!(
             executor
-                .notify_light("light.hue_go", NotificationKind::WindowOpened, NotificationOperation::Show)
+                .set_light_notification("light.hue_go", LightSignal::WindowOpened, true)
                 .await
                 .is_err()
         );

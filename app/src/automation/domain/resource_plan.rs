@@ -3,7 +3,9 @@ use crate::automation::domain::action::{
     InformWindowOpen, PauseHeatingForVentilation, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{
-    CommandTarget, EnergySavingDevice, Fan, NotificationKind, NotificationLight, NotificationRecipient, PowerToggle,
+    CommandTarget, ControlFanTarget, EnergySavingDevice, Fan, NotificationLight, OpenDoorTarget, PowerToggle,
+    PushNotification, PushNotifyTarget, PushRecipient, SetEnergySavingTarget, SetHeatingTarget,
+    SetLightNotificationTarget, SetPowerTarget,
 };
 use crate::core::domain::Radiator;
 use crate::home_state::FanActivity;
@@ -15,9 +17,10 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
     let mut plan: Vec<(CommandTarget, Vec<HomeAction>)> = vec![
         // --- Power devices ---
         (
-            CommandTarget::SetPower {
+            SetPowerTarget {
                 device: PowerToggle::BedroomAirPurifier,
-            },
+            }
+            .into(),
             vec![
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::BedroomAirPurifier)).into(),
                 PurifyAir::BedroomSleepPreparation.into(),
@@ -25,9 +28,10 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             ],
         ),
         (
-            CommandTarget::SetPower {
+            SetPowerTarget {
                 device: PowerToggle::Dehumidifier,
-            },
+            }
+            .into(),
             vec![
                 BlockAutomation::BathroomDehumidifier.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier)).into(),
@@ -35,9 +39,10 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             ],
         ),
         (
-            CommandTarget::SetPower {
+            SetPowerTarget {
                 device: PowerToggle::InfraredHeater,
-            },
+            }
+            .into(),
             vec![
                 RemoteTurnOff::InfraredHeater.into(),
                 UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater)).into(),
@@ -45,16 +50,18 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             ],
         ),
         (
-            CommandTarget::SetPower {
+            SetPowerTarget {
                 device: PowerToggle::LivingRoomTvAmbilight,
-            },
+            }
+            .into(),
             vec![UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvAmbilight)).into()],
         ),
         // --- Fan devices ---
         (
-            CommandTarget::ControlFan {
+            ControlFanTarget {
                 device: Fan::BedroomDehumidifier,
-            },
+            }
+            .into(),
             vec![
                 BlockAutomation::BedroomDehumidifier.into(),
                 RemoteTurnOff::BedroomDehumidifier.into(),
@@ -63,9 +70,10 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             ],
         ),
         (
-            CommandTarget::ControlFan {
+            ControlFanTarget {
                 device: Fan::LivingRoomAirPurifier,
-            },
+            }
+            .into(),
             vec![
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
                 PurifyAir::LivingRoom.into(),
@@ -73,54 +81,60 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         ),
         // --- Heating devices (one per radiator) ---
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::LivingRoomBig,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::LivingRoomBig).into(),
                 FollowTargetHeatingDemand::new(Radiator::LivingRoomBig).into(),
             ],
         ),
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::LivingRoomSmall,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::LivingRoomSmall).into(),
                 FollowTargetHeatingDemand::new(Radiator::LivingRoomSmall).into(),
             ],
         ),
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::Bedroom,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::Bedroom).into(),
                 FollowTargetHeatingDemand::new(Radiator::Bedroom).into(),
             ],
         ),
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::Kitchen,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::Kitchen).into(),
                 FollowTargetHeatingDemand::new(Radiator::Kitchen).into(),
             ],
         ),
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::RoomOfRequirements,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::RoomOfRequirements).into(),
                 FollowTargetHeatingDemand::new(Radiator::RoomOfRequirements).into(),
             ],
         ),
         (
-            CommandTarget::SetHeating {
+            SetHeatingTarget {
                 device: Radiator::Bathroom,
-            },
+            }
+            .into(),
             vec![
                 PauseHeatingForVentilation::new(Radiator::Bathroom).into(),
                 FollowTargetHeatingDemand::new(Radiator::Bathroom).into(),
@@ -128,37 +142,42 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         ),
         // --- Energy saving ---
         (
-            CommandTarget::SetEnergySaving {
+            SetEnergySavingTarget {
                 device: EnergySavingDevice::LivingRoomTv,
-            },
+            }
+            .into(),
             vec![UserTriggerAction::new(UserTriggerTarget::DevicePower(OnOffDevice::LivingRoomTvEnergySaving)).into()],
         ),
         // --- Notifications ---
         (
-            CommandTarget::NotifyLight {
+            SetLightNotificationTarget {
                 device: NotificationLight::LivingRoom,
-            },
+            }
+            .into(),
             vec![InformWindowOpen::NotificationLightLivingRoom.into()],
         ),
         (
-            CommandTarget::NotifyPhone {
-                recipient: NotificationRecipient::Dennis,
-                notification: NotificationKind::WindowOpened,
-            },
-            vec![InformWindowOpen::PushNotification(NotificationRecipient::Dennis).into()],
+            PushNotifyTarget {
+                recipient: PushRecipient::Dennis,
+                notification: PushNotification::WindowOpened,
+            }
+            .into(),
+            vec![InformWindowOpen::PushNotification(PushRecipient::Dennis).into()],
         ),
         (
-            CommandTarget::NotifyPhone {
-                recipient: NotificationRecipient::Sabine,
-                notification: NotificationKind::WindowOpened,
-            },
-            vec![InformWindowOpen::PushNotification(NotificationRecipient::Sabine).into()],
+            PushNotifyTarget {
+                recipient: PushRecipient::Sabine,
+                notification: PushNotification::WindowOpened,
+            }
+            .into(),
+            vec![InformWindowOpen::PushNotification(PushRecipient::Sabine).into()],
         ),
         // --- Door ---
         (
-            CommandTarget::OpenDoor {
+            OpenDoorTarget {
                 device: crate::command::Lock::BuildingEntrance,
-            },
+            }
+            .into(),
             vec![UserTriggerAction::new(UserTriggerTarget::OpenDoor(Door::Building)).into()],
         ),
     ];
@@ -182,7 +201,7 @@ mod tests {
     #[test]
     fn every_radiator_pauses_for_ventilation_before_following_its_target() {
         for radiator in Radiator::variants() {
-            let target = CommandTarget::SetHeating { device: *radiator };
+            let target: CommandTarget = SetHeatingTarget { device: *radiator }.into();
             let (_, rules) = resource_plans()
                 .into_iter()
                 .find(|(candidate, _)| candidate == &target)
@@ -207,9 +226,10 @@ mod tests {
             assert!(targets.insert(target.clone()), "duplicate resource plan for {target}");
         }
 
-        let light_target = CommandTarget::NotifyLight {
+        let light_target: CommandTarget = SetLightNotificationTarget {
             device: NotificationLight::LivingRoom,
-        };
+        }
+        .into();
         let (_, light_rules) = plans
             .iter()
             .find(|(target, _)| target == &light_target)
@@ -220,20 +240,22 @@ mod tests {
         ));
         assert!(matches!(light_rules.last(), Some(HomeAction::FollowDefaultSetting(_))));
 
-        for recipient in [NotificationRecipient::Dennis, NotificationRecipient::Sabine] {
-            let phone_target = CommandTarget::NotifyPhone {
+        for recipient in [PushRecipient::Dennis, PushRecipient::Sabine] {
+            let phone_target: CommandTarget = PushNotifyTarget {
                 recipient,
-                notification: NotificationKind::WindowOpened,
-            };
+                notification: PushNotification::WindowOpened,
+            }
+            .into();
             assert!(plans.iter().any(|(target, _)| target == &phone_target));
         }
     }
 
     #[test]
     fn ambilight_follows_user_requests_before_its_default() {
-        let target = CommandTarget::SetPower {
+        let target: CommandTarget = SetPowerTarget {
             device: PowerToggle::LivingRoomTvAmbilight,
-        };
+        }
+        .into();
         let (_, rules) = resource_plans()
             .into_iter()
             .find(|(candidate, _)| candidate == &target)

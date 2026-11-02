@@ -2,7 +2,7 @@ use r#macro::Id;
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::{
-    command::{Command, Fan, PowerToggle},
+    command::{Command, ControlFan, Fan, PowerToggle, SetPower},
     core::{
         domain::{HeatingZone, RoomWithWindow},
         timeseries::DataPoint,
@@ -21,24 +21,27 @@ pub enum PurifyAir {
 
 impl Rule for PurifyAir {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<RuleResult> {
-        let command = match self {
+        let command: Option<Command> = match self {
             PurifyAir::BedroomAfterVentilation => {
                 decide_bedroom_after_ventilation(ctx.current_dp(Ventilation::Room(RoomWithWindow::Bedroom))?)
+                    .map(Command::from)
             }
             PurifyAir::BedroomSleepPreparation => {
                 decide_bedroom_sleep(ctx.current_dp(TargetHeatingMode::HeatingZone(HeatingZone::Bedroom))?)
+                    .map(Command::from)
             }
             PurifyAir::LivingRoom => decide_living_room(
                 ctx.current_dp(Ventilation::Room(RoomWithWindow::LivingRoom))?,
                 ctx.current(Occupancy::LivingRoomCouchShort)?,
-            ),
+            )
+            .map(Command::from),
         };
 
         Ok(command.map_or(RuleResult::Skip, RuleResult::Execute))
     }
 }
 
-fn decide_bedroom_after_ventilation(ventilation: DataPoint<bool>) -> Option<Command> {
+fn decide_bedroom_after_ventilation(ventilation: DataPoint<bool>) -> Option<SetPower> {
     if ventilation.value {
         tracing::info!("Bedroom ventilation still active; skipping air purification");
         return None;
@@ -47,7 +50,7 @@ fn decide_bedroom_after_ventilation(ventilation: DataPoint<bool>) -> Option<Comm
     let ventilation_done_duration = ventilation.timestamp.elapsed();
     if ventilation_done_duration < t!(15 minutes) {
         tracing::info!("Bedroom ventilation ended less than 15 minutes ago; turning on air purification");
-        return Some(Command::SetPower {
+        return Some(SetPower {
             device: PowerToggle::BedroomAirPurifier,
             power_on: true,
         });
@@ -57,7 +60,7 @@ fn decide_bedroom_after_ventilation(ventilation: DataPoint<bool>) -> Option<Comm
     None
 }
 
-fn decide_bedroom_sleep(heating_mode: DataPoint<HeatingMode>) -> Option<Command> {
+fn decide_bedroom_sleep(heating_mode: DataPoint<HeatingMode>) -> Option<SetPower> {
     if heating_mode.value != HeatingMode::Sleep {
         tracing::info!("Bedroom heating is not entering sleep mode; skipping air purification");
         return None;
@@ -69,13 +72,13 @@ fn decide_bedroom_sleep(heating_mode: DataPoint<HeatingMode>) -> Option<Command>
     }
 
     tracing::info!("Bedroom heating entered sleep mode less than 15 minutes ago; turning on air purification");
-    Some(Command::SetPower {
+    Some(SetPower {
         device: PowerToggle::BedroomAirPurifier,
         power_on: true,
     })
 }
 
-fn decide_living_room(ventilation: DataPoint<bool>, couch_occupancy: Probability) -> Option<Command> {
+fn decide_living_room(ventilation: DataPoint<bool>, couch_occupancy: Probability) -> Option<ControlFan> {
     let speed = speed_for_couch_occupancy(couch_occupancy);
 
     if ventilation.value {
@@ -101,8 +104,8 @@ fn speed_for_couch_occupancy(couch_occupancy: Probability) -> FanSpeed {
     }
 }
 
-fn control_living_room_air_purifier(speed: FanSpeed) -> Command {
-    Command::ControlFan {
+fn control_living_room_air_purifier(speed: FanSpeed) -> ControlFan {
+    ControlFan {
         device: Fan::LivingRoomAirPurifier,
         speed: FanAirflow::Forward(speed),
     }
@@ -139,8 +142,8 @@ mod tests {
         DataPoint::new(mode, minutes_ago(mins_ago))
     }
 
-    fn expected_command(speed: FanSpeed) -> Command {
-        Command::ControlFan {
+    fn expected_command(speed: FanSpeed) -> ControlFan {
+        ControlFan {
             device: Fan::LivingRoomAirPurifier,
             speed: FanAirflow::Forward(speed),
         }
@@ -154,7 +157,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Some(Command::SetPower {
+            Some(SetPower {
                 device: PowerToggle::BedroomAirPurifier,
                 power_on: true,
             })
@@ -174,7 +177,7 @@ mod tests {
 
         assert_eq!(
             result,
-            Some(Command::SetPower {
+            Some(SetPower {
                 device: PowerToggle::BedroomAirPurifier,
                 power_on: true,
             })

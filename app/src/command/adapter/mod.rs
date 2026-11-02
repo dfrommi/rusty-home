@@ -1,7 +1,7 @@
 use crate::{
     command::{
-        Command, EnergySavingDevice, Fan, Lock, NotificationDestination, NotificationLight, NotificationRecipient,
-        PowerToggle,
+        Command, ControlFan, EnergySavingDevice, Fan, Lock, NotificationLight, OpenDoor, PowerToggle, PushNotify,
+        PushRecipient, SetEnergySaving, SetHeating, SetLightNotification, SetPower,
     },
     core::domain::Radiator,
 };
@@ -47,27 +47,27 @@ impl CommandDispatcher {
 
     pub async fn dispatch(&self, command: &Command) -> anyhow::Result<()> {
         match command {
-            Command::SetPower {
+            Command::SetPower(SetPower {
                 device: PowerToggle::BedroomAirPurifier,
                 power_on,
-            } => {
+            }) => {
                 self.homeassistant
                     .set_power("switch.zhimi_de_974125313_rmb1_on_p_2_1", *power_on)
                     .await
             }
-            Command::SetPower {
+            Command::SetPower(SetPower {
                 device: PowerToggle::InfraredHeater,
                 power_on,
-            } => self.tasmota.set_power("irheater", *power_on).await,
-            Command::SetPower {
+            }) => self.tasmota.set_power("irheater", *power_on).await,
+            Command::SetPower(SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on,
-            } => self.z2m.set_power("bathroom/dehumidifier_plug", *power_on).await,
-            Command::SetPower {
+            }) => self.z2m.set_power("bathroom/dehumidifier_plug", *power_on).await,
+            Command::SetPower(SetPower {
                 device: PowerToggle::LivingRoomTvAmbilight,
                 power_on,
-            } => self.lgtv.set_piccap_power(*power_on).await,
-            Command::SetHeating { device, target_state } => {
+            }) => self.lgtv.set_piccap_power(*power_on).await,
+            Command::SetHeating(SetHeating { device, target_state }) => {
                 let device_id = match device {
                     Radiator::RoomOfRequirements => "room_of_requirements/radiator_thermostat_sonoff",
                     Radiator::Bathroom => "bathroom/radiator_thermostat_sonoff",
@@ -78,48 +78,44 @@ impl CommandDispatcher {
                 };
                 self.z2m.set_heating(device_id, target_state.clone()).await
             }
-            Command::Notify {
+            Command::PushNotify(PushNotify {
                 notification,
-                target: NotificationDestination::Phone { recipient },
+                recipient,
                 operation,
-            } => {
+            }) => {
                 self.homeassistant
-                    .notify_phone(phone_service(*recipient), *notification, *operation)
+                    .push_notify(push_recipient(*recipient), *notification, *operation)
                     .await
             }
-            Command::Notify {
-                notification,
-                target: NotificationDestination::Light { device },
-                operation,
-            } => {
+            Command::SetLightNotification(SetLightNotification { device, signal, on }) => {
                 self.homeassistant
-                    .notify_light(notification_light_entity(*device), *notification, *operation)
+                    .set_light_notification(notification_light_entity(*device), *signal, *on)
                     .await
             }
-            Command::SetEnergySaving {
+            Command::SetEnergySaving(SetEnergySaving {
                 device: EnergySavingDevice::LivingRoomTv,
                 on,
-            } => self.lgtv.set_energy_saving(*on).await,
-            Command::ControlFan {
+            }) => self.lgtv.set_energy_saving(*on).await,
+            Command::ControlFan(ControlFan {
                 device: Fan::BedroomDehumidifier,
                 speed,
-            } => {
+            }) => {
                 self.homeassistant
                     .set_comfee_fan_speed("humidifier.dehumidifier_34e8", "fan.dehumidifier_34e8_fan", speed)
                     .await
             }
-            Command::ControlFan {
+            Command::ControlFan(ControlFan {
                 device: Fan::LivingRoomAirPurifier,
                 speed,
-            } => {
+            }) => {
                 self.homeassistant
                     .set_philips_air_purifier_speed("fan.wohnzimmer", speed)
                     .await
             }
-            Command::OpenDoor {
+            Command::OpenDoor(OpenDoor {
                 device: Lock::BuildingEntrance,
                 open,
-            } => {
+            }) => {
                 if *open {
                     self.nuki.open_door("1CC90CCA").await
                 } else {
@@ -131,10 +127,10 @@ impl CommandDispatcher {
     }
 }
 
-fn phone_service(recipient: NotificationRecipient) -> &'static str {
+fn push_recipient(recipient: PushRecipient) -> &'static str {
     match recipient {
-        NotificationRecipient::Dennis => "mobile_app_jarvis",
-        NotificationRecipient::Sabine => "mobile_app_simi",
+        PushRecipient::Dennis => "mobile_app_jarvis",
+        PushRecipient::Sabine => "mobile_app_simi",
     }
 }
 

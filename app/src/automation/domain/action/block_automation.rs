@@ -4,7 +4,7 @@ use crate::automation::RuleEvaluationContext;
 use crate::core::unit::FanAirflow;
 use crate::{
     automation::domain::action::{Rule, RuleResult},
-    command::{Command, Fan, PowerToggle},
+    command::{ControlFan, Fan, PowerToggle, SetPower},
     home_state::FanActivity,
     home_state::Resident,
     t,
@@ -71,17 +71,21 @@ impl Rule for BlockAutomation {
 
         // No override — produce the off command directly.
         tracing::info!("No valid user override; turning off device");
-        let command = match self {
-            BlockAutomation::BathroomDehumidifier => Command::SetPower {
-                device: PowerToggle::Dehumidifier,
-                power_on: false,
-            },
-            BlockAutomation::BedroomDehumidifier => Command::ControlFan {
-                device: Fan::BedroomDehumidifier,
-                speed: FanAirflow::Off,
-            },
-        };
-
-        Ok(RuleResult::Execute(command))
+        match self {
+            BlockAutomation::BathroomDehumidifier => Ok(RuleResult::Execute(
+                SetPower {
+                    device: PowerToggle::Dehumidifier,
+                    power_on: false,
+                }
+                .into(),
+            )),
+            BlockAutomation::BedroomDehumidifier => Ok(RuleResult::Execute(
+                ControlFan {
+                    device: Fan::BedroomDehumidifier,
+                    speed: FanAirflow::Off,
+                }
+                .into(),
+            )),
+        }
     }
 }

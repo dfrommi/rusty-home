@@ -46,21 +46,20 @@ impl CommandExecutionRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::PowerToggle;
-
+    use crate::command::{PowerToggle, SetPower};
     #[tokio::test]
     async fn latest_execution_is_loaded_by_target_with_its_command() {
         let repository = CommandExecutionRepository::default();
-        let command = Command::SetPower {
+        let command = Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: true,
-        };
+        });
         repository.record_execution(command.clone()).await;
 
-        let other_state = Command::SetPower {
+        let other_state = Command::SetPower(SetPower {
             device: PowerToggle::Dehumidifier,
             power_on: false,
-        };
+        });
         let latest = repository
             .latest_for(&CommandTarget::from(&other_state))
             .await

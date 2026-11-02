@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
-use crate::command::{Command, Fan, PowerToggle};
+use crate::command::{ControlFan, Fan, PowerToggle, SetPower};
 use crate::core::unit::FanAirflow;
 use crate::t;
 use crate::trigger::{DualButtonPress, RemoteTrigger, RemoteTriggerTarget, UserTrigger, UserTriggerTarget};
@@ -35,18 +35,24 @@ impl Rule for RemoteTurnOff {
             return Ok(RuleResult::Skip);
         };
 
-        let command = match self {
-            RemoteTurnOff::InfraredHeater => Command::SetPower {
-                device: PowerToggle::InfraredHeater,
-                power_on: false,
-            },
-            RemoteTurnOff::BedroomDehumidifier => Command::ControlFan {
-                device: Fan::BedroomDehumidifier,
-                speed: FanAirflow::Off,
-            },
-        };
-
         tracing::info!("Remote turn-off accepted");
-        Ok(RuleResult::ExecuteTrigger(command, trigger.id.clone()))
+        match self {
+            RemoteTurnOff::InfraredHeater => Ok(RuleResult::ExecuteTrigger(
+                SetPower {
+                    device: PowerToggle::InfraredHeater,
+                    power_on: false,
+                }
+                .into(),
+                trigger.id.clone(),
+            )),
+            RemoteTurnOff::BedroomDehumidifier => Ok(RuleResult::ExecuteTrigger(
+                ControlFan {
+                    device: Fan::BedroomDehumidifier,
+                    speed: FanAirflow::Off,
+                }
+                .into(),
+                trigger.id.clone(),
+            )),
+        }
     }
 }

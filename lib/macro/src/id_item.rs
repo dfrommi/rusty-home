@@ -168,52 +168,117 @@ fn derive_enum(enum_name: &Ident, type_name_ext: &str, data_enum: DataEnum) -> p
 }
 
 fn derive_struct(struct_name: &Ident, type_name_ext: &str, data_struct: DataStruct) -> proc_macro2::TokenStream {
-    match data_struct.fields {
+    let (field_types, field_accesses, bindings, constructor) = match data_struct.fields {
         Fields::Unit => {
-            Error::new_spanned(struct_name, "Id derive requires structs to have at least one field").to_compile_error()
+            return Error::new_spanned(struct_name, "Id derive requires structs to have at least one field")
+                .to_compile_error();
         }
         Fields::Unnamed(fields) => {
-            let indices: Vec<_> = (0..fields.unnamed.len()).collect();
-            let variant_parts = indices.iter().map(|idx| {
-                let index = syn::Index::from(*idx);
-                quote! { self.#index.ext_id().variant_name() }
-            });
-
-            quote! {
-                impl #struct_name {
-                    pub fn ext_id(&self) -> crate::core::id::ExternalId {
-                        let variant_name = vec![#(#variant_parts),*].join("::");
-                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
-                    }
-                }
-            }
+            let field_types: Vec<_> = fields.unnamed.into_iter().map(|field| field.ty).collect();
+            let indices: Vec<_> = (0..field_types.len()).collect();
+            let field_accesses: Vec<_> = indices
+                .iter()
+                .map(|idx| {
+                    let index = syn::Index::from(*idx);
+                    quote! { self.#index }
+                })
+                .collect();
+            let bindings: Vec<_> = indices.iter().map(|idx| format_ident!("field_{idx}")).collect();
+            let constructor = quote! { Self(#(#bindings),*) };
+            (field_types, field_accesses, bindings, constructor)
         }
         Fields::Named(fields) => {
-            let field_idents: Vec<_> = fields
+            let fields: Vec<_> = fields
                 .named
-                .iter()
-                .map(|field| match field.ident.as_ref() {
-                    Some(ident) => ident.clone(),
+                .into_iter()
+                .map(|field| match field.ident {
+                    Some(ident) => (ident, field.ty),
                     None => unreachable!("named field expected"),
                 })
                 .collect();
+            let field_types = fields.iter().map(|(_, ty)| ty.clone()).collect();
+            let field_accesses: Vec<_> = fields.iter().map(|(ident, _)| quote! { self.#ident }).collect();
+            let bindings: Vec<_> = (0..fields.len()).map(|idx| format_ident!("field_{idx}")).collect();
+            let assignments = fields
+                .iter()
+                .zip(bindings.iter())
+                .map(|((ident, _), binding)| quote! { #ident: #binding });
+            let constructor = quote! { Self { #(#assignments),* } };
+            (field_types, field_accesses, bindings, constructor)
+        }
+    };
 
-            let variant_parts = field_idents.iter().map(|field_ident| {
-                quote! { self.#field_ident.ext_id().variant_name() }
-            });
+    let field_type_names = match field_types
+        .iter()
+        .map(|field_type| match field_type {
+            Type::Path(type_path) => type_path
+                .path
+                .segments
+                .last()
+                .filter(|segment| segment.arguments.is_empty())
+                .map(|segment| segment.ident.to_string().to_snake_case())
+                .ok_or_else(|| Error::new_spanned(field_type, "Id fields must use simple types")),
+            _ => Err(Error::new_spanned(field_type, "Id fields must use simple types")),
+        })
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(names) => names,
+        Err(error) => return error.to_compile_error(),
+    };
 
+    let variant_parts = field_accesses
+        .iter()
+        .map(|field_access| quote! { #field_access.ext_id().variant_name() });
+    let parse_fields = bindings
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_type_names.iter())
+        .map(|((binding, field_type), field_type_name)| {
             quote! {
-                impl #struct_name {
-                    pub fn ext_id(&self) -> crate::core::id::ExternalId {
-                        let variant_name = vec![#(#variant_parts),*].join("::");
-                        crate::core::id::ExternalId::new(#type_name_ext, variant_name)
-                    }
+                let #binding = {
+                    let segment = segments.next().ok_or_else(|| {
+                        anyhow::anyhow!("Missing ID segment for {}", stringify!(#binding))
+                    })?;
+                    <#field_type>::try_from(crate::core::id::ExternalId::new(#field_type_name, segment))?
+                };
+            }
+        });
+
+    quote! {
+        impl #struct_name {
+            pub fn ext_id(&self) -> crate::core::id::ExternalId {
+                let variant_name = vec![#(#variant_parts),*].join("::");
+                crate::core::id::ExternalId::new(#type_name_ext, variant_name)
+            }
+        }
+
+        impl TryFrom<&crate::core::id::ExternalId> for #struct_name {
+            type Error = anyhow::Error;
+
+            fn try_from(value: &crate::core::id::ExternalId) -> Result<Self, Self::Error> {
+                if value.type_name() != #type_name_ext {
+                    anyhow::bail!("Error converting ExternalId, expected type {}, got {}", #type_name_ext, value.type_name());
                 }
+
+                let mut segments = value.variant_name().split("::");
+                #(#parse_fields)*
+                if segments.next().is_some() {
+                    anyhow::bail!("Error converting ExternalId, too many segments for {}", #type_name_ext);
+                }
+
+                Ok(#constructor)
+            }
+        }
+
+        impl TryFrom<crate::core::id::ExternalId> for #struct_name {
+            type Error = anyhow::Error;
+
+            fn try_from(value: crate::core::id::ExternalId) -> Result<Self, Self::Error> {
+                Self::try_from(&value)
             }
         }
     }
 }
-
 pub fn derive_id_item_delegation(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

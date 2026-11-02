@@ -1,5 +1,5 @@
 use crate::{
-    command::{Command, HeatingTargetState},
+    command::{HeatingTargetState, SetHeating},
     core::domain::Radiator,
     core::unit::DegreeCelsius,
     home_state::{HeatingMode, SetPoint, TargetHeatingDemand, TargetHeatingMode},
@@ -32,7 +32,7 @@ impl Rule for FollowTargetHeatingDemand {
             }
         };
 
-        let command = Command::SetHeating {
+        let command = SetHeating {
             device: self.radiator,
             target_state,
         };
@@ -42,10 +42,10 @@ impl Rule for FollowTargetHeatingDemand {
 
         if let HeatingMode::Manual(_, trigger_id) = mode {
             tracing::info!("Manual mode active; applying target heating demand");
-            Ok(RuleResult::ExecuteTrigger(command, trigger_id))
+            Ok(RuleResult::ExecuteTrigger(command.into(), trigger_id))
         } else {
             tracing::info!("Applying target heating demand");
-            Ok(RuleResult::Execute(command))
+            Ok(RuleResult::Execute(command.into()))
         }
     }
 }

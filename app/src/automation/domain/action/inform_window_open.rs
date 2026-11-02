@@ -2,7 +2,8 @@ use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::{
-    Command, NotificationDestination, NotificationKind, NotificationLight, NotificationOperation, NotificationRecipient,
+    LightSignal, NotificationLight, PushNotification, PushNotify, PushNotifyOperation, PushRecipient,
+    SetLightNotification,
 };
 use crate::core::domain::RoomWithWindow;
 use crate::core::time::DateTime;
@@ -14,7 +15,7 @@ use crate::home_state::ColdAirComingIn;
 
 #[derive(Debug, Clone, Id, EnumVariants)]
 pub enum InformWindowOpen {
-    PushNotification(NotificationRecipient),
+    PushNotification(PushRecipient),
     NotificationLightLivingRoom,
 }
 
@@ -22,20 +23,20 @@ impl Rule for InformWindowOpen {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<super::RuleResult> {
         let command = match self {
             InformWindowOpen::PushNotification(recipient) if self.preconditions_fulfilled_push(recipient, ctx)? => {
-                Command::Notify {
-                    notification: NotificationKind::WindowOpened,
-                    target: NotificationDestination::Phone { recipient: *recipient },
-                    operation: NotificationOperation::Show,
+                PushNotify {
+                    notification: PushNotification::WindowOpened,
+                    recipient: *recipient,
+                    operation: PushNotifyOperation::Show,
                 }
+                .into()
             }
             InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(ctx)? => {
-                Command::Notify {
-                    notification: NotificationKind::WindowOpened,
-                    target: NotificationDestination::Light {
-                        device: NotificationLight::LivingRoom,
-                    },
-                    operation: NotificationOperation::Show,
+                SetLightNotification {
+                    device: NotificationLight::LivingRoom,
+                    signal: LightSignal::WindowOpened,
+                    on: true,
                 }
+                .into()
             }
 
             _ => return Ok(RuleResult::Skip),
@@ -48,12 +49,12 @@ impl Rule for InformWindowOpen {
 impl InformWindowOpen {
     fn preconditions_fulfilled_push(
         &self,
-        recipient: &NotificationRecipient,
+        recipient: &PushRecipient,
         ctx: &RuleEvaluationContext,
     ) -> anyhow::Result<bool> {
         let presence_item = match recipient {
-            NotificationRecipient::Dennis => Presence::AtHomeDennis,
-            NotificationRecipient::Sabine => Presence::AtHomeSabine,
+            PushRecipient::Dennis => Presence::AtHomeDennis,
+            PushRecipient::Sabine => Presence::AtHomeSabine,
         };
 
         let at_home = ctx.current(presence_item)?;

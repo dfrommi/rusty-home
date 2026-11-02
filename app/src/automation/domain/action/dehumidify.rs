@@ -1,6 +1,6 @@
 use super::{RuleEvaluationContext, SimpleRule};
 use crate::{
-    command::{Command, Fan, PowerToggle},
+    command::{Command, ControlFan, Fan, PowerToggle, SetPower},
     core::domain::{HeatingZone, Room, RoomWithWindow},
     core::unit::{
         DegreeCelsius,
@@ -25,10 +25,11 @@ pub enum Dehumidify {
 impl SimpleRule for Dehumidify {
     fn command(&self) -> Command {
         match self {
-            Dehumidify::Bathroom => Command::SetPower {
+            Dehumidify::Bathroom => SetPower {
                 device: PowerToggle::Dehumidifier,
                 power_on: true,
-            },
+            }
+            .into(),
             Dehumidify::Bedroom => {
                 let speed = if t!(20:00 - 11:00).is_now() {
                     Forward(Medium)
@@ -36,10 +37,11 @@ impl SimpleRule for Dehumidify {
                     Forward(High)
                 };
 
-                Command::ControlFan {
+                ControlFan {
                     device: Fan::BedroomDehumidifier,
                     speed,
                 }
+                .into()
             }
         }
     }

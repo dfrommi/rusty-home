@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use r#macro::Id;
 
 use crate::{
-    command::{Command, HeatingTargetState},
+    command::{Command, HeatingTargetState, SetHeating},
     core::{domain::Radiator, time::DateTime, timeseries::DataPoint, unit::Percent},
     home_state::{AdjustmentDirection, HeatingMode, TargetHeatingAdjustment, TargetHeatingMode, Ventilation},
     t,
@@ -24,10 +24,11 @@ impl PauseHeatingForVentilation {
 
 impl SimpleRule for PauseHeatingForVentilation {
     fn command(&self) -> Command {
-        Command::SetHeating {
+        SetHeating {
             device: self.radiator,
             target_state: HeatingTargetState::Off,
         }
+        .into()
     }
 
     fn preconditions_fulfilled(&self, ctx: &RuleEvaluationContext) -> Result<bool> {

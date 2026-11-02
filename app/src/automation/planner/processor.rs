@@ -1,13 +1,11 @@
 use anyhow::Result;
 use infrastructure::TraceContext;
 
-use crate::automation::{HomeAction, RuleEvaluationContext};
+use crate::automation::{HomeAction, RuleEvaluationContext, RuleResult};
 use crate::command::{Command, CommandClient, CommandExecutionResult, CommandTarget};
 use crate::core::{id::ExternalId, time::DateTime};
 use crate::home_state::StateSnapshot;
 use crate::trigger::{TriggerClient, UserTriggerId};
-
-use super::ActionEvaluationResult;
 
 #[derive(Debug)]
 enum PlanResult {
@@ -120,23 +118,22 @@ impl<'a> Planner<'a> {
     )]
     async fn process_action(&self, resource: &CommandTarget, action: &HomeAction) -> Result<Option<PlanResult>> {
         let trace = TraceContext::current();
+        let ext_id = action.ext_id();
+
         match action.evaluate(&self.context) {
-            Ok(ActionEvaluationResult::ExecuteDefault) => {
+            Ok(RuleResult::ExecuteDefault) => {
                 trace.set_ok();
-                Ok(Some(
-                    self.execute_command(None, resource.to_default_command(), action.ext_id())
-                        .await,
-                ))
+                Ok(Some(self.execute_command(None, resource.to_default_command(), ext_id).await))
             }
-            Ok(ActionEvaluationResult::Execute(command, source)) => {
+            Ok(RuleResult::Execute(command)) => {
                 trace.set_ok();
-                Ok(Some(self.execute_command(None, command, source).await))
+                Ok(Some(self.execute_command(None, command, ext_id).await))
             }
-            Ok(ActionEvaluationResult::ExecuteTrigger(command, source, trigger_id)) => {
+            Ok(RuleResult::ExecuteTrigger(command, trigger_id)) => {
                 trace.set_ok();
-                Ok(Some(self.execute_command(Some(trigger_id), command, source).await))
+                Ok(Some(self.execute_command(Some(trigger_id), command, ext_id).await))
             }
-            Ok(ActionEvaluationResult::Skip) => Ok(None),
+            Ok(RuleResult::Skip) => Ok(None),
             Err(error) => {
                 tracing::error!("Error evaluating action {}: {:?}", action, error);
                 trace.set_error(error.to_string());

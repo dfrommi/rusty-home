@@ -29,7 +29,6 @@ pub use user_trigger_action::UserTriggerAction;
 
 use infrastructure::TraceContext;
 
-use crate::automation::planner::ActionEvaluationResult;
 use crate::home_state::*;
 
 #[derive(Debug, Clone)]
@@ -143,7 +142,7 @@ impl<T: SimpleRule> Rule for T {
     }
 }
 
-#[derive(Debug, Clone, derive_more::From)]
+#[derive(Debug, Clone, derive_more::From, r#macro::IdDelegation)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
     InformWindowOpen(InformWindowOpen),
@@ -165,34 +164,18 @@ impl Display for HomeAction {
 }
 
 impl HomeAction {
-    fn as_rule(&self) -> (&dyn Rule, ExternalId) {
+    pub fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<RuleResult> {
         match self {
-            HomeAction::Dehumidify(r) => (r, r.ext_id()),
-            HomeAction::InformWindowOpen(r) => (r, r.ext_id()),
-            HomeAction::PurifyAir(r) => (r, r.ext_id()),
-            HomeAction::AutoTurnOff(r) => (r, r.ext_id()),
-            HomeAction::FollowDefaultSetting(r) => (r, r.ext_id()),
-            HomeAction::UserTriggerAction(r) => (r, r.ext_id()),
-            HomeAction::FollowTargetHeatingDemand(r) => (r, r.ext_id()),
-            HomeAction::PauseHeatingForVentilation(r) => (r, r.ext_id()),
-            HomeAction::BlockAutomation(r) => (r, r.ext_id()),
-            HomeAction::RemoteTurnOff(r) => (r, r.ext_id()),
+            HomeAction::Dehumidify(rule) => rule.evaluate(ctx),
+            HomeAction::InformWindowOpen(rule) => rule.evaluate(ctx),
+            HomeAction::PurifyAir(rule) => rule.evaluate(ctx),
+            HomeAction::AutoTurnOff(rule) => rule.evaluate(ctx),
+            HomeAction::FollowDefaultSetting(rule) => rule.evaluate(ctx),
+            HomeAction::UserTriggerAction(rule) => rule.evaluate(ctx),
+            HomeAction::FollowTargetHeatingDemand(rule) => rule.evaluate(ctx),
+            HomeAction::PauseHeatingForVentilation(rule) => rule.evaluate(ctx),
+            HomeAction::BlockAutomation(rule) => rule.evaluate(ctx),
+            HomeAction::RemoteTurnOff(rule) => rule.evaluate(ctx),
         }
-    }
-
-    pub fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<ActionEvaluationResult> {
-        let (rule, ext_id) = self.as_rule();
-        match rule.evaluate(ctx)? {
-            RuleResult::ExecuteDefault => Ok(ActionEvaluationResult::ExecuteDefault),
-            RuleResult::Execute(command) => Ok(ActionEvaluationResult::Execute(command, ext_id)),
-            RuleResult::ExecuteTrigger(command, user_trigger_id) => {
-                Ok(ActionEvaluationResult::ExecuteTrigger(command, ext_id, user_trigger_id))
-            }
-            RuleResult::Skip => Ok(ActionEvaluationResult::Skip),
-        }
-    }
-
-    pub fn ext_id(&self) -> ExternalId {
-        self.as_rule().1
     }
 }

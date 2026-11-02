@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     home_state::{PowerAvailable, StateSnapshot},
 };
 use anyhow::Result;
@@ -65,7 +65,7 @@ impl CommandBehavior for SetPower {
         }
     }
 
-    fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
+    fn command_state(&self, snapshot: &StateSnapshot) -> Result<CommandState> {
         let powered_item = match self.device {
             PowerToggle::BedroomAirPurifier => PowerAvailable::BedroomAirPurifier,
             PowerToggle::Dehumidifier => PowerAvailable::Dehumidifier,
@@ -74,7 +74,11 @@ impl CommandBehavior for SetPower {
         };
 
         let powered = snapshot.try_get(powered_item)?.value;
-        Ok(Some(powered == self.power_on))
+        Ok(if powered == self.power_on {
+            CommandState::Reflected
+        } else {
+            CommandState::NotReflected
+        })
     }
 }
 
@@ -130,6 +134,5 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "SetPower");
         assert_eq!(command.display_parts().target, "Dehumidifier");
         assert_eq!(command.display_parts().state, "on");
-        assert!(!command.deduplicate_when_unobservable());
     }
 }

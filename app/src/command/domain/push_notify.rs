@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     home_state::StateSnapshot,
 };
 use anyhow::Result;
@@ -80,12 +80,8 @@ impl CommandBehavior for PushNotify {
         }
     }
 
-    fn deduplicate_when_unobservable(&self) -> bool {
-        true
-    }
-
-    fn is_reflected_in_state(&self, _snapshot: &StateSnapshot) -> Result<Option<bool>> {
-        Ok(None)
+    fn command_state(&self, _snapshot: &StateSnapshot) -> Result<CommandState> {
+        Ok(CommandState::UnobservableDeduplicated)
     }
 }
 
@@ -138,7 +134,9 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "PushNotify");
         assert_eq!(command.display_parts().target, "WindowOpened @ Dennis");
         assert_eq!(command.display_parts().state, "Show");
-        assert!(command.deduplicate_when_unobservable());
-        assert!(matches!(command.is_reflected_in_state(&StateSnapshot::default()), Ok(None)));
+        assert!(matches!(
+            command.command_state(&StateSnapshot::default()),
+            Ok(CommandState::UnobservableDeduplicated)
+        ));
     }
 }

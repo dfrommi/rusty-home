@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     home_state::{PowerAvailable, StateSnapshot},
 };
 use anyhow::Result;
@@ -68,12 +68,16 @@ impl CommandBehavior for SetLightNotification {
         }
     }
 
-    fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
+    fn command_state(&self, snapshot: &StateSnapshot) -> Result<CommandState> {
         let state_item = match self.device {
             NotificationLight::LivingRoom => PowerAvailable::LivingRoomNotificationLight,
         };
         let powered = snapshot.try_get(state_item)?.value;
-        Ok(Some(powered == self.on))
+        Ok(if powered == self.on {
+            CommandState::Reflected
+        } else {
+            CommandState::NotReflected
+        })
     }
 }
 
@@ -125,6 +129,5 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "SetLightNotification");
         assert_eq!(command.display_parts().target, "LivingRoom");
         assert_eq!(command.display_parts().state, "on");
-        assert!(!command.deduplicate_when_unobservable());
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     home_state::{EnergySaving, StateSnapshot},
 };
 use anyhow::Result;
@@ -63,11 +63,15 @@ impl CommandBehavior for SetEnergySaving {
         }
     }
 
-    fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
+    fn command_state(&self, snapshot: &StateSnapshot) -> Result<CommandState> {
         let state_device = match self.device {
             EnergySavingDevice::LivingRoomTv => EnergySaving::LivingRoomTv,
         };
-        Ok(Some(snapshot.try_get(state_device)?.value == self.on))
+        Ok(if snapshot.try_get(state_device)?.value == self.on {
+            CommandState::Reflected
+        } else {
+            CommandState::NotReflected
+        })
     }
 }
 
@@ -122,6 +126,5 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "SetEnergySaving");
         assert_eq!(command.display_parts().target, "LivingRoomTv");
         assert_eq!(command.display_parts().state, "on");
-        assert!(!command.deduplicate_when_unobservable());
     }
 }

@@ -3,7 +3,7 @@ use r#macro::Id;
 
 use crate::{
     command::{
-        Command, CommandTarget,
+        Command, CommandState, CommandTarget,
         adapter::{CommandExecution, CommandExecutionRepository},
     },
     core::id::ExternalId,
@@ -57,8 +57,8 @@ impl CommandService {
     ) -> anyhow::Result<CommandExecutionResult> {
         let target = CommandTarget::from(&command);
         let latest_execution = self.execution_repository.latest_for(&target).await;
-        let reflection = command.is_reflected_in_state(snapshot)?;
-        let outcome = match execution_decision(&command, reflection, latest_execution.as_ref()) {
+        let command_state = command.command_state(snapshot)?;
+        let outcome = match execution_decision(&command, command_state, latest_execution.as_ref()) {
             ExecutionDecision::Debounced => Ok(CommandExecutionResult::Debounced),
             ExecutionDecision::AlreadyReflected => Ok(CommandExecutionResult::AlreadyReflected),
             ExecutionDecision::AlreadyExecuted => Ok(CommandExecutionResult::AlreadyExecuted),
@@ -87,20 +87,21 @@ enum ExecutionDecision {
 
 fn execution_decision(
     command: &Command,
-    reflection: Option<bool>,
+    command_state: CommandState,
     latest_execution: Option<&CommandExecution>,
 ) -> ExecutionDecision {
     let same_command = latest_execution.is_some_and(|execution| execution.command == *command);
     let recent_same_command = latest_execution
         .is_some_and(|execution| execution.command == *command && execution.created.elapsed() < t!(30 seconds));
 
-    match reflection {
-        Some(true) => ExecutionDecision::AlreadyReflected,
-        Some(false) if recent_same_command => ExecutionDecision::Debounced,
-        Some(false) => ExecutionDecision::Execute,
-        None if command.deduplicate_when_unobservable() && same_command => ExecutionDecision::AlreadyExecuted,
-        None if recent_same_command => ExecutionDecision::Debounced,
-        None => ExecutionDecision::Execute,
+    match command_state {
+        CommandState::Reflected => ExecutionDecision::AlreadyReflected,
+        CommandState::NotReflected if recent_same_command => ExecutionDecision::Debounced,
+        CommandState::NotReflected => ExecutionDecision::Execute,
+        CommandState::UnobservableDeduplicated if same_command => ExecutionDecision::AlreadyExecuted,
+        CommandState::UnobservableDeduplicated => ExecutionDecision::Execute,
+        CommandState::UnobservableRepeatable if recent_same_command => ExecutionDecision::Debounced,
+        CommandState::UnobservableRepeatable => ExecutionDecision::Execute,
     }
 }
 
@@ -198,7 +199,7 @@ mod tests {
         let recent = execution(command.clone(), crate::t!(1 seconds));
 
         assert_eq!(
-            execution_decision(&command, Some(true), Some(&recent)),
+            execution_decision(&command, CommandState::Reflected, Some(&recent)),
             ExecutionDecision::AlreadyReflected
         );
     }
@@ -213,11 +214,11 @@ mod tests {
         let stale = execution(command.clone(), crate::t!(1 minutes));
 
         assert_eq!(
-            execution_decision(&command, Some(false), Some(&recent)),
+            execution_decision(&command, CommandState::NotReflected, Some(&recent)),
             ExecutionDecision::Debounced
         );
         assert_eq!(
-            execution_decision(&command, Some(false), Some(&stale)),
+            execution_decision(&command, CommandState::NotReflected, Some(&stale)),
             ExecutionDecision::Execute
         );
     }
@@ -229,9 +230,12 @@ mod tests {
         let dismiss = execution(phone_notification(PushNotifyOperation::Dismiss), crate::t!(1 minutes));
 
         assert_eq!(
-            execution_decision(&command, None, Some(&previous)),
+            execution_decision(&command, CommandState::UnobservableDeduplicated, Some(&previous)),
             ExecutionDecision::AlreadyExecuted
         );
-        assert_eq!(execution_decision(&command, None, Some(&dismiss)), ExecutionDecision::Execute);
+        assert_eq!(
+            execution_decision(&command, CommandState::UnobservableDeduplicated, Some(&dismiss),),
+            ExecutionDecision::Execute
+        );
     }
 }

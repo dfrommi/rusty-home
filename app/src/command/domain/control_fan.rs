@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     core::unit::FanAirflow,
     home_state::{FanActivity, StateSnapshot},
 };
@@ -65,14 +65,18 @@ impl CommandBehavior for ControlFan {
         }
     }
 
-    fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
+    fn command_state(&self, snapshot: &StateSnapshot) -> Result<CommandState> {
         let state_device = match self.device {
             Fan::BedroomDehumidifier => FanActivity::BedroomDehumidifier,
             Fan::LivingRoomAirPurifier => FanActivity::LivingRoomAirPurifier,
         };
 
         let current_flow = snapshot.try_get(state_device)?.value;
-        Ok(Some(current_flow == self.speed))
+        Ok(if current_flow == self.speed {
+            CommandState::Reflected
+        } else {
+            CommandState::NotReflected
+        })
     }
 }
 
@@ -127,6 +131,5 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "ControlFan");
         assert_eq!(command.display_parts().target, "BedroomDehumidifier");
         assert_eq!(command.display_parts().state, "off");
-        assert!(!command.deduplicate_when_unobservable());
     }
 }

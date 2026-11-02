@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     home_state::StateSnapshot,
 };
 use anyhow::Result;
@@ -63,8 +63,12 @@ impl CommandBehavior for OpenDoor {
         }
     }
 
-    fn is_reflected_in_state(&self, _snapshot: &StateSnapshot) -> Result<Option<bool>> {
-        Ok(None)
+    fn command_state(&self, _snapshot: &StateSnapshot) -> Result<CommandState> {
+        Ok(if self.open {
+            CommandState::UnobservableRepeatable
+        } else {
+            CommandState::UnobservableDeduplicated
+        })
     }
 }
 
@@ -113,6 +117,9 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "OpenDoor");
         assert_eq!(command.display_parts().target, "BuildingEntrance");
         assert_eq!(command.display_parts().state, "open");
-        assert!(matches!(command.is_reflected_in_state(&StateSnapshot::default()), Ok(None)));
+        assert!(matches!(
+            command.command_state(&StateSnapshot::default()),
+            Ok(CommandState::UnobservableRepeatable)
+        ));
     }
 }

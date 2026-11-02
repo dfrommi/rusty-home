@@ -1,5 +1,5 @@
 use crate::{
-    command::{CommandBehavior, CommandDisplayParts, CommandTargetBehavior},
+    command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
     core::{
         domain::Radiator,
         range::Range,
@@ -81,7 +81,7 @@ impl CommandBehavior for SetHeating {
         }
     }
 
-    fn is_reflected_in_state(&self, snapshot: &StateSnapshot) -> Result<Option<bool>> {
+    fn command_state(&self, snapshot: &StateSnapshot) -> Result<CommandState> {
         let (target_temperature, demand) = match &self.target_state {
             HeatingTargetState::Off => (Range::new(DegreeCelsius(0.0), DegreeCelsius(0.0)), Percent(0.0)),
             HeatingTargetState::Heat {
@@ -104,7 +104,11 @@ impl CommandBehavior for SetHeating {
             is_reflected
         );
 
-        Ok(Some(is_reflected))
+        Ok(if is_reflected {
+            CommandState::Reflected
+        } else {
+            CommandState::NotReflected
+        })
     }
 }
 
@@ -160,6 +164,5 @@ mod tests {
         assert_eq!(command.display_parts().command_type, "SetHeating");
         assert_eq!(command.display_parts().target, "Kitchen");
         assert_eq!(command.display_parts().state, "Off");
-        assert!(!command.deduplicate_when_unobservable());
     }
 }

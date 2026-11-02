@@ -17,15 +17,20 @@ pub use set_power::{PowerToggle, SetPower, SetPowerTarget};
 use derive_more::derive::From;
 use serde::Serialize;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandState {
+    Reflected,
+    NotReflected,
+    UnobservableDeduplicated,
+    UnobservableRepeatable,
+}
+
 pub trait CommandBehavior: Clone + PartialEq + Sized {
     type Target: CommandTargetBehavior<Command = Self>;
 
     fn target(&self) -> Self::Target;
     fn display_parts(&self) -> CommandDisplayParts;
-    fn deduplicate_when_unobservable(&self) -> bool {
-        false
-    }
-    fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>>;
+    fn command_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<CommandState>;
 }
 
 pub trait CommandTargetBehavior: Clone + Eq + std::hash::Hash + Sized {
@@ -84,27 +89,15 @@ impl CommandBehavior for Command {
         }
     }
 
-    fn deduplicate_when_unobservable(&self) -> bool {
+    fn command_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<CommandState> {
         match self {
-            Command::SetPower(command) => command.deduplicate_when_unobservable(),
-            Command::SetHeating(command) => command.deduplicate_when_unobservable(),
-            Command::PushNotify(command) => command.deduplicate_when_unobservable(),
-            Command::SetLightNotification(command) => command.deduplicate_when_unobservable(),
-            Command::SetEnergySaving(command) => command.deduplicate_when_unobservable(),
-            Command::ControlFan(command) => command.deduplicate_when_unobservable(),
-            Command::OpenDoor(command) => command.deduplicate_when_unobservable(),
-        }
-    }
-
-    fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>> {
-        match self {
-            Command::SetPower(command) => command.is_reflected_in_state(snapshot),
-            Command::SetHeating(command) => command.is_reflected_in_state(snapshot),
-            Command::PushNotify(command) => command.is_reflected_in_state(snapshot),
-            Command::SetLightNotification(command) => command.is_reflected_in_state(snapshot),
-            Command::SetEnergySaving(command) => command.is_reflected_in_state(snapshot),
-            Command::ControlFan(command) => command.is_reflected_in_state(snapshot),
-            Command::OpenDoor(command) => command.is_reflected_in_state(snapshot),
+            Command::SetPower(command) => command.command_state(snapshot),
+            Command::SetHeating(command) => command.command_state(snapshot),
+            Command::PushNotify(command) => command.command_state(snapshot),
+            Command::SetLightNotification(command) => command.command_state(snapshot),
+            Command::SetEnergySaving(command) => command.command_state(snapshot),
+            Command::ControlFan(command) => command.command_state(snapshot),
+            Command::OpenDoor(command) => command.command_state(snapshot),
         }
     }
 }
@@ -142,12 +135,8 @@ impl Command {
         CommandBehavior::display_parts(self)
     }
 
-    pub fn deduplicate_when_unobservable(&self) -> bool {
-        CommandBehavior::deduplicate_when_unobservable(self)
-    }
-
-    pub fn is_reflected_in_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<Option<bool>> {
-        CommandBehavior::is_reflected_in_state(self, snapshot)
+    pub fn command_state(&self, snapshot: &crate::home_state::StateSnapshot) -> anyhow::Result<CommandState> {
+        CommandBehavior::command_state(self, snapshot)
     }
 }
 

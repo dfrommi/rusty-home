@@ -78,8 +78,9 @@ impl Z2mRemoteIncomingDataSource {
 
         let triggers = targets
             .iter()
-            .map(|target| match target {
-                RemoteTriggerTarget::BedroomDoorRemote => RemoteTrigger::BedroomDoorRemote(button_press.clone()),
+            .filter_map(|target| match target {
+                RemoteTriggerTarget::BedroomDoorRemote => Some(RemoteTrigger::BedroomDoorRemote(button_press.clone())),
+                RemoteTriggerTarget::BedframeRemote => None,
             })
             .collect::<Vec<_>>();
 

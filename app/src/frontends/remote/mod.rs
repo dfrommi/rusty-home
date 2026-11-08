@@ -10,19 +10,30 @@ use crate::trigger::TriggerClient;
 pub struct RemoteModule {
     service: Arc<service::RemoteService>,
     z2m_ds: adapter::z2m::Z2mRemoteIncomingDataSource,
+    ha_ds: adapter::homeassistant::HomeAssistantRemoteIncomingDataSource,
 }
 
 impl RemoteModule {
-    pub async fn new(mqtt_client: &mut Mqtt, z2m_event_topic: &str, trigger_client: TriggerClient) -> Self {
+    pub async fn new(
+        mqtt_client: &mut Mqtt,
+        z2m_event_topic: &str,
+        ha_event_topic: &str,
+        trigger_client: TriggerClient,
+    ) -> Self {
         let z2m_ds = adapter::z2m::Z2mRemoteIncomingDataSource::new(mqtt_client, z2m_event_topic).await;
+        let ha_ds =
+            adapter::homeassistant::HomeAssistantRemoteIncomingDataSource::new(mqtt_client, ha_event_topic).await;
         let service = Arc::new(service::RemoteService::new(trigger_client));
 
-        Self { service, z2m_ds }
+        Self { service, z2m_ds, ha_ds }
     }
 
     pub async fn run(mut self) {
         loop {
-            let triggers = self.z2m_ds.recv_multi().await;
+            let (source, triggers) = tokio::select! {
+                triggers = self.z2m_ds.recv_multi() => ("Z2M", triggers),
+                triggers = self.ha_ds.recv_multi() => ("Home Assistant", triggers),
+            };
 
             match triggers {
                 Some(triggers) => {
@@ -31,7 +42,7 @@ impl RemoteModule {
                     }
                 }
                 None => {
-                    tracing::error!("Remote z2m incoming source closed");
+                    tracing::error!("Remote {} incoming source closed", source);
                     return;
                 }
             }

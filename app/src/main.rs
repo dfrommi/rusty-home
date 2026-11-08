@@ -96,6 +96,7 @@ pub async fn main() -> anyhow::Result<()> {
     let remote_module = RemoteModule::new(
         &mut infrastructure.mqtt_client,
         &settings.z2m.event_topic,
+        &settings.homeassistant.topic_event,
         trigger_module.client(),
     )
     .await;

@@ -81,6 +81,7 @@ impl UserTriggerAction {
             | UserTriggerTarget::Heating(HeatingZone::RoomOfRequirements) => None,
             UserTriggerTarget::Heating(HeatingZone::Bathroom) => Some(t!(30 minutes)),
             UserTriggerTarget::Remote(RemoteTriggerTarget::BedroomDoorRemote) => Some(t!(60 minutes)),
+            UserTriggerTarget::Remote(RemoteTriggerTarget::BedframeRemote) => Some(t!(60 minutes)),
             UserTriggerTarget::OpenDoor(_) => Some(t!(30 seconds)),
         }
     }
@@ -156,6 +157,7 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
             None
         }
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => None,
+        UserTrigger::Remote(RemoteTrigger::BedframeRemote(_)) => None,
         UserTrigger::OpenDoor { door: Door::Building } => Some(
             OpenDoor {
                 device: Lock::BuildingEntrance,

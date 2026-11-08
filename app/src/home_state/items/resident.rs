@@ -11,6 +11,7 @@ use r#macro::{EnumVariants, Id};
 pub enum Resident {
     AnyoneSleeping,
     AnyoneOnCouch,
+    PreparingForSleep,
 }
 
 pub struct ResidentStateProvider;
@@ -26,14 +27,65 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
             }
 
             Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch).map(|dp| dp.value),
+            Resident::PreparingForSleep => {
+                let Some(time_range) = t!(22:30 - 3:00).active() else {
+                    tracing::trace!("Not preparing for sleep, because out of going-to-bed range");
+                    return Some(false);
+                };
+
+                let sleeping = ctx.get(Resident::AnyoneSleeping)?;
+                let tv_states = ctx.all_since(IsRunning::LivingRoomTv, *time_range.start())?;
+
+                pre_sleep(time_range, sleeping, tv_states)
+            }
         }
     }
+}
+
+fn pre_sleep(
+    time_range: DateTimeRange,
+    sleeping: DataPoint<bool>,
+    tv_states: crate::core::timeseries::DataFrame<bool>,
+) -> Option<bool> {
+    if sleeping.value {
+        tracing::trace!("Not preparing for sleep, because already sleeping");
+        return Some(false);
+    }
+
+    let Some((prev, current)) = tv_states.last2() else {
+        tracing::trace!("Not preparing for sleep, because only one TV state found in time range");
+        return Some(false);
+    };
+
+    if current.value {
+        tracing::trace!("Not preparing for sleep, because TV is on");
+        return Some(false);
+    }
+
+    //Current is false -> prev was true. Only check time range constraints
+    if current.timestamp.elapsed_since(prev.timestamp) < t!(45 minutes) {
+        tracing::trace!("Not preparing for sleep, because TV was on for less than 45 minutes");
+        return Some(false);
+    }
+
+    if !time_range.contains(&current.timestamp) {
+        tracing::trace!("Not preparing for sleep, because last TV state change was outside of bedtime range");
+        return Some(false);
+    }
+
+    tracing::trace!(
+        "Preparing for sleep, because TV off for {} after on for {} while not yet sleeping",
+        current.timestamp.elapsed(),
+        prev.timestamp.elapsed()
+    );
+
+    Some(true)
 }
 
 fn sleeping(tv_on: DataPoint<bool>, ventilation: DataPoint<bool>) -> Option<bool> {
     //let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(now);
 
-    let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(t!(now));
+    let in_bed_full_range = t!(22:30 - 13:00).active_or_previous();
     let in_bed_start_range = DateTimeRange::new(*in_bed_full_range.start(), in_bed_full_range.end().at(t!(3:00)));
     let in_bed_stop_range = DateTimeRange::new(in_bed_full_range.end().at(t!(6:00)), *in_bed_full_range.end());
 

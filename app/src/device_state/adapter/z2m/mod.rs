@@ -12,8 +12,8 @@ use crate::core::timeseries::DataPoint;
 use crate::core::unit::{DegreeCelsius, KiloWattHours, Percent, Watt};
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{
-    DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, HeatingDemandLimit, PowerAvailable, SetPoint,
-    Temperature,
+    DeviceAvailability, DeviceAvailabilityItem, DeviceStateValue, HeatingDemand, HeatingDemandLimit, PowerAvailable,
+    SetPoint, Temperature,
 };
 use infrastructure::{Mqtt, MqttInMessage, MqttSubscription};
 
@@ -216,25 +216,43 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
         availability(device_id, payload.last_seen),
     ];
 
-    let (setpoint_lower, setpoint_upper, demand_upper) = match thermostat {
+    let (setpoint_lower, setpoint_upper, demand_upper, heating_demand) = match thermostat {
         Radiator::LivingRoomBig => (
             SetPoint::LivingRoomBigLower,
             SetPoint::LivingRoomBig,
             HeatingDemandLimit::LivingRoomBigUpper,
+            HeatingDemand::LivingRoomBig,
         ),
         Radiator::LivingRoomSmall => (
             SetPoint::LivingRoomSmallLower,
             SetPoint::LivingRoomSmall,
             HeatingDemandLimit::LivingRoomSmallUpper,
+            HeatingDemand::LivingRoomSmall,
         ),
-        Radiator::Bedroom => (SetPoint::BedroomLower, SetPoint::Bedroom, HeatingDemandLimit::BedroomUpper),
-        Radiator::Kitchen => (SetPoint::KitchenLower, SetPoint::Kitchen, HeatingDemandLimit::KitchenUpper),
+        Radiator::Bedroom => (
+            SetPoint::BedroomLower,
+            SetPoint::Bedroom,
+            HeatingDemandLimit::BedroomUpper,
+            HeatingDemand::Bedroom,
+        ),
+        Radiator::Kitchen => (
+            SetPoint::KitchenLower,
+            SetPoint::Kitchen,
+            HeatingDemandLimit::KitchenUpper,
+            HeatingDemand::Kitchen,
+        ),
         Radiator::RoomOfRequirements => (
             SetPoint::RoomOfRequirementsLower,
             SetPoint::RoomOfRequirements,
             HeatingDemandLimit::RoomOfRequirementsUpper,
+            HeatingDemand::RoomOfRequirements,
         ),
-        Radiator::Bathroom => (SetPoint::BathroomLower, SetPoint::Bathroom, HeatingDemandLimit::BathroomUpper),
+        Radiator::Bathroom => (
+            SetPoint::BathroomLower,
+            SetPoint::Bathroom,
+            HeatingDemandLimit::BathroomUpper,
+            HeatingDemand::Bathroom,
+        ),
     };
 
     let is_off = payload.system_mode.as_deref() == Some("off");
@@ -263,29 +281,45 @@ fn parse_sonoff_thermostat(device_id: &str, thermostat: Radiator, payload: &str)
         .into(),
     );
 
+    let mut max_valve_position = None;
+
     if let Some(valve_opening_degree) = payload.valve_opening_degree {
-        result.push(
-            DataPoint::new(
-                DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(valve_opening_degree).clamp()),
-                payload.last_seen,
-            )
-            .into(),
-        );
+        max_valve_position = Some(valve_opening_degree);
     }
 
     if let Some(heating_valve_position) = payload.heating_valve_position {
+        max_valve_position = Some(heating_valve_position);
+    }
+
+    if let Some(max_valve_position) = max_valve_position {
         result.push(
             DataPoint::new(
-                DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(heating_valve_position).clamp()),
+                DeviceStateValue::HeatingDemandLimit(demand_upper, Percent(max_valve_position).clamp()),
                 payload.last_seen,
             )
             .into(),
         );
     }
 
-    //Current demand not exposed directly at running state is not reliable and no other
-    //way of reading the current demand exists.
-    //Calculating it in home-state heating demand.
+    if let Some(running_state) = payload.running_state
+        && let Some(max_valve_position) = max_valve_position
+    {
+        let heating_demand_value = match running_state.as_str() {
+            "idle" => Some(0.0),
+            "heat" => Some(max_valve_position),
+            _ => None,
+        };
+
+        if let Some(heating_demand_value) = heating_demand_value {
+            result.push(
+                DataPoint::new(
+                    DeviceStateValue::HeatingDemand(heating_demand, Percent(heating_demand_value).clamp()),
+                    payload.last_seen,
+                )
+                .into(),
+            );
+        }
+    }
 
     Ok(result)
 }
@@ -325,6 +359,7 @@ struct PowerPlug {
 #[derive(Debug, Clone, serde::Deserialize)]
 struct SonoffThermostatPayload {
     system_mode: Option<String>,
+    running_state: Option<String>,
     valve_opening_degree: Option<f64>,
     heating_valve_position: Option<f64>,
     occupied_heating_setpoint: f64,

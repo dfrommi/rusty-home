@@ -7,6 +7,7 @@ mod purify_air;
 mod remote_turn_off;
 mod user_trigger_action;
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
 
@@ -42,11 +43,20 @@ pub enum RuleResult {
 #[derive(Clone)]
 pub struct RuleEvaluationContext {
     snapshot: StateSnapshot,
+    active_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
 }
 
 impl RuleEvaluationContext {
-    pub fn new(snapshot: StateSnapshot) -> Self {
-        Self { snapshot }
+    pub fn new(snapshot: StateSnapshot, active_triggers: Vec<UserTriggerExecution>) -> Self {
+        let triggers_by_target = active_triggers
+            .into_iter()
+            .map(|trigger| (trigger.trigger.target(), trigger))
+            .collect();
+
+        Self {
+            snapshot,
+            active_triggers: triggers_by_target,
+        }
     }
 
     pub fn inner(&self) -> &StateSnapshot {
@@ -107,7 +117,7 @@ impl RuleEvaluationContext {
         );
         let _enter = span.enter();
 
-        let result = self.snapshot.user_trigger(target.clone());
+        let result = self.active_triggers.get(&target);
 
         span.record("otel.name", target.to_string());
         if let Some(trigger) = result {

@@ -34,7 +34,9 @@ pub async fn plan_for_home(
     }
 
     tracing::info!("Start planning");
-    let result = Planner::new(snapshot, command_client, trigger_client).run().await;
+    let planner = Planner::new(snapshot, command_client, trigger_client).await?;
+    let result = planner.run().await;
+
     if let Err(error) = &result {
         TraceContext::current().set_error(error.to_string());
     }
@@ -52,13 +54,19 @@ struct Planner<'a> {
 }
 
 impl<'a> Planner<'a> {
-    fn new(snapshot: &StateSnapshot, command_client: &'a CommandClient, trigger_client: &'a TriggerClient) -> Self {
-        Self {
+    async fn new(
+        snapshot: &StateSnapshot,
+        command_client: &'a CommandClient,
+        trigger_client: &'a TriggerClient,
+    ) -> Result<Self> {
+        let active_triggers = trigger_client.get_all_active_triggers().await?;
+
+        Ok(Self {
             command_client,
             trigger_client,
-            context: RuleEvaluationContext::new(snapshot.clone()),
+            context: RuleEvaluationContext::new(snapshot.clone(), active_triggers),
             planning_data_timestamp: snapshot.timestamp(),
-        }
+        })
     }
 
     async fn run(self) -> Result<()> {

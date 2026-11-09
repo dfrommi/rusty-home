@@ -3,7 +3,9 @@ use crate::home_state::IsRunning;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 use crate::home_state::items::ventilation::Ventilation;
 use crate::t;
+use crate::trigger::{DimmerSwitchButtonPress, RemoteTrigger, RemoteTriggerTarget, UserTrigger, UserTriggerExecution};
 use crate::{core::timeseries::DataPoint, home_state::Presence};
+use actix_web::cookie::time;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 
@@ -22,8 +24,9 @@ impl DerivedStateProvider<Resident, bool> for ResidentStateProvider {
             Resident::AnyoneSleeping => {
                 let ventilation = ctx.get(Ventilation::AcrossAllRooms)?;
                 let tv_on = ctx.get(IsRunning::LivingRoomTv)?;
+                let bed_light_control = ctx.latest_trigger(RemoteTriggerTarget::BedframeRemote.into());
 
-                sleeping(tv_on, ventilation)
+                sleeping(tv_on, ventilation, bed_light_control)
             }
 
             Resident::AnyoneOnCouch => ctx.get(Presence::LivingRoomCouch).map(|dp| dp.value),
@@ -82,7 +85,11 @@ fn pre_sleep(
     Some(true)
 }
 
-fn sleeping(tv_on: DataPoint<bool>, ventilation: DataPoint<bool>) -> Option<bool> {
+fn sleeping(
+    tv_on: DataPoint<bool>,
+    ventilation: DataPoint<bool>,
+    bed_light_control: Option<UserTriggerExecution>,
+) -> Option<bool> {
     //let in_bed_full_range = t!(22:30 - 13:00).active_or_previous_at(now);
 
     let in_bed_full_range = t!(22:30 - 13:00).active_or_previous();
@@ -111,8 +118,25 @@ fn sleeping(tv_on: DataPoint<bool>, ventilation: DataPoint<bool>) -> Option<bool
             return Some(false);
         }
 
-        if tv_on.timestamp.elapsed() <= t!(5 minutes) {
-            tracing::trace!("Not sleeping, because TV turned off less than 5 minutes ago");
+        let bed_light_turned_off_ts = match bed_light_control {
+            Some(UserTriggerExecution {
+                trigger:
+                    UserTrigger::Remote(RemoteTrigger::BedframeRemote(
+                        DimmerSwitchButtonPress::SingleOff | DimmerSwitchButtonPress::HoldOff,
+                    )),
+                timestamp,
+                ..
+            }) => Some(timestamp),
+            _ => None,
+        };
+
+        if let Some(bed_light_turned_off_ts) = bed_light_turned_off_ts
+            && tv_on.timestamp < bed_light_turned_off_ts
+        {
+            tracing::trace!("Sleeping, because bed light turned off from bed after TV turned off");
+        } else if tv_on.timestamp.elapsed() <= t!(30 minutes) {
+            //Bedlight should usually trigger it. 30 minutes is just a safety net
+            tracing::trace!("Not sleeping, because TV turned off less than 30 minutes ago");
             return Some(false);
         }
     }

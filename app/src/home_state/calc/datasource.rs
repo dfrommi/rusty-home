@@ -1,6 +1,6 @@
-pub use device_state::{CurrentDeviceStateProvider, PreloadedDeviceStateProvider};
+pub use device_state::{CurrentDeviceStateProvider, DeviceStateProvider, PreloadedDeviceStateProvider};
 
-pub use user_trigger::{CurrentUserTriggerProvider, PreloadedUserTriggerProvider};
+pub use user_trigger::{CurrentUserTriggerProvider, PreloadedUserTriggerProvider, UserTriggerProvider};
 
 mod device_state {
     use std::{collections::HashMap, sync::Arc};
@@ -8,9 +8,19 @@ mod device_state {
     use crate::{
         core::timeseries::{DataFrame, DataPoint},
         device_state::{DeviceStateClient, DeviceStateId, DeviceStateValue},
-        home_state::calc::context::DeviceStateProvider,
         t,
     };
+
+    pub trait DeviceStateProvider {
+        fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>>;
+
+        fn get_all(&self) -> HashMap<DeviceStateId, DataPoint<DeviceStateValue>> {
+            DeviceStateId::variants()
+                .iter()
+                .filter_map(|id| self.get(id).map(|dp| (*id, dp)))
+                .collect()
+        }
+    }
 
     pub struct CurrentDeviceStateProvider {
         device_states: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
@@ -59,10 +69,18 @@ mod device_state {
 mod user_trigger {
     use std::{collections::HashMap, sync::Arc};
 
-    use crate::{
-        home_state::calc::context::UserTriggerProvider,
-        trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
-    };
+    use crate::trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget};
+
+    pub trait UserTriggerProvider {
+        fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution>;
+
+        fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution> {
+            UserTriggerTarget::variants()
+                .iter()
+                .filter_map(|target| self.get(target).map(|exec| (target.clone(), exec)))
+                .collect()
+        }
+    }
 
     pub struct CurrentUserTriggerProvider {
         active_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,

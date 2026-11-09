@@ -14,12 +14,12 @@ mod iter;
 mod snapshot;
 
 pub use context::DerivedStateProvider;
-pub use context::DeviceStateProvider;
 pub use context::StateCalculationContext;
 pub use context::StateCalculationResult;
-pub use context::UserTriggerProvider;
 pub use datasource::CurrentDeviceStateProvider;
 pub use datasource::CurrentUserTriggerProvider;
+pub use datasource::DeviceStateProvider;
+pub use datasource::UserTriggerProvider;
 
 pub use snapshot::StateSnapshot;
 

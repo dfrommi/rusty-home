@@ -18,28 +18,6 @@ pub trait DerivedStateProvider<ID, T> {
     fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<T>;
 }
 
-pub trait DeviceStateProvider {
-    fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>>;
-
-    fn get_all(&self) -> HashMap<DeviceStateId, DataPoint<DeviceStateValue>> {
-        DeviceStateId::variants()
-            .iter()
-            .filter_map(|id| self.get(id).map(|dp| (*id, dp)))
-            .collect()
-    }
-}
-
-pub trait UserTriggerProvider {
-    fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution>;
-
-    fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution> {
-        UserTriggerTarget::variants()
-            .iter()
-            .filter_map(|target| self.get(target).map(|exec| (target.clone(), exec)))
-            .collect()
-    }
-}
-
 #[derive(Clone)]
 pub struct StateCalculationResult {
     start_time: DateTime,

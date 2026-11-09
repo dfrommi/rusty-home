@@ -4,7 +4,7 @@ use crate::{
     core::time::{DateTime, DateTimeRange, Duration},
     device_state::DeviceStateClient,
     home_state::calc::{
-        StateCalculationContext, StateCalculationResult,
+        StateCalculationResult, calculate_next_result,
         datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
     },
     t,
@@ -16,7 +16,6 @@ pub struct StateCalculationResultIterator {
     device_client: DeviceStateClient,
     trigger_client: TriggerClient,
     keep_duration: Duration,
-    enable_tracing: bool,
 
     current: Option<StateCalculationResult>,
 
@@ -31,7 +30,6 @@ impl StateCalculationResultIterator {
         keep_duration: Duration,
         device_client: DeviceStateClient,
         trigger_client: TriggerClient,
-        enable_tracing: bool,
     ) -> Self {
         Self {
             preload_range: Self::preload_range_starting_at(*full_range.start(), &full_range),
@@ -42,7 +40,6 @@ impl StateCalculationResultIterator {
             trigger_client,
             keep_duration,
             current: None,
-            enable_tracing,
         }
     }
 
@@ -87,21 +84,18 @@ impl StateCalculationResultIterator {
 
         //Timeshift and eager load is important to get the state at the expected point in time.
         //Internal timeshift would require async
-        let new_ctx = next_dt
+        let new_res = next_dt
             .eval_timeshifted(async {
-                let new_ctx = StateCalculationContext::new(
-                    device_ds,
-                    trigger_ds,
-                    self.current.take().unwrap_or_default(),
+                calculate_next_result(
                     self.keep_duration.clone(),
-                    self.enable_tracing,
-                );
-                new_ctx.load_all();
-                new_ctx
+                    self.current.take().unwrap_or_default(),
+                    &device_ds,
+                    &trigger_ds,
+                )
             })
             .await;
 
-        self.current = Some(new_ctx.into_result());
+        self.current = Some(new_res);
 
         Ok(self.current.as_ref())
     }

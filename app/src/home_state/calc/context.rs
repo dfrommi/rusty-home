@@ -5,7 +5,7 @@ use infrastructure::TraceContext;
 use crate::{
     core::{
         id::ExternalId,
-        time::{DateTime, Duration},
+        time::DateTime,
         timeseries::{DataFrame, DataPoint},
     },
     device_state::{DeviceStateId, DeviceStateItem, DeviceStateValue},
@@ -18,20 +18,32 @@ pub trait DerivedStateProvider<ID, T> {
     fn calculate_current(&self, id: ID, context: &StateCalculationContext) -> Option<T>;
 }
 
-pub trait DeviceStateProvider: Send + 'static {
+pub trait DeviceStateProvider {
     fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>>;
+
+    fn get_all(&self) -> HashMap<DeviceStateId, DataPoint<DeviceStateValue>> {
+        DeviceStateId::variants()
+            .iter()
+            .filter_map(|id| self.get(id).map(|dp| (*id, dp)))
+            .collect()
+    }
 }
 
-pub trait UserTriggerProvider: Send + 'static {
+pub trait UserTriggerProvider {
     fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution>;
-    fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution>;
+
+    fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution> {
+        UserTriggerTarget::variants()
+            .iter()
+            .filter_map(|target| self.get(target).map(|exec| (target.clone(), exec)))
+            .collect()
+    }
 }
 
 #[derive(Clone)]
 pub struct StateCalculationResult {
     start_time: DateTime,
     data: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
-    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
 }
 
 impl Default for StateCalculationResult {
@@ -39,7 +51,6 @@ impl Default for StateCalculationResult {
         StateCalculationResult {
             start_time: t!(now),
             data: HashMap::new(),
-            active_user_triggers: HashMap::new(),
         }
     }
 }
@@ -49,42 +60,25 @@ impl std::fmt::Debug for StateCalculationResult {
         f.debug_struct("StateCalculationResult")
             .field("start_time", &self.start_time)
             .field("data_keys", &self.data.keys().collect::<Vec<&HomeStateId>>())
-            .field(
-                "active_user_triggers_keys",
-                &self.active_user_triggers.keys().collect::<Vec<&UserTriggerTarget>>(),
-            )
             .finish()
     }
 }
 
 impl StateCalculationResult {
+    pub fn new(start_time: DateTime, data: HashMap<HomeStateId, DataFrame<HomeStateValue>>) -> Self {
+        StateCalculationResult { start_time, data }
+    }
+
     pub fn timestamp(&self) -> DateTime {
         self.start_time
     }
 
-    pub fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
+    pub fn get_latest(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
         self.data.get(&id).and_then(|df| df.last().cloned())
     }
 
     pub fn data_frame(&self, id: HomeStateId, since: DateTime) -> Option<DataFrame<HomeStateValue>> {
         self.data.get(&id).map(|df| df.get_since_plus_one(since))
-    }
-
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
-        self.active_user_triggers.get(&target)
-    }
-
-    pub fn home_state_iter(&self) -> impl Iterator<Item = (&HomeStateId, &DataFrame<HomeStateValue>)> {
-        self.data.iter()
-    }
-
-    fn truncate_to(&mut self, cutoff: DateTime) {
-        for df in self.data.values_mut() {
-            df.remove_before_keep_one_more(cutoff);
-        }
-
-        self.data.retain(|_, df| !df.is_empty());
-        self.start_time = cutoff;
     }
 }
 
@@ -92,8 +86,8 @@ pub struct StateCalculationContext {
     start_time: DateTime,
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
     calculating: RefCell<Vec<HomeStateId>>,
-    device_state: Box<dyn DeviceStateProvider>,
-    active_user_triggers: Box<dyn UserTriggerProvider>,
+    device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
+    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
 }
@@ -113,20 +107,15 @@ impl Drop for CalculatingGuard<'_> {
 }
 
 impl StateCalculationContext {
-    pub fn new<D: DeviceStateProvider, T: UserTriggerProvider>(
-        device_state: D,
-        active_user_triggers: T,
-        mut previous: StateCalculationResult,
-        keep: Duration,
-        enable_tracing: bool,
+    pub fn new(
+        device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
+        active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+        previous: StateCalculationResult,
     ) -> Self {
         let start_time = t!(now);
-        let cutoff = start_time - keep;
-
-        previous.truncate_to(cutoff);
 
         let mut trace_contexts: HashMap<String, TraceContext> = HashMap::new();
-        if enable_tracing {
+        if Self::tracing_enabled() {
             let root_span = TraceContext::current();
 
             for home_state_id in HomeStateId::variants().iter() {
@@ -145,34 +134,10 @@ impl StateCalculationContext {
             start_time,
             current: RefCell::new(HashMap::new()),
             calculating: RefCell::new(Vec::new()),
-            device_state: Box::new(device_state),
-            active_user_triggers: Box::new(active_user_triggers),
+            device_state,
+            active_user_triggers,
             prev: previous,
             trace_contexts,
-        }
-    }
-
-    #[tracing::instrument(name = "load_all_home_states", skip(self))]
-    pub fn load_all(&self) {
-        for id in HomeStateId::variants().iter() {
-            self.get_home_state_value(*id);
-        }
-    }
-
-    #[tracing::instrument(name = "into_calculation_result", skip(self))]
-    pub fn into_result(self) -> StateCalculationResult {
-        let current_data = self.current.into_inner();
-        let mut data = self.prev.data;
-
-        for (id, dp) in current_data.into_iter() {
-            let df = data.entry(id).or_insert_with(DataFrame::empty);
-            df.insert(dp);
-        }
-
-        StateCalculationResult {
-            start_time: self.start_time,
-            data,
-            active_user_triggers: self.active_user_triggers.get_all(),
         }
     }
 }
@@ -206,8 +171,9 @@ impl StateCalculationContext {
         Some(df)
     }
 
+    //TODO return reference
     pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
-        self.active_user_triggers.get(&target)
+        self.active_user_triggers.get(&target).cloned()
     }
 
     pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>
@@ -225,7 +191,7 @@ impl StateCalculationContext {
     }
 
     pub fn trace(&self, id: impl Into<ExternalId>, item_name: &'static str, value: impl Into<f64>) {
-        if DateTime::is_shifted() {
+        if !Self::tracing_enabled() {
             //skip tracing in shifted time contexts
             return;
         }
@@ -241,6 +207,10 @@ impl StateCalculationContext {
 }
 
 impl StateCalculationContext {
+    fn tracing_enabled() -> bool {
+        !DateTime::is_shifted()
+    }
+
     fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
         if let Some(dp) = self.current.borrow().get(&id).cloned() {
             return Some(dp);
@@ -266,7 +236,7 @@ impl StateCalculationContext {
         };
 
         let calculated_value = self.calculate_new_home_state_value(id)?;
-        let previous_dp = self.prev.get_home_state_value(id);
+        let previous_dp = self.prev.get_latest(id);
 
         //check if previous value is the same, then reuse timestamp
         let calculated_dp = if let Some(previous_dp) = previous_dp

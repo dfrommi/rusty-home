@@ -13,8 +13,8 @@ use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
 use crate::home_state::calc::{
-    CurrentDeviceStateProvider, CurrentUserTriggerProvider, StateCalculationContext, StateCalculationResult,
-    bootstrap_context,
+    CurrentDeviceStateProvider, CurrentUserTriggerProvider, StateCalculationResult, bootstrap_context,
+    calculate_next_result,
 };
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
@@ -116,11 +116,11 @@ impl HomeStateModule {
 
         let old_dps: HashMap<HomeStateId, DataPoint<HomeStateValue>> = HomeStateId::variants()
             .into_iter()
-            .filter_map(|id| old_result.get_home_state_value(id).map(|dp| (id, dp.clone())))
+            .filter_map(|id| old_result.get_latest(id).map(|dp| (id, dp.clone())))
             .collect();
 
-        let new_context = match (device_state, trigger_state) {
-            (Ok(ds), Ok(ts)) => StateCalculationContext::new(ds, ts, old_result, self.duration.clone(), true),
+        let new_result = match (device_state, trigger_state) {
+            (Ok(ds), Ok(ts)) => calculate_next_result(self.duration.clone(), old_result, &ds, &ts),
             (Err(e), _) => {
                 tracing::error!("Failed to load device state for home state update: {:?}", e);
                 return old_result;
@@ -130,9 +130,6 @@ impl HomeStateModule {
                 return old_result;
             }
         };
-
-        new_context.load_all();
-        let new_result = new_context.into_result();
 
         self.emit_events(&new_result, old_dps);
 

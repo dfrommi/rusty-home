@@ -90,10 +90,6 @@ mod user_trigger {
         fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution> {
             self.active_triggers.get(target).cloned()
         }
-
-        fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution> {
-            self.active_triggers.clone()
-        }
     }
 
     #[derive(Clone)]
@@ -118,18 +114,6 @@ mod user_trigger {
                 .filter(|exec| exec.is_active())
                 .max_by_key(|exec| exec.timestamp)
                 .cloned()
-        }
-
-        fn get_all(&self) -> HashMap<UserTriggerTarget, UserTriggerExecution> {
-            let mut result = HashMap::new();
-
-            for target in self.trigger_executions.keys() {
-                if let Some(exec) = self.get(target) {
-                    result.insert(target.clone(), exec);
-                }
-            }
-
-            result
         }
     }
 }

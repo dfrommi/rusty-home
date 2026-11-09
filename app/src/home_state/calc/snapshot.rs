@@ -5,22 +5,23 @@ use infrastructure::{CorrelationId, TraceContext};
 use crate::{
     core::{
         time::DateTime,
-        timeseries::{DataFrame, DataPoint},
+        timeseries::DataPoint,
     },
-    home_state::{HomeStateId, HomeStateItem, HomeStateValue, calc::StateCalculationResult},
-    trigger::{UserTriggerExecution, UserTriggerTarget},
+    home_state::{HomeStateId, HomeStateItem, calc::StateCalculationResult},
 };
 
 #[derive(Clone, Debug)]
 pub struct StateSnapshot {
-    inner: Arc<StateCalculationResult>,
+    timestamp: DateTime,
+    data: Arc<StateCalculationResult>,
     correlation_id: Option<CorrelationId>,
 }
 
 impl Default for StateSnapshot {
     fn default() -> Self {
         StateSnapshot {
-            inner: Arc::new(StateCalculationResult::default()),
+            timestamp: DateTime::now(),
+            data: Arc::new(StateCalculationResult::default()),
             correlation_id: TraceContext::current().correlation_id(),
         }
     }
@@ -29,7 +30,8 @@ impl Default for StateSnapshot {
 impl StateSnapshot {
     pub fn new(result: StateCalculationResult) -> Self {
         StateSnapshot {
-            inner: Arc::new(result),
+            timestamp: result.timestamp(),
+            data: Arc::new(result),
             correlation_id: TraceContext::current().correlation_id(),
         }
     }
@@ -39,7 +41,7 @@ impl StateSnapshot {
     }
 
     pub fn timestamp(&self) -> DateTime {
-        self.inner.timestamp()
+        self.timestamp
     }
 
     #[allow(clippy::expect_used)]
@@ -47,7 +49,7 @@ impl StateSnapshot {
     where
         S: Into<HomeStateId> + HomeStateItem + Clone,
     {
-        let state_value = self.inner.get_home_state_value(id.clone().into())?;
+        let state_value = self.data.get_latest(id.clone().into())?;
         let value = id
             .try_downcast(state_value.value.clone())
             .expect("Internal error: HomeStateValue type mismatch");
@@ -64,12 +66,5 @@ impl StateSnapshot {
     {
         self.get(id)
             .ok_or_else(|| anyhow::anyhow!("no data point found for state"))
-    }
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<&UserTriggerExecution> {
-        self.inner.user_trigger(target)
-    }
-
-    pub fn home_state_iter(&self) -> impl Iterator<Item = (&HomeStateId, &DataFrame<HomeStateValue>)> {
-        self.inner.home_state_iter()
     }
 }

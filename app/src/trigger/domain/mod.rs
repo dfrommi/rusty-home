@@ -15,7 +15,7 @@ use crate::home_state::FanActivity;
 #[sqlx(transparent)]
 pub struct UserTriggerId(i64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum OnOffDevice {
     BedroomAirPurifier,
@@ -35,7 +35,9 @@ pub enum UserTrigger {
     Remote(RemoteTrigger),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, Id)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, Id, EnumVariants,
+)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UserTriggerTarget {
     #[display("DevicePower[{}]", _0)]
@@ -46,6 +48,7 @@ pub enum UserTriggerTarget {
     Heating(HeatingZone),
     #[display("OpenDoor[{}]", _0)]
     OpenDoor(Door),
+    #[display("Remote[{}]", _0)]
     Remote(RemoteTriggerTarget),
 }
 

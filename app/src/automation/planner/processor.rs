@@ -59,7 +59,12 @@ impl<'a> Planner<'a> {
         command_client: &'a CommandClient,
         trigger_client: &'a TriggerClient,
     ) -> Result<Self> {
-        let active_triggers = trigger_client.get_all_active_triggers().await?;
+        let active_triggers = trigger_client
+            .get_latest_triggers()
+            .await?
+            .into_iter()
+            .filter(|t| t.is_active())
+            .collect();
 
         Ok(Self {
             command_client,

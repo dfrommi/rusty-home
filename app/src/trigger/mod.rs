@@ -71,8 +71,8 @@ impl TriggerClient {
         self.service.add_trigger(trigger).await
     }
 
-    pub async fn get_all_active_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        self.service.get_all_active_triggers().await
+    pub async fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        self.service.get_latest_triggers().await
     }
 
     pub async fn get_all_triggers_active_anytime_in_range(

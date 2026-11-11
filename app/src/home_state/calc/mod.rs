@@ -32,6 +32,7 @@ pub async fn bootstrap_context(
 
     let mut it = iter::StateCalculationResultIterator::new(range, duration, device_state, trigger_client);
 
+    //TODO try to call calculate_next_result from here, not within iterator
     while let Some(ctx) = it.next().await? {
         tracing::trace!("Bootstrapping context for {}", ctx.timestamp());
     }

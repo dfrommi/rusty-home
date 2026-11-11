@@ -79,12 +79,13 @@ impl TriggerRepository {
         let records = sqlx::query!(
             r#"SELECT id as "id!", trigger as "trigger!", timestamp as "timestamp!", active_from as "active_from", active_until as "active_until", correlation_id
                     FROM user_trigger
-                    WHERE (timestamp >= $1 AND timestamp <= $2)
-                    OR (active_until IS NOT NULL AND active_until >= $1 AND active_until <= $2) 
-                    OR (timestamp <= $2 AND (active_until IS NULL OR active_until >= $2))
+                    WHERE timestamp <= $2
+                    AND timestamp <= $3
+                    AND (timestamp >= $1 OR active_until IS NULL OR active_until >= $1)
                ORDER BY timestamp DESC"#,
             range.start().into_db(),
             range.end().into_db(),
+            t!(now).into_db()
         )
         .fetch_all(&self.pool)
         .await?;
@@ -112,7 +113,10 @@ impl TriggerRepository {
         Ok(result)
     }
 
-    pub async fn get_all_active_triggers_since(&self, since: DateTime) -> anyhow::Result<Vec<UserTriggerExecution>> {
+    pub async fn get_latest_triggers_created_since(
+        &self,
+        since: DateTime,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let now = t!(now);
 
         let records = sqlx::query!(
@@ -120,7 +124,6 @@ impl TriggerRepository {
                     FROM user_trigger
                     WHERE timestamp >= $1
                     AND timestamp <= $2
-                    AND (active_until IS NULL OR active_until >= $2)
                ORDER BY timestamp DESC"#,
             since.into_db(),
             now.into_db(),
@@ -138,7 +141,7 @@ impl TriggerRepository {
             };
             let timestamp = row.timestamp.into();
             let active_from = row.active_from.map(|dt| dt.into());
-            let active_until = row.active_until.map(|dt| dt.into());
+            let active_until = row.active_until.map(|dt| dt.into()).take_if(|dt| now <= *dt);
 
             let target = trigger.target();
             if seen_targets.contains(&target) {
@@ -177,7 +180,7 @@ mod tests {
     use super::*;
 
     #[sqlx::test(migrations = "../migrations")]
-    async fn active_trigger_query_ignores_unsupported_trigger_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    async fn latest_trigger_query_ignores_unsupported_trigger_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let repo = TriggerRepository::new(pool);
 
         sqlx::query!(
@@ -197,7 +200,7 @@ mod tests {
         .execute(&repo.pool)
         .await?;
 
-        let triggers = repo.get_all_active_triggers_since(t!(1 hours ago)).await?;
+        let triggers = repo.get_latest_triggers_created_since(t!(1 hours ago)).await?;
 
         assert_eq!(triggers.len(), 1);
         match &triggers[0].trigger {
@@ -244,6 +247,35 @@ mod tests {
             }
             other => panic!("Unexpected trigger: {other:?}"),
         }
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn range_trigger_query_includes_older_trigger_active_in_range(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let repo = TriggerRepository::new(pool);
+        let created_at = t!(2 hours ago);
+        let active_until = t!(in 30 minutes);
+
+        sqlx::query!(
+            r#"INSERT INTO user_trigger (trigger, timestamp, active_until) VALUES ($1, $2, $3)"#,
+            serde_json::json!(UserTrigger::DevicePower {
+                device: OnOffDevice::InfraredHeater,
+                on: true,
+            }),
+            created_at.into_db(),
+            active_until.into_db(),
+        )
+        .execute(&repo.pool)
+        .await?;
+
+        let triggers = repo
+            .get_all_triggers_active_anytime_in_range(DateTimeRange::since(t!(1 hours ago)))
+            .await?;
+
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].timestamp, created_at);
+        assert_eq!(triggers[0].active_until, Some(active_until));
 
         Ok(())
     }

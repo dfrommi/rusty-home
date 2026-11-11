@@ -29,8 +29,8 @@ impl TriggerService {
         self.repo.get_all_triggers_active_anytime_in_range(range).await
     }
 
-    pub async fn get_all_active_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        self.repo.get_all_active_triggers_since(t!(48 hours ago)).await
+    pub async fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        self.repo.get_latest_triggers_created_since(t!(48 hours ago)).await
     }
 
     pub async fn disable_triggers_before_except(

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     core::time::{DateTime, DateTimeRange, Duration},
     device_state::DeviceStateClient,
@@ -8,7 +6,7 @@ use crate::{
         datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
     },
     t,
-    trigger::{TriggerClient, UserTriggerExecution},
+    trigger::TriggerClient,
 };
 
 pub struct StateCalculationResultIterator {
@@ -67,7 +65,7 @@ impl StateCalculationResultIterator {
         let device_ds = match &self.device_data_source {
             Some(ds) => ds.clone(),
             None => {
-                let ds = Self::create_device_ds(self.device_client.clone(), self.full_range.clone()).await?;
+                let ds = PreloadedDeviceStateProvider::new(&self.device_client, self.full_range.clone()).await?;
                 self.device_data_source = Some(ds.clone());
                 ds
             }
@@ -76,7 +74,7 @@ impl StateCalculationResultIterator {
         let trigger_ds = match &self.trigger_data_source {
             Some(ds) => ds.clone(),
             None => {
-                let ds = Self::create_trigger_ds(self.trigger_client.clone(), self.full_range.clone()).await?;
+                let ds = PreloadedUserTriggerProvider::new(&self.trigger_client, self.full_range.clone()).await?;
                 self.trigger_data_source = Some(ds.clone());
                 ds
             }
@@ -102,26 +100,5 @@ impl StateCalculationResultIterator {
 
     fn preload_range_starting_at(dt: DateTime, clamp: &DateTimeRange) -> DateTimeRange {
         DateTimeRange::new(dt, (dt + t!(30 days)).min(*clamp.end()))
-    }
-
-    async fn create_device_ds(
-        device_client: DeviceStateClient,
-        range: DateTimeRange,
-    ) -> anyhow::Result<PreloadedDeviceStateProvider> {
-        let device_state_data = device_client.get_all_data_points_in_range(range).await?;
-        Ok(PreloadedDeviceStateProvider::new(device_state_data))
-    }
-
-    async fn create_trigger_ds(
-        trigger_client: TriggerClient,
-        range: DateTimeRange,
-    ) -> anyhow::Result<PreloadedUserTriggerProvider> {
-        let trigger_data: Vec<UserTriggerExecution> =
-            trigger_client.get_all_triggers_active_anytime_in_range(range).await?;
-        let trigger_map = trigger_data.into_iter().fold(HashMap::new(), |mut acc, trigger| {
-            acc.entry(trigger.target()).or_insert_with(Vec::new).push(trigger);
-            acc
-        });
-        Ok(PreloadedUserTriggerProvider::new(trigger_map))
     }
 }

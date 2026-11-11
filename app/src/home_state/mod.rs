@@ -110,8 +110,8 @@ impl HomeStateModule {
         tracing::trace!("Updating home state context");
 
         let (device_state, trigger_state) = tokio::join!(
-            CurrentDeviceStateProvider::load(&self.device_state),
-            CurrentUserTriggerProvider::load(&self.trigger_client)
+            CurrentDeviceStateProvider::new(&self.device_state),
+            CurrentUserTriggerProvider::new(&self.trigger_client)
         );
 
         let old_dps: HashMap<HomeStateId, DataPoint<HomeStateValue>> = HomeStateId::variants()

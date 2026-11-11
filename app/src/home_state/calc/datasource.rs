@@ -6,7 +6,10 @@ mod device_state {
     use std::{collections::HashMap, sync::Arc};
 
     use crate::{
-        core::timeseries::{DataFrame, DataPoint},
+        core::{
+            time::DateTimeRange,
+            timeseries::{DataFrame, DataPoint},
+        },
         device_state::{DeviceStateClient, DeviceStateId, DeviceStateValue},
         t,
     };
@@ -27,14 +30,10 @@ mod device_state {
     }
 
     impl CurrentDeviceStateProvider {
-        fn new(device_states: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>) -> Self {
-            Self { device_states }
-        }
-
         #[tracing::instrument(skip_all, "load_current_device_states")]
-        pub async fn load(device_state_client: &DeviceStateClient) -> anyhow::Result<Self> {
+        pub async fn new(device_state_client: &DeviceStateClient) -> anyhow::Result<Self> {
             let device_states = device_state_client.get_current_for_all().await?;
-            Ok(Self::new(device_states))
+            Ok(Self { device_states })
         }
     }
 
@@ -50,10 +49,11 @@ mod device_state {
     }
 
     impl PreloadedDeviceStateProvider {
-        pub fn new(device_states: HashMap<DeviceStateId, DataFrame<DeviceStateValue>>) -> Self {
-            Self {
+        pub async fn new(device_client: &DeviceStateClient, range: DateTimeRange) -> anyhow::Result<Self> {
+            let device_states = device_client.get_all_data_points_in_range(range).await?;
+            Ok(Self {
                 device_states: Arc::new(device_states),
-            }
+            })
         }
     }
 
@@ -69,7 +69,11 @@ mod device_state {
 mod user_trigger {
     use std::{collections::HashMap, sync::Arc};
 
-    use crate::trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget};
+    use crate::{
+        core::time::DateTimeRange,
+        t,
+        trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
+    };
 
     pub trait UserTriggerProvider {
         fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution>;
@@ -83,55 +87,63 @@ mod user_trigger {
     }
 
     pub struct CurrentUserTriggerProvider {
-        active_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+        triggers: Vec<UserTriggerExecution>,
     }
 
     impl CurrentUserTriggerProvider {
-        //TODO filter for inactive triggers
-        fn new(active_triggers: Vec<UserTriggerExecution>) -> Self {
-            Self {
-                active_triggers: active_triggers
-                    .into_iter()
-                    .map(|trigger| (trigger.target(), trigger))
-                    .collect(),
-            }
-        }
-
         #[tracing::instrument(skip_all, "load_current_user_triggers")]
-        pub async fn load(trigger_client: &TriggerClient) -> anyhow::Result<Self> {
-            let active_triggers = trigger_client.get_all_active_triggers().await?;
-            Ok(Self::new(active_triggers))
+        pub async fn new(trigger_client: &TriggerClient) -> anyhow::Result<Self> {
+            let triggers = trigger_client.get_latest_triggers().await?;
+            Ok(Self { triggers })
         }
     }
 
     impl UserTriggerProvider for CurrentUserTriggerProvider {
         fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution> {
-            self.active_triggers.get(target).cloned()
+            self.triggers.iter().find(|exec| exec.target() == *target).cloned()
         }
     }
 
     #[derive(Clone)]
     pub struct PreloadedUserTriggerProvider {
-        trigger_executions: Arc<HashMap<UserTriggerTarget, Vec<UserTriggerExecution>>>,
+        triggers: Arc<Vec<UserTriggerExecution>>,
     }
 
     impl PreloadedUserTriggerProvider {
-        pub fn new(trigger_executions: HashMap<UserTriggerTarget, Vec<UserTriggerExecution>>) -> Self {
-            Self {
-                trigger_executions: Arc::new(trigger_executions),
-            }
+        pub async fn new(trigger_client: &TriggerClient, range: DateTimeRange) -> anyhow::Result<Self> {
+            let triggers = trigger_client.get_all_triggers_active_anytime_in_range(range).await?;
+
+            Ok(Self {
+                triggers: Arc::new(triggers),
+            })
         }
     }
 
     //Not very efficient, but amount of triggers is very small anyway
     impl UserTriggerProvider for PreloadedUserTriggerProvider {
         fn get(&self, target: &UserTriggerTarget) -> Option<UserTriggerExecution> {
-            self.trigger_executions
-                .get(target)?
+            let now = t!(now);
+            let mut trigger = self
+                .triggers
                 .iter()
-                .filter(|exec| exec.is_active())
-                .max_by_key(|exec| exec.timestamp)
-                .cloned()
+                .filter(|exec| exec.target() == *target && exec.timestamp <= now)
+                .max_by_key(|exec| exec.timestamp) //latest within timeshifted range
+                .cloned()?;
+
+            //Fake state at `now` timestamp
+            if let Some(active_from) = trigger.active_from
+                && active_from > now
+            {
+                trigger.active_from = None;
+            }
+
+            if let Some(active_until) = trigger.active_until
+                && active_until > now
+            {
+                trigger.active_until = None;
+            }
+
+            Some(trigger)
         }
     }
 }

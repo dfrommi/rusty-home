@@ -97,7 +97,7 @@ impl DerivedStateProvider<TargetHeatingMode, HeatingMode> for TargetHeatingModeS
 impl TargetHeatingModeStateProvider {
     fn get_user_override(&self, id: TargetHeatingMode, ctx: &StateCalculationContext) -> Option<UserHeatingOverride> {
         let TargetHeatingMode::HeatingZone(zone) = id;
-        let user_trigger = ctx.user_trigger(UserTriggerTarget::Heating(zone))?;
+        let user_trigger = ctx.active_trigger(UserTriggerTarget::Heating(zone))?;
 
         let target_temperature = match &user_trigger.trigger {
             UserTrigger::Heating { request, .. } => match request {

@@ -65,7 +65,7 @@ pub struct StateCalculationContext {
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
     calculating: RefCell<Vec<HomeStateId>>,
     device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
-    active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+    latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
 }
@@ -87,7 +87,7 @@ impl Drop for CalculatingGuard<'_> {
 impl StateCalculationContext {
     pub fn new(
         device_state: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
-        active_user_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+        latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
         previous: StateCalculationResult,
     ) -> Self {
         let start_time = t!(now);
@@ -113,7 +113,7 @@ impl StateCalculationContext {
             current: RefCell::new(HashMap::new()),
             calculating: RefCell::new(Vec::new()),
             device_state,
-            active_user_triggers,
+            latest_triggers,
             prev: previous,
             trace_contexts,
         }
@@ -149,9 +149,12 @@ impl StateCalculationContext {
         Some(df)
     }
 
-    //TODO return reference
-    pub fn user_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
-        self.active_user_triggers.get(&target).cloned()
+    pub fn active_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
+        self.latest_trigger(target).take_if(|exec| exec.is_active())
+    }
+
+    pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
+        self.latest_triggers.get(&target).cloned()
     }
 
     pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>

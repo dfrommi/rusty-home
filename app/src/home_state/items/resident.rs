@@ -5,7 +5,6 @@ use crate::home_state::items::ventilation::Ventilation;
 use crate::t;
 use crate::trigger::{DimmerSwitchButtonPress, RemoteTrigger, RemoteTriggerTarget, UserTrigger, UserTriggerExecution};
 use crate::{core::timeseries::DataPoint, home_state::Presence};
-use actix_web::cookie::time;
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 

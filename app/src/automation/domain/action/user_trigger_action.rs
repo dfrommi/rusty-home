@@ -159,9 +159,8 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
         UserTrigger::Remote(RemoteTrigger::BedroomDoorRemote(_)) => None,
         UserTrigger::Remote(RemoteTrigger::BedframeRemote(_)) => None,
         UserTrigger::OpenDoor { door: Door::Building } => Some(
-            OpenDoor {
+            BuzzDoor {
                 device: Lock::BuildingEntrance,
-                open: false,
             }
             .into(),
         ),
@@ -171,7 +170,22 @@ fn into_command(trigger: &UserTrigger) -> Option<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::{PowerToggle, SetPower};
+    use crate::command::{BuzzDoor, Lock, PowerToggle, SetPower};
+    #[test]
+    fn building_door_trigger_maps_to_one_shot_buzz_command() {
+        let command = into_command(&UserTrigger::OpenDoor { door: Door::Building });
+
+        assert_eq!(
+            command,
+            Some(
+                BuzzDoor {
+                    device: Lock::BuildingEntrance,
+                }
+                .into()
+            )
+        );
+    }
+
     #[test]
     fn ambilight_power_trigger_maps_to_generic_power_command() {
         let command = into_command(&UserTrigger::DevicePower {

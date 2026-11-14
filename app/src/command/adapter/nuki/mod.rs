@@ -28,6 +28,8 @@ impl NukiCommandExecutor {
             self.bridge_url, nuki_id, self.token
         );
 
+        tracing::info!("NUKI: Sending Nuki open door command to URL: {}", url);
+
         let response = self.client.get(&url).send().await?;
         let body: serde_json::Value = response.json().await?;
 

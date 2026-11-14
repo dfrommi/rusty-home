@@ -84,8 +84,8 @@ impl CommandBehavior for SetLightNotification {
 impl CommandTargetBehavior for SetLightNotificationTarget {
     type Command = SetLightNotification;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(LightSignal::WindowOpened, false)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(LightSignal::WindowOpened, false))
     }
 }
 
@@ -112,7 +112,9 @@ mod tests {
             device: NotificationLight::LivingRoom,
         };
 
-        let command = target.to_default_command();
+        let command = target
+            .to_default_command()
+            .expect("notification light target has a default command");
 
         assert_eq!(command.signal, LightSignal::WindowOpened);
         assert!(!command.on);

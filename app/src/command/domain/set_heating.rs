@@ -115,8 +115,8 @@ impl CommandBehavior for SetHeating {
 impl CommandTargetBehavior for SetHeatingTarget {
     type Command = SetHeating;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(HeatingTargetState::Off)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(HeatingTargetState::Off))
     }
 }
 
@@ -142,7 +142,9 @@ mod tests {
             device: Radiator::Bathroom,
         };
 
-        let command = target.to_default_command();
+        let command = target
+            .to_default_command()
+            .expect("heating target has a default command");
 
         assert_eq!(command.device, Radiator::Bathroom);
         assert!(matches!(command.target_state, HeatingTargetState::Off));

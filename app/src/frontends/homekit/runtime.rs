@@ -64,6 +64,11 @@ impl HomekitRunner {
     }
 
     async fn handle_state_change(&mut self, state: DataPoint<HomeStateValue>) {
+        let exports = self.registry.export_state(&state.value);
+        self.publish_events(exports).await;
+    }
+
+    async fn publish_events(&mut self, events: Vec<HomekitEvent>) {
         //example
         // {"name": "flex_lamp", "service_name": "light", "characteristic": "On", "value": true}
         #[derive(Debug, Serialize)]
@@ -75,30 +80,24 @@ impl HomekitRunner {
             value: serde_json::Value,
         }
 
-        let exports = self
-            .registry
-            .export_state(&state.value)
-            .into_iter()
-            .map(|export| OutgoingMessage {
-                name: export.target.name,
-                service: export.target.service,
-                characteristic: export.target.characteristic,
-                value: export.value,
-            })
-            .collect::<Vec<OutgoingMessage>>();
-
-        for export in exports {
+        for event in events {
+            let export = OutgoingMessage {
+                name: event.target.name,
+                service: event.target.service,
+                characteristic: event.target.characteristic,
+                value: event.value,
+            };
             let topic = "to/set";
             let payload = match serde_json::to_string(&export) {
-                Ok(p) => p,
-                Err(e) => {
-                    tracing::error!("Error serializing Homekit outgoing message: {:?} -- {:?}", export, e);
+                Ok(payload) => payload,
+                Err(error) => {
+                    tracing::error!("Error serializing Homekit outgoing message: {:?} -- {:?}", export, error);
                     continue;
                 }
             };
 
-            if let Err(e) = self.mqtt_sender.send_transient(topic, payload).await {
-                tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, e);
+            if let Err(error) = self.mqtt_sender.send_transient(topic, payload).await {
+                tracing::error!("Error sending MQTT message to Homekit: {} -- {:?}", topic, error);
             }
         }
     }
@@ -133,6 +132,9 @@ impl HomekitRunner {
         if let Some(command) = self.registry.process_trigger(&state) {
             self.handle_command(command).await;
         }
+
+        let pending_events = self.registry.export_pending_events();
+        self.publish_events(pending_events).await;
     }
 
     async fn handle_command(&mut self, command: HomekitCommand) {

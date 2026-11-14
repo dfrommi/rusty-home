@@ -172,7 +172,9 @@ fn add_to_trace(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::{PowerToggle, PushNotification, PushNotify, PushNotifyOperation, PushRecipient, SetPower};
+    use crate::command::{
+        BuzzDoor, Lock, PowerToggle, PushNotification, PushNotify, PushNotifyOperation, PushRecipient, SetPower,
+    };
 
     fn execution(command: Command, elapsed: crate::core::time::Duration) -> CommandExecution {
         CommandExecution {
@@ -219,6 +221,25 @@ mod tests {
         );
         assert_eq!(
             execution_decision(&command, CommandState::NotReflected, Some(&stale)),
+            ExecutionDecision::Execute
+        );
+    }
+
+    #[test]
+    fn repeatable_unobservable_commands_use_the_cooldown_window() {
+        let command: Command = BuzzDoor {
+            device: Lock::BuildingEntrance,
+        }
+        .into();
+        let recent = execution(command.clone(), crate::t!(1 seconds));
+        let stale = execution(command.clone(), crate::t!(1 minutes));
+
+        assert_eq!(
+            execution_decision(&command, CommandState::UnobservableRepeatable, Some(&recent)),
+            ExecutionDecision::Debounced
+        );
+        assert_eq!(
+            execution_decision(&command, CommandState::UnobservableRepeatable, Some(&stale)),
             ExecutionDecision::Execute
         );
     }

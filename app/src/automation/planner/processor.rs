@@ -136,7 +136,10 @@ impl<'a> Planner<'a> {
         match action.evaluate(&self.context) {
             Ok(RuleResult::ExecuteDefault) => {
                 trace.set_ok();
-                Ok(Some(self.execute_command(None, resource.to_default_command(), ext_id).await))
+                match resource.to_default_command() {
+                    Some(command) => Ok(Some(self.execute_command(None, command, ext_id).await)),
+                    None => Ok(None),
+                }
             }
             Ok(RuleResult::Execute(command)) => {
                 trace.set_ok();

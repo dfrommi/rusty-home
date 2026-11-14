@@ -83,8 +83,8 @@ impl CommandBehavior for ControlFan {
 impl CommandTargetBehavior for ControlFanTarget {
     type Command = ControlFan;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(FanAirflow::Off)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(FanAirflow::Off))
     }
 }
 
@@ -110,7 +110,7 @@ mod tests {
             device: Fan::LivingRoomAirPurifier,
         };
 
-        let command = target.to_default_command();
+        let command = target.to_default_command().expect("fan target has a default command");
 
         assert_eq!(command.speed, FanAirflow::Off);
     }

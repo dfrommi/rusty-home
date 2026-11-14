@@ -78,8 +78,8 @@ impl CommandBehavior for SetEnergySaving {
 impl CommandTargetBehavior for SetEnergySavingTarget {
     type Command = SetEnergySaving;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(true)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(true))
     }
 }
 
@@ -105,7 +105,9 @@ mod tests {
             device: EnergySavingDevice::LivingRoomTv,
         };
 
-        let command = target.to_default_command();
+        let command = target
+            .to_default_command()
+            .expect("energy-saving target has a default command");
 
         assert!(command.on);
     }

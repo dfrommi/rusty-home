@@ -1,6 +1,6 @@
 use crate::{
     command::{
-        Command, ControlFan, EnergySavingDevice, Fan, Lock, NotificationLight, OpenDoor, PowerToggle, PushNotify,
+        BuzzDoor, Command, ControlFan, EnergySavingDevice, Fan, Lock, NotificationLight, PowerToggle, PushNotify,
         PushRecipient, SetEnergySaving, SetHeating, SetLightNotification, SetPower,
     },
     core::domain::Radiator,
@@ -112,17 +112,9 @@ impl CommandDispatcher {
                     .set_philips_air_purifier_speed("fan.wohnzimmer", speed)
                     .await
             }
-            Command::OpenDoor(OpenDoor {
+            Command::BuzzDoor(BuzzDoor {
                 device: Lock::BuildingEntrance,
-                open,
-            }) => {
-                if *open {
-                    self.nuki.open_door("1CC90CCA").await
-                } else {
-                    //Nothing to do to close it, just leave as is
-                    Ok(())
-                }
-            }
+            }) => self.nuki.open_door("1CC90CCA").await,
         }
     }
 }

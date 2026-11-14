@@ -88,8 +88,8 @@ impl CommandBehavior for PushNotify {
 impl CommandTargetBehavior for PushNotifyTarget {
     type Command = PushNotify;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(PushNotifyOperation::Dismiss)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(PushNotifyOperation::Dismiss))
     }
 }
 
@@ -118,7 +118,9 @@ mod tests {
             recipient: PushRecipient::Sabine,
         };
 
-        let command = target.to_default_command();
+        let command = target
+            .to_default_command()
+            .expect("push notification target has a default command");
 
         assert_eq!(command.operation, PushNotifyOperation::Dismiss);
     }

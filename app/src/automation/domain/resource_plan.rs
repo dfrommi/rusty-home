@@ -3,7 +3,7 @@ use crate::automation::domain::action::{
     InformWindowOpen, PauseHeatingForVentilation, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{
-    CommandTarget, ControlFanTarget, EnergySavingDevice, Fan, NotificationLight, OpenDoorTarget, PowerToggle,
+    BuzzDoorTarget, CommandTarget, ControlFanTarget, EnergySavingDevice, Fan, NotificationLight, PowerToggle,
     PushNotification, PushNotifyTarget, PushRecipient, SetEnergySavingTarget, SetHeatingTarget,
     SetLightNotificationTarget, SetPowerTarget,
 };
@@ -176,7 +176,7 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
         ),
         // --- Door ---
         (
-            OpenDoorTarget {
+            BuzzDoorTarget {
                 device: crate::command::Lock::BuildingEntrance,
             }
             .into(),
@@ -218,6 +218,24 @@ mod tests {
             ));
         }
         assert_eq!(HeatingZone::Bathroom.room_with_window(), RoomWithWindow::Bedroom);
+    }
+
+    #[test]
+    fn one_shot_action_target_has_no_default_command() {
+        let target: CommandTarget = BuzzDoorTarget {
+            device: crate::command::Lock::BuildingEntrance,
+        }
+        .into();
+        let (planned_target, rules) = resource_plans()
+            .into_iter()
+            .find(|(candidate, _)| candidate == &target)
+            .expect("building buzzer plan");
+
+        assert_eq!(planned_target.to_default_command(), None);
+        assert!(matches!(
+            rules.as_slice(),
+            [HomeAction::UserTriggerAction(_), HomeAction::FollowDefaultSetting(_),]
+        ));
     }
 
     #[test]

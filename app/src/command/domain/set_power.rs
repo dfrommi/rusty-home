@@ -85,8 +85,8 @@ impl CommandBehavior for SetPower {
 impl CommandTargetBehavior for SetPowerTarget {
     type Command = SetPower;
 
-    fn to_default_command(&self) -> Self::Command {
-        self.to_command(false)
+    fn to_default_command(&self) -> Option<Self::Command> {
+        Some(self.to_command(false))
     }
 }
 
@@ -112,7 +112,7 @@ mod tests {
             device: PowerToggle::InfraredHeater,
         };
 
-        let command = target.to_default_command();
+        let command = target.to_default_command().expect("power target has a default command");
 
         assert_eq!(command.device, PowerToggle::InfraredHeater);
         assert!(!command.power_on);

@@ -12,13 +12,24 @@ pub struct DoorLock {
 
 impl DoorLock {
     pub fn new(name: &'static str, door: Door) -> Self {
-        // pending_reset starts true so the first home state event corrects any
-        // persisted or default "open" state in homebridge-mqtt on startup
+        // Correct any persisted or default "open" state in homebridge-mqtt on startup.
         Self {
             name,
             door,
             pending_reset: true,
         }
+    }
+
+    fn export_pending_reset(&mut self) -> Vec<HomekitEvent> {
+        if self.pending_reset {
+            self.pending_reset = false;
+            return vec![
+                self.event(HomekitCharacteristic::CurrentDoorState, serde_json::json!(1)),
+                self.event(HomekitCharacteristic::TargetDoorState, serde_json::json!(1)),
+            ];
+        }
+
+        Vec::new()
     }
 }
 
@@ -35,15 +46,11 @@ impl Accessory for DoorLock {
     }
 
     fn export_state(&mut self, _state: &crate::home_state::HomeStateValue) -> Vec<HomekitEvent> {
-        if self.pending_reset {
-            self.pending_reset = false;
-            // Reset to closed after the trigger was fired
-            return vec![
-                self.event(HomekitCharacteristic::CurrentDoorState, serde_json::json!(1)),
-                self.event(HomekitCharacteristic::TargetDoorState, serde_json::json!(1)),
-            ];
-        }
-        Vec::new()
+        self.export_pending_reset()
+    }
+
+    fn export_pending_events(&mut self) -> Vec<HomekitEvent> {
+        self.export_pending_reset()
     }
 
     fn process_trigger(&mut self, trigger: &HomekitEvent) -> Option<HomekitCommand> {
@@ -92,5 +99,36 @@ impl DoorLock {
             target: self.target(characteristic),
             value,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn buzzer_request_can_reset_homekit_state_without_a_home_state_change() {
+        let mut door = DoorLock::new("Haustür", Door::Building);
+        let request = HomekitEvent {
+            target: door.target(HomekitCharacteristic::TargetDoorState),
+            value: serde_json::json!(0),
+        };
+
+        let command = door
+            .process_trigger(&request)
+            .expect("open request triggers the buzzer");
+        assert!(matches!(command.trigger, UserTrigger::OpenDoor { .. }));
+
+        let reset_events = door.export_pending_events();
+
+        assert_eq!(reset_events.len(), 2);
+        assert!(reset_events.iter().any(|event| {
+            event.target.characteristic == HomekitCharacteristic::CurrentDoorState
+                && event.value == serde_json::json!(1)
+        }));
+        assert!(reset_events.iter().any(|event| {
+            event.target.characteristic == HomekitCharacteristic::TargetDoorState && event.value == serde_json::json!(1)
+        }));
+        assert!(door.export_pending_events().is_empty());
     }
 }

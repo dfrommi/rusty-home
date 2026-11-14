@@ -1,13 +1,13 @@
+mod buzz_door;
 mod control_fan;
-mod open_door;
 mod push_notify;
 mod set_energy_saving;
 mod set_heating;
 mod set_light_notification;
 mod set_power;
 
+pub use buzz_door::{BuzzDoor, BuzzDoorTarget, Lock};
 pub use control_fan::{ControlFan, ControlFanTarget, Fan};
-pub use open_door::{Lock, OpenDoor, OpenDoorTarget};
 pub use push_notify::{PushNotification, PushNotify, PushNotifyOperation, PushNotifyTarget, PushRecipient};
 pub use set_energy_saving::{EnergySavingDevice, SetEnergySaving, SetEnergySavingTarget};
 pub use set_heating::{HeatingTargetState, SetHeating, SetHeatingTarget};
@@ -36,7 +36,7 @@ pub trait CommandBehavior: Clone + PartialEq + Sized {
 pub trait CommandTargetBehavior: Clone + Eq + std::hash::Hash + Sized {
     type Command: CommandBehavior<Target = Self>;
 
-    fn to_default_command(&self) -> Self::Command;
+    fn to_default_command(&self) -> Option<Self::Command>;
 }
 
 #[derive(Debug, Clone, PartialEq, From, Serialize)]
@@ -48,7 +48,7 @@ pub enum Command {
     SetLightNotification(SetLightNotification),
     SetEnergySaving(SetEnergySaving),
     ControlFan(ControlFan),
-    OpenDoor(OpenDoor),
+    BuzzDoor(BuzzDoor),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, r#macro::IdDelegation)]
@@ -59,7 +59,7 @@ pub enum CommandTarget {
     SetLightNotification(SetLightNotificationTarget),
     SetEnergySaving(SetEnergySavingTarget),
     ControlFan(ControlFanTarget),
-    OpenDoor(OpenDoorTarget),
+    BuzzDoor(BuzzDoorTarget),
 }
 
 impl CommandBehavior for Command {
@@ -73,7 +73,7 @@ impl CommandBehavior for Command {
             Command::SetLightNotification(command) => CommandTarget::SetLightNotification(command.target()),
             Command::SetEnergySaving(command) => CommandTarget::SetEnergySaving(command.target()),
             Command::ControlFan(command) => CommandTarget::ControlFan(command.target()),
-            Command::OpenDoor(command) => CommandTarget::OpenDoor(command.target()),
+            Command::BuzzDoor(command) => CommandTarget::BuzzDoor(command.target()),
         }
     }
 
@@ -85,7 +85,7 @@ impl CommandBehavior for Command {
             Command::SetLightNotification(command) => command.display_parts(),
             Command::SetEnergySaving(command) => command.display_parts(),
             Command::ControlFan(command) => command.display_parts(),
-            Command::OpenDoor(command) => command.display_parts(),
+            Command::BuzzDoor(command) => command.display_parts(),
         }
     }
 
@@ -97,7 +97,7 @@ impl CommandBehavior for Command {
             Command::SetLightNotification(command) => command.command_state(snapshot),
             Command::SetEnergySaving(command) => command.command_state(snapshot),
             Command::ControlFan(command) => command.command_state(snapshot),
-            Command::OpenDoor(command) => command.command_state(snapshot),
+            Command::BuzzDoor(command) => command.command_state(snapshot),
         }
     }
 }
@@ -105,15 +105,15 @@ impl CommandBehavior for Command {
 impl CommandTargetBehavior for CommandTarget {
     type Command = Command;
 
-    fn to_default_command(&self) -> Self::Command {
+    fn to_default_command(&self) -> Option<Self::Command> {
         match self {
-            CommandTarget::SetPower(target) => target.to_default_command().into(),
-            CommandTarget::SetHeating(target) => target.to_default_command().into(),
-            CommandTarget::PushNotify(target) => target.to_default_command().into(),
-            CommandTarget::SetLightNotification(target) => target.to_default_command().into(),
-            CommandTarget::SetEnergySaving(target) => target.to_default_command().into(),
-            CommandTarget::ControlFan(target) => target.to_default_command().into(),
-            CommandTarget::OpenDoor(target) => target.to_default_command().into(),
+            CommandTarget::SetPower(target) => target.to_default_command().map(Into::into),
+            CommandTarget::SetHeating(target) => target.to_default_command().map(Into::into),
+            CommandTarget::PushNotify(target) => target.to_default_command().map(Into::into),
+            CommandTarget::SetLightNotification(target) => target.to_default_command().map(Into::into),
+            CommandTarget::SetEnergySaving(target) => target.to_default_command().map(Into::into),
+            CommandTarget::ControlFan(target) => target.to_default_command().map(Into::into),
+            CommandTarget::BuzzDoor(target) => target.to_default_command().map(Into::into),
         }
     }
 }
@@ -141,7 +141,7 @@ impl Command {
 }
 
 impl CommandTarget {
-    pub fn to_default_command(&self) -> Command {
+    pub fn to_default_command(&self) -> Option<Command> {
         CommandTargetBehavior::to_default_command(self)
     }
 }
@@ -155,7 +155,7 @@ impl std::fmt::Display for CommandTarget {
             CommandTarget::SetLightNotification(target) => target.fmt(f),
             CommandTarget::SetEnergySaving(target) => target.fmt(f),
             CommandTarget::ControlFan(target) => target.fmt(f),
-            CommandTarget::OpenDoor(target) => target.fmt(f),
+            CommandTarget::BuzzDoor(target) => target.fmt(f),
         }
     }
 }
@@ -190,6 +190,15 @@ mod test {
                 }
             })
         );
+    }
+
+    #[test]
+    fn one_shot_targets_have_no_default_command() {
+        let target = CommandTarget::BuzzDoor(BuzzDoorTarget {
+            device: Lock::BuildingEntrance,
+        });
+
+        assert!(target.to_default_command().is_none());
     }
 
     #[test]

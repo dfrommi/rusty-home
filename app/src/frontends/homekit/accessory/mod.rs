@@ -69,6 +69,10 @@ trait Accessory: Send {
         Vec::new()
     }
 
+    fn export_pending_events(&mut self) -> Vec<HomekitEvent> {
+        Vec::new()
+    }
+
     fn process_trigger(&mut self, _trigger: &HomekitEvent) -> Option<HomekitCommand> {
         None
     }
@@ -94,6 +98,13 @@ impl HomekitRegistry {
         self.accessories
             .iter_mut()
             .flat_map(|accessory| accessory.export_state(state))
+            .collect()
+    }
+
+    pub fn export_pending_events(&mut self) -> Vec<HomekitEvent> {
+        self.accessories
+            .iter_mut()
+            .flat_map(|accessory| accessory.export_pending_events())
             .collect()
     }
 

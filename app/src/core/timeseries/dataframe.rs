@@ -102,6 +102,20 @@ impl<T: Clone> DataFrame<T> {
         DataFrame::new(points)
     }
 
+    pub fn get_since_plus_one_until(&self, range: DateTimeRange) -> Self {
+        let start_cutoff = self
+            .prev_or_at(*range.start())
+            .map(|dp| dp.timestamp)
+            .unwrap_or(*range.start());
+        let end_cutoff = *range.end();
+        let points = self
+            .data
+            .range(start_cutoff..=end_cutoff)
+            .map(|(_, dp)| dp.clone())
+            .collect::<Vec<_>>();
+        DataFrame::new(points)
+    }
+
     pub fn remove_before_keep_one_more(&mut self, before: DateTime) {
         let cutoff = self.prev_or_at(before).map(|dp| dp.timestamp).unwrap_or(before);
         //Is there a bulk operation?
@@ -152,6 +166,10 @@ impl<T: Clone> DataFrame<T> {
 
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    pub fn first(&self) -> Option<&DataPoint<T>> {
+        self.data.values().next()
     }
 
     pub fn last(&self) -> Option<&DataPoint<T>> {

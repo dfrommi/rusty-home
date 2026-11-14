@@ -3,10 +3,7 @@ use std::sync::Arc;
 use infrastructure::{CorrelationId, TraceContext};
 
 use crate::{
-    core::{
-        time::DateTime,
-        timeseries::DataPoint,
-    },
+    core::{time::DateTime, timeseries::DataPoint},
     home_state::{HomeStateId, HomeStateItem, calc::StateCalculationResult},
 };
 

@@ -7,38 +7,40 @@ mod device_state {
 
     use crate::{
         core::{
-            time::DateTimeRange,
-            timeseries::{DataFrame, DataPoint},
+            time::{DateTimeRange, Duration},
+            timeseries::DataFrame,
         },
         device_state::{DeviceStateClient, DeviceStateId, DeviceStateValue},
-        t,
     };
 
-    pub trait DeviceStateProvider {
-        fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>>;
+    const LOOKBACK_DURATION_HOURS: i64 = 36;
 
-        fn get_all(&self) -> HashMap<DeviceStateId, DataPoint<DeviceStateValue>> {
+    pub trait DeviceStateProvider {
+        fn get(&self, id: &DeviceStateId) -> Option<DataFrame<DeviceStateValue>>;
+
+        fn get_all(&self) -> HashMap<DeviceStateId, DataFrame<DeviceStateValue>> {
             DeviceStateId::variants()
                 .iter()
-                .filter_map(|id| self.get(id).map(|dp| (*id, dp)))
+                .filter_map(|id| self.get(id).map(|states| (*id, states)))
                 .collect()
         }
     }
 
     pub struct CurrentDeviceStateProvider {
-        device_states: HashMap<DeviceStateId, DataPoint<DeviceStateValue>>,
+        device_states: HashMap<DeviceStateId, DataFrame<DeviceStateValue>>,
     }
 
     impl CurrentDeviceStateProvider {
         #[tracing::instrument(skip_all, "load_current_device_states")]
         pub async fn new(device_state_client: &DeviceStateClient) -> anyhow::Result<Self> {
-            let device_states = device_state_client.get_current_for_all().await?;
+            let range = DateTimeRange::of_last(Duration::hours(LOOKBACK_DURATION_HOURS));
+            let device_states = device_state_client.get_all_data_points_in_range(range).await?;
             Ok(Self { device_states })
         }
     }
 
     impl DeviceStateProvider for CurrentDeviceStateProvider {
-        fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>> {
+        fn get(&self, id: &DeviceStateId) -> Option<DataFrame<DeviceStateValue>> {
             self.device_states.get(id).cloned()
         }
     }
@@ -50,6 +52,7 @@ mod device_state {
 
     impl PreloadedDeviceStateProvider {
         pub async fn new(device_client: &DeviceStateClient, range: DateTimeRange) -> anyhow::Result<Self> {
+            let range = DateTimeRange::new(*range.start() - Duration::hours(LOOKBACK_DURATION_HOURS), *range.end());
             let device_states = device_client.get_all_data_points_in_range(range).await?;
             Ok(Self {
                 device_states: Arc::new(device_states),
@@ -58,10 +61,9 @@ mod device_state {
     }
 
     impl DeviceStateProvider for PreloadedDeviceStateProvider {
-        fn get(&self, id: &DeviceStateId) -> Option<DataPoint<DeviceStateValue>> {
-            self.device_states
-                .get(id)
-                .and_then(|df| df.prev_or_at(t!(now)).cloned())
+        fn get(&self, id: &DeviceStateId) -> Option<DataFrame<DeviceStateValue>> {
+            let range = DateTimeRange::of_last(Duration::hours(LOOKBACK_DURATION_HOURS));
+            self.device_states.get(id)?.get_since_plus_one_until(range).non_empty()
         }
     }
 }

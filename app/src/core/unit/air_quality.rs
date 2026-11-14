@@ -30,6 +30,12 @@ impl Display for MicrogramsPerCubicMeter {
     }
 }
 
+impl From<MicrogramsPerCubicMeter> for f64 {
+    fn from(value: MicrogramsPerCubicMeter) -> Self {
+        value.0
+    }
+}
+
 impl From<&MicrogramsPerCubicMeter> for f64 {
     fn from(value: &MicrogramsPerCubicMeter) -> Self {
         value.0

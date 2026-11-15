@@ -32,6 +32,7 @@ impl PostgresDeviceStateRepository {
 
     pub async fn save(&self, dp: DataPoint<DeviceStateValue>) -> Result<SaveOutcome> {
         let fvalue = f64::from(&dp.value);
+        let minimum_delta = dp.value.minimum_storage_delta().unwrap_or(0.0);
         let tag_id = self.get_tag_id(&dp.value.into()).await?;
         let timestamp = dp.timestamp.into_db();
 
@@ -48,7 +49,9 @@ impl PostgresDeviceStateRepository {
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM latest_value
-                    WHERE value = $2 OR timestamp > $3
+                    WHERE value = $2
+                       OR timestamp > $3
+                       OR abs(value - $2) < $4
                 )
                 RETURNING 1
             )
@@ -57,7 +60,8 @@ impl PostgresDeviceStateRepository {
                 EXISTS (SELECT 1 FROM latest_value WHERE timestamp > $3) AS "stale!""#,
             tag_id as i32,
             fvalue,
-            timestamp
+            timestamp,
+            minimum_delta
         )
         .fetch_one(&self.pool)
         .await?;

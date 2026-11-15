@@ -57,6 +57,17 @@ pub enum DeviceStateValue {
     TotalRadiatorConsumption(total_radiator_consumption::TotalRadiatorConsumption, HeatingUnit),
 }
 
+impl DeviceStateValue {
+    /// Returns the typed minimum change for this incoming value, if this state opts into filtering.
+    pub fn minimum_storage_delta(&self) -> Option<f64> {
+        match self {
+            DeviceStateValue::CurrentPowerUsage(id, value) => id.minimum_storage_delta(*value).as_ref().map(f64::from),
+            DeviceStateValue::LightLevel(id, value) => id.minimum_storage_delta(*value).as_ref().map(f64::from),
+            _ => None,
+        }
+    }
+}
+
 impl From<&DeviceStateValue> for f64 {
     fn from(value: &DeviceStateValue) -> Self {
         match value {

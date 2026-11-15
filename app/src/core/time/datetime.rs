@@ -39,8 +39,18 @@ impl DateTime {
         self.delegate.month()
     }
 
-    pub fn millis(&self) -> i64 {
+    pub fn unix_seconds(&self) -> i64 {
+        self.delegate.timestamp()
+    }
+
+    pub fn unix_millis(&self) -> i64 {
         self.delegate.timestamp_millis()
+    }
+
+    pub fn from_unix_millis(millis: i64) -> Self {
+        chrono::DateTime::from_timestamp_millis(millis)
+            .unwrap_or_else(|| panic!("Invalid Unix timestamp in milliseconds: {millis}"))
+            .into()
     }
 
     pub fn min_value() -> Self {
@@ -172,20 +182,6 @@ impl Sub<Duration> for DateTime {
     }
 }
 
-impl From<DateTime> for f64 {
-    fn from(val: DateTime) -> Self {
-        (val.delegate.timestamp_millis() as f64) / 1000.0
-    }
-}
-
-impl From<f64> for DateTime {
-    fn from(value: f64) -> Self {
-        let nanos: i64 = (value * 1_000_000_000.0) as i64;
-        let delegate = chrono::DateTime::from_timestamp_nanos(nanos);
-        DateTime::new(delegate)
-    }
-}
-
 impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
     fn from(val: chrono::DateTime<T>) -> Self {
         DateTime::new(val)
@@ -200,8 +196,8 @@ mod constructor {
     #[test]
     fn test_from_millis() {
         let datetime = DateTime::from_static_iso("2024-11-03T15:23:46.123Z");
-        let millis: f64 = datetime.into();
-        let result: DateTime = millis.into();
+        let millis = datetime.unix_millis();
+        let result = DateTime::from_unix_millis(millis);
         assert_eq!(result, datetime);
     }
 

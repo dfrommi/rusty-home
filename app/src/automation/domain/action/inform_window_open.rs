@@ -2,8 +2,7 @@ use r#macro::{EnumVariants, Id};
 
 use super::{Rule, RuleEvaluationContext, RuleResult};
 use crate::command::{
-    LightSignal, NotificationLight, PushNotification, PushNotify, PushNotifyOperation, PushRecipient,
-    SetLightNotification,
+    LightSignal, NotificationLight, PushNotification, PushNotify, PushRecipient, SetLightNotification,
 };
 use crate::core::domain::RoomWithWindow;
 use crate::core::time::DateTime;
@@ -23,12 +22,7 @@ impl Rule for InformWindowOpen {
     fn evaluate(&self, ctx: &RuleEvaluationContext) -> anyhow::Result<super::RuleResult> {
         let command = match self {
             InformWindowOpen::PushNotification(recipient) if self.preconditions_fulfilled_push(recipient, ctx)? => {
-                PushNotify {
-                    notification: PushNotification::WindowOpened,
-                    recipient: *recipient,
-                    operation: PushNotifyOperation::Show,
-                }
-                .into()
+                PushNotify::Show(*recipient, PushNotification::WindowOpened).into()
             }
             InformWindowOpen::NotificationLightLivingRoom if self.preconditions_fulfilled_light(ctx)? => {
                 SetLightNotification {

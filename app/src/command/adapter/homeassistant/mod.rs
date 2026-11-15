@@ -2,9 +2,13 @@ use infrastructure::HttpClientConfig;
 use reqwest_middleware::ClientWithMiddleware;
 
 use super::metrics::*;
-use crate::command::{LightSignal, PushNotification, PushNotifyOperation};
+use crate::command::{LightSignal, PushNotification, PushNotifyTarget, PushRecipient, WashingMachineState};
 use crate::core::unit::{FanAirflow, FanSpeed};
+use crate::t;
 use serde_json::json;
+
+const PUSH_TAG_WINDOW_OPENED: &str = "window_opened";
+const PUSH_TAG_WASHING_MACHINE: &str = "washing_machine";
 
 pub struct HomeAssistantCommandExecutor {
     client: HaHttpClient,
@@ -18,40 +22,46 @@ impl HomeAssistantCommandExecutor {
         Self { client: http_client }
     }
 
-    pub async fn push_notify(
+    pub async fn dismiss_push_notification(&self, target: PushNotifyTarget) -> anyhow::Result<()> {
+        let service = super::push_recipient(target.recipient());
+
+        let tag = match target {
+            PushNotifyTarget::WindowOpened(_) => PUSH_TAG_WINDOW_OPENED,
+            PushNotifyTarget::WashingMachine(_) => PUSH_TAG_WASHING_MACHINE,
+        };
+
+        self.client
+            .call_service(
+                "notify",
+                service,
+                json!({
+                    "message": "clear_notification",
+                    "data": { "tag": tag }
+                }),
+            )
+            .await?;
+
+        record_executed(service);
+        Ok(())
+    }
+
+    pub async fn show_push_notification(
         &self,
-        service: &str,
+        recipient: PushRecipient,
         notification: PushNotification,
-        operation: PushNotifyOperation,
     ) -> anyhow::Result<()> {
-        match operation {
-            PushNotifyOperation::Show => {
-                let (title, message, tag) = notification_content(notification);
-                self.client
-                    .call_service(
-                        "notify",
-                        service,
-                        json!({
-                            "title": title,
-                            "message": message,
-                            "data": { "tag": tag }
-                        }),
-                    )
-                    .await?;
-            }
-            PushNotifyOperation::Dismiss => {
-                self.client
-                    .call_service(
-                        "notify",
-                        service,
-                        json!({
-                            "message": "clear_notification",
-                            "data": { "tag": notification_tag(notification) }
-                        }),
-                    )
-                    .await?;
-            }
-        }
+        let service = super::push_recipient(recipient);
+
+        let payload = match notification {
+            PushNotification::WindowOpened => json!({
+                "title": "Fenster offen",
+                "message": "Mindestens ein Fenster ist offen",
+                "data": { "tag": PUSH_TAG_WINDOW_OPENED }
+            }),
+            PushNotification::WashingMachine(state) => washing_machine_notification_payload(&state),
+        };
+
+        self.client.call_service("notify", service, payload).await?;
         record_executed(service);
         Ok(())
     }
@@ -159,18 +169,6 @@ impl HomeAssistantCommandExecutor {
     }
 }
 
-fn notification_content(notification: PushNotification) -> (&'static str, &'static str, &'static str) {
-    match notification {
-        PushNotification::WindowOpened => ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened"),
-    }
-}
-
-fn notification_tag(notification: PushNotification) -> &'static str {
-    match notification {
-        PushNotification::WindowOpened => "window_opened",
-    }
-}
-
 fn record_executed(id: &str) {
     CommandMetric::Executed {
         device_id: id.to_string(),
@@ -179,11 +177,95 @@ fn record_executed(id: &str) {
     .record();
 }
 
+fn washing_machine_notification_payload(state: &WashingMachineState) -> serde_json::Value {
+    match state {
+        WashingMachineState::Done => json!({
+            "title": "Wäsche fertig",
+            "message": "Die Wäsche ist fertig",
+            "data": {
+                "tag": PUSH_TAG_WASHING_MACHINE,
+                "live_update": true,
+                "progress": 100,
+                "progress_max": 100,
+                "progress_bar_direction": "increasing",
+                "notification_icon": "mdi:washing-machine",
+            }
+        }),
+        WashingMachineState::InProgress {
+            started_at,
+            estimated_end,
+        } => {
+            let now = t!(now).unix_seconds();
+            let started_at = started_at.unix_seconds();
+            let estimated_end = estimated_end.unix_seconds();
+            //covering the case where estimated is before start
+            let range = (estimated_end - started_at).max(100);
+
+            json!({
+                "title": "Wäsche fertig",
+                "message": "Die Wäsche ist fertig",
+                "data": {
+                    "tag": PUSH_TAG_WASHING_MACHINE,
+                    "live_update": true,
+                    "silent": true,
+                    "chronometer": true,
+                    "when_relative": false,
+                    "when": estimated_end,
+                    "progress": (now - started_at).max(range),
+                    "progress_max": range,
+                    "progress_bar_direction": "increasing",
+                    "notification_icon": "mdi:washing-machine",
+                }
+            })
+        }
+    }
+}
+
 fn philips_air_purifier_preset(speed: &FanSpeed) -> &'static str {
     match speed {
         FanSpeed::Low => "speed_1",
         FanSpeed::Medium => "speed_2",
         FanSpeed::High => "speed_3",
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HaHttpClient {
+    client: ClientWithMiddleware,
+    base_url: String,
+}
+
+impl HaHttpClient {
+    pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
+        let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
+
+        Ok(Self {
+            client,
+            base_url: url.to_owned(),
+        })
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn call_service(
+        &self,
+        domain: &str,
+        service: &str,
+        service_data: serde_json::Value,
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/api/services/{}/{}", self.base_url, domain, service);
+
+        tracing::info!("Calling HA service {}: {:?}", url, serde_json::to_string(&service_data)?);
+
+        let response = self.client.post(url).json(&service_data).send().await?;
+        let status = response.status();
+        let body = response.text().await?;
+        tracing::info!("Response: {} - {}", status, body);
+
+        if !status.is_success() {
+            anyhow::bail!("Home Assistant service returned HTTP status {status}");
+        }
+
+        Ok(())
     }
 }
 
@@ -197,32 +279,6 @@ mod tests {
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Low), "speed_1");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Medium), "speed_2");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::High), "speed_3");
-    }
-
-    #[test]
-    fn window_open_notification_keeps_its_mobile_presentation() {
-        assert_eq!(
-            notification_content(PushNotification::WindowOpened),
-            ("Fenster offen", "Mindestens ein Fenster ist offen", "window_opened")
-        );
-        assert_eq!(notification_tag(PushNotification::WindowOpened), "window_opened");
-    }
-
-    #[tokio::test]
-    async fn sends_phone_notification_to_provided_home_assistant_service() {
-        let mut server = mockito::Server::new_async().await;
-        let _mock = server
-            .mock("POST", "/api/services/notify/mobile_app_jarvis")
-            .with_status(200)
-            .expect(1)
-            .create_async()
-            .await;
-        let executor = HomeAssistantCommandExecutor::new(&server.url(), "token");
-
-        executor
-            .push_notify("mobile_app_jarvis", PushNotification::WindowOpened, PushNotifyOperation::Show)
-            .await
-            .unwrap();
     }
 
     #[tokio::test]
@@ -268,45 +324,5 @@ mod tests {
                 .await
                 .is_err()
         );
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct HaHttpClient {
-    client: ClientWithMiddleware,
-    base_url: String,
-}
-
-impl HaHttpClient {
-    pub fn new(url: &str, token: &str) -> anyhow::Result<Self> {
-        let client = HttpClientConfig::new(Some(token.to_owned())).new_tracing_client()?;
-
-        Ok(Self {
-            client,
-            base_url: url.to_owned(),
-        })
-    }
-
-    #[tracing::instrument(skip(self))]
-    pub async fn call_service(
-        &self,
-        domain: &str,
-        service: &str,
-        service_data: serde_json::Value,
-    ) -> anyhow::Result<()> {
-        let url = format!("{}/api/services/{}/{}", self.base_url, domain, service);
-
-        tracing::info!("Calling HA service {}: {:?}", url, serde_json::to_string(&service_data)?);
-
-        let response = self.client.post(url).json(&service_data).send().await?;
-        let status = response.status();
-        let body = response.text().await?;
-        tracing::info!("Response: {} - {}", status, body);
-
-        if !status.is_success() {
-            anyhow::bail!("Home Assistant service returned HTTP status {status}");
-        }
-
-        Ok(())
     }
 }

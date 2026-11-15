@@ -78,13 +78,12 @@ impl CommandDispatcher {
                 };
                 self.z2m.set_heating(device_id, target_state.clone()).await
             }
-            Command::PushNotify(PushNotify {
-                notification,
-                recipient,
-                operation,
-            }) => {
+            Command::PushNotify(PushNotify::Dismiss(target)) => {
+                self.homeassistant.dismiss_push_notification(*target).await
+            }
+            Command::PushNotify(PushNotify::Show(recipient, notification)) => {
                 self.homeassistant
-                    .push_notify(push_recipient(*recipient), *notification, *operation)
+                    .show_push_notification(*recipient, *notification)
                     .await
             }
             Command::SetLightNotification(SetLightNotification { device, signal, on }) => {

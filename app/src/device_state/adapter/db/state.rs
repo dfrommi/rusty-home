@@ -4,7 +4,11 @@ use sqlx::PgPool;
 use std::collections::HashSet;
 
 use crate::{
-    core::{id::ExternalId, time::DateTimeRange, timeseries::DataPoint},
+    core::{
+        id::ExternalId,
+        time::{DateTime, DateTimeRange},
+        timeseries::DataPoint,
+    },
     device_state::{DeviceStateId, DeviceStateValue},
     t,
 };
@@ -180,7 +184,9 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
     match id {
         DeviceStateId::AllergenIndex(id) => DeviceStateValue::AllergenIndex(id, value.into()),
         DeviceStateId::EnergySaving(id) => DeviceStateValue::EnergySaving(id, bool_of(value)),
-        DeviceStateId::CompletionTime(id) => DeviceStateValue::CompletionTime(id, value.into()),
+        DeviceStateId::CompletionTime(id) => {
+            DeviceStateValue::CompletionTime(id, DateTime::from_unix_millis(value.round() as i64))
+        }
         DeviceStateId::Opened(id) => DeviceStateValue::Opened(id, bool_of(value)),
         DeviceStateId::ParticulateMatter(id) => DeviceStateValue::ParticulateMatter(id, value.into()),
         DeviceStateId::PowerAvailable(id) => DeviceStateValue::PowerAvailable(id, bool_of(value)),

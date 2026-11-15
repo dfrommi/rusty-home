@@ -4,8 +4,8 @@ use crate::automation::domain::action::{
 };
 use crate::command::{
     BuzzDoorTarget, CommandTarget, ControlFanTarget, EnergySavingDevice, Fan, NotificationLight, PowerToggle,
-    PushNotification, PushNotifyTarget, PushRecipient, SetEnergySavingTarget, SetHeatingTarget,
-    SetLightNotificationTarget, SetPowerTarget,
+    PushNotifyTarget, PushRecipient, SetEnergySavingTarget, SetHeatingTarget, SetLightNotificationTarget,
+    SetPowerTarget,
 };
 use crate::core::domain::Radiator;
 use crate::home_state::FanActivity;
@@ -159,19 +159,11 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             vec![InformWindowOpen::NotificationLightLivingRoom.into()],
         ),
         (
-            PushNotifyTarget {
-                recipient: PushRecipient::Dennis,
-                notification: PushNotification::WindowOpened,
-            }
-            .into(),
+            PushNotifyTarget::WindowOpened(PushRecipient::Dennis).into(),
             vec![InformWindowOpen::PushNotification(PushRecipient::Dennis).into()],
         ),
         (
-            PushNotifyTarget {
-                recipient: PushRecipient::Sabine,
-                notification: PushNotification::WindowOpened,
-            }
-            .into(),
+            PushNotifyTarget::WindowOpened(PushRecipient::Sabine).into(),
             vec![InformWindowOpen::PushNotification(PushRecipient::Sabine).into()],
         ),
         // --- Door ---
@@ -261,11 +253,7 @@ mod tests {
         assert!(matches!(light_rules.last(), Some(HomeAction::FollowDefaultSetting(_))));
 
         for recipient in [PushRecipient::Dennis, PushRecipient::Sabine] {
-            let phone_target: CommandTarget = PushNotifyTarget {
-                recipient,
-                notification: PushNotification::WindowOpened,
-            }
-            .into();
+            let phone_target: CommandTarget = PushNotifyTarget::WindowOpened(recipient).into();
             assert!(plans.iter().any(|(target, _)| target == &phone_target));
         }
     }

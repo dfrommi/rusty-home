@@ -78,9 +78,9 @@ where
         return next.value.clone();
     }
 
-    let prev_time: f64 = prev.timestamp.into();
-    let next_time: f64 = next.timestamp.into();
-    let at_time: f64 = at.into();
+    let prev_time = prev.timestamp.unix_millis() as f64;
+    let next_time = next.timestamp.unix_millis() as f64;
+    let at_time = at.unix_millis() as f64;
 
     let prev_value: f64 = (&prev.value).into();
     let next_value: f64 = (&next.value).into();

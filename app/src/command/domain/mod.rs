@@ -8,7 +8,7 @@ mod set_power;
 
 pub use buzz_door::{BuzzDoor, BuzzDoorTarget, Lock};
 pub use control_fan::{ControlFan, ControlFanTarget, Fan};
-pub use push_notify::{PushNotification, PushNotify, PushNotifyOperation, PushNotifyTarget, PushRecipient};
+pub use push_notify::{PushNotification, PushNotify, PushNotifyTarget, PushRecipient, WashingMachineState};
 pub use set_energy_saving::{EnergySavingDevice, SetEnergySaving, SetEnergySavingTarget};
 pub use set_heating::{HeatingTargetState, SetHeating, SetHeatingTarget};
 pub use set_light_notification::{LightSignal, NotificationLight, SetLightNotification, SetLightNotificationTarget};
@@ -203,15 +203,11 @@ mod test {
 
     #[test]
     fn notification_targets_have_clear_ids_and_display() {
-        let push_command = Command::PushNotify(PushNotify {
-            notification: PushNotification::WindowOpened,
-            recipient: PushRecipient::Dennis,
-            operation: PushNotifyOperation::Show,
-        });
+        let push_command = Command::PushNotify(PushNotify::Show(PushRecipient::Dennis, PushNotification::WindowOpened));
         let push_target = CommandTarget::from(&push_command);
 
         assert_eq!(push_target.ext_id().to_string(), "push_notify_target::window_opened::dennis");
-        assert_eq!(push_target.to_string(), "PushNotify[WindowOpened @ Dennis]");
+        assert_eq!(push_target.to_string(), "WindowOpened @ Dennis");
         assert_eq!(push_command.display_parts().target, "WindowOpened @ Dennis");
         assert_eq!(push_command.display_parts().state, "Show");
 

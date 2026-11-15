@@ -89,7 +89,7 @@ impl From<&DeviceStateValue> for f64 {
             DeviceStateValue::Temperature(_, v) => v.into(),
             DeviceStateValue::TotalEnergyConsumption(_, v) => v.into(),
             DeviceStateValue::TotalRadiatorConsumption(_, v) => v.into(),
-            DeviceStateValue::CompletionTime(_, v) => (*v).into(),
+            DeviceStateValue::CompletionTime(_, v) => v.unix_millis() as f64,
             DeviceStateValue::EnergySaving(_, v)
             | DeviceStateValue::IsRunning(_, v)
             | DeviceStateValue::Opened(_, v)

@@ -173,7 +173,7 @@ fn add_to_trace(
 mod tests {
     use super::*;
     use crate::command::{
-        BuzzDoor, Lock, PowerToggle, PushNotification, PushNotify, PushNotifyOperation, PushRecipient, SetPower,
+        BuzzDoor, Lock, PowerToggle, PushNotification, PushNotify, PushNotifyTarget, PushRecipient, SetPower,
     };
 
     fn execution(command: Command, elapsed: crate::core::time::Duration) -> CommandExecution {
@@ -183,13 +183,12 @@ mod tests {
         }
     }
 
-    fn phone_notification(operation: PushNotifyOperation) -> Command {
-        PushNotify {
-            notification: PushNotification::WindowOpened,
-            recipient: PushRecipient::Dennis,
-            operation,
+    fn phone_notification(show: bool) -> Command {
+        if show {
+            PushNotify::Show(PushRecipient::Dennis, PushNotification::WindowOpened).into()
+        } else {
+            PushNotify::Dismiss(PushNotifyTarget::WindowOpened(PushRecipient::Dennis)).into()
         }
-        .into()
     }
 
     #[test]
@@ -246,9 +245,9 @@ mod tests {
 
     #[test]
     fn unobservable_notification_deduplicates_by_successful_command_equality() {
-        let command = phone_notification(PushNotifyOperation::Show);
+        let command = phone_notification(true);
         let previous = execution(command.clone(), crate::t!(1 minutes));
-        let dismiss = execution(phone_notification(PushNotifyOperation::Dismiss), crate::t!(1 minutes));
+        let dismiss = execution(phone_notification(false), crate::t!(1 minutes));
 
         assert_eq!(
             execution_decision(&command, CommandState::UnobservableDeduplicated, Some(&previous)),

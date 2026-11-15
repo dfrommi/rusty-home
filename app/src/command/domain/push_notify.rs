@@ -1,15 +1,52 @@
 use crate::{
     command::{CommandBehavior, CommandDisplayParts, CommandState, CommandTargetBehavior},
+    core::time::DateTime,
     home_state::StateSnapshot,
 };
 use anyhow::Result;
 use r#macro::{EnumVariants, Id};
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, derive_more::Display, Id, EnumVariants)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum PushNotify {
+    Dismiss(PushNotifyTarget),
+    Show(PushRecipient, PushNotification),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, derive_more::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum PushNotification {
     WindowOpened,
+    WashingMachine(WashingMachineState),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, derive_more::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum WashingMachineState {
+    Done,
+    #[display("InProgess({})", estimated_end)]
+    InProgress {
+        started_at: DateTime,
+        estimated_end: DateTime,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Id, Serialize, derive_more::Display)]
+#[serde(rename_all = "snake_case")]
+pub enum PushNotifyTarget {
+    #[display("WindowOpened @ {}", _0)]
+    WindowOpened(PushRecipient),
+    #[display("WashingMachine @ {}", _0)]
+    WashingMachine(PushRecipient),
+}
+
+impl PushNotifyTarget {
+    pub fn recipient(&self) -> PushRecipient {
+        match self {
+            PushNotifyTarget::WindowOpened(recipient) => *recipient,
+            PushNotifyTarget::WashingMachine(recipient) => *recipient,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, derive_more::Display, Id, EnumVariants)]
@@ -26,41 +63,14 @@ pub enum PushNotifyOperation {
     Dismiss,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct PushNotify {
-    pub notification: PushNotification,
-    pub recipient: PushRecipient,
-    pub operation: PushNotifyOperation,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, derive_more::Display, Id)]
-#[display("PushNotify[{} @ {}]", notification, recipient)]
-pub struct PushNotifyTarget {
-    pub notification: PushNotification,
-    pub recipient: PushRecipient,
-}
-
-impl PushNotifyTarget {
-    pub fn to_command(self, operation: PushNotifyOperation) -> PushNotify {
-        PushNotify {
-            notification: self.notification,
-            recipient: self.recipient,
-            operation,
-        }
-    }
-}
-
-impl From<PushNotify> for PushNotifyTarget {
-    fn from(command: PushNotify) -> Self {
-        Self::from(&command)
-    }
-}
-
 impl From<&PushNotify> for PushNotifyTarget {
     fn from(command: &PushNotify) -> Self {
-        Self {
-            notification: command.notification,
-            recipient: command.recipient,
+        match command {
+            PushNotify::Dismiss(target) => *target,
+            PushNotify::Show(recipient, PushNotification::WindowOpened) => PushNotifyTarget::WindowOpened(*recipient),
+            PushNotify::Show(recipient, PushNotification::WashingMachine { .. }) => {
+                PushNotifyTarget::WashingMachine(*recipient)
+            }
         }
     }
 }
@@ -69,14 +79,20 @@ impl CommandBehavior for PushNotify {
     type Target = PushNotifyTarget;
 
     fn target(&self) -> Self::Target {
-        self.into()
+        PushNotifyTarget::from(self)
     }
 
     fn display_parts(&self) -> CommandDisplayParts {
+        let target: PushNotifyTarget = self.into();
+        let operation = match self {
+            PushNotify::Dismiss(_) => PushNotifyOperation::Dismiss,
+            PushNotify::Show(_, _) => PushNotifyOperation::Show,
+        };
+
         CommandDisplayParts {
             command_type: "PushNotify",
-            target: format!("{} @ {}", self.notification, self.recipient),
-            state: self.operation.to_string(),
+            target: target.to_string(),
+            state: operation.to_string(),
         }
     }
 
@@ -89,7 +105,7 @@ impl CommandTargetBehavior for PushNotifyTarget {
     type Command = PushNotify;
 
     fn to_default_command(&self) -> Option<Self::Command> {
-        Some(self.to_command(PushNotifyOperation::Dismiss))
+        PushNotify::Dismiss(*self).into()
     }
 }
 
@@ -98,40 +114,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn target_creates_a_command_with_the_requested_operation() {
-        let target = PushNotifyTarget {
-            notification: PushNotification::WindowOpened,
-            recipient: PushRecipient::Dennis,
-        };
+    fn show_command_targets_the_notification_for_its_recipient() {
+        let command = PushNotify::Show(PushRecipient::Dennis, PushNotification::WindowOpened);
 
-        let command = target.to_command(PushNotifyOperation::Show);
-
-        assert_eq!(command.notification, PushNotification::WindowOpened);
-        assert_eq!(command.recipient, PushRecipient::Dennis);
-        assert_eq!(command.operation, PushNotifyOperation::Show);
+        assert_eq!(command.target(), PushNotifyTarget::WindowOpened(PushRecipient::Dennis));
+        assert_eq!(command.display_parts().state, "Show");
     }
 
     #[test]
     fn target_creates_a_dismiss_command_by_default() {
-        let target = PushNotifyTarget {
-            notification: PushNotification::WindowOpened,
-            recipient: PushRecipient::Sabine,
-        };
+        let target = PushNotifyTarget::WindowOpened(PushRecipient::Sabine);
 
         let command = target
             .to_default_command()
             .expect("push notification target has a default command");
 
-        assert_eq!(command.operation, PushNotifyOperation::Dismiss);
+        assert_eq!(command, PushNotify::Dismiss(target));
     }
 
     #[test]
     fn push_notification_is_unobservable_and_deduplicated() {
-        let command = PushNotify {
-            notification: PushNotification::WindowOpened,
-            recipient: PushRecipient::Dennis,
-            operation: PushNotifyOperation::Show,
-        };
+        let command = PushNotify::Show(PushRecipient::Dennis, PushNotification::WindowOpened);
 
         assert_eq!(command.display_parts().command_type, "PushNotify");
         assert_eq!(command.display_parts().target, "WindowOpened @ Dennis");

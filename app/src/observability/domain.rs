@@ -24,7 +24,7 @@ pub enum MetricLabel {
 
 impl std::fmt::Display for Metric {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.id, self.value, self.timestamp.millis())
+        write!(f, "{} {} {}", self.id, self.value, self.timestamp.unix_millis())
     }
 }
 

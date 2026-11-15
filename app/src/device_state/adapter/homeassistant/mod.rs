@@ -9,12 +9,12 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use crate::device_state::adapter::{IncomingData, IncomingDataSource};
 use crate::device_state::{
-    AllergenIndex, DeviceAvailability, DeviceAvailabilityItem, FanActivity, LightLevel, ParticulateMatter,
-    PowerAvailable, Presence, RelativeHumidity, Temperature,
+    AllergenIndex, CompletionTime, DeviceAvailability, DeviceAvailabilityItem, FanActivity, IsRunning, LightLevel,
+    ParticulateMatter, PowerAvailable, Presence, RelativeHumidity, Temperature,
 };
 use std::collections::HashMap;
 
-use crate::core::time::DateTime;
+use crate::core::time::{DateTime, Duration};
 use serde::Deserializer;
 use serde_json::Value;
 
@@ -48,6 +48,8 @@ pub enum HaChannel {
     ComfeeDehumidifierFanSpeed(FanActivity),
     PhilipsAirPurifierFan(FanActivity),
     LightLevel(LightLevel),
+    CompletionTime(CompletionTime),
+    HomeConnectIsRunning(IsRunning),
 }
 
 #[derive(Deserialize, Debug)]
@@ -228,6 +230,17 @@ fn parse_ha_channel(
             )
             .into(),
         ),
+        HaChannel::CompletionTime(channel) => {
+            let duration = parse_ha_duration(ha_value, attributes)?;
+            Some(
+                //TODO consider updating only when machine is running, but it requires keeping track
+                //of running state internally
+                DataPoint::new(DeviceStateValue::CompletionTime(channel, timestamp + duration), timestamp).into(),
+            )
+        }
+        HaChannel::HomeConnectIsRunning(channel) => {
+            Some(DataPoint::new(DeviceStateValue::IsRunning(channel, ha_value == "run"), timestamp).into())
+        }
         HaChannel::Powered(channel) => {
             Some(DataPoint::new(DeviceStateValue::PowerAvailable(channel, ha_value == "on"), timestamp).into())
         }
@@ -269,6 +282,24 @@ fn parse_ha_channel(
     };
 
     Ok(dp)
+}
+
+fn parse_ha_duration(ha_value: &str, attributes: &HashMap<String, Value>) -> anyhow::Result<Duration> {
+    let remaining: f64 = ha_value.parse()?;
+    let duration = match attributes.get("unit_of_measurement").and_then(|v| v.as_str()) {
+        Some("h") => Duration::millis((remaining * 60.0 * 60.0 * 1000.0).round() as i64),
+        Some("min") => Duration::millis((remaining * 60.0 * 1000.0).round() as i64),
+        Some("s") => Duration::millis((remaining * 1000.0).round() as i64),
+        Some("ms") => Duration::millis(remaining.round() as i64),
+        None => {
+            bail!("Attribute unit_of_measurement missing from payload")
+        }
+        Some(unit) => {
+            bail!("Unknown unit_of_measurement attribute value: {:?}", unit)
+        }
+    };
+
+    Ok(duration)
 }
 
 fn philips_air_purifier_airflow(ha_value: &str, preset_mode: Option<&str>) -> anyhow::Result<FanAirflow> {
@@ -503,6 +534,51 @@ mod tests {
             extract_state_value(value),
             DeviceStateValue::ParticulateMatter(ParticulateMatter::LivingRoomPM25, MicrogramsPerCubicMeter(3.25),)
         );
+    }
+
+    #[tokio::test]
+    async fn parses_estimated_completion_time_from_remaining_minutes() {
+        let now = DateTime::from_static_iso("2025-01-01T12:00:00Z");
+
+        let value = parse_ha_channel(
+            &HaChannel::CompletionTime(CompletionTime::WashingMachineEstimated),
+            "140.0",
+            &HashMap::from([("unit_of_measurement".to_string(), json!("min"))]),
+            now,
+            &Mutex::new(HashMap::new()),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            extract_state_value(value),
+            DeviceStateValue::CompletionTime(CompletionTime::WashingMachineEstimated, now + Duration::minutes(140))
+        );
+    }
+
+    #[test]
+    fn washer_is_running_only_during_run_operation_state() {
+        for (state, expected) in [
+            ("run", true),
+            ("ready", false),
+            ("pause", false),
+            ("delayedstart", false),
+        ] {
+            let value = parse_ha_channel(
+                &HaChannel::HomeConnectIsRunning(IsRunning::WashingMachine),
+                state,
+                &HashMap::new(),
+                t!(now),
+                &Mutex::new(HashMap::new()),
+            )
+            .unwrap()
+            .unwrap();
+
+            assert_eq!(
+                extract_state_value(value),
+                DeviceStateValue::IsRunning(IsRunning::WashingMachine, expected)
+            );
+        }
     }
 
     #[test]

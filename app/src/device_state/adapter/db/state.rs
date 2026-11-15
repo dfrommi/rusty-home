@@ -180,6 +180,7 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
     match id {
         DeviceStateId::AllergenIndex(id) => DeviceStateValue::AllergenIndex(id, value.into()),
         DeviceStateId::EnergySaving(id) => DeviceStateValue::EnergySaving(id, bool_of(value)),
+        DeviceStateId::CompletionTime(id) => DeviceStateValue::CompletionTime(id, value.into()),
         DeviceStateId::Opened(id) => DeviceStateValue::Opened(id, bool_of(value)),
         DeviceStateId::ParticulateMatter(id) => DeviceStateValue::ParticulateMatter(id, value.into()),
         DeviceStateId::PowerAvailable(id) => DeviceStateValue::PowerAvailable(id, bool_of(value)),
@@ -188,6 +189,7 @@ fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
         DeviceStateId::FanActivity(id) => DeviceStateValue::FanActivity(id, value.into()),
         DeviceStateId::HeatingDemand(id) => DeviceStateValue::HeatingDemand(id, value.into()),
         DeviceStateId::HeatingDemandLimit(id) => DeviceStateValue::HeatingDemandLimit(id, value.into()),
+        DeviceStateId::IsRunning(id) => DeviceStateValue::IsRunning(id, bool_of(value)),
         DeviceStateId::LightLevel(id) => DeviceStateValue::LightLevel(id, value.into()),
         DeviceStateId::RelativeHumidity(id) => DeviceStateValue::RelativeHumidity(id, value.into()),
         DeviceStateId::SetPoint(id) => DeviceStateValue::SetPoint(id, value.into()),

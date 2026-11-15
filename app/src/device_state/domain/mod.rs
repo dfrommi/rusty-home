@@ -1,13 +1,15 @@
 use r#macro::StateEnumDerive;
 
-use crate::core::unit::*;
+use crate::core::{time::DateTime, unit::*};
 
 mod allergen_index;
+mod completion_time;
 mod current_power_usage;
 mod energy_saving;
 mod fan_activity;
 mod heating_demand;
 mod heating_demand_limit;
+mod is_running;
 mod light_level;
 mod opened;
 mod particulate_matter;
@@ -20,12 +22,14 @@ mod total_energy_consumption;
 mod total_radiator_consumption;
 
 pub use allergen_index::AllergenIndex;
+pub use completion_time::CompletionTime;
 pub use current_power_usage::CurrentPowerUsage;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::FanActivity;
 #[allow(unused_imports)]
 pub use heating_demand::HeatingDemand;
 pub use heating_demand_limit::HeatingDemandLimit;
+pub use is_running::IsRunning;
 pub use light_level::LightLevel;
 pub use opened::Opened;
 pub use particulate_matter::ParticulateMatter;
@@ -40,11 +44,13 @@ pub use total_radiator_consumption::TotalRadiatorConsumption;
 #[derive(Debug, Clone, PartialEq, StateEnumDerive)]
 pub enum DeviceStateValue {
     AllergenIndex(allergen_index::AllergenIndex, AllergenIndexValue),
+    CompletionTime(completion_time::CompletionTime, DateTime),
     EnergySaving(energy_saving::EnergySaving, bool),
     CurrentPowerUsage(current_power_usage::CurrentPowerUsage, Watt),
     FanActivity(fan_activity::FanActivity, FanAirflow),
     HeatingDemand(heating_demand::HeatingDemand, Percent),
     HeatingDemandLimit(heating_demand_limit::HeatingDemandLimit, Percent),
+    IsRunning(is_running::IsRunning, bool),
     LightLevel(light_level::LightLevel, Lux),
     Opened(opened::Opened, bool),
     ParticulateMatter(particulate_matter::ParticulateMatter, MicrogramsPerCubicMeter),
@@ -83,7 +89,9 @@ impl From<&DeviceStateValue> for f64 {
             DeviceStateValue::Temperature(_, v) => v.into(),
             DeviceStateValue::TotalEnergyConsumption(_, v) => v.into(),
             DeviceStateValue::TotalRadiatorConsumption(_, v) => v.into(),
+            DeviceStateValue::CompletionTime(_, v) => (*v).into(),
             DeviceStateValue::EnergySaving(_, v)
+            | DeviceStateValue::IsRunning(_, v)
             | DeviceStateValue::Opened(_, v)
             | DeviceStateValue::PowerAvailable(_, v)
             | DeviceStateValue::Presence(_, v) => {

@@ -178,6 +178,14 @@ impl From<DateTime> for f64 {
     }
 }
 
+impl From<f64> for DateTime {
+    fn from(value: f64) -> Self {
+        let nanos: i64 = (value * 1_000_000_000.0) as i64;
+        let delegate = chrono::DateTime::from_timestamp_nanos(nanos);
+        DateTime::new(delegate)
+    }
+}
+
 impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
     fn from(val: chrono::DateTime<T>) -> Self {
         DateTime::new(val)
@@ -188,6 +196,14 @@ impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for DateTime {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod constructor {
     use super::*;
+
+    #[test]
+    fn test_from_millis() {
+        let datetime = DateTime::from_static_iso("2024-11-03T15:23:46.123Z");
+        let millis: f64 = datetime.into();
+        let result: DateTime = millis.into();
+        assert_eq!(result, datetime);
+    }
 
     #[test]
     fn test_midpoint() {

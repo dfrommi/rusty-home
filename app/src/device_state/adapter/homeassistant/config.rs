@@ -1,11 +1,23 @@
 use crate::device_state::{
-    AllergenIndex, FanActivity, LightLevel, ParticulateMatter, PowerAvailable, Presence, RelativeHumidity, Temperature,
+    AllergenIndex, CompletionTime, FanActivity, IsRunning, LightLevel, ParticulateMatter, PowerAvailable, Presence,
+    RelativeHumidity, Temperature,
 };
 
 use super::HaChannel;
 
 pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
     vec![
+        //
+        // APPLIANCE PROGRESS
+        //
+        (
+            "sensor.bosch_washer_remaining_program_time",
+            HaChannel::CompletionTime(CompletionTime::WashingMachineEstimated),
+        ),
+        (
+            "sensor.bosch_washer_operation_state",
+            HaChannel::HomeConnectIsRunning(IsRunning::WashingMachine),
+        ),
         //
         // AIR QUALITY
         //

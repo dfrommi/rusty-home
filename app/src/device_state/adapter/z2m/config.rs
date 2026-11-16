@@ -38,7 +38,7 @@ pub fn default_z2m_state_config() -> Vec<(&'static str, Z2mChannel)> {
             ),
         ),
         (
-            "bedroom/outer_wall",
+            "bedroom/temp_sensor_outer_wall",
             Z2mChannel::ClimateSensor(Temperature::BedroomOuterWall, RelativeHumidity::BedroomOuterWall),
         ),
         (

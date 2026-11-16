@@ -3,7 +3,9 @@ mod items;
 
 use std::collections::HashMap;
 
-pub use calc::StateSnapshot;
+use anyhow::Context;
+
+pub use calc::{StateCalculationResult, StateSnapshot};
 use infrastructure::EventEmitter;
 use infrastructure::{EventBus, EventListener};
 pub use items::*;
@@ -13,8 +15,7 @@ use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
 use crate::home_state::calc::{
-    CurrentDeviceStateProvider, CurrentUserTriggerProvider, StateCalculationResult, bootstrap_context,
-    calculate_next_result,
+    CurrentDeviceStateProvider, CurrentUserTriggerProvider, bootstrap_context, calculate_next_result,
 };
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
@@ -61,18 +62,20 @@ impl HomeStateModule {
         self.event_bus.subscribe()
     }
 
-    #[allow(clippy::expect_used)]
-    pub async fn run(mut self) {
-        use tokio::time::{self, Duration, Instant};
-
+    pub async fn bootstrap(&self) -> anyhow::Result<StateCalculationResult> {
         tracing::info!("Starting bootstrap of home state context");
-        let mut state_result =
+        let state_result =
             bootstrap_context(self.duration.clone(), self.device_state.clone(), self.trigger_client.clone())
                 .await
-                .expect("Failed to bootstrap home state context");
+                .context("Failed to bootstrap home state context")?;
 
         tracing::info!("Calculating initial home state context");
-        state_result = self.update_context(state_result).await;
+        Ok(self.update_context(state_result).await)
+    }
+
+    pub async fn run(mut self, mut state_result: StateCalculationResult) {
+        use tokio::time::{self, Duration, Instant};
+
         tracing::info!("Completed bootstrap of home state context");
 
         let scheduled_duration = Duration::from_secs(30);

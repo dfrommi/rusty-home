@@ -4,13 +4,11 @@ mod http;
 mod monitoring;
 mod mqtt;
 
-pub use monitoring::MonitoringConfig;
-pub use monitoring::{CorrelationId, TraceContext};
-
 pub use bus::{EventBus, EventEmitter, EventListener};
 pub use db::DatabaseConfig;
 pub use http::client::HttpClientConfig;
 pub use http::server::HttpServerConfig;
+pub use monitoring::{BootstrapMonitoring, CorrelationId, MonitoringConfig, MonitoringControl, TraceContext};
 pub use mqtt::{Mqtt, MqttConfig, MqttInMessage, MqttSender, MqttSubscription};
 
 pub mod meter {

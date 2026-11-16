@@ -32,6 +32,9 @@ type AppTask = (&'static str, JoinHandle<()>);
 pub async fn main() -> anyhow::Result<()> {
     let settings = Settings::new().expect("Error reading configuration");
 
+    let monitoring = settings.monitoring.init()?;
+    let bootstrap_monitoring = monitoring.enter_bootstrap_mode()?;
+
     let mut infrastructure = Infrastructure::init(&settings)
         .await
         .expect("Error initializing infrastructure");
@@ -126,8 +129,10 @@ pub async fn main() -> anyhow::Result<()> {
         }
     };
 
-    tracing::info!("Starting main loop");
+    let initial_home_state = home_state_module.bootstrap().await?;
+    bootstrap_monitoring.finish()?;
 
+    tracing::info!("Starting main loop");
     let mut tasks = vec![
         spawn_app_task("device-state", async move {
             device_state_module.run().await;
@@ -136,7 +141,7 @@ pub async fn main() -> anyhow::Result<()> {
             automation_module.run().await;
         }),
         spawn_app_task("home-state", async move {
-            home_state_module.run().await;
+            home_state_module.run(initial_home_state).await;
         }),
         spawn_app_task("observability", async move {
             observability_module.run().await;
@@ -177,10 +182,7 @@ pub async fn main() -> anyhow::Result<()> {
 impl Infrastructure {
     #[allow(clippy::expect_used)]
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
-        settings.monitoring.init().expect("Error initializing monitoring");
-
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
-
         let mqtt_client = settings.mqtt.new_client();
 
         Ok(Self { db_pool, mqtt_client })

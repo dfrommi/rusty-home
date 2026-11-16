@@ -10,6 +10,7 @@ pub enum PowerAvailable {
     InfraredHeater,
     LivingRoomTv,
     LivingRoomTvAmbilight,
+    WashingMachine,
 }
 
 pub struct PowerAvailableStateProvider;
@@ -25,6 +26,7 @@ impl DerivedStateProvider<PowerAvailable, bool> for PowerAvailableStateProvider 
             PowerAvailable::InfraredHeater => DevicePowerAvailable::InfraredHeater,
             PowerAvailable::LivingRoomTv => DevicePowerAvailable::LivingRoomTv,
             PowerAvailable::LivingRoomTvAmbilight => DevicePowerAvailable::LivingRoomTvAmbilight,
+            PowerAvailable::WashingMachine => DevicePowerAvailable::WashingMachine,
         })
         .map(|dp| dp.value)
     }

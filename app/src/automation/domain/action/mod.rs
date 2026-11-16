@@ -2,6 +2,7 @@ mod block_automation;
 mod dehumidify;
 mod follow_default_setting;
 mod heating;
+mod inform_device_state;
 mod inform_window_open;
 mod purify_air;
 mod remote_turn_off;
@@ -23,6 +24,7 @@ pub use block_automation::BlockAutomation;
 pub use dehumidify::Dehumidify;
 pub use follow_default_setting::FollowDefaultSetting;
 pub use heating::*;
+pub use inform_device_state::InformDeviceState;
 pub use inform_window_open::InformWindowOpen;
 pub use purify_air::PurifyAir;
 pub use remote_turn_off::RemoteTurnOff;
@@ -155,6 +157,7 @@ impl<T: SimpleRule> Rule for T {
 #[derive(Debug, Clone, derive_more::From, r#macro::IdDelegation)]
 pub enum HomeAction {
     Dehumidify(Dehumidify),
+    InformDeviceState(InformDeviceState),
     InformWindowOpen(InformWindowOpen),
     PurifyAir(PurifyAir),
     AutoTurnOff(AutoTurnOff),
@@ -177,6 +180,7 @@ impl HomeAction {
     pub fn evaluate(&self, ctx: &RuleEvaluationContext) -> Result<RuleResult> {
         match self {
             HomeAction::Dehumidify(rule) => rule.evaluate(ctx),
+            HomeAction::InformDeviceState(rule) => rule.evaluate(ctx),
             HomeAction::InformWindowOpen(rule) => rule.evaluate(ctx),
             HomeAction::PurifyAir(rule) => rule.evaluate(ctx),
             HomeAction::AutoTurnOff(rule) => rule.evaluate(ctx),

@@ -1,6 +1,7 @@
 mod absolute_humidity;
 mod allergen_index;
 mod cold_air_coming_in;
+mod completion_time;
 mod dewpoint;
 mod energy_saving;
 mod fan_activity;
@@ -24,6 +25,7 @@ use std::fmt::Debug;
 pub use absolute_humidity::AbsoluteHumidity;
 pub use allergen_index::AllergenIndex;
 pub use cold_air_coming_in::ColdAirComingIn;
+pub use completion_time::CompletionTime;
 pub use dewpoint::DewPoint;
 pub use energy_saving::EnergySaving;
 pub use fan_activity::*;
@@ -43,6 +45,7 @@ pub use temperature_change::TemperatureChange;
 pub use ventilation::Ventilation;
 
 use crate::core::range::Range;
+use crate::core::time::DateTime;
 use crate::core::unit::*;
 use crate::home_state::calc::DerivedStateProvider;
 use crate::home_state::calc::StateCalculationContext;
@@ -54,6 +57,7 @@ pub enum HomeStateValue {
     AbsoluteHumidity(AbsoluteHumidity, GramPerCubicMeter),
     AllergenIndex(AllergenIndex, AllergenIndexValue),
     ColdAirComingIn(ColdAirComingIn, bool),
+    CompletionTime(CompletionTime, DateTime),
     DewPoint(DewPoint, DegreeCelsius),
     FeltTemperature(FeltTemperature, DegreeCelsius),
     IsRunning(IsRunning, bool),
@@ -101,6 +105,9 @@ impl DerivedStateProvider<HomeStateId, HomeStateValue> for HomeStateDerivedState
             HomeStateId::ColdAirComingIn(id) => cold_air_coming_in::ColdAirComingInStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::ColdAirComingIn(id, value)),
+            HomeStateId::CompletionTime(id) => completion_time::CompletionTimeStateProvider
+                .calculate_current(id, ctx)
+                .map(|value| HomeStateValue::CompletionTime(id, value)),
             HomeStateId::DewPoint(id) => dewpoint::DewPointStateProvider
                 .calculate_current(id, ctx)
                 .map(|value| HomeStateValue::DewPoint(id, value)),

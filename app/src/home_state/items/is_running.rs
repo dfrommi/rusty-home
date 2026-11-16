@@ -1,7 +1,7 @@
 use r#macro::{EnumVariants, Id};
 
 use crate::core::unit::Watt;
-use crate::device_state::CurrentPowerUsage;
+use crate::device_state::{CurrentPowerUsage, IsRunning as DeviceIsRunning};
 use crate::home_state::PowerAvailable;
 use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 
@@ -9,6 +9,7 @@ use crate::home_state::calc::{DerivedStateProvider, StateCalculationContext};
 pub enum IsRunning {
     LivingRoomTv,
     RoomOfRequirementsMonitor,
+    WashingMachine,
 }
 
 pub struct IsRunningStateProvider;
@@ -21,6 +22,7 @@ impl DerivedStateProvider<IsRunning, bool> for IsRunningStateProvider {
                 let power_usage_dp = ctx.device_state(CurrentPowerUsage::RoomOfRequirementsMonitor)?;
                 Some(power_usage_dp.value > Watt(15.0))
             }
+            IsRunning::WashingMachine => ctx.device_state(DeviceIsRunning::WashingMachine).map(|dp| dp.value),
         }
     }
 }

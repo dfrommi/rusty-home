@@ -195,12 +195,15 @@ fn washing_machine_notification_payload(state: &WashingMachineState) -> serde_js
             started_at,
             estimated_end,
         } => {
-            let now = t!(now).unix_seconds();
+            let now = t!(now);
+            let started_at = *started_at;
+            let estimated_end = (*estimated_end)
+                .max(now + t!(2 minutes))
+                .max(started_at + t!(100 seconds));
+            let now = now.unix_seconds();
             let started_at = started_at.unix_seconds();
             let estimated_end = estimated_end.unix_seconds();
-            //covering the case where estimated is before start
             let range = (estimated_end - started_at).max(100);
-
             json!({
                 "title": "Wäsche fertig",
                 "message": "Die Wäsche ist fertig",
@@ -211,7 +214,7 @@ fn washing_machine_notification_payload(state: &WashingMachineState) -> serde_js
                     "chronometer": true,
                     "when_relative": false,
                     "when": estimated_end,
-                    "progress": (now - started_at).max(range),
+                    "progress": (now - started_at).clamp(0, range),
                     "progress_max": range,
                     "progress_bar_direction": "increasing",
                     "notification_icon": "mdi:washing-machine",
@@ -273,12 +276,45 @@ impl HaHttpClient {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
-
+    use crate::core::time::{DateTime, Duration};
+    use serde_json::json;
     #[test]
     fn maps_philips_air_purifier_command_speed_presets() {
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Low), "speed_1");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::Medium), "speed_2");
         assert_eq!(philips_air_purifier_preset(&FanSpeed::High), "speed_3");
+    }
+
+    #[tokio::test]
+    async fn washing_machine_progress_reflects_elapsed_time_before_estimated_end() {
+        let now = DateTime::from_static_iso("2025-01-01T12:00:00Z");
+        let payload = now
+            .eval_timeshifted(async {
+                washing_machine_notification_payload(&WashingMachineState::InProgress {
+                    started_at: now - Duration::minutes(10),
+                    estimated_end: now + Duration::minutes(15),
+                })
+            })
+            .await;
+
+        assert_eq!(payload["data"]["progress"], json!(600));
+        assert_eq!(payload["data"]["progress_max"], json!(1500));
+    }
+    #[tokio::test]
+    async fn washing_machine_progress_uses_a_safe_future_end_for_a_past_estimate() {
+        let now = DateTime::from_static_iso("2025-01-01T12:00:00Z");
+        let payload = now
+            .eval_timeshifted(async {
+                washing_machine_notification_payload(&WashingMachineState::InProgress {
+                    started_at: now - Duration::minutes(10),
+                    estimated_end: now - Duration::minutes(1),
+                })
+            })
+            .await;
+
+        assert_eq!(payload["data"]["when"], json!((now + Duration::minutes(2)).unix_seconds()));
+        assert_eq!(payload["data"]["progress"], json!(600));
+        assert_eq!(payload["data"]["progress_max"], json!(720));
     }
 
     #[tokio::test]

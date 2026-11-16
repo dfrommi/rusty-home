@@ -59,6 +59,10 @@ pub fn default_ha_state_config() -> Vec<(&'static str, HaChannel)> {
             "switch.zhimi_de_974125313_rmb1_on_p_2_1",
             HaChannel::Powered(PowerAvailable::BedroomAirPurifier),
         ),
+        (
+            "sensor.bosch_washer_power_state",
+            HaChannel::Powered(PowerAvailable::WashingMachine),
+        ),
         ("light.hue_go", HaChannel::Powered(PowerAvailable::LivingRoomNotificationLight)),
         //
         // PRESENCE

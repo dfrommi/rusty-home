@@ -1,6 +1,6 @@
 use crate::automation::domain::action::{
     AutoTurnOff, BlockAutomation, Dehumidify, FollowDefaultSetting, FollowTargetHeatingDemand, HomeAction,
-    InformWindowOpen, PauseHeatingForVentilation, PurifyAir, RemoteTurnOff, UserTriggerAction,
+    InformDeviceState, InformWindowOpen, PauseHeatingForVentilation, PurifyAir, RemoteTurnOff, UserTriggerAction,
 };
 use crate::command::{
     BuzzDoorTarget, CommandTarget, ControlFanTarget, EnergySavingDevice, Fan, NotificationLight, PowerToggle,
@@ -166,6 +166,10 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             PushNotifyTarget::WindowOpened(PushRecipient::Sabine).into(),
             vec![InformWindowOpen::PushNotification(PushRecipient::Sabine).into()],
         ),
+        (
+            PushNotifyTarget::WashingMachine(PushRecipient::Dennis).into(),
+            vec![InformDeviceState::WashingMachine(PushRecipient::Dennis).into()],
+        ),
         // --- Door ---
         (
             BuzzDoorTarget {
@@ -256,6 +260,18 @@ mod tests {
             let phone_target: CommandTarget = PushNotifyTarget::WindowOpened(recipient).into();
             assert!(plans.iter().any(|(target, _)| target == &phone_target));
         }
+
+        let washing_machine_target: CommandTarget = PushNotifyTarget::WashingMachine(PushRecipient::Dennis).into();
+        assert!(plans.iter().any(|(target, rules)| {
+            target == &washing_machine_target
+                && matches!(
+                    rules.first(),
+                    Some(HomeAction::InformDeviceState(InformDeviceState::WashingMachine(
+                        PushRecipient::Dennis
+                    )))
+                )
+                && matches!(rules.last(), Some(HomeAction::FollowDefaultSetting(_)))
+        }));
     }
 
     #[test]

@@ -8,4 +8,5 @@ pub enum PowerAvailable {
     InfraredHeater,
     LivingRoomTv,
     LivingRoomTvAmbilight,
+    WashingMachine,
 }

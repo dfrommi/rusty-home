@@ -69,6 +69,10 @@ impl DeviceStateValue {
         match self {
             DeviceStateValue::CurrentPowerUsage(id, value) => id.minimum_storage_delta(*value).as_ref().map(f64::from),
             DeviceStateValue::LightLevel(id, value) => id.minimum_storage_delta(*value).as_ref().map(f64::from),
+            DeviceStateValue::CompletionTime(id, value) => {
+                //DateTime is stored as millis in DB. Breaks encapsuliation a bit
+                id.minimum_storage_delta(*value).as_ref().map(|d| d.as_millis() as f64)
+            }
             _ => None,
         }
     }

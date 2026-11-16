@@ -44,6 +44,10 @@ impl Duration {
         self.delegate.num_seconds()
     }
 
+    pub fn as_millis(&self) -> i64 {
+        self.delegate.num_milliseconds()
+    }
+
     pub fn as_secs_f64(&self) -> f64 {
         self.delegate.num_milliseconds() as f64 / 1000.0
     }

@@ -78,6 +78,7 @@ pub fn resource_plans() -> Vec<(CommandTarget, Vec<HomeAction>)> {
             vec![
                 UserTriggerAction::new(UserTriggerTarget::FanSpeed(FanActivity::LivingRoomAirPurifier)).into(),
                 BlockAutomation::AtNight.into(),
+                BlockAutomation::WhenPresenceInLivingRoom.into(),
                 PurifyAir::LivingRoom.into(),
             ],
         ),

@@ -87,6 +87,11 @@ fn decide_living_room(ventilation: DataPoint<bool>, couch_occupancy: Probability
     }
 
     let ventilation_done_duration = ventilation.timestamp.elapsed();
+    if ventilation_done_duration < t!(5 minutes) {
+        tracing::info!("Ventilation ended less than 5 minutes ago; skipping air purification");
+        return None;
+    }
+
     if ventilation_done_duration < t!(15 minutes) {
         tracing::info!("Ventilation ended less than 15 minutes ago; running air purification");
         return Some(control_living_room_air_purifier(speed));

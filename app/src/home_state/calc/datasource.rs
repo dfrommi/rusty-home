@@ -13,7 +13,7 @@ mod device_state {
         device_state::{DeviceStateClient, DeviceStateId, DeviceStateValue},
     };
 
-    const LOOKBACK_DURATION_HOURS: i64 = 36;
+    const LOOKBACK_DURATION_HOURS: i64 = 3;
 
     pub trait DeviceStateProvider {
         fn get(&self, id: &DeviceStateId) -> Option<DataFrame<DeviceStateValue>>;

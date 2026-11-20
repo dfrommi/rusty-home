@@ -135,6 +135,10 @@ impl<T: Clone> DataFrame<T> {
         self.data.values().rev().find(|dp| predicate(dp))
     }
 
+    pub fn any(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> bool {
+        self.data.values().rev().any(|dp| predicate(dp))
+    }
+
     pub fn fulfilled_since(&self, predicate: impl Fn(&DataPoint<T>) -> bool) -> Option<DateTime> {
         self.data
             .values()

@@ -5,7 +5,7 @@ mod monitoring;
 mod mqtt;
 
 pub use bus::{EventBus, EventEmitter, EventListener};
-pub use db::DatabaseConfig;
+pub use db::{DatabaseConfig, SQLiteDatabase};
 pub use http::client::HttpClientConfig;
 pub use http::server::HttpServerConfig;
 pub use monitoring::{BootstrapMonitoring, CorrelationId, MonitoringConfig, MonitoringControl, TraceContext};

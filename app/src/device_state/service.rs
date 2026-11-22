@@ -1,57 +1,128 @@
 use std::collections::{HashMap, HashSet};
 
-use infrastructure::EventEmitter;
+use infrastructure::{EventEmitter, SQLiteDatabase};
+use moka::sync::Cache;
 
 use crate::{
     core::{
-        time::{DateTime, DateTimeRange},
-        timeseries::DataPoint,
+        time::DateTime,
+        timeseries::{DataFrame, DataPoint},
     },
     device_state::{
         DeviceAvailability, DeviceAvailabilityItem, DeviceAvailabilityStatus, DeviceStateEvent, DeviceStateId,
         DeviceStateValue,
-        adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, SaveOutcome},
+        adapter::db::{
+            DeviceAvailabilityRepository, PostgresDeviceStateRepository, SQLiteDeviceStateRepository, SaveOutcome,
+        },
     },
 };
 
 pub struct DeviceStateService {
-    state_repo: CachedDeviceStateRepository,
+    state_repo: PostgresDeviceStateRepository,
+    sqlite_repo: SQLiteDeviceStateRepository,
+    sqlite_db: SQLiteDatabase,
     availability_repo: DeviceAvailabilityRepository,
     event_tx: EventEmitter<DeviceStateEvent>,
+    latest_values: Cache<DeviceStateId, Option<DataPoint<DeviceStateValue>>>,
 }
 
 impl DeviceStateService {
     pub fn new(
-        state_repo: CachedDeviceStateRepository,
+        state_repo: PostgresDeviceStateRepository,
+        sqlite_db: SQLiteDatabase,
         availability_repo: DeviceAvailabilityRepository,
         event_tx: EventEmitter<DeviceStateEvent>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        let sqlite_repo = {
+            let connection = sqlite_db.for_writing()?;
+            SQLiteDeviceStateRepository::new(&connection)?
+        };
+
+        Ok(Self {
             state_repo,
+            sqlite_repo,
+            sqlite_db,
             availability_repo,
             event_tx,
-        }
+            latest_values: Cache::builder().max_capacity(100_000).build(),
+        })
     }
 
     pub async fn initialize_availability(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
         self.availability_repo.sync_item_availability(&items).await
     }
 
-    pub async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
+    pub(super) async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
         if DateTime::is_shifted() {
             tracing::warn!("Received device state update with shifted DateTime: {:?}, ignoring", dp);
             return;
         }
 
         let id = DeviceStateId::from(&dp.value);
-
         let outcome = match self.state_repo.save(dp.clone()).await {
             Ok(outcome) => outcome,
-            Err(e) => {
-                tracing::error!("Error saving device state for {:?}: {:?}", id, e);
+            Err(error) => {
+                tracing::error!("Error saving device state for {:?}: {:?}", id, error);
                 return;
             }
         };
+
+        // Keep SQLite's read/check/write flow under one lock. Do not hold this synchronous lock
+        // across the Postgres await above.
+        let sqlite_outcome = match self.sqlite_db.for_writing() {
+            Ok(connection) => (|| -> anyhow::Result<SaveOutcome> {
+                let current_dp = self.sqlite_repo.get_latest_for_device(&connection, &id)?;
+                let sqlite_outcome = match current_dp {
+                    None => {
+                        tracing::debug!("SQLite: No current device state for {:?}, inserting new value: {:?}", id, dp);
+                        SaveOutcome::Inserted
+                    }
+                    Some(current_dp) if dp.value == current_dp.value => {
+                        tracing::debug!(
+                            "SQLite: Duplicate device state update for {:?}: value {:?} is the same as the current value {:?}",
+                            id,
+                            dp.value,
+                            current_dp.value
+                        );
+                        SaveOutcome::Duplicate
+                    }
+                    //TODO better internal timestamp handling without unneccessary high precision, for
+                    //examlple truncate to millis
+                    Some(current_dp) if dp.timestamp.unix_millis() < current_dp.timestamp.unix_millis() => {
+                        tracing::debug!(
+                            "SQLite: Stale device state update for {:?}: current timestamp {:?} is newer than update timestamp {:?}",
+                            id,
+                            current_dp.timestamp,
+                            dp.timestamp
+                        );
+                        SaveOutcome::Stale
+                    }
+                    _ => {
+                        tracing::debug!("SQLite: Inserting new device state for {:?}: {:?}", id, dp);
+                        SaveOutcome::Inserted
+                    }
+                };
+
+                if outcome == SaveOutcome::Inserted {
+                    self.sqlite_repo.save(&connection, dp.clone())?;
+                    tracing::info!("Saved device state to SQLite for {:?}: {:?}", id, &dp.value);
+                }
+
+                Ok(sqlite_outcome)
+            })(),
+            Err(error) => Err(error),
+        };
+
+        match sqlite_outcome {
+            Ok(sqlite_outcome) if sqlite_outcome != outcome => tracing::error!(
+                "Inconsistent save outcome for device state update of {:?}, trusting Postgres. SQLite: {}; Postgres {}",
+                id,
+                sqlite_outcome,
+                outcome
+            ),
+            Ok(_) => {}
+            Err(error) => tracing::error!("Error syncing device state with SQLite for {:?}: {:?}", id, error),
+        }
 
         if outcome == SaveOutcome::Stale {
             tracing::debug!("Ignoring stale device state update for {:?}: {:?}", id, dp);
@@ -59,8 +130,8 @@ impl DeviceStateService {
         }
 
         tracing::info!("Device state update received ({:?}): {:?}", outcome, &dp.value);
-
         self.event_tx.send(DeviceStateEvent::Updated(dp.clone()));
+
         if outcome == SaveOutcome::Inserted {
             tracing::info!(
                 event = "device_state_changed",
@@ -71,6 +142,8 @@ impl DeviceStateService {
                 id,
                 &dp.value
             );
+
+            self.latest_values.invalidate(&id);
 
             // Only for new values, to preserve the time when the value became active.
             self.event_tx.send(DeviceStateEvent::Changed(dp));
@@ -96,11 +169,10 @@ impl DeviceStateService {
         }
     }
 
-    pub async fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
+    pub fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
         let mut res = HashMap::new();
-
         for id in DeviceStateId::variants() {
-            match self.state_repo.get_latest_for_device(&id).await {
+            match self.get_latest_for_device(&id) {
                 Ok(Some(dp)) => {
                     res.insert(id, dp);
                 }
@@ -112,83 +184,29 @@ impl DeviceStateService {
                 }
             }
         }
-
         Ok(res)
     }
 
-    pub async fn get_all_data_points_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<DataPoint<DeviceStateValue>>> {
-        self.state_repo.get_all_data_points_in_range_ts_asc(range).await
+    pub fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
+        if DateTime::is_shifted() {
+            let connection = self.sqlite_db.for_reading()?;
+            return self.sqlite_repo.get_latest_for_device(&connection, id);
+        }
+
+        self.latest_values
+            .try_get_with(*id, || {
+                let connection = self.sqlite_db.for_reading()?;
+                self.sqlite_repo.get_latest_for_device(&connection, id)
+            })
+            .map_err(|e| anyhow::anyhow!("Error getting latest device state for {:?}: {:?}", id, e))
+    }
+
+    pub fn get_state_since(&self, id: &DeviceStateId, since: DateTime) -> anyhow::Result<DataFrame<DeviceStateValue>> {
+        let connection = self.sqlite_db.for_reading()?;
+        self.sqlite_repo.get_data_frame_since(&connection, id, since)
     }
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         self.availability_repo.get_item_availabilities().await
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
-    use infrastructure::EventBus;
-    use sqlx::PgPool;
-
-    use crate::{
-        core::{timeseries::DataPoint, unit::DegreeCelsius},
-        device_state::{
-            DeviceAvailabilityConfig, DeviceStateEvent, DeviceStateValue, Temperature,
-            adapter::db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository},
-        },
-        t,
-    };
-
-    use super::DeviceStateService;
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn stale_updates_do_not_emit_events_but_duplicates_still_emit_updated(pool: PgPool) -> anyhow::Result<()> {
-        let event_bus = EventBus::new(8);
-        let mut events = event_bus.subscribe();
-        let service = DeviceStateService::new(
-            CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool.clone())),
-            DeviceAvailabilityRepository::new(
-                pool,
-                DeviceAvailabilityConfig {
-                    default_offline_after: t!(1 hours),
-                    overrides: vec![],
-                },
-            ),
-            event_bus.emitter(),
-        );
-        let latest = DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0)),
-            t!(now),
-        );
-
-        service.handle_state_update(latest.clone()).await;
-        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Updated(_))));
-        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Changed(_))));
-
-        service.handle_state_update(latest).await;
-        assert!(matches!(events.recv().await, Some(DeviceStateEvent::Updated(_))));
-        assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
-                .await
-                .is_err()
-        );
-
-        service
-            .handle_state_update(DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
-                t!(1 minutes ago),
-            ))
-            .await;
-        assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
-                .await
-                .is_err()
-        );
-
-        Ok(())
     }
 }

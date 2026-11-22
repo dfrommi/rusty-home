@@ -4,7 +4,7 @@ mod service;
 
 use anyhow::Context;
 pub use domain::*;
-use infrastructure::{EventBus, EventListener, Mqtt};
+use infrastructure::{EventBus, EventListener, Mqtt, SQLiteDatabase};
 use serde::Deserialize;
 
 use std::{
@@ -16,13 +16,13 @@ use sqlx::PgPool;
 
 use crate::{
     core::{
-        time::{DateTime, DateTimeRange, Duration},
+        time::{DateTime, Duration},
         timeseries::{DataFrame, DataPoint},
     },
     device_state::{
         adapter::{
             IncomingDataSource,
-            db::{CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository},
+            db::{DeviceAvailabilityRepository, PostgresDeviceStateRepository},
             energy_meter::EnergyMeterIncomingDataSource,
             homeassistant::HomeAssistantIncomingDataSource,
             lgtv::LgtvIncomingDataSource,
@@ -156,8 +156,10 @@ impl DeviceStateModule {
         tado_url: &str,
         tado_home_id: &str,
         availability_config: DeviceAvailabilityConfig,
+        sqlite_database: SQLiteDatabase,
     ) -> anyhow::Result<Self> {
-        let state_repo = CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool.clone()));
+        let state_repo = PostgresDeviceStateRepository::new(pool.clone());
+
         let availability_repo = DeviceAvailabilityRepository::new(pool, availability_config);
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
@@ -168,7 +170,7 @@ impl DeviceStateModule {
 
         let event_bus = EventBus::new(128);
 
-        let service = DeviceStateService::new(state_repo, availability_repo, event_bus.emitter());
+        let service = DeviceStateService::new(state_repo, sqlite_database, availability_repo, event_bus.emitter())?;
 
         Ok(DeviceStateModule {
             service: Arc::new(service),
@@ -237,15 +239,17 @@ impl DeviceStateModule {
 }
 
 impl DeviceStateClient {
-    pub async fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
-        self.service.get_current_for_all().await
+    pub fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
+        self.service.get_latest_for_device(id)
     }
 
-    pub async fn get_all_data_points_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<HashMap<DeviceStateId, DataFrame<DeviceStateValue>>> {
-        Ok(group_by_device_id(self.service.get_all_data_points_in_range(range).await?))
+    pub fn get_state_since(&self, id: &DeviceStateId, since: DateTime) -> anyhow::Result<DataFrame<DeviceStateValue>> {
+        self.service.get_state_since(id, since)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
+        self.service.get_current_for_all()
     }
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
@@ -253,20 +257,10 @@ impl DeviceStateClient {
     }
 }
 
-fn group_by_device_id(
-    data_points: Vec<DataPoint<DeviceStateValue>>,
-) -> HashMap<DeviceStateId, DataFrame<DeviceStateValue>> {
-    data_points.into_iter().fold(HashMap::new(), |mut acc, dp| {
-        let id = DeviceStateId::from(&dp.value);
-        acc.entry(id).or_insert_with(DataFrame::empty).insert(dp);
-        acc
-    })
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
-    use crate::{core::unit::DegreeCelsius, t};
+    use crate::t;
 
     use super::*;
 
@@ -327,51 +321,5 @@ mod tests {
         };
 
         assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_group_by_device_id() {
-        let dps = vec![
-            DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.0)),
-                t!(30 minutes ago),
-            ),
-            DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0)),
-                t!(20 minutes ago),
-            ),
-            DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5)),
-                t!(20 minutes ago),
-            ),
-            DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.5)),
-                t!(25 minutes ago),
-            ),
-            DataPoint::new(
-                DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
-                t!(10 minutes ago),
-            ),
-        ];
-
-        let grouped = group_by_device_id(dps);
-
-        assert_eq!(grouped.len(), 2);
-        let living_room_df = grouped
-            .get(&DeviceStateId::Temperature(Temperature::LivingRoom))
-            .expect("Living room DataFrame not found");
-        let bedroom_df = grouped
-            .get(&DeviceStateId::Temperature(Temperature::Bedroom))
-            .expect("Bedroom DataFrame not found");
-
-        assert_eq!(living_room_df.len(), 3);
-        assert_eq!(
-            living_room_df.prev_or_at(t!(15 minutes ago)).unwrap().value,
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5))
-        );
-
-        assert_eq!(bedroom_df.len(), 2);
-
-        println!("Grouped DataFrames: {:?}", grouped);
     }
 }

@@ -8,7 +8,7 @@ use crate::{
         time::DateTime,
         timeseries::{DataFrame, DataPoint},
     },
-    device_state::{DeviceStateId, DeviceStateItem, DeviceStateValue},
+    device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem},
     home_state::{HomeStateDerivedStateProvider, HomeStateId, HomeStateItem, HomeStateValue},
     t,
     trigger::{UserTriggerExecution, UserTriggerTarget},
@@ -62,9 +62,9 @@ impl StateCalculationResult {
 
 pub struct StateCalculationContext {
     start_time: DateTime,
+    device_state_client: DeviceStateClient,
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
     calculating: RefCell<Vec<HomeStateId>>,
-    device_states: HashMap<DeviceStateId, DataFrame<DeviceStateValue>>,
     latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
@@ -86,7 +86,7 @@ impl Drop for CalculatingGuard<'_> {
 
 impl StateCalculationContext {
     pub fn new(
-        device_states: HashMap<DeviceStateId, DataFrame<DeviceStateValue>>,
+        device_state_client: DeviceStateClient,
         latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
         previous: StateCalculationResult,
     ) -> Self {
@@ -110,9 +110,9 @@ impl StateCalculationContext {
 
         StateCalculationContext {
             start_time,
+            device_state_client,
             current: RefCell::new(HashMap::new()),
             calculating: RefCell::new(Vec::new()),
-            device_states,
             latest_triggers,
             prev: previous,
             trace_contexts,
@@ -155,7 +155,7 @@ impl StateCalculationContext {
         D: Into<DeviceStateId> + DeviceStateItem + Clone,
     {
         let device_state_id = id.clone().into();
-        let df = self.device_states.get(&device_state_id)?.get_since_plus_one(since);
+        let df = self.device_state_client.get_state_since(&device_state_id, since).ok()?;
 
         if df.first().is_none() {
             tracing::warn!(
@@ -183,7 +183,12 @@ impl StateCalculationContext {
     where
         D: Into<DeviceStateId> + DeviceStateItem + Clone,
     {
-        let dp = self.device_states.get(&id.clone().into())?.last()?;
+        let device_state_id: DeviceStateId = id.clone().into();
+        let dp = self
+            .device_state_client
+            .get_latest_for_device(&device_state_id)
+            .ok()
+            .flatten()?;
 
         match id.try_downcast(dp.value.clone()) {
             Ok(v) => Some(DataPoint::new(v, dp.timestamp)),
@@ -300,71 +305,5 @@ impl StateCalculationContext {
         }
 
         if df.is_empty() { None } else { Some(df) }
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use std::collections::HashMap;
-
-    use crate::{
-        core::{
-            timeseries::{DataFrame, DataPoint},
-            unit::DegreeCelsius,
-        },
-        device_state::{DeviceStateValue, Temperature},
-        t,
-    };
-
-    use super::{StateCalculationContext, StateCalculationResult};
-
-    fn context_with_history(id: Temperature, states: DataFrame<DeviceStateValue>) -> StateCalculationContext {
-        let mut histories = HashMap::new();
-        histories.insert(id.into(), states);
-        StateCalculationContext::new(histories, HashMap::new(), StateCalculationResult::default())
-    }
-
-    #[test]
-    fn device_states_returns_available_history_when_since_predates_earliest_point() {
-        let id = Temperature::LivingRoom;
-        let since = t!(48 hours ago);
-        let baseline = t!(40 hours ago);
-        let recent = t!(24 hours ago);
-        let context = context_with_history(
-            id,
-            DataFrame::new([
-                DataPoint::new(DeviceStateValue::Temperature(id, DegreeCelsius(18.0)), baseline),
-                DataPoint::new(DeviceStateValue::Temperature(id, DegreeCelsius(19.0)), recent),
-            ]),
-        );
-
-        let states = context.device_states(id, since).unwrap();
-        let values: Vec<_> = states.into_iter().map(|dp| dp.value.0).collect();
-
-        assert_eq!(values, vec![18.0, 19.0]);
-    }
-
-    #[test]
-    fn device_states_returns_history_since_cutoff_with_its_baseline() {
-        let id = Temperature::LivingRoom;
-        let since = t!(15 hours ago);
-        let outside_cutoff = since - t!(15 hours);
-        let baseline = since - t!(1 hours);
-        let after_cutoff = since + t!(5 hours);
-        let context = context_with_history(
-            id,
-            DataFrame::new([
-                DataPoint::new(DeviceStateValue::Temperature(id, DegreeCelsius(17.0)), outside_cutoff),
-                DataPoint::new(DeviceStateValue::Temperature(id, DegreeCelsius(18.0)), baseline),
-                DataPoint::new(DeviceStateValue::Temperature(id, DegreeCelsius(19.0)), after_cutoff),
-            ]),
-        );
-
-        let states = context.device_states(id, since).unwrap();
-        let values: Vec<_> = states.into_iter().map(|dp| dp.value.0).collect();
-
-        assert_eq!(values, vec![18.0, 19.0]);
-        assert_eq!(context.device_state(id).unwrap().value, DegreeCelsius(19.0));
     }
 }

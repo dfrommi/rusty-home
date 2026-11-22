@@ -29,8 +29,8 @@ rumqttc = { workspace = true }
 tokio = { workspace = true }
 
 #DB Dependencies
+rusqlite = { workspace = true }
 sqlx = { workspace = true }
-
 #HTTP dependencies
 actix-web = { workspace = true }
 tracing-actix-web = { workspace = true }

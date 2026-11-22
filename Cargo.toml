@@ -43,16 +43,18 @@ reqwest = { version = "*", features = ["json", "stream", "form"] }
 reqwest-middleware = { version = "*", features = ["json"] }
 
 #DB Dependencies
-sqlx = { version = "0.8", features = [
+rusqlite = { version = "0.42", features = ["bundled"] }
+sqlx = { version = "0.9", default-features = false, features = [
   "postgres",
   "runtime-tokio",
   "macros",
+  "migrate",
   "chrono",
 ] }
 
 #Caching dependencies
 cached = { version = "0.56", features = ["default", "async"] }
-moka = { version = "0.12", features = ["future"] }
+moka = { version = "0.12", features = ["future", "sync"] }
 
 #Tracing dependencies
 tracing = "0.1"

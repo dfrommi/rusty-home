@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use futures::future::select_all;
-use infrastructure::{EventBus, Mqtt};
+use infrastructure::{EventBus, Mqtt, SQLiteDatabase};
 use tokio::task::{AbortHandle, JoinError, JoinHandle};
 
 use crate::automation::AutomationModule;
@@ -22,6 +22,7 @@ mod trigger;
 
 struct Infrastructure {
     db_pool: sqlx::PgPool,
+    sqlite_database: SQLiteDatabase,
     mqtt_client: Mqtt,
 }
 
@@ -54,6 +55,7 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.tado.url,
         &settings.tado.home_id,
         settings.device_availability.clone(),
+        infrastructure.sqlite_database.clone(),
     )
     .await?;
     device_state_module.initialize_availability().await?;
@@ -183,9 +185,14 @@ impl Infrastructure {
     #[allow(clippy::expect_used)]
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
         let db_pool = settings.database.new_pool().await.expect("Error initializing database");
+        let sqlite_database = settings.database.new_sqlite_database()?;
         let mqtt_client = settings.mqtt.new_client();
 
-        Ok(Self { db_pool, mqtt_client })
+        Ok(Self {
+            db_pool,
+            sqlite_database,
+            mqtt_client,
+        })
     }
 }
 

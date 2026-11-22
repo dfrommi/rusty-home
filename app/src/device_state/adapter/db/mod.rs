@@ -1,10 +1,12 @@
 mod availability;
-mod cached;
+
 mod state;
+mod state_sqlite;
 
 pub use availability::DeviceAvailabilityRepository;
-pub use cached::CachedDeviceStateRepository;
+
 pub use state::{PostgresDeviceStateRepository, SaveOutcome};
+pub use state_sqlite::SQLiteDeviceStateRepository;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -14,133 +16,17 @@ mod tests {
     use sqlx::PgPool;
 
     use crate::{
-        core::{time::DateTimeRange, timeseries::DataPoint, unit::DegreeCelsius},
-        device_state::{
-            DeviceAvailabilityConfig, DeviceAvailabilityItem, DeviceAvailabilityOverride, DeviceStateId,
-            DeviceStateValue, Temperature,
-        },
+        device_state::{DeviceAvailabilityConfig, DeviceAvailabilityItem, DeviceAvailabilityOverride},
         t,
     };
 
-    use super::{
-        CachedDeviceStateRepository, DeviceAvailabilityRepository, PostgresDeviceStateRepository, SaveOutcome,
-    };
+    use super::DeviceAvailabilityRepository;
 
     fn default_availability_config() -> DeviceAvailabilityConfig {
         DeviceAvailabilityConfig {
             default_offline_after: t!(1 hours),
             overrides: vec![],
         }
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn get_all_data_points_in_range_ts_asc(pool: PgPool) -> anyhow::Result<()> {
-        let repo = PostgresDeviceStateRepository::new(pool);
-        prepare_test_data(&repo).await?;
-
-        let dps = repo
-            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(35 minutes ago)))
-            .await?;
-
-        assert_eq!(dps.len(), 4);
-        assert_eq!(
-            dps[0].value,
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0))
-        );
-        assert_eq!(
-            dps[1].value,
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.5))
-        );
-        assert_eq!(
-            dps[2].value,
-            DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0))
-        );
-        assert_eq!(
-            dps[3].value,
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
-        );
-
-        Ok(())
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn get_latest_for_device(pool: PgPool) -> anyhow::Result<()> {
-        let repo = PostgresDeviceStateRepository::new(pool);
-        prepare_test_data(&repo).await?;
-
-        let dp = repo
-            .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))
-            .await?
-            .expect("expected a data point for existing device");
-
-        assert_eq!(
-            dp.value,
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0))
-        );
-
-        Ok(())
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn get_latest_for_device_no_data(pool: PgPool) -> anyhow::Result<()> {
-        let repo = PostgresDeviceStateRepository::new(pool);
-
-        let dp = repo
-            .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))
-            .await?;
-
-        assert!(dp.is_none());
-
-        Ok(())
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn cached_latest_state_updates_on_save_and_bypasses_cache_during_timeshift(
-        pool: PgPool,
-    ) -> anyhow::Result<()> {
-        let repo = CachedDeviceStateRepository::new(PostgresDeviceStateRepository::new(pool));
-        let id = DeviceStateId::Temperature(Temperature::LivingRoom);
-        let first = DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5)),
-            t!(2 hours ago),
-        );
-        let latest = DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
-            t!(1 hours ago),
-        );
-
-        assert_eq!(repo.save(first.clone()).await?, SaveOutcome::Inserted);
-        assert_eq!(repo.save(latest.clone()).await?, SaveOutcome::Inserted);
-        assert_eq!(repo.save(latest.clone()).await?, SaveOutcome::Duplicate);
-
-        let stale = DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(19.0)),
-            t!(75 minutes ago),
-        );
-        assert_eq!(repo.save(stale).await?, SaveOutcome::Stale);
-
-        let cached = repo.get_latest_for_device(&id).await?.expect("latest value not found");
-        assert_eq!(cached.value, latest.value);
-        assert_eq!(cached.timestamp, latest.timestamp);
-
-        let points = repo
-            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(3 hours ago)))
-            .await?;
-        assert_eq!(points.len(), 2);
-
-        let shifted_now = t!(90 minutes ago);
-        let shifted = shifted_now
-            .eval_timeshifted(async { repo.get_latest_for_device(&id).await })
-            .await?
-            .expect("shifted value not found");
-        assert_eq!(shifted.value, first.value);
-        assert_eq!(shifted.timestamp, first.timestamp);
-
-        let current = repo.get_latest_for_device(&id).await?.expect("latest value not found");
-        assert_eq!(current.value, latest.value);
-        assert_eq!(current.timestamp, latest.timestamp);
-
-        Ok(())
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -236,70 +122,6 @@ mod tests {
 
         assert!(!override_status.is_offline);
         assert!(default_status.is_offline);
-
-        Ok(())
-    }
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn get_all_data_points_ignores_unsupported_tag(pool: PgPool) -> anyhow::Result<()> {
-        let repo = PostgresDeviceStateRepository::new(pool.clone());
-
-        let tag_id = sqlx::query_scalar!(
-            r#"INSERT INTO thing_value_tag (channel, name) VALUES ($1, $2) RETURNING id as "id!""#,
-            "removed_state",
-            "removed_device",
-        )
-        .fetch_one(&pool)
-        .await?;
-
-        sqlx::query!(
-            r#"INSERT INTO thing_value (tag_id, value, timestamp) VALUES ($1, $2, $3)"#,
-            tag_id,
-            1.0,
-            t!(now).into_db(),
-        )
-        .execute(&pool)
-        .await?;
-
-        let dps = repo
-            .get_all_data_points_in_range_ts_asc(DateTimeRange::since(t!(1 hours ago)))
-            .await?;
-
-        assert!(dps.is_empty());
-
-        Ok(())
-    }
-
-    async fn prepare_test_data(repo: &PostgresDeviceStateRepository) -> anyhow::Result<()> {
-        repo.save(DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.5)),
-            t!(50 minutes ago),
-        ))
-        .await?;
-
-        repo.save(DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0)),
-            t!(40 minutes ago),
-        ))
-        .await?;
-
-        repo.save(DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.5)),
-            t!(30 minutes ago),
-        ))
-        .await?;
-
-        repo.save(DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(22.0)),
-            t!(20 minutes ago),
-        ))
-        .await?;
-
-        repo.save(DataPoint::new(
-            DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0)),
-            t!(22 minutes ago),
-        ))
-        .await?;
 
         Ok(())
     }

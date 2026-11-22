@@ -68,7 +68,7 @@ impl ObservabilityModule {
                     _ => vec![],
                 },
 
-                _ = device_state_timer.tick() => match self.device_state_client.get_current_for_all().await {
+                _ = device_state_timer.tick() => match self.device_state_client.get_current_for_all() {
                     Ok(states) => {
                         states
                             .into_values()

@@ -1,10 +1,7 @@
 use crate::{
     core::time::{DateTime, DateTimeRange, Duration},
     device_state::DeviceStateClient,
-    home_state::calc::{
-        StateCalculationResult, calculate_next_result,
-        datasource::{PreloadedDeviceStateProvider, PreloadedUserTriggerProvider},
-    },
+    home_state::calc::{StateCalculationResult, calculate_next_result, datasource::PreloadedUserTriggerProvider},
     t,
     trigger::TriggerClient,
 };
@@ -18,7 +15,6 @@ pub struct StateCalculationResultIterator {
     current: Option<StateCalculationResult>,
 
     preload_range: DateTimeRange,
-    device_data_source: Option<PreloadedDeviceStateProvider>,
     trigger_data_source: Option<PreloadedUserTriggerProvider>,
 }
 
@@ -31,7 +27,6 @@ impl StateCalculationResultIterator {
     ) -> Self {
         Self {
             preload_range: Self::preload_range_starting_at(*full_range.start(), &full_range),
-            device_data_source: None,
             trigger_data_source: None,
             full_range,
             device_client,
@@ -58,18 +53,8 @@ impl StateCalculationResultIterator {
         //Reset when next block needs to be loaded
         if !self.preload_range.contains(&next_dt) {
             self.preload_range = Self::preload_range_starting_at(next_dt, &self.full_range);
-            self.device_data_source = None;
             self.trigger_data_source = None;
         }
-
-        let device_ds = match &self.device_data_source {
-            Some(ds) => ds.clone(),
-            None => {
-                let ds = PreloadedDeviceStateProvider::new(&self.device_client, self.full_range.clone()).await?;
-                self.device_data_source = Some(ds.clone());
-                ds
-            }
-        };
 
         let trigger_ds = match &self.trigger_data_source {
             Some(ds) => ds.clone(),
@@ -87,7 +72,7 @@ impl StateCalculationResultIterator {
                 calculate_next_result(
                     self.keep_duration.clone(),
                     self.current.take().unwrap_or_default(),
-                    &device_ds,
+                    self.device_client.clone(),
                     &trigger_ds,
                 )
             })

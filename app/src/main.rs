@@ -68,7 +68,8 @@ pub async fn main() -> anyhow::Result<()> {
         tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
     }
 
-    let trigger_module = trigger::TriggerModule::new(infrastructure.db_pool.clone());
+    let trigger_module =
+        trigger::TriggerModule::new(infrastructure.db_pool.clone(), infrastructure.sqlite_database.clone())?;
     let home_state_module = HomeStateModule::new(
         t!(25 hours),
         device_state_module.subscribe(),

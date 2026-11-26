@@ -15,6 +15,11 @@ use crate::home_state::FanActivity;
 #[sqlx(transparent)]
 pub struct UserTriggerId(i64);
 
+impl UserTriggerId {
+    pub fn value(&self) -> i64 {
+        self.0
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::Display, Id, EnumVariants)]
 #[serde(rename_all = "snake_case")]
 pub enum OnOffDevice {

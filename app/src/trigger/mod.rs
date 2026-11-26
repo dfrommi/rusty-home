@@ -5,7 +5,7 @@ mod service;
 use std::sync::Arc;
 
 pub use domain::*;
-use infrastructure::{EventBus, EventListener};
+use infrastructure::{EventBus, EventListener, SQLiteDatabase};
 use sqlx::PgPool;
 
 use crate::{
@@ -72,14 +72,14 @@ impl TriggerClient {
     }
 
     pub async fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        self.service.get_latest_triggers().await
+        self.service.get_latest_triggers()
     }
 
     pub async fn get_all_triggers_active_anytime_in_range(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        self.service.get_all_triggers_active_anytime_in_range(range).await
+        self.service.get_all_triggers_active_anytime_in_range(range)
     }
 
     pub async fn disable_triggers_before_except(
@@ -87,21 +87,21 @@ impl TriggerClient {
         before: DateTime,
         excluded_ids: &[UserTriggerId],
     ) -> anyhow::Result<u64> {
-        self.service.disable_triggers_before_except(before, excluded_ids).await
+        self.service.disable_triggers_before_except(before, excluded_ids)
     }
 
     pub async fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
-        self.service.set_triggers_active_from_if_unset(trigger_ids).await
+        self.service.set_triggers_active_from_if_unset(trigger_ids)
     }
 }
 
 impl TriggerModule {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, sqlite_db: SQLiteDatabase) -> anyhow::Result<Self> {
         let repo = TriggerRepository::new(pool);
         let event_bus = EventBus::new(64);
-        let service = Arc::new(TriggerService::new(repo, event_bus.emitter()));
+        let service = Arc::new(TriggerService::new(repo, sqlite_db, event_bus.emitter())?);
 
-        Self { service, event_bus }
+        Ok(Self { service, event_bus })
     }
 
     pub fn client(&self) -> TriggerClient {

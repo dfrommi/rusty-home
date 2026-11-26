@@ -61,7 +61,7 @@ mod user_trigger {
                 .triggers
                 .iter()
                 .filter(|exec| exec.target() == *target && exec.timestamp <= now)
-                .max_by_key(|exec| exec.timestamp) //latest within timeshifted range
+                .max_by_key(|exec| (exec.timestamp, exec.id.value()))
                 .cloned()?;
 
             //Fake state at `now` timestamp
@@ -78,6 +78,59 @@ mod user_trigger {
             }
 
             Some(trigger)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::{
+            core::time::DateTime,
+            trigger::{OnOffDevice, UserTrigger},
+        };
+        use anyhow::Context as _;
+
+        #[tokio::test]
+        async fn replay_picks_the_higher_id_on_ties_and_hides_future_lifecycle_dates() -> anyhow::Result<()> {
+            let timestamp = DateTime::from_static_iso("2026-03-10T12:00:00Z");
+            let active_from = timestamp + t!(1 minutes);
+            let active_until = timestamp + t!(2 minutes);
+            let newest = UserTriggerExecution {
+                id: 2.into(),
+                trigger: UserTrigger::DevicePower {
+                    device: OnOffDevice::InfraredHeater,
+                    on: false,
+                },
+                timestamp,
+                active_from: Some(active_from),
+                active_until: Some(active_until),
+                correlation_id: None,
+            };
+            let older = UserTriggerExecution {
+                id: 1.into(),
+                ..newest.clone()
+            };
+            let target = newest.target();
+            let id = newest.id.clone();
+            // SQLite returns the higher ID first for equal timestamps.
+            let provider = PreloadedUserTriggerProvider {
+                triggers: Arc::new(vec![newest, older]),
+            };
+
+            for (now, expected_from, expected_until) in [
+                (timestamp, None, None),
+                (active_from, Some(active_from), None),
+                (active_until, Some(active_from), Some(active_until)),
+            ] {
+                let trigger = now
+                    .eval_timeshifted(async { provider.get(&target) })
+                    .await
+                    .context("Trigger should be visible in replay")?;
+                assert_eq!(trigger.id, id);
+                assert_eq!(trigger.active_from, expected_from);
+                assert_eq!(trigger.active_until, expected_until);
+            }
+            Ok(())
         }
     }
 }

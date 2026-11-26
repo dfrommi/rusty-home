@@ -22,20 +22,16 @@ pub struct DeviceAvailabilityService {
 impl DeviceAvailabilityService {
     pub fn new(
         postgres_repo: DeviceAvailabilityRepository,
+        sqlite_repo: SQLiteDeviceAvailabilityRepository,
         sqlite_db: SQLiteDatabase,
         config: DeviceAvailabilityConfig,
-    ) -> anyhow::Result<Self> {
-        let sqlite_repo = {
-            let connection = sqlite_db.for_writing()?;
-            SQLiteDeviceAvailabilityRepository::new(&connection)?
-        };
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             postgres_repo,
             sqlite_repo,
             sqlite_db,
             config,
-        })
+        }
     }
 
     pub async fn initialize(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {

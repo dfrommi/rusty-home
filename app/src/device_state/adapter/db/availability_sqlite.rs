@@ -90,6 +90,7 @@ mod tests {
     #[test]
     fn stores_and_updates_availability_records() -> anyhow::Result<()> {
         let path = test_file();
+        fs::File::create_new(&path)?;
         let database = SQLiteDatabase::open(&path)?;
         let repository = {
             let connection = database.for_writing()?;

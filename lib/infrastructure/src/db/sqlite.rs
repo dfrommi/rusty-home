@@ -51,8 +51,9 @@ impl SQLiteDatabase {
         let path = path.as_ref().to_path_buf();
         ensure!(!path.as_os_str().is_empty(), "SQLite path must not be empty");
 
-        let connection =
-            Connection::open(&path).with_context(|| format!("Error opening SQLite database {}", path.display()))?;
+        let flags = OpenFlags::default() - OpenFlags::SQLITE_OPEN_CREATE;
+        let connection = Connection::open_with_flags(&path, flags)
+            .with_context(|| format!("Error opening existing SQLite database {}", path.display()))?;
         Self::initialize_file(connection, &path)
     }
 
@@ -89,5 +90,17 @@ impl SQLiteDatabase {
                 next: AtomicUsize::new(0),
             }),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SQLiteDatabase;
+
+    #[test]
+    fn rejects_a_missing_database_without_creating_it() {
+        let path = std::env::temp_dir().join(format!("rusty-home-missing-{}.sqlite", std::process::id()));
+        assert!(SQLiteDatabase::open(&path).is_err());
+        assert!(!path.exists());
     }
 }

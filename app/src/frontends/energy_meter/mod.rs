@@ -12,6 +12,7 @@ mod persistence_sqlite;
 mod service;
 
 use persistence::EnergyReadingRepository;
+use persistence_sqlite::SQLiteEnergyReadingRepository;
 use service::EnergyReadingService;
 
 #[derive(Clone)]
@@ -25,7 +26,11 @@ impl EnergyMeter {
         sqlite_db: SQLiteDatabase,
         tx: EventEmitter<DataPoint<EnergyReading>>,
     ) -> anyhow::Result<Self> {
-        let service = EnergyReadingService::new(EnergyReadingRepository::new(pool), sqlite_db, tx)?;
+        let sqlite_repo = {
+            let connection = sqlite_db.for_writing()?;
+            SQLiteEnergyReadingRepository::new(&connection)?
+        };
+        let service = EnergyReadingService::new(EnergyReadingRepository::new(pool), sqlite_repo, sqlite_db, tx);
         Ok(Self {
             service: Arc::new(service),
         })
@@ -96,9 +101,9 @@ mod tests {
     pub fn test_database() -> anyhow::Result<(TestDatabaseFile, SQLiteDatabase)> {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let file = TestDatabaseFile(
-            std::env::temp_dir().join(format!("rusty-home-energy-{}-{id}.sqlite", std::process::id())),
-        );
+        let path = std::env::temp_dir().join(format!("rusty-home-energy-{}-{id}.sqlite", std::process::id()));
+        fs::File::create_new(&path)?;
+        let file = TestDatabaseFile(path);
         let db = SQLiteDatabase::open(&file.0)?;
         Ok((file, db))
     }

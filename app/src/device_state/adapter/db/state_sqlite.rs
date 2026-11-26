@@ -88,46 +88,31 @@ impl SQLiteDeviceStateRepository {
         connection: &Connection,
         id: &DeviceStateId,
         since: DateTime,
-    ) -> Result<DataFrame<DeviceStateValue>> {
+    ) -> Result<Option<DataFrame<DeviceStateValue>>> {
         let tag_id = self.tag_id(*id)?;
         let now = DateTime::now();
         let mut statement = connection.prepare_cached(
             r#"
-            SELECT id, value, timestamp_ms
+            SELECT value, timestamp_ms
             FROM device_state
-            WHERE tag_id = ?1 AND timestamp_ms >= ?2 AND timestamp_ms <= ?3
-
-            UNION ALL
-
-            SELECT id, value, timestamp_ms
-            FROM (
-                SELECT id, value, timestamp_ms
+            WHERE tag_id = ?1 AND timestamp_ms <= ?3
+              AND timestamp_ms >= COALESCE((
+                SELECT MAX(timestamp_ms)
                 FROM device_state
-                WHERE tag_id = ?4 AND timestamp_ms < ?5
-                ORDER BY timestamp_ms DESC, id DESC
-                LIMIT 1
-            )
+                WHERE tag_id = ?1 AND timestamp_ms <= MIN(?2, ?3)
+              ), ?2)
             ORDER BY timestamp_ms ASC, id ASC
             "#,
         )?;
 
-        let rows = statement.query_map(
-            params![
-                tag_id,
-                since.unix_millis(),
-                now.unix_millis(),
-                tag_id,
-                since.unix_millis()
-            ],
-            |row| {
-                Ok(DataPoint {
-                    value: from_f64_value(*id, row.get(1)?),
-                    timestamp: DateTime::from_unix_millis(row.get(2)?),
-                })
-            },
-        )?;
+        let rows = statement.query_map(params![tag_id, since.unix_millis(), now.unix_millis()], |row| {
+            Ok(DataPoint {
+                value: from_f64_value(*id, row.get(0)?),
+                timestamp: DateTime::from_unix_millis(row.get(1)?),
+            })
+        })?;
 
-        Ok(DataFrame::new(rows.collect::<rusqlite::Result<Vec<_>>>()?))
+        Ok(DataFrame::new(rows.collect::<rusqlite::Result<Vec<_>>>()?).non_empty())
     }
 
     fn tag_id(&self, id: DeviceStateId) -> Result<i64> {
@@ -184,10 +169,11 @@ mod tests {
     use std::{fs, path::PathBuf, sync::atomic::AtomicU64};
 
     use infrastructure::SQLiteDatabase;
+    use rusqlite::Connection;
 
     use crate::{
-        core::{timeseries::DataPoint, unit::DegreeCelsius},
-        device_state::{DeviceStateId, DeviceStateValue, Temperature},
+        core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
+        device_state::{DeviceStateId, DeviceStateValue, Presence, Temperature},
         t,
     };
 
@@ -203,6 +189,7 @@ mod tests {
     #[test]
     fn creates_strict_schema_and_round_trips_device_state_data() -> anyhow::Result<()> {
         let path = test_file();
+        fs::File::create_new(&path)?;
         let database = SQLiteDatabase::open(&path)?;
         let repository = {
             let connection = database.for_writing()?;
@@ -248,7 +235,9 @@ mod tests {
             let latest = repository
                 .get_latest_for_device(&connection, &living_room)?
                 .expect("latest device state not found");
-            let data_frame = repository.get_data_frame_since(&connection, &living_room, now - t!(25 minutes))?;
+            let data_frame = repository
+                .get_data_frame_since(&connection, &living_room, now - t!(25 minutes))?
+                .expect("device state history not found");
             (latest, data_frame)
         };
 
@@ -270,5 +259,44 @@ mod tests {
         fs::remove_file(path)?;
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn history_starts_at_an_exact_match_and_hides_rows_after_shifted_now() -> anyhow::Result<()> {
+        let connection = Connection::open_in_memory()?;
+        let repository = SQLiteDeviceStateRepository::new(&connection)?;
+        let cutoff = DateTime::from_static_iso("2026-03-10T12:00:00Z");
+        let now = cutoff + t!(5 minutes);
+        let couch = DeviceStateId::Presence(Presence::LivingRoomCouch);
+        let bedroom = DeviceStateId::Temperature(Temperature::Bedroom);
+        for (timestamp, value) in [
+            (
+                cutoff - t!(1 seconds),
+                DeviceStateValue::Presence(Presence::LivingRoomCouch, true),
+            ),
+            (cutoff, DeviceStateValue::Presence(Presence::LivingRoomCouch, false)),
+            (now + t!(1 seconds), DeviceStateValue::Presence(Presence::LivingRoomCouch, true)),
+            (
+                now + t!(1 seconds),
+                DeviceStateValue::Temperature(Temperature::Bedroom, DegreeCelsius(19.0)),
+            ),
+        ] {
+            repository.save(&connection, DataPoint::new(value, timestamp))?;
+        }
+
+        now.eval_timeshifted(async {
+            let history = repository
+                .get_data_frame_since(&connection, &couch, cutoff)?
+                .expect("couch history not found");
+            assert_eq!(history.len(), 1);
+            assert!(!history.any(|dp| dp.value == DeviceStateValue::Presence(Presence::LivingRoomCouch, true)));
+            assert!(
+                repository
+                    .get_data_frame_since(&connection, &bedroom, now + t!(2 seconds))?
+                    .is_none()
+            );
+            Ok(())
+        })
+        .await
     }
 }

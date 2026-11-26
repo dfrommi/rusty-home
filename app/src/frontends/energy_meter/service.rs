@@ -21,19 +21,16 @@ pub struct EnergyReadingService {
 impl EnergyReadingService {
     pub fn new(
         postgres_repo: EnergyReadingRepository,
+        sqlite_repo: SQLiteEnergyReadingRepository,
         sqlite_db: SQLiteDatabase,
         events: EventEmitter<DataPoint<EnergyReading>>,
-    ) -> anyhow::Result<Self> {
-        let sqlite_repo = {
-            let connection = sqlite_db.for_writing()?;
-            SQLiteEnergyReadingRepository::new(&connection)?
-        };
-        Ok(Self {
+    ) -> Self {
+        Self {
             postgres_repo,
             sqlite_repo,
             sqlite_db,
             events,
-        })
+        }
     }
 
     pub async fn add_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<()> {

@@ -11,7 +11,10 @@ use sqlx::PgPool;
 use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
-    trigger::{adapter::db::TriggerRepository, service::TriggerService},
+    trigger::{
+        adapter::{db::TriggerRepository, db_sqlite::SQLiteTriggerRepository},
+        service::TriggerService,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -98,8 +101,12 @@ impl TriggerClient {
 impl TriggerModule {
     pub fn new(pool: PgPool, sqlite_db: SQLiteDatabase) -> anyhow::Result<Self> {
         let repo = TriggerRepository::new(pool);
+        let sqlite_repo = {
+            let connection = sqlite_db.for_writing()?;
+            SQLiteTriggerRepository::new(&connection)?
+        };
         let event_bus = EventBus::new(64);
-        let service = Arc::new(TriggerService::new(repo, sqlite_db, event_bus.emitter())?);
+        let service = Arc::new(TriggerService::new(repo, sqlite_repo, sqlite_db, event_bus.emitter()));
 
         Ok(Self { service, event_bus })
     }

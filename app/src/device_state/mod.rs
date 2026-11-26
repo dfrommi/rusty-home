@@ -23,7 +23,10 @@ use crate::{
     device_state::{
         adapter::{
             IncomingDataSource,
-            db::{DeviceAvailabilityRepository, PostgresDeviceStateRepository},
+            db::{
+                DeviceAvailabilityRepository, PostgresDeviceStateRepository, SQLiteDeviceAvailabilityRepository,
+                SQLiteDeviceStateRepository,
+            },
             energy_meter::EnergyMeterIncomingDataSource,
             homeassistant::HomeAssistantIncomingDataSource,
             lgtv::LgtvIncomingDataSource,
@@ -183,9 +186,20 @@ impl DeviceStateModule {
 
         let event_bus = EventBus::new(128);
 
-        let availability_service =
-            DeviceAvailabilityService::new(availability_repo, sqlite_database.clone(), availability_config)?;
-        let service = DeviceStateService::new(state_repo, sqlite_database, event_bus.emitter())?;
+        let (sqlite_availability_repo, sqlite_state_repo) = {
+            let connection = sqlite_database.for_writing()?;
+            (
+                SQLiteDeviceAvailabilityRepository::new(&connection)?,
+                SQLiteDeviceStateRepository::new(&connection)?,
+            )
+        };
+        let availability_service = DeviceAvailabilityService::new(
+            availability_repo,
+            sqlite_availability_repo,
+            sqlite_database.clone(),
+            availability_config,
+        );
+        let service = DeviceStateService::new(state_repo, sqlite_state_repo, sqlite_database, event_bus.emitter());
 
         Ok(DeviceStateModule {
             service: Arc::new(service),
@@ -260,7 +274,11 @@ impl DeviceStateClient {
         self.service.get_latest_for_device(id)
     }
 
-    pub fn get_state_since(&self, id: &DeviceStateId, since: DateTime) -> anyhow::Result<DataFrame<DeviceStateValue>> {
+    pub fn get_state_since(
+        &self,
+        id: &DeviceStateId,
+        since: DateTime,
+    ) -> anyhow::Result<Option<DataFrame<DeviceStateValue>>> {
         self.service.get_state_since(id, since)
     }
 

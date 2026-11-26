@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use anyhow::Context as _;
 use infrastructure::{EventEmitter, SQLiteDatabase};
-use moka::sync::Cache;
+use moka::{ops::compute::Op, sync::Cache};
 
 use crate::{
     core::{
@@ -14,32 +15,30 @@ use crate::{
     },
 };
 
+type LatestValues = Cache<DeviceStateId, Option<DataPoint<DeviceStateValue>>>;
+
 pub struct DeviceStateService {
     state_repo: PostgresDeviceStateRepository,
     sqlite_repo: SQLiteDeviceStateRepository,
     sqlite_db: SQLiteDatabase,
     event_tx: EventEmitter<DeviceStateEvent>,
-    latest_values: Cache<DeviceStateId, Option<DataPoint<DeviceStateValue>>>,
+    latest_values: LatestValues,
 }
 
 impl DeviceStateService {
     pub fn new(
         state_repo: PostgresDeviceStateRepository,
+        sqlite_repo: SQLiteDeviceStateRepository,
         sqlite_db: SQLiteDatabase,
         event_tx: EventEmitter<DeviceStateEvent>,
-    ) -> anyhow::Result<Self> {
-        let sqlite_repo = {
-            let connection = sqlite_db.for_writing()?;
-            SQLiteDeviceStateRepository::new(&connection)?
-        };
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             state_repo,
             sqlite_repo,
             sqlite_db,
             event_tx,
             latest_values: Cache::builder().max_capacity(100_000).build(),
-        })
+        }
     }
 
     pub(super) async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
@@ -103,6 +102,11 @@ impl DeviceStateService {
             Err(error) => Err(error),
         };
 
+        // Invalidate only after saving, and wait on the cache without holding the SQLite connection.
+        if outcome == SaveOutcome::Inserted && sqlite_outcome.is_ok() {
+            invalidate_latest(&self.latest_values, id);
+        }
+
         match sqlite_outcome {
             Ok(sqlite_outcome) if sqlite_outcome != outcome => tracing::error!(
                 "Inconsistent save outcome for device state update of {:?}, trusting Postgres. SQLite: {}; Postgres {}",
@@ -133,8 +137,6 @@ impl DeviceStateService {
                 &dp.value
             );
 
-            self.latest_values.invalidate(&id);
-
             // Only for new values, to preserve the time when the value became active.
             self.event_tx.send(DeviceStateEvent::Changed(dp));
         }
@@ -159,21 +161,101 @@ impl DeviceStateService {
     }
 
     pub fn get_latest_for_device(&self, id: &DeviceStateId) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
-        if DateTime::is_shifted() {
+        let read = || {
             let connection = self.sqlite_db.for_reading()?;
-            return self.sqlite_repo.get_latest_for_device(&connection, id);
+            self.sqlite_repo.get_latest_for_device(&connection, id)
+        };
+        if DateTime::is_shifted() {
+            return read();
         }
 
-        self.latest_values
-            .try_get_with(*id, || {
-                let connection = self.sqlite_db.for_reading()?;
-                self.sqlite_repo.get_latest_for_device(&connection, id)
-            })
-            .map_err(|e| anyhow::anyhow!("Error getting latest device state for {:?}: {:?}", id, e))
+        read_latest_cached(&self.latest_values, *id, read)
+            .with_context(|| format!("Error getting latest device state for {id:?}"))
     }
 
-    pub fn get_state_since(&self, id: &DeviceStateId, since: DateTime) -> anyhow::Result<DataFrame<DeviceStateValue>> {
+    pub fn get_state_since(
+        &self,
+        id: &DeviceStateId,
+        since: DateTime,
+    ) -> anyhow::Result<Option<DataFrame<DeviceStateValue>>> {
         let connection = self.sqlite_db.for_reading()?;
         self.sqlite_repo.get_data_frame_since(&connection, id, since)
+    }
+}
+
+fn read_latest_cached(
+    cache: &LatestValues,
+    id: DeviceStateId,
+    read: impl FnOnce() -> anyhow::Result<Option<DataPoint<DeviceStateValue>>>,
+) -> anyhow::Result<Option<DataPoint<DeviceStateValue>>> {
+    if let Some(value) = cache.get(&id) {
+        return Ok(value);
+    }
+
+    let result = cache.entry(id).and_try_compute_with(|current| -> anyhow::Result<_> {
+        if current.is_some() {
+            Ok(Op::Nop)
+        } else {
+            Ok(Op::Put(read()?))
+        }
+    })?;
+    Ok(result.into_entry().and_then(|entry| entry.into_value()))
+}
+
+fn invalidate_latest(cache: &LatestValues, id: DeviceStateId) {
+    // Use the same per-key operation as a fill, so removal waits for an in-progress fill.
+    cache.entry(id).and_compute_with(|_| Op::Remove);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::mpsc, thread, time::Duration};
+
+    use crate::{core::unit::DegreeCelsius, device_state::Temperature};
+
+    use super::*;
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn invalidation_discards_a_cache_fill_that_started_before_the_write() -> anyhow::Result<()> {
+        let cache = LatestValues::new(8);
+        let id = DeviceStateId::Temperature(Temperature::LivingRoom);
+        let (old_value_read, wait_for_read) = mpsc::channel();
+        let (resume, continue_fill) = mpsc::channel();
+        let (invalidation_started, wait_for_start) = mpsc::channel();
+        let (invalidated, wait_for_invalidation) = mpsc::channel();
+        let timeout = Duration::from_secs(2);
+
+        thread::scope(|scope| -> anyhow::Result<()> {
+            let cache = &cache;
+            let fill = scope.spawn(move || {
+                read_latest_cached(cache, id, || {
+                    old_value_read.send(())?;
+                    continue_fill.recv_timeout(timeout)?;
+                    Ok(None)
+                })
+            });
+            wait_for_read.recv_timeout(timeout)?;
+
+            let writer = scope.spawn(move || -> anyhow::Result<()> {
+                invalidation_started.send(())?;
+                invalidate_latest(cache, id);
+                invalidated.send(())?;
+                Ok(())
+            });
+            wait_for_start.recv_timeout(timeout)?;
+            let before_fill = wait_for_invalidation.recv_timeout(Duration::from_millis(25));
+            resume.send(())?;
+            assert_eq!(before_fill, Err(mpsc::RecvTimeoutError::Timeout));
+            assert!(fill.join().expect("cache fill thread panicked")?.is_none());
+            writer.join().expect("cache invalidation thread panicked")?;
+            Ok(())
+        })?;
+
+        let new_value = DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(21.0));
+        let latest = read_latest_cached(&cache, id, || Ok(Some(DataPoint::new(new_value.clone(), DateTime::now()))))?
+            .context("Expected the cache to read the new value after invalidation")?;
+        assert_eq!(latest.value, new_value);
+        Ok(())
     }
 }

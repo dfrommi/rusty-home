@@ -155,15 +155,10 @@ impl StateCalculationContext {
         D: Into<DeviceStateId> + DeviceStateItem + Clone,
     {
         let device_state_id = id.clone().into();
-        let df = self.device_state_client.get_state_since(&device_state_id, since).ok()?;
-
-        if df.first().is_none() {
-            tracing::warn!(
-                device_state_id = ?device_state_id,
-                requested_since = %since,
-                "Requested device state history predates the earliest available data point; returning available data"
-            );
-        }
+        let df = self
+            .device_state_client
+            .get_state_since(&device_state_id, since)
+            .ok()??;
 
         Some(df.map(|dp| {
             id.try_downcast(dp.value.clone())

@@ -25,19 +25,16 @@ pub struct TriggerService {
 impl TriggerService {
     pub fn new(
         postgres_repo: TriggerRepository,
+        sqlite_repo: SQLiteTriggerRepository,
         sqlite_db: SQLiteDatabase,
         event_tx: EventEmitter<TriggerEvent>,
-    ) -> anyhow::Result<Self> {
-        let sqlite_repo = {
-            let connection = sqlite_db.for_writing()?;
-            SQLiteTriggerRepository::new(&connection)?
-        };
-        Ok(Self {
+    ) -> Self {
+        Self {
             postgres_repo,
             sqlite_repo,
             sqlite_db,
             event_tx,
-        })
+        }
     }
 
     pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
@@ -155,8 +152,7 @@ fn parse_trigger(row: TriggerRow) -> Option<UserTriggerExecution> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trigger::OnOffDevice;
-    use infrastructure::EventBus;
+    use crate::trigger::{OnOffDevice, TriggerModule};
     use rusqlite::params;
     use std::{
         fs,
@@ -167,10 +163,12 @@ mod tests {
     struct TestFile(PathBuf);
 
     impl TestFile {
-        fn new() -> Self {
+        fn new() -> anyhow::Result<Self> {
             static NEXT_ID: AtomicU64 = AtomicU64::new(0);
             let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-            Self(std::env::temp_dir().join(format!("rusty-home-triggers-{}-{id}.sqlite", std::process::id())))
+            let path = std::env::temp_dir().join(format!("rusty-home-triggers-{}-{id}.sqlite", std::process::id()));
+            fs::File::create_new(&path)?;
+            Ok(Self(path))
         }
     }
 
@@ -182,11 +180,11 @@ mod tests {
 
     #[sqlx::test(migrations = "../migrations")]
     async fn new_trigger_is_written_to_both_but_lifecycle_uses_sqlite_ids(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let file = TestFile::new();
+        let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
-        let bus = EventBus::new(8);
-        let mut events = bus.subscribe();
-        let service = TriggerService::new(TriggerRepository::new(pool.clone()), db.clone(), bus.emitter())?;
+        let module = TriggerModule::new(pool.clone(), db.clone())?;
+        let mut events = module.subscribe();
+        let service = &module.service;
         let now = DateTime::from_static_iso("2026-03-10T12:00:00.123456Z");
         let start = now + t!(1 minutes);
         let stop = now + t!(2 minutes);
@@ -247,11 +245,11 @@ mod tests {
     async fn a_failed_dual_write_does_not_make_a_trigger_visible_to_automation(
         pool: sqlx::PgPool,
     ) -> anyhow::Result<()> {
-        let file = TestFile::new();
+        let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
-        let bus = EventBus::new(8);
-        let mut events = bus.subscribe();
-        let service = TriggerService::new(TriggerRepository::new(pool.clone()), db.clone(), bus.emitter())?;
+        let module = TriggerModule::new(pool.clone(), db.clone())?;
+        let mut events = module.subscribe();
+        let service = &module.service;
         let trigger = UserTrigger::DevicePower {
             device: OnOffDevice::InfraredHeater,
             on: true,
@@ -282,10 +280,11 @@ mod tests {
 
     #[tokio::test]
     async fn latest_and_historical_reads_keep_their_distinct_time_windows() -> anyhow::Result<()> {
-        let file = TestFile::new();
+        let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
         let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://localhost/not_used")?;
-        let service = TriggerService::new(TriggerRepository::new(pool), db.clone(), EventBus::new(8).emitter())?;
+        let module = TriggerModule::new(pool, db.clone())?;
+        let service = &module.service;
         let now = DateTime::from_static_iso("2026-03-10T12:00:00Z");
         let start = now - t!(30 minutes);
         let expired = now - t!(10 minutes);

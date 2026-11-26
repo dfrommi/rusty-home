@@ -1,6 +1,7 @@
 mod adapter;
+mod availability_service;
 mod domain;
-mod service;
+mod state_service;
 
 use anyhow::Context;
 pub use domain::*;
@@ -30,7 +31,8 @@ use crate::{
             tasmota::TasmotaIncomingDataSource,
             z2m::Z2mIncomingDataSource,
         },
-        service::DeviceStateService,
+        availability_service::DeviceAvailabilityService,
+        state_service::DeviceStateService,
     },
     frontends::energy_meter::EnergyReading,
 };
@@ -45,6 +47,7 @@ pub enum DeviceStateEvent {
 #[derive(Clone)]
 pub struct DeviceStateClient {
     service: Arc<DeviceStateService>,
+    availability_service: Arc<DeviceAvailabilityService>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -122,6 +125,15 @@ pub struct DeviceAvailability {
     pub marked_offline: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceAvailabilityRecord {
+    pub item: DeviceAvailabilityItem,
+    pub last_seen: DateTime,
+    pub marked_offline: bool,
+    pub entry_updated: DateTime,
+    pub disabled: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceAvailabilityStatus {
     pub source: String,
@@ -133,6 +145,7 @@ pub struct DeviceAvailabilityStatus {
 
 pub struct DeviceStateModule {
     service: Arc<DeviceStateService>,
+    availability_service: Arc<DeviceAvailabilityService>,
     event_bus: EventBus<DeviceStateEvent>,
     tasmota_ds: TasmotaIncomingDataSource,
     z2m_ds: Z2mIncomingDataSource,
@@ -160,7 +173,7 @@ impl DeviceStateModule {
     ) -> anyhow::Result<Self> {
         let state_repo = PostgresDeviceStateRepository::new(pool.clone());
 
-        let availability_repo = DeviceAvailabilityRepository::new(pool, availability_config);
+        let availability_repo = DeviceAvailabilityRepository::new(pool, availability_config.clone());
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
@@ -170,10 +183,13 @@ impl DeviceStateModule {
 
         let event_bus = EventBus::new(128);
 
-        let service = DeviceStateService::new(state_repo, sqlite_database, availability_repo, event_bus.emitter())?;
+        let availability_service =
+            DeviceAvailabilityService::new(availability_repo, sqlite_database.clone(), availability_config)?;
+        let service = DeviceStateService::new(state_repo, sqlite_database, event_bus.emitter())?;
 
         Ok(DeviceStateModule {
             service: Arc::new(service),
+            availability_service: Arc::new(availability_service),
             event_bus,
             tasmota_ds,
             z2m_ds,
@@ -187,6 +203,7 @@ impl DeviceStateModule {
     pub fn client(&self) -> DeviceStateClient {
         DeviceStateClient {
             service: self.service.clone(),
+            availability_service: self.availability_service.clone(),
         }
     }
 
@@ -203,7 +220,7 @@ impl DeviceStateModule {
         items.extend(self.energy_meter_ds.availability_items());
         items.extend(self.tado_ds.availability_items());
 
-        self.service.initialize_availability(items).await
+        self.availability_service.initialize(items).await
     }
 
     pub async fn run(mut self) {
@@ -231,7 +248,7 @@ impl DeviceStateModule {
             match update {
                 adapter::IncomingData::StateValue(data_point) => self.service.handle_state_update(data_point).await,
                 adapter::IncomingData::ItemAvailability(device_availability) => {
-                    self.service.handle_availability_update(device_availability).await
+                    self.availability_service.handle_update(device_availability).await
                 }
             }
         }
@@ -253,7 +270,7 @@ impl DeviceStateClient {
     }
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
-        self.service.get_item_availabilities().await
+        self.availability_service.get_item_availabilities().await
     }
 }
 

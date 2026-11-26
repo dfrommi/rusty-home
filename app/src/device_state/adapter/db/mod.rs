@@ -1,9 +1,11 @@
 mod availability;
+mod availability_sqlite;
 
 mod state;
 mod state_sqlite;
 
 pub use availability::DeviceAvailabilityRepository;
+pub use availability_sqlite::SQLiteDeviceAvailabilityRepository;
 
 pub use state::{PostgresDeviceStateRepository, SaveOutcome};
 pub use state_sqlite::SQLiteDeviceStateRepository;

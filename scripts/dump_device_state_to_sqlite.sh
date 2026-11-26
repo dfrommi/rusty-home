@@ -32,6 +32,7 @@ tag_csv="$temporary_dir/device_state_tag.csv"
 state_csv="$temporary_dir/device_state.csv"
 availability_csv="$temporary_dir/item_availability.csv"
 trigger_csv="$temporary_dir/user_trigger.csv"
+energy_csv="$temporary_dir/energy_reading.csv"
 
 quote_sql_literal() {
     local escaped=${1//\'/\'\'}
@@ -43,6 +44,7 @@ tag_csv_sql=$(quote_sql_literal "$tag_csv")
 state_csv_sql=$(quote_sql_literal "$state_csv")
 availability_csv_sql=$(quote_sql_literal "$availability_csv")
 trigger_csv_sql=$(quote_sql_literal "$trigger_csv")
+energy_csv_sql=$(quote_sql_literal "$energy_csv")
 
 duckdb -no-agent -bail <<SQL
 LOAD postgres;
@@ -98,6 +100,18 @@ COPY (
     FROM source.user_trigger
     ORDER BY id
 ) TO $trigger_csv_sql (HEADER, DELIMITER ',');
+
+COPY (
+    SELECT
+        id,
+        type,
+        name,
+        CASE WHEN isfinite(value) THEN value ELSE error('Non-finite energy reading: id ' || id) END AS value,
+        epoch_us(timestamp) AS timestamp_us,
+        CASE WHEN year_end THEN 1 ELSE 0 END AS year_end
+    FROM source.energy_reading
+    ORDER BY id
+) TO $energy_csv_sql (HEADER, DELIMITER ',');
 
 DETACH source;
 SQL
@@ -158,6 +172,17 @@ DROP TABLE user_trigger_import;
 CREATE INDEX user_trigger_timestamp_id_idx
     ON user_trigger (timestamp_us DESC, id DESC);
 
+CREATE TABLE energy_reading (
+    id INTEGER PRIMARY KEY,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    value REAL NOT NULL,
+    timestamp_us INTEGER NOT NULL,
+    year_end INTEGER NOT NULL CHECK (year_end IN (0, 1))
+) STRICT;
+
+.import --csv --skip 1 "$energy_csv" energy_reading
+
 ANALYZE;
 .headers on
 .mode column
@@ -167,7 +192,9 @@ SELECT 'device_state', count(*) FROM device_state
 UNION ALL
 SELECT 'item_availability', count(*) FROM item_availability
 UNION ALL
-SELECT 'user_trigger', count(*) FROM user_trigger;
+SELECT 'user_trigger', count(*) FROM user_trigger
+UNION ALL
+SELECT 'energy_reading', count(*) FROM energy_reading;
 SQL
 
 ln "$staging_path" "$output_path"

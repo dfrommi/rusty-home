@@ -59,12 +59,12 @@ pub async fn main() -> anyhow::Result<()> {
     )
     .await?;
     device_state_module.initialize_availability().await?;
-    if let Err(e) = frontends::energy_meter::EnergyMeter::publish_initial_readings(
+    let energy_meter = frontends::energy_meter::EnergyMeter::new(
         infrastructure.db_pool.clone(),
-        &energy_meter_bus.emitter(),
-    )
-    .await
-    {
+        infrastructure.sqlite_database.clone(),
+        energy_meter_bus.emitter(),
+    )?;
+    if let Err(e) = energy_meter.publish_initial_readings() {
         tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
     }
 
@@ -114,22 +114,12 @@ pub async fn main() -> anyhow::Result<()> {
         device_state_module.client(),
     );
 
-    let http_server_exec = {
-        let energy_reading_emitter = energy_meter_bus.emitter();
-        let energy_reading_pool = infrastructure.db_pool.clone();
-
-        async move {
-            settings
-                .http_server
-                .run_server(move || {
-                    vec![frontends::energy_meter::EnergyMeter::new_web_service(
-                        energy_reading_pool.clone(),
-                        energy_reading_emitter.clone(),
-                    )]
-                })
-                .await
-                .expect("HTTP server execution failed");
-        }
+    let http_server_exec = async move {
+        settings
+            .http_server
+            .run_server(move || vec![energy_meter.new_web_service()])
+            .await
+            .expect("HTTP server execution failed");
     };
 
     let initial_home_state = home_state_module.bootstrap().await?;

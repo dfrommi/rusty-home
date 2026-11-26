@@ -1,33 +1,42 @@
-use infrastructure::EventEmitter;
+use std::sync::Arc;
+
+use infrastructure::{EventEmitter, SQLiteDatabase};
 use r#macro::{EnumVariants, Id};
 
 use crate::core::timeseries::DataPoint;
 
 mod http_server;
+#[allow(dead_code, reason = "Keep the Postgres energy repository intact for rollback")]
 mod persistence;
+mod persistence_sqlite;
+mod service;
 
 use persistence::EnergyReadingRepository;
+use service::EnergyReadingService;
 
-#[derive(Debug, Clone)]
-pub struct EnergyMeter;
+#[derive(Clone)]
+pub struct EnergyMeter {
+    service: Arc<EnergyReadingService>,
+}
 
 impl EnergyMeter {
-    pub fn new_web_service(pool: sqlx::PgPool, tx: EventEmitter<DataPoint<EnergyReading>>) -> actix_web::Scope {
-        http_server::new_actix_web_scope(EnergyReadingRepository::new(pool), tx)
+    pub fn new(
+        pool: sqlx::PgPool,
+        sqlite_db: SQLiteDatabase,
+        tx: EventEmitter<DataPoint<EnergyReading>>,
+    ) -> anyhow::Result<Self> {
+        let service = EnergyReadingService::new(EnergyReadingRepository::new(pool), sqlite_db, tx)?;
+        Ok(Self {
+            service: Arc::new(service),
+        })
     }
 
-    pub async fn publish_initial_readings(
-        pool: sqlx::PgPool,
-        tx: &EventEmitter<DataPoint<EnergyReading>>,
-    ) -> anyhow::Result<()> {
-        let repo = EnergyReadingRepository::new(pool);
-        for id in repo.get_latest_total_readings_ids().await? {
-            match repo.get_total_reading_by_id(id).await {
-                Ok(reading) => tx.send(reading),
-                Err(e) => tracing::error!("Error loading Energy Reading with id {}: {:?}", id, e),
-            }
-        }
-        Ok(())
+    pub fn new_web_service(&self) -> actix_web::Scope {
+        http_server::new_actix_web_scope(self.service.clone())
+    }
+
+    pub fn publish_initial_readings(&self) -> anyhow::Result<()> {
+        self.service.publish_initial_readings()
     }
 }
 
@@ -62,35 +71,74 @@ pub enum Radiator {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
 
     use infrastructure::EventBus;
+    use rusqlite::params;
 
     use crate::core::time::DateTime;
 
     use super::*;
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn startup_publishes_latest_totals_with_original_timestamps_without_adding_readings(
-        pool: sqlx::PgPool,
-    ) -> anyhow::Result<()> {
-        sqlx::query(
-            r#"INSERT INTO energy_reading (type, name, value, timestamp, year_end) VALUES
-                ('heating', 'bedroom', 100, '2024-12-31T23:00:00Z', true),
-                ('heating', 'bedroom', 12.5, '2025-01-10T12:00:00Z', false),
-                ('heating', 'kitchen', 900, '2024-12-31T23:00:00Z', true),
-                ('heating', 'kitchen', 50, '2025-01-11T12:00:00Z', false)"#,
-        )
-        .execute(&pool)
-        .await?;
+    pub struct TestDatabaseFile(PathBuf);
 
+    impl Drop for TestDatabaseFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.0);
+        }
+    }
+
+    pub fn test_database() -> anyhow::Result<(TestDatabaseFile, SQLiteDatabase)> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let file = TestDatabaseFile(
+            std::env::temp_dir().join(format!("rusty-home-energy-{}-{id}.sqlite", std::process::id())),
+        );
+        let db = SQLiteDatabase::open(&file.0)?;
+        Ok((file, db))
+    }
+
+    pub fn seed_heating_readings(db: &SQLiteDatabase, rows: &[(&str, f64, &str, bool)]) -> anyhow::Result<()> {
+        let connection = db.for_writing()?;
+        for (name, value, timestamp, year_end) in rows {
+            connection.execute(
+                "INSERT INTO energy_reading (type, name, value, timestamp_us, year_end) VALUES ('heating', ?1, ?2, ?3, ?4)",
+                params![name, value, DateTime::from_iso(timestamp)?.into_db().timestamp_micros(), year_end],
+            )?;
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn startup_publishes_latest_totals_from_sqlite_without_adding_readings() -> anyhow::Result<()> {
+        let (_file, db) = test_database()?;
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://localhost/not_used")?;
+        pool.close().await;
         let bus = EventBus::new(8);
         let mut readings = bus.subscribe();
-        EnergyMeter::publish_initial_readings(pool.clone(), &bus.emitter()).await?;
+        let meter = EnergyMeter::new(pool, db.clone(), bus.emitter())?;
+        seed_heating_readings(
+            &db,
+            &[
+                ("bedroom", 100.0, "2024-12-31T23:00:00Z", true),
+                ("bedroom", 12.5, "2025-01-10T12:00:00Z", false),
+                ("kitchen", 900.0, "2024-12-31T23:00:00Z", true),
+                ("kitchen", 50.0, "2025-01-11T12:00:00Z", false),
+                ("removed_radiator", 77.0, "2025-01-11T12:00:00Z", false),
+            ],
+        )?;
+        meter.publish_initial_readings()?;
 
         let mut totals = HashMap::new();
         for _ in 0..2 {
-            let reading = readings.recv().await.expect("energy meter source closed");
+            let reading = tokio::time::timeout(std::time::Duration::from_secs(1), readings.recv())
+                .await?
+                .expect("energy meter source closed");
             totals.insert(reading.value.target(), reading);
         }
         for (radiator, expected, timestamp) in [
@@ -106,10 +154,10 @@ mod tests {
             assert_eq!(reading.timestamp, DateTime::from_static_iso(timestamp));
         }
 
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) AS "count!" FROM energy_reading"#)
-            .fetch_one(&pool)
-            .await?;
-        assert_eq!(count, 4);
+        let count: i64 = db
+            .for_reading()?
+            .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
+        assert_eq!(count, 5);
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(10), readings.recv())
                 .await

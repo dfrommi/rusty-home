@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt};
 
 use anyhow::{Context as _, ensure};
 use infrastructure::{EventEmitter, SQLiteDatabase};
@@ -10,6 +10,17 @@ use super::{
     persistence::EnergyReadingRepository,
     persistence_sqlite::{RawEnergyReading, SQLiteEnergyReadingRepository},
 };
+
+#[derive(Debug)]
+pub(super) struct InvalidEnergyReading(&'static str);
+
+impl fmt::Display for InvalidEnergyReading {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
+
+impl std::error::Error for InvalidEnergyReading {}
 
 pub struct EnergyReadingService {
     postgres_repo: EnergyReadingRepository,
@@ -49,6 +60,16 @@ impl EnergyReadingService {
             year_end: false,
         };
 
+        if value < 0.0 {
+            return Err(InvalidEnergyReading("Energy reading cannot be negative").into());
+        }
+
+        let history = {
+            let connection = self.sqlite_db.for_reading()?;
+            self.sqlite_repo.get_all(&connection)?
+        };
+        validate_reading(&row, &history)?;
+
         self.postgres_repo.add_yearly_energy_reading(reading, timestamp).await?;
         let rows = {
             let connection = self.sqlite_db.for_writing()?;
@@ -79,6 +100,22 @@ impl EnergyReadingService {
         }
         Ok(())
     }
+}
+
+fn validate_reading(row: &RawEnergyReading, history: &[RawEnergyReading]) -> Result<(), InvalidEnergyReading> {
+    let previous = history.iter().find(|previous| {
+        previous.timestamp < row.timestamp && previous.reading_type == row.reading_type && previous.name == row.name
+    });
+    if let Some(previous) = previous
+        && !previous.year_end
+        && row.value < previous.value
+    {
+        return Err(InvalidEnergyReading(
+            "Energy reading cannot be smaller than the previous reading unless it was a year-end reading",
+        ));
+    }
+
+    Ok(())
 }
 
 fn total_reading(row: &RawEnergyReading, history: &[RawEnergyReading]) -> anyhow::Result<DataPoint<EnergyReading>> {

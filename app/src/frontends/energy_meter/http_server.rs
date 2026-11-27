@@ -1,12 +1,18 @@
 use std::sync::Arc;
 
 use actix_web::web::{self, Json};
-use actix_web::{HttpResponse, error::ErrorInternalServerError};
+use actix_web::{
+    HttpResponse,
+    error::{ErrorBadRequest, ErrorInternalServerError},
+};
 use serde::Deserialize;
 
 use crate::t;
 
-use super::{EnergyReading, Radiator, service::EnergyReadingService};
+use super::{
+    EnergyReading, Radiator,
+    service::{EnergyReadingService, InvalidEnergyReading},
+};
 
 pub fn new_actix_web_scope(service: Arc<EnergyReadingService>) -> actix_web::Scope {
     web::scope("/api/energy/readings")
@@ -43,10 +49,13 @@ async fn handle_heating_reading(
 
     tracing::info!("Received reading {:?}", reading);
 
-    service
-        .add_reading(reading, t!(now))
-        .await
-        .map_err(ErrorInternalServerError)?;
+    service.add_reading(reading, t!(now)).await.map_err(|error| {
+        if error.downcast_ref::<InvalidEnergyReading>().is_some() {
+            ErrorBadRequest(error)
+        } else {
+            ErrorInternalServerError(error)
+        }
+    })?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -127,6 +136,60 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
+    async fn readings_cannot_decrease_unless_previous_reading_was_year_end(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let (_file, db) = test_database()?;
+        let bus = EventBus::new(8);
+        let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
+        let app = test::init_service(App::new().service(meter.new_web_service())).await;
+        seed_heating_readings(
+            &db,
+            &[
+                ("bedroom", 100.0, "2025-01-01T00:00:00Z", true),
+                ("kitchen", 100.0, "2025-01-01T00:00:00Z", false),
+                ("bathroom", 100.0, "2025-01-01T00:00:00Z", false),
+            ],
+        )?;
+        let request = |label: &str, value: &str| {
+            test::TestRequest::put()
+                .uri("/api/energy/readings/heating")
+                .set_json(json!({ "label": label, "value": value }))
+                .to_request()
+        };
+
+        let reset_time = DateTime::from_static_iso("2025-01-02T00:00:00Z");
+        let response = reset_time
+            .eval_timeshifted(test::call_service(&app, request("Schlafzimmer", "10")))
+            .await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+        let after_reset_time = DateTime::from_static_iso("2025-01-03T00:00:00Z");
+        let response = after_reset_time
+            .eval_timeshifted(test::call_service(&app, request("Schlafzimmer", "9")))
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let response = after_reset_time
+            .eval_timeshifted(test::call_service(&app, request("Küche", "99")))
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let response = after_reset_time
+            .eval_timeshifted(test::call_service(&app, request("Bad", "100")))
+            .await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+        let postgres_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM energy_reading")
+            .fetch_one(&pool)
+            .await?;
+        let sqlite_rows: i64 = db
+            .for_reading()?
+            .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
+        assert_eq!((postgres_rows, sqlite_rows), (2, 5));
+
+        Ok(())
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
     async fn database_failure_returns_error_without_emitting_a_reading(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
@@ -167,12 +230,12 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
-    async fn non_finite_readings_are_rejected_before_either_write(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    async fn invalid_values_are_rejected_before_either_write(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
         let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
         let app = test::init_service(App::new().service(meter.new_web_service())).await;
-        for value in ["NaN", "inf", "-inf"] {
+        for value in ["NaN", "inf", "-inf", "-1"] {
             let request = test::TestRequest::put()
                 .uri("/api/energy/readings/heating")
                 .set_json(json!({ "label": "Schlafzimmer", "value": value }))

@@ -37,17 +37,15 @@ impl TriggerRepository {
         Ok(result.rows_affected())
     }
 
-    #[tracing::instrument(skip(self))]
-    pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+    #[tracing::instrument(skip(self, correlation_id))]
+    pub async fn add_trigger(&self, trigger: UserTrigger, correlation_id: Option<&str>) -> anyhow::Result<()> {
         let trigger: serde_json::Value = serde_json::to_value(trigger)?;
 
         sqlx::query!(
             r#"INSERT INTO user_trigger (trigger, timestamp, correlation_id) VALUES ($1, $2, $3)"#,
             trigger,
             t!(now).into_db(),
-            infrastructure::TraceContext::current()
-                .correlation_id()
-                .map(|id| id.to_string()),
+            correlation_id,
         )
         .execute(&self.pool)
         .await

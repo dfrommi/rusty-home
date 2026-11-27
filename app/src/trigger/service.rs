@@ -8,10 +8,7 @@ use crate::{
     t,
     trigger::{
         TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId,
-        adapter::{
-            db::TriggerRepository,
-            db_sqlite::{SQLiteTriggerRepository, TriggerRow},
-        },
+        adapter::{db::TriggerRepository, db_sqlite::SQLiteTriggerRepository},
     },
 };
 
@@ -37,17 +34,20 @@ impl TriggerService {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        let timestamp_us = t!(now).into_db().timestamp_micros();
+        let timestamp = t!(now);
         let correlation_id = TraceContext::current().correlation_id().map(|id| id.to_string());
         let trigger_json = serde_json::to_string(&trigger)?;
-        self.postgres_repo.add_trigger(trigger).await?;
+        self.postgres_repo
+            .add_trigger(trigger, correlation_id.as_deref())
+            .await?;
 
         self.sqlite_db
             .for_writing()
             .and_then(|connection| {
                 self.sqlite_repo
-                    .insert(&connection, &trigger_json, timestamp_us, correlation_id.as_deref())
+                    .insert(&connection, &trigger_json, timestamp, correlation_id.as_deref())
             })
             .context("Trigger was saved to Postgres but could not be saved to SQLite")?;
         self.event_tx.send(TriggerEvent::TriggerAdded);
@@ -58,24 +58,20 @@ impl TriggerService {
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        let start_us = range.start().into_db().timestamp_micros();
-        let end_us = (*range.end()).min(t!(now)).into_db().timestamp_micros();
-        let rows = self.read_rows(i64::MIN, end_us)?;
-        Ok(rows
-            .into_iter()
-            .filter(|row| row.timestamp_us >= start_us || row.active_until_us.is_none_or(|until| until >= start_us))
-            .filter_map(parse_trigger)
-            .collect())
+        let start = *range.start();
+        let end = (*range.end()).min(t!(now));
+        let connection = self.sqlite_db.for_reading()?;
+        self.sqlite_repo.active_anytime_in_range(&connection, start, end)
     }
 
     pub fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let now = t!(now);
         let since = now - t!(48 hours);
-        let rows = self.read_rows(since.into_db().timestamp_micros(), now.into_db().timestamp_micros())?;
+        let connection = self.sqlite_db.for_reading()?;
+        let triggers = self.sqlite_repo.created_between(&connection, since, now)?;
         let mut seen_targets = HashSet::new();
-        Ok(rows
+        Ok(triggers
             .into_iter()
-            .filter_map(parse_trigger)
             .filter(|execution| seen_targets.insert(execution.target()))
             .map(|mut execution| {
                 // Match the existing Postgres latest-trigger view, not the historical view.
@@ -85,67 +81,29 @@ impl TriggerService {
             .collect())
     }
 
-    fn read_rows(&self, start_us: i64, end_us: i64) -> anyhow::Result<Vec<TriggerRow>> {
-        let connection = self.sqlite_db.for_reading()?;
-        self.sqlite_repo.created_between(&connection, start_us, end_us)
-    }
-
     pub fn disable_triggers_before_except(
         &self,
         before: DateTime,
         excluded_ids: &[UserTriggerId],
     ) -> anyhow::Result<u64> {
-        let before_us = before.into_db().timestamp_micros();
-        let excluded_ids: HashSet<_> = excluded_ids.iter().map(UserTriggerId::value).collect();
         let mut connection = self.sqlite_db.for_writing()?;
         let transaction = connection.transaction()?;
-        let ids = self.sqlite_repo.open_ids_created_before(&transaction, before_us)?;
-        let mut count = 0;
-        for id in ids.into_iter().filter(|id| !excluded_ids.contains(id)) {
-            count += self.sqlite_repo.set_active_until(&transaction, id, before_us)?;
-        }
+        let count = self
+            .sqlite_repo
+            .disable_before_except(&transaction, before, excluded_ids)?;
         transaction.commit()?;
         Ok(count)
     }
 
     pub fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
-        let from_us = t!(now).into_db().timestamp_micros();
+        let from = t!(now);
         let mut connection = self.sqlite_db.for_writing()?;
         let transaction = connection.transaction()?;
-        let mut count = 0;
-        for id in trigger_ids {
-            count += self
-                .sqlite_repo
-                .set_active_from_if_unset(&transaction, id.value(), from_us)?;
-        }
+        let count = self
+            .sqlite_repo
+            .set_active_from_if_unset(&transaction, trigger_ids, from)?;
         transaction.commit()?;
         Ok(count)
-    }
-}
-
-fn parse_trigger(row: TriggerRow) -> Option<UserTriggerExecution> {
-    fn parse_timestamp(micros: i64) -> anyhow::Result<DateTime> {
-        chrono::DateTime::from_timestamp_micros(micros)
-            .map(DateTime::from)
-            .context("Invalid trigger timestamp")
-    }
-
-    let execution = (|| -> anyhow::Result<_> {
-        Ok(UserTriggerExecution {
-            id: row.id.into(),
-            trigger: serde_json::from_str(&row.trigger)?,
-            timestamp: parse_timestamp(row.timestamp_us)?,
-            active_from: row.active_from_us.map(parse_timestamp).transpose()?,
-            active_until: row.active_until_us.map(parse_timestamp).transpose()?,
-            correlation_id: row.correlation_id,
-        })
-    })();
-    match execution {
-        Ok(execution) => Some(execution),
-        Err(error) => {
-            tracing::warn!(id = row.id, %error, "Invalid SQLite user_trigger row, ignoring");
-            None
-        }
     }
 }
 
@@ -153,6 +111,7 @@ fn parse_trigger(row: TriggerRow) -> Option<UserTriggerExecution> {
 mod tests {
     use super::*;
     use crate::trigger::{OnOffDevice, TriggerModule};
+
     use rusqlite::params;
     use std::{
         fs,
@@ -195,10 +154,7 @@ mod tests {
         // Force different ID spaces to catch accidental Postgres lifecycle updates or reads.
         db.for_writing()?.execute(
             "INSERT INTO user_trigger (id, trigger, timestamp_us) VALUES (500, ?1, ?2)",
-            params![
-                serde_json::to_string(&trigger)?,
-                (now - t!(1 hours)).into_db().timestamp_micros()
-            ],
+            params![serde_json::to_string(&trigger)?, (now - t!(1 hours)).unix_micros()],
         )?;
 
         now.eval_timeshifted(service.add_trigger(trigger)).await?;
@@ -208,6 +164,7 @@ mod tests {
         assert_eq!(latest.len(), 1);
         let id = latest[0].id.clone();
         assert_eq!(id.value(), 501);
+
         assert_eq!(latest[0].timestamp, now);
         assert_eq!(
             start
@@ -302,12 +259,7 @@ mod tests {
             ] {
                 connection.execute(
                     "INSERT INTO user_trigger (id, trigger, timestamp_us, active_until_us) VALUES (?1, ?2, ?3, ?4)",
-                    params![
-                        id,
-                        json,
-                        timestamp.into_db().timestamp_micros(),
-                        until.map(|dt| dt.into_db().timestamp_micros())
-                    ],
+                    params![id, json, timestamp.unix_micros(), until.map(|dt| dt.unix_micros())],
                 )?;
             }
         }

@@ -1,12 +1,20 @@
+use std::collections::HashSet;
+
+use anyhow::Context as _;
 use rusqlite::{Connection, params};
 
-pub struct TriggerRow {
-    pub id: i64,
-    pub trigger: String,
-    pub timestamp_us: i64,
-    pub active_from_us: Option<i64>,
-    pub active_until_us: Option<i64>,
-    pub correlation_id: Option<String>,
+use crate::{
+    core::time::DateTime,
+    trigger::{UserTriggerExecution, UserTriggerId},
+};
+
+struct TriggerRow {
+    id: i64,
+    trigger: String,
+    timestamp_us: i64,
+    active_from_us: Option<i64>,
+    active_until_us: Option<i64>,
+    correlation_id: Option<String>,
 }
 
 pub struct SQLiteTriggerRepository;
@@ -32,12 +40,12 @@ impl SQLiteTriggerRepository {
         &self,
         connection: &Connection,
         trigger: &str,
-        timestamp_us: i64,
+        timestamp: DateTime,
         correlation_id: Option<&str>,
     ) -> anyhow::Result<()> {
         connection.execute(
             "INSERT INTO user_trigger (trigger, timestamp_us, correlation_id) VALUES (?1, ?2, ?3)",
-            params![trigger, timestamp_us, correlation_id],
+            params![trigger, timestamp.unix_micros(), correlation_id],
         )?;
         Ok(())
     }
@@ -45,43 +53,115 @@ impl SQLiteTriggerRepository {
     pub fn created_between(
         &self,
         connection: &Connection,
-        start_us: i64,
-        end_us: i64,
-    ) -> anyhow::Result<Vec<TriggerRow>> {
+        start: DateTime,
+        end: DateTime,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let mut statement = connection.prepare_cached(
             "SELECT id, trigger, timestamp_us, active_from_us, active_until_us, correlation_id
              FROM user_trigger
              WHERE timestamp_us BETWEEN ?1 AND ?2
              ORDER BY timestamp_us DESC, id DESC",
         )?;
-        let rows = statement.query_map(params![start_us, end_us], |row| {
-            Ok(TriggerRow {
-                id: row.get(0)?,
-                trigger: row.get(1)?,
-                timestamp_us: row.get(2)?,
-                active_from_us: row.get(3)?,
-                active_until_us: row.get(4)?,
-                correlation_id: row.get(5)?,
-            })
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let rows = statement.query_map(params![start.unix_micros(), end.unix_micros()], read_trigger_row)?;
+        parse_rows(rows)
     }
 
-    pub fn open_ids_created_before(&self, connection: &Connection, before_us: i64) -> anyhow::Result<Vec<i64>> {
+    pub fn active_anytime_in_range(
+        &self,
+        connection: &Connection,
+        start: DateTime,
+        end: DateTime,
+    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        let mut statement = connection.prepare_cached(
+            "SELECT id, trigger, timestamp_us, active_from_us, active_until_us, correlation_id
+             FROM user_trigger
+             WHERE timestamp_us <= ?2
+               AND (timestamp_us >= ?1 OR active_until_us IS NULL OR active_until_us >= ?1)
+             ORDER BY timestamp_us DESC, id DESC",
+        )?;
+        let rows = statement.query_map(params![start.unix_micros(), end.unix_micros()], read_trigger_row)?;
+        parse_rows(rows)
+    }
+
+    pub fn disable_before_except(
+        &self,
+        connection: &Connection,
+        before: DateTime,
+        excluded_ids: &[UserTriggerId],
+    ) -> anyhow::Result<u64> {
+        let excluded_ids: HashSet<_> = excluded_ids.iter().map(UserTriggerId::value).collect();
         let mut statement = connection
             .prepare_cached("SELECT id FROM user_trigger WHERE active_until_us IS NULL AND timestamp_us < ?1")?;
-        let rows = statement.query_map([before_us], |row| row.get(0))?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let rows = statement.query_map([before.unix_micros()], |row| row.get(0))?;
+        let mut count = 0;
+        for id in rows.collect::<rusqlite::Result<Vec<i64>>>()? {
+            if !excluded_ids.contains(&id) {
+                count += self.set_active_until(connection, id, before)?;
+            }
+        }
+        Ok(count)
     }
 
-    pub fn set_active_until(&self, connection: &Connection, id: i64, until_us: i64) -> anyhow::Result<u64> {
+    pub fn set_active_until(&self, connection: &Connection, id: i64, until: DateTime) -> anyhow::Result<u64> {
         let mut statement = connection.prepare_cached("UPDATE user_trigger SET active_until_us = ?2 WHERE id = ?1")?;
-        Ok(statement.execute(params![id, until_us])? as u64)
+        Ok(statement.execute(params![id, until.unix_micros()])? as u64)
     }
 
-    pub fn set_active_from_if_unset(&self, connection: &Connection, id: i64, from_us: i64) -> anyhow::Result<u64> {
+    pub fn set_active_from_if_unset(
+        &self,
+        connection: &Connection,
+        trigger_ids: &[UserTriggerId],
+        from: DateTime,
+    ) -> anyhow::Result<u64> {
         let mut statement = connection
             .prepare_cached("UPDATE user_trigger SET active_from_us = ?2 WHERE id = ?1 AND active_from_us IS NULL")?;
-        Ok(statement.execute(params![id, from_us])? as u64)
+        let mut count = 0;
+        for id in trigger_ids {
+            count += statement.execute(params![id.value(), from.unix_micros()])? as u64;
+        }
+        Ok(count)
+    }
+}
+
+fn read_trigger_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TriggerRow> {
+    Ok(TriggerRow {
+        id: row.get(0)?,
+        trigger: row.get(1)?,
+        timestamp_us: row.get(2)?,
+        active_from_us: row.get(3)?,
+        active_until_us: row.get(4)?,
+        correlation_id: row.get(5)?,
+    })
+}
+
+fn parse_rows(rows: impl Iterator<Item = rusqlite::Result<TriggerRow>>) -> anyhow::Result<Vec<UserTriggerExecution>> {
+    Ok(rows
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .filter_map(parse_trigger)
+        .collect())
+}
+
+fn parse_trigger(row: TriggerRow) -> Option<UserTriggerExecution> {
+    fn parse_timestamp(micros: i64) -> anyhow::Result<DateTime> {
+        DateTime::try_from_unix_micros(micros).context("Invalid SQLite user trigger timestamp")
+    }
+
+    let execution = (|| -> anyhow::Result<_> {
+        Ok(UserTriggerExecution {
+            id: row.id.into(),
+            trigger: serde_json::from_str(&row.trigger)?,
+            timestamp: parse_timestamp(row.timestamp_us)?,
+            active_from: row.active_from_us.map(parse_timestamp).transpose()?,
+            active_until: row.active_until_us.map(parse_timestamp).transpose()?,
+            correlation_id: row.correlation_id,
+        })
+    })();
+    match execution {
+        Ok(execution) => Some(execution),
+        Err(error) => {
+            tracing::warn!(id = row.id, %error, "Invalid SQLite user_trigger row, ignoring");
+            None
+        }
     }
 }

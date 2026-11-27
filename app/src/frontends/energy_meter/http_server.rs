@@ -112,13 +112,7 @@ mod tests {
         )?;
         assert_eq!(
             sqlite_row,
-            (
-                "heating".into(),
-                "bedroom".into(),
-                12.5,
-                timestamp.into_db().timestamp_micros(),
-                false
-            )
+            ("heating".into(), "bedroom".into(), 12.5, timestamp.unix_micros(), false)
         );
 
         let total = tokio::time::timeout(std::time::Duration::from_secs(1), readings.recv())

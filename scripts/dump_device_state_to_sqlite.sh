@@ -64,9 +64,9 @@ COPY (
     SELECT
         source,
         item,
-        epoch_ms(last_seen) AS last_seen_ms,
+        epoch_us(last_seen) AS last_seen_us,
         CASE WHEN marked_offline THEN 1 ELSE 0 END AS marked_offline,
-        epoch_ms(entry_updated) AS entry_updated_ms,
+        epoch_us(entry_updated) AS entry_updated_us,
         CASE WHEN disabled THEN 1 ELSE 0 END AS disabled
     FROM source.item_availability
     ORDER BY source, item
@@ -83,7 +83,7 @@ COPY (
         row_number() OVER (ORDER BY v.timestamp ASC, v.id ASC)::BIGINT AS id,
         m.tag_id,
         v.value,
-        epoch_ms(v.timestamp) AS timestamp_ms
+        epoch_us(v.timestamp) AS timestamp_us
     FROM source.thing_value v
     JOIN source_tag_map m ON m.source_tag_id = v.tag_id
     ORDER BY v.timestamp ASC, v.id ASC
@@ -131,21 +131,21 @@ CREATE TABLE device_state (
     id INTEGER PRIMARY KEY,
     tag_id INTEGER NOT NULL REFERENCES device_state_tag(id),
     value REAL NOT NULL,
-    timestamp_ms INTEGER NOT NULL
+    timestamp_us INTEGER NOT NULL
 ) STRICT;
 
 .import --csv --skip 1 "$tag_csv" device_state_tag
 .import --csv --skip 1 "$state_csv" device_state
 
 CREATE INDEX device_state_tag_timestamp_id_idx
-    ON device_state (tag_id, timestamp_ms DESC, id DESC);
+    ON device_state (tag_id, timestamp_us DESC, id DESC);
 
 CREATE TABLE item_availability (
     source TEXT NOT NULL,
     item TEXT NOT NULL,
-    last_seen_ms INTEGER NOT NULL,
+    last_seen_us INTEGER NOT NULL,
     marked_offline INTEGER NOT NULL CHECK (marked_offline IN (0, 1)),
-    entry_updated_ms INTEGER NOT NULL,
+    entry_updated_us INTEGER NOT NULL,
     disabled INTEGER NOT NULL CHECK (disabled IN (0, 1)),
     PRIMARY KEY (source, item)
 ) STRICT;

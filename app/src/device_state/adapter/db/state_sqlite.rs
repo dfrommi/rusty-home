@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use rusqlite::{Connection, params};
 
 use crate::{
@@ -25,10 +25,10 @@ CREATE TABLE IF NOT EXISTS device_state (
     id INTEGER PRIMARY KEY,
     tag_id INTEGER NOT NULL REFERENCES device_state_tag(id),
     value REAL NOT NULL,
-    timestamp_ms INTEGER NOT NULL
+    timestamp_us INTEGER NOT NULL
 ) STRICT;
 CREATE INDEX IF NOT EXISTS device_state_tag_timestamp_id_idx
-    ON device_state (tag_id, timestamp_ms DESC, id DESC);
+    ON device_state (tag_id, timestamp_us DESC, id DESC);
 "#;
 
 #[derive(Clone)]
@@ -49,8 +49,8 @@ impl SQLiteDeviceStateRepository {
         let id = DeviceStateId::from(&dp.value);
         let tag_id = self.tag_id(id)?;
         connection.execute(
-            "INSERT INTO device_state (tag_id, value, timestamp_ms) VALUES (?1, ?2, ?3)",
-            params![tag_id, f64::from(&dp.value), dp.timestamp.unix_millis()],
+            "INSERT INTO device_state (tag_id, value, timestamp_us) VALUES (?1, ?2, ?3)",
+            params![tag_id, f64::from(&dp.value), dp.timestamp.unix_micros()],
         )?;
 
         Ok(())
@@ -64,22 +64,22 @@ impl SQLiteDeviceStateRepository {
         let tag_id = self.tag_id(*id)?;
         let mut statement = connection.prepare_cached(
             r#"
-            SELECT value, timestamp_ms
+            SELECT value, timestamp_us
             FROM device_state
-            WHERE tag_id = ?1 AND timestamp_ms <= ?2
-            ORDER BY timestamp_ms DESC, id DESC
+            WHERE tag_id = ?1 AND timestamp_us <= ?2
+            ORDER BY timestamp_us DESC, id DESC
             LIMIT 1
             "#,
         )?;
 
-        let mut rows = statement.query(params![tag_id, DateTime::now().unix_millis()])?;
+        let mut rows = statement.query(params![tag_id, DateTime::now().unix_micros()])?;
         let Some(row) = rows.next()? else {
             return Ok(None);
         };
 
         Ok(Some(DataPoint {
             value: from_f64_value(*id, row.get(0)?),
-            timestamp: DateTime::from_unix_millis(row.get(1)?),
+            timestamp: DateTime::try_from_unix_micros(row.get(1)?).context("Invalid SQLite device-state timestamp")?,
         }))
     }
 
@@ -93,26 +93,33 @@ impl SQLiteDeviceStateRepository {
         let now = DateTime::now();
         let mut statement = connection.prepare_cached(
             r#"
-            SELECT value, timestamp_ms
+            SELECT value, timestamp_us
             FROM device_state
-            WHERE tag_id = ?1 AND timestamp_ms <= ?3
-              AND timestamp_ms >= COALESCE((
-                SELECT MAX(timestamp_ms)
+            WHERE tag_id = ?1 AND timestamp_us <= ?3
+              AND timestamp_us >= COALESCE((
+                SELECT MAX(timestamp_us)
                 FROM device_state
-                WHERE tag_id = ?1 AND timestamp_ms <= MIN(?2, ?3)
+                WHERE tag_id = ?1 AND timestamp_us <= MIN(?2, ?3)
               ), ?2)
-            ORDER BY timestamp_ms ASC, id ASC
+            ORDER BY timestamp_us ASC, id ASC
             "#,
         )?;
 
-        let rows = statement.query_map(params![tag_id, since.unix_millis(), now.unix_millis()], |row| {
-            Ok(DataPoint {
-                value: from_f64_value(*id, row.get(0)?),
-                timestamp: DateTime::from_unix_millis(row.get(1)?),
-            })
+        let rows = statement.query_map(params![tag_id, since.unix_micros(), now.unix_micros()], |row| {
+            Ok((row.get::<_, f64>(0)?, row.get::<_, i64>(1)?))
         })?;
+        let points = rows
+            .map(|row| {
+                let (value, timestamp_us) = row?;
+                Ok(DataPoint {
+                    value: from_f64_value(*id, value),
+                    timestamp: DateTime::try_from_unix_micros(timestamp_us)
+                        .context("Invalid SQLite device-state timestamp")?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-        Ok(DataFrame::new(rows.collect::<rusqlite::Result<Vec<_>>>()?).non_empty())
+        Ok(DataFrame::new(points).non_empty())
     }
 
     fn tag_id(&self, id: DeviceStateId) -> Result<i64> {
@@ -261,11 +268,26 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn invalid_latest_timestamp_returns_an_error() -> anyhow::Result<()> {
+        let connection = Connection::open_in_memory()?;
+        let repository = SQLiteDeviceStateRepository::new(&connection)?;
+        let id = DeviceStateId::Presence(Presence::LivingRoomCouch);
+        repository.save(
+            &connection,
+            DataPoint::new(DeviceStateValue::Presence(Presence::LivingRoomCouch, false), DateTime::now()),
+        )?;
+        connection.execute("UPDATE device_state SET timestamp_us = ?1", [i64::MIN])?;
+
+        assert!(repository.get_latest_for_device(&connection, &id).is_err());
+        Ok(())
+    }
+
     #[tokio::test]
     async fn history_starts_at_an_exact_match_and_hides_rows_after_shifted_now() -> anyhow::Result<()> {
         let connection = Connection::open_in_memory()?;
         let repository = SQLiteDeviceStateRepository::new(&connection)?;
-        let cutoff = DateTime::from_static_iso("2026-03-10T12:00:00Z");
+        let cutoff = DateTime::from_static_iso("2026-03-10T12:00:00.123456Z");
         let now = cutoff + t!(5 minutes);
         let couch = DeviceStateId::Presence(Presence::LivingRoomCouch);
         let bedroom = DeviceStateId::Temperature(Temperature::Bedroom);
@@ -289,6 +311,7 @@ mod tests {
                 .get_data_frame_since(&connection, &couch, cutoff)?
                 .expect("couch history not found");
             assert_eq!(history.len(), 1);
+            assert_eq!(history.first().unwrap().timestamp, cutoff);
             assert!(!history.any(|dp| dp.value == DeviceStateValue::Presence(Presence::LivingRoomCouch, true)));
             assert!(
                 repository

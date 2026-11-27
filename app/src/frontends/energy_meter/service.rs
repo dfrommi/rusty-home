@@ -45,7 +45,7 @@ impl EnergyReadingService {
             reading_type: reading_type.to_string(),
             name: name.to_string(),
             value,
-            timestamp_us: timestamp.into_db().timestamp_micros(),
+            timestamp,
             year_end: false,
         };
 
@@ -90,7 +90,7 @@ fn total_reading(row: &RawEnergyReading, history: &[RawEnergyReading]) -> anyhow
         .iter()
         .filter(|previous| {
             previous.year_end
-                && previous.timestamp_us < row.timestamp_us
+                && previous.timestamp < row.timestamp
                 && previous.reading_type == row.reading_type
                 && previous.name == row.name
         })
@@ -99,7 +99,5 @@ fn total_reading(row: &RawEnergyReading, history: &[RawEnergyReading]) -> anyhow
     let total = row.value + earlier_years;
     ensure!(total.is_finite(), "Cumulative energy reading must be finite");
     let EnergyMeterTarget::Heating(radiator) = target;
-    let timestamp =
-        chrono::DateTime::from_timestamp_micros(row.timestamp_us).context("Invalid energy reading timestamp")?;
-    Ok(DataPoint::new(EnergyReading::Heating(radiator, total), timestamp.into()))
+    Ok(DataPoint::new(EnergyReading::Heating(radiator, total), row.timestamp))
 }

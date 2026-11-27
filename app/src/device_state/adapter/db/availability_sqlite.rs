@@ -1,15 +1,18 @@
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use rusqlite::{Connection, params};
 
-use crate::device_state::{DeviceAvailabilityItem, DeviceAvailabilityRecord};
+use crate::{
+    core::time::DateTime,
+    device_state::{DeviceAvailabilityItem, DeviceAvailabilityRecord},
+};
 
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS item_availability (
     source TEXT NOT NULL,
     item TEXT NOT NULL,
-    last_seen_ms INTEGER NOT NULL,
+    last_seen_us INTEGER NOT NULL,
     marked_offline INTEGER NOT NULL CHECK (marked_offline IN (0, 1)),
-    entry_updated_ms INTEGER NOT NULL,
+    entry_updated_us INTEGER NOT NULL,
     disabled INTEGER NOT NULL CHECK (disabled IN (0, 1)),
     PRIMARY KEY (source, item)
 ) STRICT;
@@ -26,38 +29,52 @@ impl SQLiteDeviceAvailabilityRepository {
 
     pub fn get_all(&self, connection: &Connection) -> Result<Vec<DeviceAvailabilityRecord>> {
         let mut statement = connection.prepare_cached(
-            r#"SELECT source, item, last_seen_ms, marked_offline, entry_updated_ms, disabled
+            r#"SELECT source, item, last_seen_us, marked_offline, entry_updated_us, disabled
                FROM item_availability"#,
         )?;
         let rows = statement.query_map([], |row| {
-            Ok(DeviceAvailabilityRecord {
-                item: DeviceAvailabilityItem::new(row.get::<_, String>(0)?, row.get::<_, String>(1)?),
-                last_seen: crate::core::time::DateTime::from_unix_millis(row.get(2)?),
-                marked_offline: row.get(3)?,
-                entry_updated: crate::core::time::DateTime::from_unix_millis(row.get(4)?),
-                disabled: row.get(5)?,
-            })
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, bool>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, bool>(5)?,
+            ))
         })?;
-
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+        rows.map(|row| {
+            let (source, item, last_seen_us, marked_offline, entry_updated_us, disabled) = row?;
+            let last_seen = DateTime::try_from_unix_micros(last_seen_us)
+                .context("Invalid SQLite availability last_seen timestamp")?;
+            let entry_updated = DateTime::try_from_unix_micros(entry_updated_us)
+                .context("Invalid SQLite availability entry_updated timestamp")?;
+            Ok(DeviceAvailabilityRecord {
+                item: DeviceAvailabilityItem::new(source, item),
+                last_seen,
+                marked_offline,
+                entry_updated,
+                disabled,
+            })
+        })
+        .collect()
     }
 
     pub fn save(&self, connection: &Connection, record: &DeviceAvailabilityRecord) -> Result<()> {
         connection.execute(
             r#"INSERT INTO item_availability
-               (source, item, last_seen_ms, marked_offline, entry_updated_ms, disabled)
+               (source, item, last_seen_us, marked_offline, entry_updated_us, disabled)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                ON CONFLICT (source, item) DO UPDATE SET
-                   last_seen_ms = excluded.last_seen_ms,
+                   last_seen_us = excluded.last_seen_us,
                    marked_offline = excluded.marked_offline,
-                   entry_updated_ms = excluded.entry_updated_ms,
+                   entry_updated_us = excluded.entry_updated_us,
                    disabled = excluded.disabled"#,
             params![
                 record.item.source,
                 record.item.item,
-                record.last_seen.unix_millis(),
+                record.last_seen.unix_micros(),
                 record.marked_offline,
-                record.entry_updated.unix_millis(),
+                record.entry_updated.unix_micros(),
                 record.disabled,
             ],
         )?;
@@ -88,6 +105,19 @@ mod tests {
     }
 
     #[test]
+    fn invalid_timestamps_return_an_error() -> anyhow::Result<()> {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        let repository = SQLiteDeviceAvailabilityRepository::new(&connection)?;
+        connection.execute(
+            "INSERT INTO item_availability VALUES ('HA', 'sensor.invalid', ?1, 0, ?1, 0)",
+            [i64::MAX],
+        )?;
+
+        assert!(repository.get_all(&connection).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn stores_and_updates_availability_records() -> anyhow::Result<()> {
         let path = test_file();
         fs::File::create_new(&path)?;
@@ -99,9 +129,9 @@ mod tests {
         let item = DeviceAvailabilityItem::new("HA", "sensor.temperature");
         let mut record = DeviceAvailabilityRecord {
             item: item.clone(),
-            last_seen: DateTime::from_static_iso("2025-01-01T10:00:00Z"),
+            last_seen: DateTime::from_static_iso("2025-01-01T10:00:00.123456Z"),
             marked_offline: false,
-            entry_updated: DateTime::from_static_iso("2025-01-01T10:01:00Z"),
+            entry_updated: DateTime::from_static_iso("2025-01-01T10:01:00.654321Z"),
             disabled: false,
         };
 

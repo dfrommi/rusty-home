@@ -113,7 +113,7 @@ mod tests {
         for (name, value, timestamp, year_end) in rows {
             connection.execute(
                 "INSERT INTO energy_reading (type, name, value, timestamp_us, year_end) VALUES ('heating', ?1, ?2, ?3, ?4)",
-                params![name, value, DateTime::from_iso(timestamp)?.into_db().timestamp_micros(), year_end],
+                params![name, value, DateTime::from_iso(timestamp)?.unix_micros(), year_end],
             )?;
         }
         Ok(())

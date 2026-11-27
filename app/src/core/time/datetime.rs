@@ -47,10 +47,18 @@ impl DateTime {
         self.delegate.timestamp_millis()
     }
 
+    pub fn unix_micros(&self) -> i64 {
+        self.delegate.timestamp_micros()
+    }
+
     pub fn from_unix_millis(millis: i64) -> Self {
         chrono::DateTime::from_timestamp_millis(millis)
             .unwrap_or_else(|| panic!("Invalid Unix timestamp in milliseconds: {millis}"))
             .into()
+    }
+
+    pub fn try_from_unix_micros(micros: i64) -> Option<Self> {
+        chrono::DateTime::from_timestamp_micros(micros).map(Into::into)
     }
 
     pub fn min_value() -> Self {
@@ -201,6 +209,14 @@ mod constructor {
         assert_eq!(result, datetime);
     }
 
+    #[test]
+    fn test_from_micros() {
+        let datetime = DateTime::from_static_iso("2024-11-03T15:23:46.123456Z");
+        let micros = datetime.unix_micros();
+        let result = DateTime::try_from_unix_micros(micros).unwrap();
+        assert_eq!(result, datetime);
+        assert!(DateTime::try_from_unix_micros(i64::MAX).is_none());
+    }
     #[test]
     fn test_midpoint() {
         let start = DateTime::from_static_iso("2024-11-03T15:23:46Z");

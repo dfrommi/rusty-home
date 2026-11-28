@@ -357,8 +357,8 @@ mod tests {
         assert_eq!(range.end().time(), t!(2:30)); // 2:30 gets adjusted to 2:30
     }
 
-    #[tokio::test]
-    async fn test_active_or_previous_after_midnight() {
+    #[test]
+    fn test_active_or_previous_after_midnight() {
         let range = t!(22:00 - 03:00).active_or_previous_at(t!(01:00).today());
 
         assert_eq!(range.start(), &t!(22:00).yesterday());

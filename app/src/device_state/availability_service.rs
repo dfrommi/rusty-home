@@ -30,7 +30,7 @@ impl DeviceAvailabilityService {
         }
     }
 
-    pub async fn initialize(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
+    pub fn initialize(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
         self.config.warn_unknown_items(&items);
 
         let records = {
@@ -47,7 +47,7 @@ impl DeviceAvailabilityService {
         Ok(())
     }
 
-    pub async fn handle_update(&self, availability: DeviceAvailability) -> anyhow::Result<()> {
+    pub fn handle_update(&self, availability: DeviceAvailability) -> anyhow::Result<()> {
         let record = DeviceAvailabilityRecord {
             item: availability.item,
             last_seen: availability.last_seen,
@@ -67,7 +67,7 @@ impl DeviceAvailabilityService {
         Ok(())
     }
 
-    pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
+    pub fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
         let records = self
             .sqlite_db
             .for_reading()
@@ -153,8 +153,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn sqlite_write_failure_is_returned_to_the_caller() -> anyhow::Result<()> {
+    #[test]
+    fn sqlite_write_failure_is_returned_to_the_caller() -> anyhow::Result<()> {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
@@ -185,7 +185,7 @@ mod tests {
             last_seen: DateTime::now(),
             marked_offline: false,
         };
-        assert!(service.handle_update(availability).await.is_err());
+        assert!(service.handle_update(availability).is_err());
         Ok(())
     }
 

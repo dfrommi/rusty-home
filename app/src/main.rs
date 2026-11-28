@@ -34,10 +34,7 @@ pub async fn main() -> anyhow::Result<()> {
     let monitoring = settings.monitoring.init()?;
     let bootstrap_monitoring = monitoring.enter_bootstrap_mode()?;
 
-    let mut infrastructure = Infrastructure::init(&settings)
-        .await
-        .expect("Error initializing infrastructure");
-
+    let mut infrastructure = Infrastructure::init(&settings).expect("Error initializing infrastructure");
     let energy_meter_bus = EventBus::new(64);
 
     let device_state_module = device_state::DeviceStateModule::new(
@@ -55,7 +52,7 @@ pub async fn main() -> anyhow::Result<()> {
         infrastructure.sqlite_database.clone(),
     )
     .await?;
-    device_state_module.initialize_availability().await?;
+    device_state_module.initialize_availability()?;
     let energy_meter =
         frontends::energy_meter::EnergyMeter::new(infrastructure.sqlite_database.clone(), energy_meter_bus.emitter())?;
     if let Err(e) = energy_meter.publish_initial_readings() {
@@ -81,8 +78,7 @@ pub async fn main() -> anyhow::Result<()> {
         &settings.nuki.url,
         &settings.nuki.token,
         home_state_module.subscribe(),
-    )
-    .await;
+    );
 
     let automation_module =
         AutomationModule::new(home_state_module.subscribe(), command_module.client(), trigger_module.client());
@@ -167,7 +163,7 @@ pub async fn main() -> anyhow::Result<()> {
 
 impl Infrastructure {
     #[allow(clippy::expect_used)]
-    pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
+    pub fn init(settings: &Settings) -> anyhow::Result<Self> {
         let sqlite_database = settings.database.new_sqlite_database()?;
         let mqtt_client = settings.mqtt.new_client();
 

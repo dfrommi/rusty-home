@@ -65,22 +65,22 @@ pub struct TriggerClient {
 }
 
 impl TriggerClient {
-    pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
-        self.service.add_trigger(trigger).await
+    pub fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+        self.service.add_trigger(trigger)
     }
 
-    pub async fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
+    pub fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
         self.service.get_latest_triggers()
     }
 
-    pub async fn get_all_triggers_active_anytime_in_range(
+    pub fn get_all_triggers_active_anytime_in_range(
         &self,
         range: DateTimeRange,
     ) -> anyhow::Result<Vec<UserTriggerExecution>> {
         self.service.get_all_triggers_active_anytime_in_range(range)
     }
 
-    pub async fn disable_triggers_before_except(
+    pub fn disable_triggers_before_except(
         &self,
         before: DateTime,
         excluded_ids: &[UserTriggerId],
@@ -88,7 +88,7 @@ impl TriggerClient {
         self.service.disable_triggers_before_except(before, excluded_ids)
     }
 
-    pub async fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
+    pub fn set_triggers_active_from_if_unset(&self, trigger_ids: &[UserTriggerId]) -> anyhow::Result<u64> {
         self.service.set_triggers_active_from_if_unset(trigger_ids)
     }
 }

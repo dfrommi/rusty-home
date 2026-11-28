@@ -211,7 +211,7 @@ impl DeviceStateModule {
         self.event_bus.subscribe()
     }
 
-    pub async fn initialize_availability(&self) -> anyhow::Result<()> {
+    pub fn initialize_availability(&self) -> anyhow::Result<()> {
         let mut items = HashSet::new();
         items.extend(self.tasmota_ds.availability_items());
         items.extend(self.z2m_ds.availability_items());
@@ -220,7 +220,7 @@ impl DeviceStateModule {
         items.extend(self.energy_meter_ds.availability_items());
         items.extend(self.tado_ds.availability_items());
 
-        self.availability_service.initialize(items).await
+        self.availability_service.initialize(items)
     }
 
     pub async fn run(mut self) {
@@ -239,20 +239,20 @@ impl DeviceStateModule {
                 return;
             };
 
-            self.process_incoming_data(updates).await;
+            self.process_incoming_data(updates);
         }
     }
 
-    async fn process_incoming_data(&self, updates: Vec<adapter::IncomingData>) {
+    fn process_incoming_data(&self, updates: Vec<adapter::IncomingData>) {
         for update in updates {
             match update {
                 adapter::IncomingData::StateValue(data_point) => {
-                    if let Err(error) = self.service.handle_state_update(data_point).await {
+                    if let Err(error) = self.service.handle_state_update(data_point) {
                         tracing::error!("Error saving device state update: {error:#}");
                     }
                 }
                 adapter::IncomingData::ItemAvailability(device_availability) => {
-                    if let Err(error) = self.availability_service.handle_update(device_availability).await {
+                    if let Err(error) = self.availability_service.handle_update(device_availability) {
                         tracing::error!("Error saving device availability update: {error:#}");
                     }
                 }
@@ -279,8 +279,8 @@ impl DeviceStateClient {
         self.service.get_current_for_all()
     }
 
-    pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
-        self.availability_service.get_item_availabilities().await
+    pub fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
+        self.availability_service.get_item_availabilities()
     }
 }
 

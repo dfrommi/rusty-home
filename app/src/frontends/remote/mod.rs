@@ -38,7 +38,7 @@ impl RemoteModule {
             match triggers {
                 Some(triggers) => {
                     for trigger in triggers {
-                        self.service.handle_remote_trigger(trigger).await;
+                        self.service.handle_remote_trigger(trigger);
                     }
                 }
                 None => {

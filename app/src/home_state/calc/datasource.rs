@@ -26,8 +26,8 @@ mod user_trigger {
 
     impl CurrentUserTriggerProvider {
         #[tracing::instrument(skip_all, "load_current_user_triggers")]
-        pub async fn new(trigger_client: &TriggerClient) -> anyhow::Result<Self> {
-            let triggers = trigger_client.get_latest_triggers().await?;
+        pub fn new(trigger_client: &TriggerClient) -> anyhow::Result<Self> {
+            let triggers = trigger_client.get_latest_triggers()?;
             Ok(Self { triggers })
         }
     }
@@ -44,9 +44,8 @@ mod user_trigger {
     }
 
     impl PreloadedUserTriggerProvider {
-        pub async fn new(trigger_client: &TriggerClient, range: DateTimeRange) -> anyhow::Result<Self> {
-            let triggers = trigger_client.get_all_triggers_active_anytime_in_range(range).await?;
-
+        pub fn new(trigger_client: &TriggerClient, range: DateTimeRange) -> anyhow::Result<Self> {
+            let triggers = trigger_client.get_all_triggers_active_anytime_in_range(range)?;
             Ok(Self {
                 triggers: Arc::new(triggers),
             })

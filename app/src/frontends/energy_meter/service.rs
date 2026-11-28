@@ -39,7 +39,7 @@ impl EnergyReadingService {
         }
     }
 
-    pub async fn add_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<()> {
+    pub fn add_reading(&self, reading: EnergyReading, timestamp: DateTime) -> anyhow::Result<()> {
         let EnergyReading::Heating(_, value) = reading;
         let target = reading.target();
         let id = target.ext_id();

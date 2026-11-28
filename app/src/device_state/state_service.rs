@@ -38,7 +38,7 @@ impl DeviceStateService {
         }
     }
 
-    pub(super) async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
+    pub(super) fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
         if DateTime::is_shifted() {
             tracing::warn!("Received device state update with shifted DateTime: {:?}, ignoring", dp);
             return Ok(());
@@ -310,7 +310,7 @@ mod tests {
             DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.0)),
             DateTime::now(),
         );
-        assert!(service.handle_state_update(update).await.is_err());
+        assert!(service.handle_state_update(update).is_err());
         assert!(
             service
                 .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))?

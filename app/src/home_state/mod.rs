@@ -68,7 +68,7 @@ impl HomeStateModule {
                 .context("Failed to bootstrap home state context")?;
 
         tracing::info!("Calculating initial home state context");
-        Ok(self.update_context(state_result).await)
+        Ok(self.update_context(state_result))
     }
 
     pub async fn run(mut self, mut state_result: StateCalculationResult) {
@@ -90,15 +90,14 @@ impl HomeStateModule {
                 },
 
                 event = self.trigger_rx.recv() => if let Some(TriggerEvent::TriggerAdded) = event {
-                    state_result = self.update_context(state_result).await;
-
+                    state_result = self.update_context(state_result);
                     //Schedule next regular update
                     debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
                 },
 
                 // Debounce elapsed
                 () = &mut debounce_sleeper => {
-                    state_result = self.update_context(state_result).await;
+                    state_result = self.update_context(state_result);
                     //Schedule next regular update
                     debounce_sleeper.as_mut().reset(Instant::now() + scheduled_duration);
                 }
@@ -107,11 +106,10 @@ impl HomeStateModule {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn update_context(&self, old_result: StateCalculationResult) -> StateCalculationResult {
+    fn update_context(&self, old_result: StateCalculationResult) -> StateCalculationResult {
         tracing::trace!("Updating home state context");
 
-        let trigger_state = CurrentUserTriggerProvider::new(&self.trigger_client).await;
-
+        let trigger_state = CurrentUserTriggerProvider::new(&self.trigger_client);
         let old_dps: HashMap<HomeStateId, DataPoint<HomeStateValue>> = HomeStateId::variants()
             .into_iter()
             .filter_map(|id| old_result.get_latest(id).map(|dp| (id, dp.clone())))

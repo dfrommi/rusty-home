@@ -34,7 +34,7 @@ pub async fn plan_for_home(
     }
 
     tracing::info!("Start planning");
-    let planner = Planner::new(snapshot, command_client, trigger_client).await?;
+    let planner = Planner::new(snapshot, command_client, trigger_client)?;
     let result = planner.run().await;
 
     if let Err(error) = &result {
@@ -54,14 +54,13 @@ struct Planner<'a> {
 }
 
 impl<'a> Planner<'a> {
-    async fn new(
+    fn new(
         snapshot: &StateSnapshot,
         command_client: &'a CommandClient,
         trigger_client: &'a TriggerClient,
     ) -> Result<Self> {
         let active_triggers = trigger_client
-            .get_latest_triggers()
-            .await?
+            .get_latest_triggers()?
             .into_iter()
             .filter(|t| t.is_active())
             .collect();
@@ -96,7 +95,7 @@ impl<'a> Planner<'a> {
             }
         }
 
-        self.update_triggers(active_trigger_ids).await
+        self.update_triggers(active_trigger_ids)
     }
 
     #[tracing::instrument(
@@ -188,16 +187,14 @@ impl<'a> Planner<'a> {
         }
     }
 
-    async fn update_triggers(&self, active_trigger_ids: Vec<UserTriggerId>) -> anyhow::Result<()> {
+    fn update_triggers(&self, active_trigger_ids: Vec<UserTriggerId>) -> anyhow::Result<()> {
         if !active_trigger_ids.is_empty() {
             self.trigger_client
-                .set_triggers_active_from_if_unset(&active_trigger_ids)
-                .await?;
+                .set_triggers_active_from_if_unset(&active_trigger_ids)?;
         }
 
         self.trigger_client
             .disable_triggers_before_except(self.planning_data_timestamp, &active_trigger_ids)
-            .await
             .map(|_| ())
     }
 }

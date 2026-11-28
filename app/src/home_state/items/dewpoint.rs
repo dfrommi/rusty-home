@@ -70,8 +70,8 @@ impl DewPoint {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_dew_point_calculation() {
+    #[test]
+    fn test_dew_point_calculation() {
         let temperature = DegreeCelsius(20.0);
         let humidity = Percent(50.0);
         let dew_point = DewPoint::calculate_dew_point(temperature, humidity);

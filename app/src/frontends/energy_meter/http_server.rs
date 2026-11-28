@@ -26,6 +26,7 @@ struct HeatingReadingDTO {
     value: String,
 }
 
+#[allow(clippy::unused_async, reason = "Keep the conventional async Actix handler form.")]
 async fn handle_heating_reading(
     service: web::Data<EnergyReadingService>,
     Json(dto): Json<HeatingReadingDTO>,
@@ -49,7 +50,7 @@ async fn handle_heating_reading(
 
     tracing::info!("Received reading {:?}", reading);
 
-    service.add_reading(reading, t!(now)).await.map_err(|error| {
+    service.add_reading(reading, t!(now)).map_err(|error| {
         if error.downcast_ref::<InvalidEnergyReading>().is_some() {
             ErrorBadRequest(error)
         } else {
@@ -59,7 +60,6 @@ async fn handle_heating_reading(
 
     Ok(HttpResponse::NoContent().finish())
 }
-
 #[cfg(test)]
 mod tests {
     use actix_web::{App, http::StatusCode, test};

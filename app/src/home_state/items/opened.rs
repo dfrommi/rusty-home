@@ -50,8 +50,8 @@ mod tests {
     use super::*;
     use crate::t;
 
-    #[tokio::test]
-    async fn test_any_of_some_opened() {
+    #[test]
+    fn test_any_of_some_opened() {
         let res = any_of(vec![
             DataPoint::new(false, t!(5 minutes ago)),
             DataPoint::new(true, t!(3 minutes ago)),
@@ -61,8 +61,8 @@ mod tests {
         assert!(res);
     }
 
-    #[tokio::test]
-    async fn test_any_of_all_closed() {
+    #[test]
+    fn test_any_of_all_closed() {
         let res = any_of(vec![
             DataPoint::new(false, t!(5 minutes ago)),
             DataPoint::new(false, t!(3 minutes ago)),

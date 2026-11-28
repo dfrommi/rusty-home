@@ -31,7 +31,7 @@ impl TriggerService {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
+    pub fn add_trigger(&self, trigger: UserTrigger) -> anyhow::Result<()> {
         let timestamp = t!(now);
         let correlation_id = TraceContext::current().correlation_id().map(|id| id.to_string());
         let trigger_json = serde_json::to_string(&trigger)?;
@@ -146,7 +146,7 @@ mod tests {
             params![serde_json::to_string(&trigger)?, (now - t!(1 hours)).unix_micros()],
         )?;
 
-        now.eval_timeshifted(service.add_trigger(trigger)).await?;
+        now.eval_timeshifted(async { service.add_trigger(trigger) }).await?;
         let event = tokio::time::timeout(std::time::Duration::from_secs(1), events.recv()).await?;
         assert!(matches!(event, Some(TriggerEvent::TriggerAdded)));
         let latest = now.eval_timeshifted(async { service.get_latest_triggers() }).await?;
@@ -187,7 +187,6 @@ mod tests {
         assert_eq!(rows, vec![(500, true, false), (501, false, false)]);
         Ok(())
     }
-
     #[tokio::test]
     async fn failed_sqlite_insert_does_not_make_trigger_visible_or_emit_event() -> anyhow::Result<()> {
         let file = TestFile::new()?;
@@ -203,7 +202,7 @@ mod tests {
             "CREATE TRIGGER reject_insert BEFORE INSERT ON user_trigger BEGIN SELECT RAISE(ABORT, 'test'); END;",
         )?;
 
-        assert!(service.add_trigger(trigger.clone()).await.is_err());
+        assert!(service.add_trigger(trigger.clone()).is_err());
         assert!(service.get_latest_triggers()?.is_empty());
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
@@ -212,7 +211,7 @@ mod tests {
         );
 
         db.for_writing()?.execute_batch("DROP TRIGGER reject_insert;")?;
-        service.add_trigger(trigger).await?;
+        service.add_trigger(trigger)?;
         assert!(matches!(events.recv().await, Some(TriggerEvent::TriggerAdded)));
         assert_eq!(service.get_latest_triggers()?.len(), 1);
         Ok(())

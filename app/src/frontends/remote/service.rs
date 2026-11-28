@@ -9,14 +9,10 @@ impl RemoteService {
         Self { trigger_client }
     }
 
-    pub async fn handle_remote_trigger(&self, trigger: RemoteTrigger) {
+    pub fn handle_remote_trigger(&self, trigger: RemoteTrigger) {
         tracing::info!("Received remote trigger: {:?}", trigger);
 
-        if let Err(e) = self
-            .trigger_client
-            .add_trigger(UserTrigger::Remote(trigger.clone()))
-            .await
-        {
+        if let Err(e) = self.trigger_client.add_trigger(UserTrigger::Remote(trigger.clone())) {
             tracing::error!("Failed to persist remote trigger {:?}: {:?}", trigger, e);
         }
     }

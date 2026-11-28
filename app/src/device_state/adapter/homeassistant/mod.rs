@@ -536,8 +536,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn parses_estimated_completion_time_from_remaining_minutes() {
+    #[test]
+    fn parses_estimated_completion_time_from_remaining_minutes() {
         let now = DateTime::from_static_iso("2025-01-01T12:00:00Z");
 
         let value = parse_ha_channel(

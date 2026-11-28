@@ -59,7 +59,7 @@ impl StateCalculationResultIterator {
         let trigger_ds = match &self.trigger_data_source {
             Some(ds) => ds.clone(),
             None => {
-                let ds = PreloadedUserTriggerProvider::new(&self.trigger_client, self.full_range.clone()).await?;
+                let ds = PreloadedUserTriggerProvider::new(&self.trigger_client, self.full_range.clone())?;
                 self.trigger_data_source = Some(ds.clone());
                 ds
             }

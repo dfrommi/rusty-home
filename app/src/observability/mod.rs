@@ -86,7 +86,7 @@ impl ObservabilityModule {
                     _ => vec![],
                 },
 
-                _ = availability_timer.tick() => match self.device_state_client.get_item_availabilities().await {
+                _ = availability_timer.tick() => match self.device_state_client.get_item_availabilities() {
                     Ok(records) => {
                         records.into_iter().flat_map(|r| {
                             self.availability_metrics_adapter.to_metrics(r)
@@ -98,7 +98,6 @@ impl ObservabilityModule {
                     }
                 },
             };
-
             for mut metric in metrics.into_iter() {
                 //ensure a consistent flow of datapoints
                 metric.timestamp = t!(now);

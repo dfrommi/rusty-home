@@ -26,7 +26,7 @@ pub struct CommandClient {
 
 impl CommandModule {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,

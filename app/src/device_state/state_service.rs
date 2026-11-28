@@ -60,39 +60,31 @@ impl DeviceStateService {
         // across the Postgres await above.
         let sqlite_outcome = match self.sqlite_db.for_writing() {
             Ok(connection) => (|| -> anyhow::Result<SaveOutcome> {
-                let current_dp = self.sqlite_repo.get_latest_for_device(&connection, &id)?;
-                let sqlite_outcome = match current_dp {
-                    None => {
-                        tracing::debug!("SQLite: No current device state for {:?}, inserting new value: {:?}", id, dp);
-                        SaveOutcome::Inserted
-                    }
-                    Some(current_dp) if dp.value == current_dp.value => {
-                        tracing::debug!(
-                            "SQLite: Duplicate device state update for {:?}: value {:?} is the same as the current value {:?}",
+                let current_dp = self.sqlite_repo.get_latest_for_device_for_save(&connection, &id)?;
+                let sqlite_outcome = save_outcome(&dp, current_dp.as_ref());
+
+                if let Some(current_dp) = current_dp.as_ref() {
+                    match sqlite_outcome {
+                        SaveOutcome::Duplicate => tracing::debug!(
+                            "SQLite: Duplicate device state update for {:?}: value {:?} is equal to or within the minimum storage delta of {:?}",
                             id,
                             dp.value,
                             current_dp.value
-                        );
-                        SaveOutcome::Duplicate
-                    }
-                    //TODO better internal timestamp handling without unneccessary high precision, for
-                    //examlple truncate to millis
-                    Some(current_dp) if dp.timestamp.unix_millis() < current_dp.timestamp.unix_millis() => {
-                        tracing::debug!(
+                        ),
+                        SaveOutcome::Stale => tracing::debug!(
                             "SQLite: Stale device state update for {:?}: current timestamp {:?} is newer than update timestamp {:?}",
                             id,
                             current_dp.timestamp,
                             dp.timestamp
-                        );
-                        SaveOutcome::Stale
+                        ),
+                        SaveOutcome::Inserted => {
+                            tracing::debug!("SQLite: Inserting new device state for {:?}: {:?}", id, dp);
+                        }
                     }
-                    _ => {
-                        tracing::debug!("SQLite: Inserting new device state for {:?}: {:?}", id, dp);
-                        SaveOutcome::Inserted
-                    }
-                };
-
-                if outcome == SaveOutcome::Inserted {
+                } else {
+                    tracing::debug!("SQLite: No current device state for {:?}, inserting new value: {:?}", id, dp);
+                }
+                if sqlite_outcome == SaveOutcome::Inserted {
                     self.sqlite_repo.save(&connection, dp.clone())?;
                     tracing::info!("Saved device state to SQLite for {:?}: {:?}", id, &dp.value);
                 }
@@ -183,6 +175,25 @@ impl DeviceStateService {
     }
 }
 
+fn save_outcome(incoming: &DataPoint<DeviceStateValue>, current: Option<&DataPoint<DeviceStateValue>>) -> SaveOutcome {
+    let Some(current) = current else {
+        return SaveOutcome::Inserted;
+    };
+
+    if incoming.timestamp < current.timestamp {
+        return SaveOutcome::Stale;
+    }
+
+    let incoming_value = f64::from(&incoming.value);
+    let current_value = f64::from(&current.value);
+    let minimum_delta = incoming.value.minimum_storage_delta().unwrap_or(0.0);
+    if incoming_value == current_value || (incoming_value - current_value).abs() < minimum_delta {
+        SaveOutcome::Duplicate
+    } else {
+        SaveOutcome::Inserted
+    }
+}
+
 fn read_latest_cached(
     cache: &LatestValues,
     id: DeviceStateId,
@@ -211,9 +222,83 @@ fn invalidate_latest(cache: &LatestValues, id: DeviceStateId) {
 mod tests {
     use std::{sync::mpsc, thread, time::Duration};
 
-    use crate::{core::unit::DegreeCelsius, device_state::Temperature};
+    use crate::{
+        core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
+        device_state::{CompletionTime, DeviceStateValue, Presence, Temperature},
+        t,
+    };
 
     use super::*;
+    #[test]
+    fn save_outcome_filters_values_inside_minimum_storage_delta() {
+        let now = DateTime::now();
+        let completion_time = CompletionTime::WashingMachineEstimated;
+        let current = DataPoint::new(DeviceStateValue::CompletionTime(completion_time, now + t!(1 hours)), now);
+        let incoming = DataPoint::new(
+            DeviceStateValue::CompletionTime(completion_time, now + t!(61 minutes)),
+            now + t!(1 seconds),
+        );
+
+        assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Duplicate);
+    }
+
+    #[test]
+    fn save_outcome_inserts_values_at_the_minimum_storage_delta() {
+        let now = DateTime::now();
+        let completion_time = CompletionTime::WashingMachineEstimated;
+        let current = DataPoint::new(DeviceStateValue::CompletionTime(completion_time, now + t!(1 hours)), now);
+        let incoming = DataPoint::new(
+            DeviceStateValue::CompletionTime(completion_time, now + t!(62 minutes)),
+            now + t!(1 seconds),
+        );
+
+        assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Inserted);
+    }
+
+    #[test]
+    fn save_outcome_marks_same_value_stale_update_as_stale() {
+        let current = DataPoint::new(
+            DeviceStateValue::Presence(Presence::LivingRoomCouch, true),
+            DateTime::from_static_iso("2026-03-10T12:00:00.123456Z"),
+        );
+        let incoming = DataPoint::new(current.value.clone(), DateTime::from_static_iso("2026-03-10T12:00:00.123455Z"));
+
+        assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Stale);
+    }
+
+    #[test]
+    fn save_outcome_uses_full_timestamp_precision() {
+        let current = DataPoint::new(
+            DeviceStateValue::Presence(Presence::LivingRoomCouch, false),
+            DateTime::from_static_iso("2026-03-10T12:00:00.123456Z"),
+        );
+        let incoming = DataPoint::new(
+            DeviceStateValue::Presence(Presence::LivingRoomCouch, true),
+            DateTime::from_static_iso("2026-03-10T12:00:00.123455Z"),
+        );
+
+        assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Stale);
+    }
+
+    #[test]
+    fn save_outcome_matches_values_after_database_conversion() {
+        let current = DataPoint::new(
+            DeviceStateValue::CompletionTime(
+                CompletionTime::WashingMachineEstimated,
+                DateTime::from_static_iso("2026-03-10T12:00:00.123100Z"),
+            ),
+            DateTime::from_static_iso("2026-03-10T12:00:00Z"),
+        );
+        let incoming = DataPoint::new(
+            DeviceStateValue::CompletionTime(
+                CompletionTime::WashingMachineEstimated,
+                DateTime::from_static_iso("2026-03-10T12:00:00.123900Z"),
+            ),
+            DateTime::from_static_iso("2026-03-10T12:00:01Z"),
+        );
+
+        assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Duplicate);
+    }
 
     #[test]
     #[allow(clippy::expect_used)]

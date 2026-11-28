@@ -61,18 +61,36 @@ impl SQLiteDeviceStateRepository {
         connection: &Connection,
         id: &DeviceStateId,
     ) -> Result<Option<DataPoint<DeviceStateValue>>> {
+        self.get_latest_for_device_at_or_before(connection, id, Some(DateTime::now()))
+    }
+
+    /// Get the latest row including future timestamps, for parity with PostgreSQL save decisions.
+    pub fn get_latest_for_device_for_save(
+        &self,
+        connection: &Connection,
+        id: &DeviceStateId,
+    ) -> Result<Option<DataPoint<DeviceStateValue>>> {
+        self.get_latest_for_device_at_or_before(connection, id, None)
+    }
+
+    fn get_latest_for_device_at_or_before(
+        &self,
+        connection: &Connection,
+        id: &DeviceStateId,
+        before: Option<DateTime>,
+    ) -> Result<Option<DataPoint<DeviceStateValue>>> {
         let tag_id = self.tag_id(*id)?;
         let mut statement = connection.prepare_cached(
             r#"
             SELECT value, timestamp_us
             FROM device_state
-            WHERE tag_id = ?1 AND timestamp_us <= ?2
+            WHERE tag_id = ?1 AND (?2 IS NULL OR timestamp_us <= ?2)
             ORDER BY timestamp_us DESC, id DESC
             LIMIT 1
             "#,
         )?;
 
-        let mut rows = statement.query(params![tag_id, DateTime::now().unix_micros()])?;
+        let mut rows = statement.query(params![tag_id, before.map(|timestamp| timestamp.unix_micros())])?;
         let Some(row) = rows.next()? else {
             return Ok(None);
         };
@@ -82,7 +100,6 @@ impl SQLiteDeviceStateRepository {
             timestamp: DateTime::try_from_unix_micros(row.get(1)?).context("Invalid SQLite device-state timestamp")?,
         }))
     }
-
     pub fn get_data_frame_since(
         &self,
         connection: &Connection,
@@ -280,6 +297,36 @@ mod tests {
         connection.execute("UPDATE device_state SET timestamp_us = ?1", [i64::MIN])?;
 
         assert!(repository.get_latest_for_device(&connection, &id).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn save_lookup_includes_future_rows_but_current_lookup_does_not() -> anyhow::Result<()> {
+        let connection = Connection::open_in_memory()?;
+        let repository = SQLiteDeviceStateRepository::new(&connection)?;
+        let id = DeviceStateId::Presence(Presence::LivingRoomCouch);
+        let now = DateTime::now();
+        repository.save(
+            &connection,
+            DataPoint::new(DeviceStateValue::Presence(Presence::LivingRoomCouch, false), now),
+        )?;
+        repository.save(
+            &connection,
+            DataPoint::new(DeviceStateValue::Presence(Presence::LivingRoomCouch, true), now + t!(1 minutes)),
+        )?;
+
+        let current = repository
+            .get_latest_for_device(&connection, &id)?
+            .expect("current device state not found");
+        let latest_for_save = repository
+            .get_latest_for_device_for_save(&connection, &id)?
+            .expect("latest device state for save not found");
+
+        assert_eq!(current.value, DeviceStateValue::Presence(Presence::LivingRoomCouch, false));
+        assert_eq!(
+            latest_for_save.value,
+            DeviceStateValue::Presence(Presence::LivingRoomCouch, true)
+        );
         Ok(())
     }
 

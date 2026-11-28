@@ -47,7 +47,7 @@ impl EnergyReadingService {
             .variant_name()
             .split_once("::")
             .context("Invalid EnergyMeterTarget ID")?;
-        let row = RawEnergyReading {
+        let mut row = RawEnergyReading {
             reading_type: reading_type.to_string(),
             name: name.to_string(),
             value,
@@ -63,8 +63,7 @@ impl EnergyReadingService {
             let connection = self.sqlite_db.for_reading()?;
             self.sqlite_repo.get_all(&connection)?
         };
-        validate_reading(&row, &history)?;
-
+        prepare_reading(&mut row, &history)?;
         let rows = {
             let connection = self.sqlite_db.for_writing()?;
             self.sqlite_repo
@@ -96,17 +95,31 @@ impl EnergyReadingService {
     }
 }
 
-fn validate_reading(row: &RawEnergyReading, history: &[RawEnergyReading]) -> Result<(), InvalidEnergyReading> {
+fn prepare_reading(row: &mut RawEnergyReading, history: &[RawEnergyReading]) -> anyhow::Result<()> {
+    let input_timestamp = row.timestamp;
+    let current_year = input_timestamp.year();
     let previous = history.iter().find(|previous| {
-        previous.timestamp < row.timestamp && previous.reading_type == row.reading_type && previous.name == row.name
+        previous.timestamp <= input_timestamp && previous.reading_type == row.reading_type && previous.name == row.name
     });
-    if let Some(previous) = previous
-        && !previous.year_end
-        && row.value < previous.value
-    {
-        return Err(InvalidEnergyReading(
-            "Energy reading cannot be smaller than the previous reading unless it was a year-end reading",
-        ));
+
+    if let Some(previous) = previous {
+        if previous.year_end {
+            return Ok(());
+        }
+
+        let previous_year = previous.timestamp.year();
+        if current_year > previous_year {
+            if row.value < previous.value {
+                return Err(
+                    InvalidEnergyReading("Year-end reading cannot be smaller than the previous reading").into(),
+                );
+            }
+            row.year_end = true;
+            row.timestamp =
+                DateTime::end_of_year(current_year - 1).context("Could not determine the end of the previous year")?;
+        } else if current_year == previous_year && row.value < previous.value {
+            return Err(InvalidEnergyReading("Energy reading cannot be smaller than the previous reading").into());
+        }
     }
 
     Ok(())

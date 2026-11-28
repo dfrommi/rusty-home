@@ -172,6 +172,81 @@ mod tests {
     }
 
     #[actix_web::test]
+    async fn year_end_reading_closes_previous_year_and_allows_lower_new_year_baseline() -> anyhow::Result<()> {
+        let (_file, db) = test_database()?;
+        let bus = EventBus::new(8);
+        let mut readings = bus.subscribe();
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
+        let app = test::init_service(App::new().service(meter.new_web_service())).await;
+        seed_heating_readings(&db, &[("bedroom", 100.0, "2026-12-30T12:00:00Z", false)])?;
+        let request = |value: &str| {
+            test::TestRequest::put()
+                .uri("/api/energy/readings/heating")
+                .set_json(json!({ "label": "Schlafzimmer", "value": value }))
+                .to_request()
+        };
+
+        let year_end_time = DateTime::from_static_iso("2027-01-01T12:00:00Z");
+        let response = year_end_time
+            .eval_timeshifted(test::call_service(&app, request("99")))
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let response = year_end_time
+            .eval_timeshifted(test::call_service(&app, request("110")))
+            .await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        let stored_year_end: (f64, bool, i64) = db.for_reading()?.query_row(
+            "SELECT value, year_end, timestamp_us FROM energy_reading WHERE type = 'heating' AND name = 'bedroom' ORDER BY id DESC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        let year_end = DateTime::end_of_year(year_end_time.year() - 1).context("year end")?;
+        assert_eq!(year_end.year(), year_end_time.year() - 1);
+        assert_eq!(year_end.month(), 12);
+        assert_eq!(year_end.unix_micros().rem_euclid(1_000_000), 999_999);
+        assert_eq!(stored_year_end, (110.0, true, year_end.unix_micros()));
+
+        let year_end_event = tokio::time::timeout(std::time::Duration::from_secs(1), readings.recv())
+            .await?
+            .context("energy meter source closed")?;
+        let EnergyReading::Heating(_, value) = year_end_event.value;
+        assert_eq!(value, 110.0);
+        assert_eq!(year_end_event.timestamp, year_end);
+
+        let first_reading_time = DateTime::from_static_iso("2027-01-01T13:00:00Z");
+        let response = first_reading_time
+            .eval_timeshifted(test::call_service(&app, request("3")))
+            .await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        let first_reading: (f64, bool) = db.for_reading()?.query_row(
+            "SELECT value, year_end FROM energy_reading WHERE type = 'heating' AND name = 'bedroom' ORDER BY id DESC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        assert_eq!(first_reading, (3.0, false));
+
+        let total_event = tokio::time::timeout(std::time::Duration::from_secs(1), readings.recv())
+            .await?
+            .context("energy meter source closed")?;
+        let EnergyReading::Heating(_, total) = total_event.value;
+        assert_eq!(total, 113.0);
+        assert_eq!(total_event.timestamp, first_reading_time);
+
+        let later_reading_time = DateTime::from_static_iso("2027-01-01T14:00:00Z");
+        let response = later_reading_time
+            .eval_timeshifted(test::call_service(&app, request("2")))
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let count: i64 = db
+            .for_reading()?
+            .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
+        assert_eq!(count, 3);
+        Ok(())
+    }
+
+    #[actix_web::test]
     async fn sqlite_failure_returns_error_without_emitting_a_reading() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);

@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Sub},
 };
 
-use chrono::Datelike as _;
+use chrono::{Datelike as _, TimeZone as _};
 use tokio::task_local;
 
 use super::{Duration, Time};
@@ -35,10 +35,19 @@ impl DateTime {
         chrono::Local::now().into()
     }
 
+    pub fn year(&self) -> i32 {
+        self.delegate.year()
+    }
+
     pub fn month(&self) -> u32 {
         self.delegate.month()
     }
 
+    pub fn end_of_year(year: i32) -> Option<Self> {
+        let next_year = year.checked_add(1)?;
+        let start_of_next_year = chrono::Local.with_ymd_and_hms(next_year, 1, 1, 0, 0, 0).earliest()?;
+        Self::try_from_unix_micros(start_of_next_year.timestamp_micros().checked_sub(1)?)
+    }
     pub fn unix_seconds(&self) -> i64 {
         self.delegate.timestamp()
     }
@@ -237,6 +246,16 @@ mod constructor {
         assert_eq!(midpoint, DateTime::from_static_iso("2024-11-03T16:23:46Z"));
     }
 
+    #[test]
+    fn test_end_of_year() {
+        let end = DateTime::end_of_year(2025).unwrap();
+
+        assert_eq!(end.year(), 2025);
+        assert_eq!(end.month(), 12);
+        assert_eq!(end.time().hour(), 23);
+        assert_eq!(end.time().minute(), 59);
+        assert_eq!(end.unix_micros().rem_euclid(1_000_000), 999_999);
+    }
     #[test]
     fn test_on_next_prev_day_roundtrip() {
         let dt = DateTime::from_static_iso("2024-06-15T14:30:00Z");

@@ -6,14 +6,12 @@ use crate::{
     core::time::DateTime,
     device_state::{
         DeviceAvailability, DeviceAvailabilityConfig, DeviceAvailabilityItem, DeviceAvailabilityRecord,
-        DeviceAvailabilityStatus,
-        adapter::db::{DeviceAvailabilityRepository, SQLiteDeviceAvailabilityRepository},
+        DeviceAvailabilityStatus, adapter::db::SQLiteDeviceAvailabilityRepository,
     },
     t,
 };
 
 pub struct DeviceAvailabilityService {
-    postgres_repo: DeviceAvailabilityRepository,
     sqlite_repo: SQLiteDeviceAvailabilityRepository,
     sqlite_db: SQLiteDatabase,
     config: DeviceAvailabilityConfig,
@@ -21,13 +19,11 @@ pub struct DeviceAvailabilityService {
 
 impl DeviceAvailabilityService {
     pub fn new(
-        postgres_repo: DeviceAvailabilityRepository,
         sqlite_repo: SQLiteDeviceAvailabilityRepository,
         sqlite_db: SQLiteDatabase,
         config: DeviceAvailabilityConfig,
     ) -> Self {
         Self {
-            postgres_repo,
             sqlite_repo,
             sqlite_db,
             config,
@@ -35,7 +31,7 @@ impl DeviceAvailabilityService {
     }
 
     pub async fn initialize(&self, items: HashSet<DeviceAvailabilityItem>) -> anyhow::Result<()> {
-        self.postgres_repo.sync_item_availability(&items).await?;
+        self.config.warn_unknown_items(&items);
 
         let records = {
             let connection = self.sqlite_db.for_reading()?;
@@ -51,7 +47,7 @@ impl DeviceAvailabilityService {
         Ok(())
     }
 
-    pub async fn handle_update(&self, availability: DeviceAvailability) {
+    pub async fn handle_update(&self, availability: DeviceAvailability) -> anyhow::Result<()> {
         let record = DeviceAvailabilityRecord {
             item: availability.item,
             last_seen: availability.last_seen,
@@ -60,54 +56,22 @@ impl DeviceAvailabilityService {
             disabled: false,
         };
 
-        if let Err(error) = self
-            .postgres_repo
-            .update_device_availability(
-                &record.item.item,
-                &record.item.source,
-                &record.last_seen,
-                record.marked_offline,
-            )
-            .await
-        {
-            tracing::error!("Error updating device availability for {}: {:?}", record.item.item, error);
-            return;
-        }
-
-        let sqlite_result = self
-            .sqlite_db
-            .for_writing()
-            .and_then(|connection| self.sqlite_repo.save(&connection, &record));
-        if let Err(error) = sqlite_result {
-            tracing::error!(
-                "Error syncing device availability with SQLite for {}: {:?}",
-                record.item.item,
-                error
-            );
-        }
+        let connection = self.sqlite_db.for_writing()?;
+        self.sqlite_repo.save(&connection, &record)?;
 
         tracing::info!(
             "Device availability updated for {}: marked_offline={}",
             record.item.item,
             record.marked_offline
         );
+        Ok(())
     }
 
     pub async fn get_item_availabilities(&self) -> anyhow::Result<Vec<DeviceAvailabilityStatus>> {
-        let records = match self
+        let records = self
             .sqlite_db
             .for_reading()
-            .and_then(|connection| self.sqlite_repo.get_all(&connection))
-        {
-            Ok(records) => records,
-            Err(error) => {
-                tracing::error!(
-                    "Error reading device availability from SQLite, falling back to PostgreSQL: {:?}",
-                    error
-                );
-                return self.postgres_repo.get_item_availabilities().await;
-            }
-        };
+            .and_then(|connection| self.sqlite_repo.get_all(&connection))?;
         let now = t!(now);
 
         Ok(records
@@ -169,9 +133,16 @@ fn availability_status(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    use infrastructure::SQLiteDatabase;
+
     use super::*;
     use crate::{device_state::DeviceAvailabilityOverride, t};
-
     fn record(item: DeviceAvailabilityItem, timestamp: DateTime, disabled: bool) -> DeviceAvailabilityRecord {
         DeviceAvailabilityRecord {
             item,
@@ -179,6 +150,50 @@ mod tests {
             marked_offline: false,
             entry_updated: timestamp,
             disabled,
+        }
+    }
+
+    #[tokio::test]
+    async fn sqlite_write_failure_is_returned_to_the_caller() -> anyhow::Result<()> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "rusty-home-availability-write-failure-{}-{id}.sqlite",
+            std::process::id()
+        ));
+        fs::File::create_new(&path)?;
+        let file = TestFile(path);
+        let database = SQLiteDatabase::open(&file.0)?;
+        let repository = {
+            let connection = database.for_writing()?;
+            SQLiteDeviceAvailabilityRepository::new(&connection)?
+        };
+        let service = DeviceAvailabilityService::new(
+            repository,
+            database.clone(),
+            DeviceAvailabilityConfig {
+                default_offline_after: t!(1 hours),
+                overrides: vec![],
+            },
+        );
+        database.for_writing()?.execute_batch(
+            "CREATE TRIGGER reject_insert BEFORE INSERT ON item_availability BEGIN SELECT RAISE(ABORT, 'test'); END;",
+        )?;
+
+        let availability = DeviceAvailability {
+            item: DeviceAvailabilityItem::new("HA", "sensor.test"),
+            last_seen: DateTime::now(),
+            marked_offline: false,
+        };
+        assert!(service.handle_update(availability).await.is_err());
+        Ok(())
+    }
+
+    struct TestFile(PathBuf);
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.0);
         }
     }
 

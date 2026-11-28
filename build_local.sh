@@ -1,10 +1,6 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-source ./.env
-
-cargo sqlx migrate run
-cargo sqlx prepare --workspace
 
 # cleanup() {
 #   colima stop -p x86 || true
@@ -24,6 +20,6 @@ docker --context colima-x86 push ghcr.io/dfrommi/rusty-home:"${commit_hash}"
 
 ssh home -o RemoteCommand=none "cd /opt/stacks/smart-home && docker compose pull rusty-home && docker compose up -d rusty-home"
 
-cargo sqlx migrate run -D "${LIVE_DATABASE_URL}"
+
 
 docker --context home logs -f rusty-home

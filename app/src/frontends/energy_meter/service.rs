@@ -7,10 +7,8 @@ use crate::core::{id::ExternalId, time::DateTime, timeseries::DataPoint};
 
 use super::{
     EnergyMeterTarget, EnergyReading,
-    persistence::EnergyReadingRepository,
     persistence_sqlite::{RawEnergyReading, SQLiteEnergyReadingRepository},
 };
-
 #[derive(Debug)]
 pub(super) struct InvalidEnergyReading(&'static str);
 
@@ -23,7 +21,6 @@ impl fmt::Display for InvalidEnergyReading {
 impl std::error::Error for InvalidEnergyReading {}
 
 pub struct EnergyReadingService {
-    postgres_repo: EnergyReadingRepository,
     sqlite_repo: SQLiteEnergyReadingRepository,
     sqlite_db: SQLiteDatabase,
     events: EventEmitter<DataPoint<EnergyReading>>,
@@ -31,13 +28,11 @@ pub struct EnergyReadingService {
 
 impl EnergyReadingService {
     pub fn new(
-        postgres_repo: EnergyReadingRepository,
         sqlite_repo: SQLiteEnergyReadingRepository,
         sqlite_db: SQLiteDatabase,
         events: EventEmitter<DataPoint<EnergyReading>>,
     ) -> Self {
         Self {
-            postgres_repo,
             sqlite_repo,
             sqlite_db,
             events,
@@ -70,12 +65,11 @@ impl EnergyReadingService {
         };
         validate_reading(&row, &history)?;
 
-        self.postgres_repo.add_yearly_energy_reading(reading, timestamp).await?;
         let rows = {
             let connection = self.sqlite_db.for_writing()?;
             self.sqlite_repo
                 .insert(&connection, &row)
-                .context("Energy reading was saved to Postgres but could not be saved to SQLite")?;
+                .context("Could not save energy reading to SQLite")?;
             self.sqlite_repo.get_all(&connection)?
         };
         self.events.send(total_reading(&row, &rows)?);

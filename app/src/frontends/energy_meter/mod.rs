@@ -6,12 +6,9 @@ use r#macro::{EnumVariants, Id};
 use crate::core::timeseries::DataPoint;
 
 mod http_server;
-#[allow(dead_code, reason = "Keep the Postgres energy repository intact for rollback")]
-mod persistence;
 mod persistence_sqlite;
 mod service;
 
-use persistence::EnergyReadingRepository;
 use persistence_sqlite::SQLiteEnergyReadingRepository;
 use service::EnergyReadingService;
 
@@ -21,16 +18,12 @@ pub struct EnergyMeter {
 }
 
 impl EnergyMeter {
-    pub fn new(
-        pool: sqlx::PgPool,
-        sqlite_db: SQLiteDatabase,
-        tx: EventEmitter<DataPoint<EnergyReading>>,
-    ) -> anyhow::Result<Self> {
+    pub fn new(sqlite_db: SQLiteDatabase, tx: EventEmitter<DataPoint<EnergyReading>>) -> anyhow::Result<Self> {
         let sqlite_repo = {
             let connection = sqlite_db.for_writing()?;
             SQLiteEnergyReadingRepository::new(&connection)?
         };
-        let service = EnergyReadingService::new(EnergyReadingRepository::new(pool), sqlite_repo, sqlite_db, tx);
+        let service = EnergyReadingService::new(sqlite_repo, sqlite_db, tx);
         Ok(Self {
             service: Arc::new(service),
         })
@@ -122,11 +115,9 @@ mod tests {
     #[tokio::test]
     async fn startup_publishes_latest_totals_from_sqlite_without_adding_readings() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
-        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://localhost/not_used")?;
-        pool.close().await;
         let bus = EventBus::new(8);
         let mut readings = bus.subscribe();
-        let meter = EnergyMeter::new(pool, db.clone(), bus.emitter())?;
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
         seed_heating_readings(
             &db,
             &[

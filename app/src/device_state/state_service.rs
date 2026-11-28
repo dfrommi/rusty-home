@@ -11,14 +11,13 @@ use crate::{
     },
     device_state::{
         DeviceStateEvent, DeviceStateId, DeviceStateValue,
-        adapter::db::{PostgresDeviceStateRepository, SQLiteDeviceStateRepository, SaveOutcome},
+        adapter::db::{SQLiteDeviceStateRepository, SaveOutcome},
     },
 };
 
 type LatestValues = Cache<DeviceStateId, Option<DataPoint<DeviceStateValue>>>;
 
 pub struct DeviceStateService {
-    state_repo: PostgresDeviceStateRepository,
     sqlite_repo: SQLiteDeviceStateRepository,
     sqlite_db: SQLiteDatabase,
     event_tx: EventEmitter<DeviceStateEvent>,
@@ -27,13 +26,11 @@ pub struct DeviceStateService {
 
 impl DeviceStateService {
     pub fn new(
-        state_repo: PostgresDeviceStateRepository,
         sqlite_repo: SQLiteDeviceStateRepository,
         sqlite_db: SQLiteDatabase,
         event_tx: EventEmitter<DeviceStateEvent>,
     ) -> Self {
         Self {
-            state_repo,
             sqlite_repo,
             sqlite_db,
             event_tx,
@@ -41,78 +38,58 @@ impl DeviceStateService {
         }
     }
 
-    pub(super) async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) {
+    pub(super) async fn handle_state_update(&self, dp: DataPoint<DeviceStateValue>) -> anyhow::Result<()> {
         if DateTime::is_shifted() {
             tracing::warn!("Received device state update with shifted DateTime: {:?}, ignoring", dp);
-            return;
+            return Ok(());
         }
 
         let id = DeviceStateId::from(&dp.value);
-        let outcome = match self.state_repo.save(dp.clone()).await {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                tracing::error!("Error saving device state for {:?}: {:?}", id, error);
-                return;
+        let outcome = {
+            let connection = self
+                .sqlite_db
+                .for_writing()
+                .with_context(|| format!("Error opening SQLite for device state {id:?}"))?;
+            let current_dp = self.sqlite_repo.get_latest_for_device_for_save(&connection, &id)?;
+            let outcome = save_outcome(&dp, current_dp.as_ref());
+
+            if let Some(current_dp) = current_dp.as_ref() {
+                match outcome {
+                    SaveOutcome::Duplicate => tracing::debug!(
+                        "Duplicate device state update for {:?}: value {:?} is equal to or within the minimum storage delta of {:?}",
+                        id,
+                        dp.value,
+                        current_dp.value
+                    ),
+                    SaveOutcome::Stale => tracing::debug!(
+                        "Stale device state update for {:?}: current timestamp {:?} is newer than update timestamp {:?}",
+                        id,
+                        current_dp.timestamp,
+                        dp.timestamp
+                    ),
+                    SaveOutcome::Inserted => tracing::debug!("Inserting new device state for {:?}: {:?}", id, dp),
+                }
+            } else {
+                tracing::debug!("No current device state for {:?}, inserting new value: {:?}", id, dp);
             }
-        };
+            if outcome == SaveOutcome::Inserted {
+                self.sqlite_repo
+                    .save(&connection, dp.clone())
+                    .with_context(|| format!("Error saving device state for {id:?} to SQLite"))?;
+                tracing::info!("Saved device state to SQLite for {:?}: {:?}", id, &dp.value);
+            }
 
-        // Keep SQLite's read/check/write flow under one lock. Do not hold this synchronous lock
-        // across the Postgres await above.
-        let sqlite_outcome = match self.sqlite_db.for_writing() {
-            Ok(connection) => (|| -> anyhow::Result<SaveOutcome> {
-                let current_dp = self.sqlite_repo.get_latest_for_device_for_save(&connection, &id)?;
-                let sqlite_outcome = save_outcome(&dp, current_dp.as_ref());
-
-                if let Some(current_dp) = current_dp.as_ref() {
-                    match sqlite_outcome {
-                        SaveOutcome::Duplicate => tracing::debug!(
-                            "SQLite: Duplicate device state update for {:?}: value {:?} is equal to or within the minimum storage delta of {:?}",
-                            id,
-                            dp.value,
-                            current_dp.value
-                        ),
-                        SaveOutcome::Stale => tracing::debug!(
-                            "SQLite: Stale device state update for {:?}: current timestamp {:?} is newer than update timestamp {:?}",
-                            id,
-                            current_dp.timestamp,
-                            dp.timestamp
-                        ),
-                        SaveOutcome::Inserted => {
-                            tracing::debug!("SQLite: Inserting new device state for {:?}: {:?}", id, dp);
-                        }
-                    }
-                } else {
-                    tracing::debug!("SQLite: No current device state for {:?}, inserting new value: {:?}", id, dp);
-                }
-                if sqlite_outcome == SaveOutcome::Inserted {
-                    self.sqlite_repo.save(&connection, dp.clone())?;
-                    tracing::info!("Saved device state to SQLite for {:?}: {:?}", id, &dp.value);
-                }
-
-                Ok(sqlite_outcome)
-            })(),
-            Err(error) => Err(error),
+            outcome
         };
 
         // Invalidate only after saving, and wait on the cache without holding the SQLite connection.
-        if outcome == SaveOutcome::Inserted && sqlite_outcome.is_ok() {
+        if outcome == SaveOutcome::Inserted {
             invalidate_latest(&self.latest_values, id);
-        }
-
-        match sqlite_outcome {
-            Ok(sqlite_outcome) if sqlite_outcome != outcome => tracing::error!(
-                "Inconsistent save outcome for device state update of {:?}, trusting Postgres. SQLite: {}; Postgres {}",
-                id,
-                sqlite_outcome,
-                outcome
-            ),
-            Ok(_) => {}
-            Err(error) => tracing::error!("Error syncing device state with SQLite for {:?}: {:?}", id, error),
         }
 
         if outcome == SaveOutcome::Stale {
             tracing::debug!("Ignoring stale device state update for {:?}: {:?}", id, dp);
-            return;
+            return Ok(());
         }
 
         tracing::info!("Device state update received ({:?}): {:?}", outcome, &dp.value);
@@ -132,8 +109,8 @@ impl DeviceStateService {
             // Only for new values, to preserve the time when the value became active.
             self.event_tx.send(DeviceStateEvent::Changed(dp));
         }
+        Ok(())
     }
-
     pub fn get_current_for_all(&self) -> anyhow::Result<HashMap<DeviceStateId, DataPoint<DeviceStateValue>>> {
         let mut res = HashMap::new();
         for id in DeviceStateId::variants() {
@@ -220,15 +197,22 @@ fn invalidate_latest(cache: &LatestValues, id: DeviceStateId) {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc, thread, time::Duration};
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::{atomic::AtomicU64, mpsc},
+        thread,
+        time::Duration,
+    };
 
+    use infrastructure::{EventBus, SQLiteDatabase};
+
+    use super::*;
     use crate::{
         core::{time::DateTime, timeseries::DataPoint, unit::DegreeCelsius},
         device_state::{CompletionTime, DeviceStateValue, Presence, Temperature},
         t,
     };
-
-    use super::*;
     #[test]
     fn save_outcome_filters_values_inside_minimum_storage_delta() {
         let now = DateTime::now();
@@ -298,6 +282,54 @@ mod tests {
         );
 
         assert_eq!(save_outcome(&incoming, Some(&current)), SaveOutcome::Duplicate);
+    }
+
+    #[tokio::test]
+    async fn sqlite_write_failure_is_returned_without_emitting_state_events() -> anyhow::Result<()> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "rusty-home-device-state-write-failure-{}-{id}.sqlite",
+            std::process::id()
+        ));
+        fs::File::create_new(&path)?;
+        let database_file = TestFile(path);
+        let database = SQLiteDatabase::open(&database_file.0)?;
+        let repository = {
+            let connection = database.for_writing()?;
+            SQLiteDeviceStateRepository::new(&connection)?
+        };
+        let bus = EventBus::new(8);
+        let mut events = bus.subscribe();
+        let service = DeviceStateService::new(repository, database.clone(), bus.emitter());
+        database.for_writing()?.execute_batch(
+            "CREATE TRIGGER reject_insert BEFORE INSERT ON device_state BEGIN SELECT RAISE(ABORT, 'test'); END;",
+        )?;
+
+        let update = DataPoint::new(
+            DeviceStateValue::Temperature(Temperature::LivingRoom, DegreeCelsius(20.0)),
+            DateTime::now(),
+        );
+        assert!(service.handle_state_update(update).await.is_err());
+        assert!(
+            service
+                .get_latest_for_device(&DeviceStateId::Temperature(Temperature::LivingRoom))?
+                .is_none()
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), events.recv())
+                .await
+                .is_err()
+        );
+        Ok(())
+    }
+
+    struct TestFile(PathBuf);
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.0);
+        }
     }
 
     #[test]

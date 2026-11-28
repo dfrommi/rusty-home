@@ -13,8 +13,6 @@ use std::{
     sync::Arc,
 };
 
-use sqlx::PgPool;
-
 use crate::{
     core::{
         time::{DateTime, Duration},
@@ -23,10 +21,7 @@ use crate::{
     device_state::{
         adapter::{
             IncomingDataSource,
-            db::{
-                DeviceAvailabilityRepository, PostgresDeviceStateRepository, SQLiteDeviceAvailabilityRepository,
-                SQLiteDeviceStateRepository,
-            },
+            db::{SQLiteDeviceAvailabilityRepository, SQLiteDeviceStateRepository},
             energy_meter::EnergyMeterIncomingDataSource,
             homeassistant::HomeAssistantIncomingDataSource,
             lgtv::LgtvIncomingDataSource,
@@ -160,7 +155,6 @@ pub struct DeviceStateModule {
 
 impl DeviceStateModule {
     pub async fn new(
-        pool: PgPool,
         mqtt_client: &mut Mqtt,
         tasmota_event_topic: &str,
         z2m_event_topic: &str,
@@ -174,9 +168,6 @@ impl DeviceStateModule {
         availability_config: DeviceAvailabilityConfig,
         sqlite_database: SQLiteDatabase,
     ) -> anyhow::Result<Self> {
-        let state_repo = PostgresDeviceStateRepository::new(pool.clone());
-
-        let availability_repo = DeviceAvailabilityRepository::new(pool, availability_config.clone());
         let tasmota_ds = TasmotaIncomingDataSource::new(mqtt_client, tasmota_event_topic).await?;
         let z2m_ds = Z2mIncomingDataSource::new(mqtt_client, z2m_event_topic).await?;
         let ha_ds = HomeAssistantIncomingDataSource::new(mqtt_client, ha_event_topic, ha_url, ha_token).await?;
@@ -193,14 +184,9 @@ impl DeviceStateModule {
                 SQLiteDeviceStateRepository::new(&connection)?,
             )
         };
-        let availability_service = DeviceAvailabilityService::new(
-            availability_repo,
-            sqlite_availability_repo,
-            sqlite_database.clone(),
-            availability_config,
-        );
-        let service = DeviceStateService::new(state_repo, sqlite_state_repo, sqlite_database, event_bus.emitter());
-
+        let availability_service =
+            DeviceAvailabilityService::new(sqlite_availability_repo, sqlite_database.clone(), availability_config);
+        let service = DeviceStateService::new(sqlite_state_repo, sqlite_database, event_bus.emitter());
         Ok(DeviceStateModule {
             service: Arc::new(service),
             availability_service: Arc::new(availability_service),
@@ -260,9 +246,15 @@ impl DeviceStateModule {
     async fn process_incoming_data(&self, updates: Vec<adapter::IncomingData>) {
         for update in updates {
             match update {
-                adapter::IncomingData::StateValue(data_point) => self.service.handle_state_update(data_point).await,
+                adapter::IncomingData::StateValue(data_point) => {
+                    if let Err(error) = self.service.handle_state_update(data_point).await {
+                        tracing::error!("Error saving device state update: {error:#}");
+                    }
+                }
                 adapter::IncomingData::ItemAvailability(device_availability) => {
-                    self.availability_service.handle_update(device_availability).await
+                    if let Err(error) = self.availability_service.handle_update(device_availability).await {
+                        tracing::error!("Error saving device availability update: {error:#}");
+                    }
                 }
             }
         }

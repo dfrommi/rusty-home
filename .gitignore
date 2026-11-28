@@ -1,7 +1,5 @@
 .idea/
 target/
-.sqlx/
-
 .*
 !.gitignore
 !.claude/

@@ -21,11 +21,9 @@ mod settings;
 mod trigger;
 
 struct Infrastructure {
-    db_pool: sqlx::PgPool,
     sqlite_database: SQLiteDatabase,
     mqtt_client: Mqtt,
 }
-
 type AppTask = (&'static str, JoinHandle<()>);
 
 #[tokio::main(flavor = "multi_thread")]
@@ -43,7 +41,6 @@ pub async fn main() -> anyhow::Result<()> {
     let energy_meter_bus = EventBus::new(64);
 
     let device_state_module = device_state::DeviceStateModule::new(
-        infrastructure.db_pool.clone(),
         &mut infrastructure.mqtt_client,
         &settings.tasmota.event_topic,
         &settings.z2m.event_topic,
@@ -59,17 +56,13 @@ pub async fn main() -> anyhow::Result<()> {
     )
     .await?;
     device_state_module.initialize_availability().await?;
-    let energy_meter = frontends::energy_meter::EnergyMeter::new(
-        infrastructure.db_pool.clone(),
-        infrastructure.sqlite_database.clone(),
-        energy_meter_bus.emitter(),
-    )?;
+    let energy_meter =
+        frontends::energy_meter::EnergyMeter::new(infrastructure.sqlite_database.clone(), energy_meter_bus.emitter())?;
     if let Err(e) = energy_meter.publish_initial_readings() {
         tracing::error!("Error loading initial state for Energy Reading: {:?}", e);
     }
 
-    let trigger_module =
-        trigger::TriggerModule::new(infrastructure.db_pool.clone(), infrastructure.sqlite_database.clone())?;
+    let trigger_module = trigger::TriggerModule::new(infrastructure.sqlite_database.clone())?;
     let home_state_module = HomeStateModule::new(
         t!(25 hours),
         device_state_module.subscribe(),
@@ -175,12 +168,10 @@ pub async fn main() -> anyhow::Result<()> {
 impl Infrastructure {
     #[allow(clippy::expect_used)]
     pub async fn init(settings: &Settings) -> anyhow::Result<Self> {
-        let db_pool = settings.database.new_pool().await.expect("Error initializing database");
         let sqlite_database = settings.database.new_sqlite_database()?;
         let mqtt_client = settings.mqtt.new_client();
 
         Ok(Self {
-            db_pool,
             sqlite_database,
             mqtt_client,
         })

@@ -9,10 +9,7 @@ use crate::core::domain::HeatingZone;
 use crate::core::unit::{DegreeCelsius, FanAirflow};
 use crate::home_state::FanActivity;
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display, sqlx::Type,
-)]
-#[sqlx(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, derive_more::From, derive_more::Display)]
 pub struct UserTriggerId(i64);
 
 impl UserTriggerId {

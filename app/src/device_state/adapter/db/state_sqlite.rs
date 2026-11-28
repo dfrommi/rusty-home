@@ -1,8 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context as _, Result};
-use rusqlite::{Connection, params};
-
 use crate::{
     core::{
         id::ExternalId,
@@ -11,9 +8,45 @@ use crate::{
     },
     device_state::{DeviceStateId, DeviceStateValue},
 };
+use anyhow::{Context as _, Result};
+use derive_more::Display;
+use rusqlite::{Connection, params};
 
-use super::state::from_f64_value;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+pub enum SaveOutcome {
+    Inserted,
+    Duplicate,
+    Stale,
+}
 
+fn from_f64_value(id: DeviceStateId, value: f64) -> DeviceStateValue {
+    fn bool_of(f: f64) -> bool {
+        f > f64::EPSILON
+    }
+
+    match id {
+        DeviceStateId::AllergenIndex(id) => DeviceStateValue::AllergenIndex(id, value.into()),
+        DeviceStateId::EnergySaving(id) => DeviceStateValue::EnergySaving(id, bool_of(value)),
+        DeviceStateId::CompletionTime(id) => {
+            DeviceStateValue::CompletionTime(id, DateTime::from_unix_millis(value.round() as i64))
+        }
+        DeviceStateId::Opened(id) => DeviceStateValue::Opened(id, bool_of(value)),
+        DeviceStateId::ParticulateMatter(id) => DeviceStateValue::ParticulateMatter(id, value.into()),
+        DeviceStateId::PowerAvailable(id) => DeviceStateValue::PowerAvailable(id, bool_of(value)),
+        DeviceStateId::Presence(id) => DeviceStateValue::Presence(id, bool_of(value)),
+        DeviceStateId::CurrentPowerUsage(id) => DeviceStateValue::CurrentPowerUsage(id, value.into()),
+        DeviceStateId::FanActivity(id) => DeviceStateValue::FanActivity(id, value.into()),
+        DeviceStateId::HeatingDemand(id) => DeviceStateValue::HeatingDemand(id, value.into()),
+        DeviceStateId::HeatingDemandLimit(id) => DeviceStateValue::HeatingDemandLimit(id, value.into()),
+        DeviceStateId::IsRunning(id) => DeviceStateValue::IsRunning(id, bool_of(value)),
+        DeviceStateId::LightLevel(id) => DeviceStateValue::LightLevel(id, value.into()),
+        DeviceStateId::RelativeHumidity(id) => DeviceStateValue::RelativeHumidity(id, value.into()),
+        DeviceStateId::SetPoint(id) => DeviceStateValue::SetPoint(id, value.into()),
+        DeviceStateId::Temperature(id) => DeviceStateValue::Temperature(id, value.into()),
+        DeviceStateId::TotalEnergyConsumption(id) => DeviceStateValue::TotalEnergyConsumption(id, value.into()),
+        DeviceStateId::TotalRadiatorConsumption(id) => DeviceStateValue::TotalRadiatorConsumption(id, value.into()),
+    }
+}
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS device_state_tag (
     id INTEGER PRIMARY KEY,

@@ -75,14 +75,12 @@ mod tests {
         },
     };
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn http_reading_is_stored_as_yearly_and_emitted_as_cumulative_reading(
-        pool: sqlx::PgPool,
-    ) -> anyhow::Result<()> {
+    #[actix_web::test]
+    async fn http_reading_is_stored_and_emitted_as_cumulative_reading() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
         let mut readings = bus.subscribe();
-        let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
         seed_heating_readings(
             &db,
             &[
@@ -104,25 +102,12 @@ mod tests {
         let response = timestamp.eval_timeshifted(test::call_service(&app, request)).await;
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
-        let stored = sqlx::query!(
-            r#"SELECT value, year_end FROM energy_reading
-                WHERE type = 'heating' AND name = 'bedroom' AND timestamp = $1"#,
-            timestamp.into_db(),
-        )
-        .fetch_one(&pool)
-        .await?;
-        assert_eq!(stored.value, 12.5);
-        assert!(!stored.year_end);
-
-        let sqlite_row: (String, String, f64, i64, bool) = db.for_reading()?.query_row(
-            "SELECT type, name, value, timestamp_us, year_end FROM energy_reading ORDER BY id DESC LIMIT 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        let stored: (f64, bool) = db.for_reading()?.query_row(
+            "SELECT value, year_end FROM energy_reading WHERE type = 'heating' AND name = 'bedroom' AND timestamp_us = ?1 ORDER BY id DESC LIMIT 1",
+            [timestamp.unix_micros()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
-        assert_eq!(
-            sqlite_row,
-            ("heating".into(), "bedroom".into(), 12.5, timestamp.unix_micros(), false)
-        );
+        assert_eq!(stored, (12.5, false));
 
         let total = tokio::time::timeout(std::time::Duration::from_secs(1), readings.recv())
             .await?
@@ -135,11 +120,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn readings_cannot_decrease_unless_previous_reading_was_year_end(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    #[actix_web::test]
+    async fn readings_cannot_decrease_unless_previous_reading_was_year_end() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
-        let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
         let app = test::init_service(App::new().service(meter.new_web_service())).await;
         seed_heating_readings(
             &db,
@@ -178,23 +163,20 @@ mod tests {
             .await;
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
-        let postgres_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM energy_reading")
-            .fetch_one(&pool)
-            .await?;
         let sqlite_rows: i64 = db
             .for_reading()?
             .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
-        assert_eq!((postgres_rows, sqlite_rows), (2, 5));
+        assert_eq!(sqlite_rows, 5);
 
         Ok(())
     }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn database_failure_returns_error_without_emitting_a_reading(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    #[actix_web::test]
+    async fn sqlite_failure_returns_error_without_emitting_a_reading() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
         let mut readings = bus.subscribe();
-        let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
         let app = test::init_service(App::new().service(meter.new_web_service())).await;
         let request = || {
             test::TestRequest::put()
@@ -208,19 +190,10 @@ mod tests {
         )?;
         let response = test::call_service(&app, request()).await;
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let postgres_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM energy_reading")
-            .fetch_one(&pool)
-            .await?;
-        assert_eq!(postgres_rows, 1);
-
-        db.for_writing()?.execute_batch("DROP TRIGGER reject_insert;")?;
-        pool.close().await;
-        let response = test::call_service(&app, request()).await;
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let sqlite_rows: i64 = db
+        let rows: i64 = db
             .for_reading()?
             .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
-        assert_eq!(sqlite_rows, 0);
+        assert_eq!(rows, 0);
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(10), readings.recv())
                 .await
@@ -229,11 +202,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn invalid_values_are_rejected_before_either_write(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    #[actix_web::test]
+    async fn invalid_values_are_rejected_before_writing() -> anyhow::Result<()> {
         let (_file, db) = test_database()?;
         let bus = EventBus::new(8);
-        let meter = EnergyMeter::new(pool.clone(), db.clone(), bus.emitter())?;
+        let meter = EnergyMeter::new(db.clone(), bus.emitter())?;
         let app = test::init_service(App::new().service(meter.new_web_service())).await;
         for value in ["NaN", "inf", "-inf", "-1"] {
             let request = test::TestRequest::put()
@@ -243,13 +216,10 @@ mod tests {
             let response = test::call_service(&app, request).await;
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         }
-        let postgres_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM energy_reading")
-            .fetch_one(&pool)
-            .await?;
-        let sqlite_rows: i64 = db
+        let rows: i64 = db
             .for_reading()?
             .query_row("SELECT count(*) FROM energy_reading", [], |row| row.get(0))?;
-        assert_eq!((postgres_rows, sqlite_rows), (0, 0));
+        assert_eq!(rows, 0);
         Ok(())
     }
 }

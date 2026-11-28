@@ -7,13 +7,11 @@ use crate::{
     core::time::{DateTime, DateTimeRange},
     t,
     trigger::{
-        TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId,
-        adapter::{db::TriggerRepository, db_sqlite::SQLiteTriggerRepository},
+        TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId, adapter::db_sqlite::SQLiteTriggerRepository,
     },
 };
 
 pub struct TriggerService {
-    postgres_repo: TriggerRepository,
     sqlite_repo: SQLiteTriggerRepository,
     sqlite_db: SQLiteDatabase,
     event_tx: EventEmitter<TriggerEvent>,
@@ -21,13 +19,11 @@ pub struct TriggerService {
 
 impl TriggerService {
     pub fn new(
-        postgres_repo: TriggerRepository,
         sqlite_repo: SQLiteTriggerRepository,
         sqlite_db: SQLiteDatabase,
         event_tx: EventEmitter<TriggerEvent>,
     ) -> Self {
         Self {
-            postgres_repo,
             sqlite_repo,
             sqlite_db,
             event_tx,
@@ -39,17 +35,13 @@ impl TriggerService {
         let timestamp = t!(now);
         let correlation_id = TraceContext::current().correlation_id().map(|id| id.to_string());
         let trigger_json = serde_json::to_string(&trigger)?;
-        self.postgres_repo
-            .add_trigger(trigger, correlation_id.as_deref())
-            .await?;
-
         self.sqlite_db
             .for_writing()
             .and_then(|connection| {
                 self.sqlite_repo
                     .insert(&connection, &trigger_json, timestamp, correlation_id.as_deref())
             })
-            .context("Trigger was saved to Postgres but could not be saved to SQLite")?;
+            .context("Could not save trigger to SQLite")?;
         self.event_tx.send(TriggerEvent::TriggerAdded);
         Ok(())
     }
@@ -74,7 +66,6 @@ impl TriggerService {
             .into_iter()
             .filter(|execution| seen_targets.insert(execution.target()))
             .map(|mut execution| {
-                // Match the existing Postgres latest-trigger view, not the historical view.
                 execution.active_until = execution.active_until.filter(|until| now <= *until);
                 execution
             })
@@ -111,7 +102,6 @@ impl TriggerService {
 mod tests {
     use super::*;
     use crate::trigger::{OnOffDevice, TriggerModule};
-
     use rusqlite::params;
     use std::{
         fs,
@@ -137,11 +127,11 @@ mod tests {
         }
     }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn new_trigger_is_written_to_both_but_lifecycle_uses_sqlite_ids(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn trigger_is_saved_and_lifecycle_uses_sqlite_ids() -> anyhow::Result<()> {
         let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
-        let module = TriggerModule::new(pool.clone(), db.clone())?;
+        let module = TriggerModule::new(db.clone())?;
         let mut events = module.subscribe();
         let service = &module.service;
         let now = DateTime::from_static_iso("2026-03-10T12:00:00.123456Z");
@@ -151,7 +141,6 @@ mod tests {
             device: OnOffDevice::InfraredHeater,
             on: true,
         };
-        // Force different ID spaces to catch accidental Postgres lifecycle updates or reads.
         db.for_writing()?.execute(
             "INSERT INTO user_trigger (id, trigger, timestamp_us) VALUES (500, ?1, ?2)",
             params![serde_json::to_string(&trigger)?, (now - t!(1 hours)).unix_micros()],
@@ -164,8 +153,8 @@ mod tests {
         assert_eq!(latest.len(), 1);
         let id = latest[0].id.clone();
         assert_eq!(id.value(), 501);
-
         assert_eq!(latest[0].timestamp, now);
+
         assert_eq!(
             start
                 .eval_timeshifted(async { service.set_triggers_active_from_if_unset(std::slice::from_ref(&id)) })
@@ -190,21 +179,20 @@ mod tests {
         assert_eq!(history[0].active_until, Some(stop));
         assert_eq!(history[1].active_until, Some(stop));
 
-        let rows: Vec<(i64, bool, bool)> =
-            sqlx::query_as("SELECT id, active_from IS NULL, active_until IS NULL FROM user_trigger")
-                .fetch_all(&pool)
-                .await?;
-        assert_eq!(rows, vec![(1, true, true)]);
+        let rows: Vec<(i64, bool, bool)> = db
+            .for_reading()?
+            .prepare("SELECT id, active_from_us IS NULL, active_until_us IS NULL FROM user_trigger ORDER BY id")?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        assert_eq!(rows, vec![(500, true, false), (501, false, false)]);
         Ok(())
     }
 
-    #[sqlx::test(migrations = "../migrations")]
-    async fn a_failed_dual_write_does_not_make_a_trigger_visible_to_automation(
-        pool: sqlx::PgPool,
-    ) -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn failed_sqlite_insert_does_not_make_trigger_visible_or_emit_event() -> anyhow::Result<()> {
         let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
-        let module = TriggerModule::new(pool.clone(), db.clone())?;
+        let module = TriggerModule::new(db.clone())?;
         let mut events = module.subscribe();
         let service = &module.service;
         let trigger = UserTrigger::DevicePower {
@@ -215,23 +203,18 @@ mod tests {
             "CREATE TRIGGER reject_insert BEFORE INSERT ON user_trigger BEGIN SELECT RAISE(ABORT, 'test'); END;",
         )?;
 
-        let result = service.add_trigger(trigger.clone()).await;
-        let postgres_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM user_trigger")
-            .fetch_one(&pool)
-            .await?;
-        assert!(result.is_err());
-        assert_eq!(postgres_rows, 1);
-        assert!(service.get_latest_triggers()?.is_empty());
-
-        db.for_writing()?.execute_batch("DROP TRIGGER reject_insert;")?;
-        pool.close().await;
-        assert!(service.add_trigger(trigger).await.is_err());
+        assert!(service.add_trigger(trigger.clone()).await.is_err());
         assert!(service.get_latest_triggers()?.is_empty());
         assert!(
             tokio::time::timeout(std::time::Duration::from_millis(10), events.recv())
                 .await
                 .is_err()
         );
+
+        db.for_writing()?.execute_batch("DROP TRIGGER reject_insert;")?;
+        service.add_trigger(trigger).await?;
+        assert!(matches!(events.recv().await, Some(TriggerEvent::TriggerAdded)));
+        assert_eq!(service.get_latest_triggers()?.len(), 1);
         Ok(())
     }
 
@@ -239,8 +222,7 @@ mod tests {
     async fn latest_and_historical_reads_keep_their_distinct_time_windows() -> anyhow::Result<()> {
         let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
-        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://localhost/not_used")?;
-        let module = TriggerModule::new(pool, db.clone())?;
+        let module = TriggerModule::new(db.clone())?;
         let service = &module.service;
         let now = DateTime::from_static_iso("2026-03-10T12:00:00Z");
         let start = now - t!(30 minutes);
@@ -266,7 +248,6 @@ mod tests {
         now.eval_timeshifted(async {
             let latest = service.get_latest_triggers()?;
             assert_eq!(latest.len(), 1);
-            // Same target and timestamp: newest SQLite ID wins.
             assert_eq!(latest[0].id.value(), 4);
             assert_eq!(latest[0].active_until, None);
             let history =

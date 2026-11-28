@@ -10,11 +10,11 @@ use infrastructure::EventEmitter;
 use infrastructure::{EventBus, EventListener};
 pub use items::*;
 
-use crate::core::time::{DateTime, Duration};
+use crate::core::time::Duration;
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
-use crate::home_state::calc::{CurrentUserTriggerProvider, bootstrap_context, calculate_next_result};
+use crate::home_state::calc::{bootstrap_context, calculate_next_result};
 use crate::trigger::TriggerClient;
 use crate::trigger::TriggerEvent;
 
@@ -109,23 +109,15 @@ impl HomeStateModule {
     fn update_context(&self, old_result: StateCalculationResult) -> StateCalculationResult {
         tracing::trace!("Updating home state context");
 
-        let trigger_state = CurrentUserTriggerProvider::new(&self.trigger_client);
         let old_dps: HashMap<HomeStateId, DataPoint<HomeStateValue>> = HomeStateId::variants()
             .into_iter()
             .filter_map(|id| old_result.get_latest(id).map(|dp| (id, dp.clone())))
             .collect();
 
-        let ts = match trigger_state {
-            Ok(ts) => ts,
-            Err(e) => {
-                tracing::error!("Failed to load trigger state for home state update: {:?}", e);
-                return old_result;
-            }
-        };
-
         let duration = self.duration.clone();
         let device_state = self.device_state.clone();
-        let new_result = calculate_next_result(duration, old_result, device_state, &ts);
+        let trigger_client = self.trigger_client.clone();
+        let new_result = calculate_next_result(duration, old_result, device_state, trigger_client);
 
         self.emit_events(&new_result, old_dps);
 

@@ -9,15 +9,11 @@ use crate::{
 };
 
 mod context;
-mod datasource;
-mod iter;
 mod snapshot;
 
 pub use context::DerivedStateProvider;
 pub use context::StateCalculationContext;
 pub use context::StateCalculationResult;
-pub use datasource::CurrentUserTriggerProvider;
-pub use datasource::UserTriggerProvider;
 
 pub use snapshot::StateSnapshot;
 
@@ -28,26 +24,37 @@ pub async fn bootstrap_context(
 ) -> anyhow::Result<StateCalculationResult> {
     let range = DateTimeRange::of_last(duration.clone());
 
-    let mut it = iter::StateCalculationResultIterator::new(range, duration, device_state, trigger_client);
+    let mut current = None;
 
-    //TODO try to call calculate_next_result from here, not within iterator
-    while let Some(ctx) = it.next().await? {
-        tracing::trace!("Bootstrapping context for {}", ctx.timestamp());
+    for next_dt in range.step_by(t!(30 seconds)) {
+        let result = next_dt
+            .eval_timeshifted(async {
+                calculate_next_result(
+                    duration.clone(),
+                    current.take().unwrap_or_default(),
+                    device_state.clone(),
+                    trigger_client.clone(),
+                )
+            })
+            .await;
+
+        tracing::trace!("Bootstrapping context for {}", result.timestamp());
+        current = Some(result);
     }
 
-    it.take().ok_or_else(|| anyhow::anyhow!("Failed to bootstrap context"))
+    current.ok_or_else(|| anyhow::anyhow!("Failed to bootstrap context"))
 }
 
 pub fn calculate_next_result(
     keep: Duration,
     current: StateCalculationResult,
     device_state_client: DeviceStateClient,
-    user_trigger_provider: &impl UserTriggerProvider,
+    trigger_client: TriggerClient,
 ) -> StateCalculationResult {
     let start_time = t!(now);
     let cutoff = start_time - keep.clone();
 
-    let ctx = StateCalculationContext::new(device_state_client, user_trigger_provider.get_all(), current);
+    let ctx = StateCalculationContext::new(device_state_client, trigger_client, current);
 
     let mut data = HashMap::new();
 

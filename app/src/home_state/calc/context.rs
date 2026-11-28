@@ -11,7 +11,7 @@ use crate::{
     device_state::{DeviceStateClient, DeviceStateId, DeviceStateItem},
     home_state::{HomeStateDerivedStateProvider, HomeStateId, HomeStateItem, HomeStateValue},
     t,
-    trigger::{UserTriggerExecution, UserTriggerTarget},
+    trigger::{TriggerClient, UserTriggerExecution, UserTriggerTarget},
 };
 
 pub trait DerivedStateProvider<ID, T> {
@@ -63,9 +63,9 @@ impl StateCalculationResult {
 pub struct StateCalculationContext {
     start_time: DateTime,
     device_state_client: DeviceStateClient,
+    trigger_client: TriggerClient,
     current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
     calculating: RefCell<Vec<HomeStateId>>,
-    latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
 }
@@ -87,7 +87,7 @@ impl Drop for CalculatingGuard<'_> {
 impl StateCalculationContext {
     pub fn new(
         device_state_client: DeviceStateClient,
-        latest_triggers: HashMap<UserTriggerTarget, UserTriggerExecution>,
+        trigger_client: TriggerClient,
         previous: StateCalculationResult,
     ) -> Self {
         let start_time = t!(now);
@@ -111,9 +111,9 @@ impl StateCalculationContext {
         StateCalculationContext {
             start_time,
             device_state_client,
+            trigger_client,
             current: RefCell::new(HashMap::new()),
             calculating: RefCell::new(Vec::new()),
-            latest_triggers,
             prev: previous,
             trace_contexts,
         }
@@ -171,7 +171,10 @@ impl StateCalculationContext {
     }
 
     pub fn latest_trigger(&self, target: UserTriggerTarget) -> Option<UserTriggerExecution> {
-        self.latest_triggers.get(&target).cloned()
+        self.trigger_client.get_latest_trigger(&target).unwrap_or_else(|error| {
+            tracing::error!(?target, %error, "Failed to load trigger for home state calculation");
+            None
+        })
     }
 
     pub fn device_state<D>(&self, id: D) -> Option<DataPoint<D::Type>>

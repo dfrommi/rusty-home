@@ -5,7 +5,7 @@ use rusqlite::{Connection, params};
 
 use crate::{
     core::time::DateTime,
-    trigger::{UserTriggerExecution, UserTriggerId},
+    trigger::{UserTriggerExecution, UserTriggerId, UserTriggerTarget},
 };
 
 struct TriggerRow {
@@ -66,23 +66,30 @@ impl SQLiteTriggerRepository {
         parse_rows(rows)
     }
 
-    pub fn active_anytime_in_range(
+    pub fn latest_for_target(
         &self,
         connection: &Connection,
-        start: DateTime,
-        end: DateTime,
-    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
+        target: &UserTriggerTarget,
+        as_of: DateTime,
+    ) -> anyhow::Result<Option<UserTriggerExecution>> {
         let mut statement = connection.prepare_cached(
             "SELECT id, trigger, timestamp_us, active_from_us, active_until_us, correlation_id
              FROM user_trigger
-             WHERE timestamp_us <= ?2
-               AND (timestamp_us >= ?1 OR active_until_us IS NULL OR active_until_us >= ?1)
+             WHERE timestamp_us <= ?1
              ORDER BY timestamp_us DESC, id DESC",
         )?;
-        let rows = statement.query_map(params![start.unix_micros(), end.unix_micros()], read_trigger_row)?;
-        parse_rows(rows)
-    }
+        let rows = statement.query_map([as_of.unix_micros()], read_trigger_row)?;
 
+        for row in rows {
+            if let Some(execution) = parse_trigger(row?)
+                && execution.target() == *target
+            {
+                return Ok(Some(execution));
+            }
+        }
+
+        Ok(None)
+    }
     pub fn disable_before_except(
         &self,
         connection: &Connection,

@@ -5,7 +5,7 @@ mod service;
 use std::sync::Arc;
 
 use crate::{
-    core::time::{DateTime, DateTimeRange},
+    core::time::DateTime,
     t,
     trigger::{adapter::db_sqlite::SQLiteTriggerRepository, service::TriggerService},
 };
@@ -73,11 +73,8 @@ impl TriggerClient {
         self.service.get_latest_triggers()
     }
 
-    pub fn get_all_triggers_active_anytime_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        self.service.get_all_triggers_active_anytime_in_range(range)
+    pub fn get_latest_trigger(&self, target: &UserTriggerTarget) -> anyhow::Result<Option<UserTriggerExecution>> {
+        self.service.get_latest_trigger(target)
     }
 
     pub fn disable_triggers_before_except(

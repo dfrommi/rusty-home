@@ -4,10 +4,11 @@ use anyhow::Context as _;
 use infrastructure::{EventEmitter, SQLiteDatabase, TraceContext};
 
 use crate::{
-    core::time::{DateTime, DateTimeRange},
+    core::time::DateTime,
     t,
     trigger::{
-        TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId, adapter::db_sqlite::SQLiteTriggerRepository,
+        TriggerEvent, UserTrigger, UserTriggerExecution, UserTriggerId, UserTriggerTarget,
+        adapter::db_sqlite::SQLiteTriggerRepository,
     },
 };
 
@@ -46,16 +47,6 @@ impl TriggerService {
         Ok(())
     }
 
-    pub fn get_all_triggers_active_anytime_in_range(
-        &self,
-        range: DateTimeRange,
-    ) -> anyhow::Result<Vec<UserTriggerExecution>> {
-        let start = *range.start();
-        let end = (*range.end()).min(t!(now));
-        let connection = self.sqlite_db.for_reading()?;
-        self.sqlite_repo.active_anytime_in_range(&connection, start, end)
-    }
-
     pub fn get_latest_triggers(&self) -> anyhow::Result<Vec<UserTriggerExecution>> {
         let now = t!(now);
         let since = now - t!(48 hours);
@@ -72,6 +63,18 @@ impl TriggerService {
             .collect())
     }
 
+    pub fn get_latest_trigger(&self, target: &UserTriggerTarget) -> anyhow::Result<Option<UserTriggerExecution>> {
+        let now = t!(now);
+        let connection = self.sqlite_db.for_reading()?;
+        let mut execution = self.sqlite_repo.latest_for_target(&connection, target, now)?;
+
+        if let Some(execution) = &mut execution {
+            execution.active_from = execution.active_from.filter(|active_from| *active_from <= now);
+            execution.active_until = execution.active_until.filter(|active_until| *active_until <= now);
+        }
+
+        Ok(execution)
+    }
     pub fn disable_triggers_before_except(
         &self,
         before: DateTime,
@@ -101,7 +104,7 @@ impl TriggerService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trigger::{OnOffDevice, TriggerModule};
+    use crate::trigger::{OnOffDevice, TriggerModule, UserTrigger, UserTriggerTarget};
     use rusqlite::params;
     use std::{
         fs,
@@ -170,14 +173,14 @@ mod tests {
         assert_eq!(service.disable_triggers_before_except(stop, &[])?, 1);
         assert_eq!(service.disable_triggers_before_except(stop + t!(1 minutes), &[])?, 0);
 
-        let history = stop
-            .eval_timeshifted(async { service.get_all_triggers_active_anytime_in_range(DateTimeRange::since(start)) })
-            .await?;
-        assert_eq!(history.len(), 2);
-        assert_eq!(history[0].id, id);
-        assert_eq!(history[0].active_from, Some(start));
-        assert_eq!(history[0].active_until, Some(stop));
-        assert_eq!(history[1].active_until, Some(stop));
+        let target = UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater);
+        let latest = stop
+            .eval_timeshifted(async { service.get_latest_trigger(&target) })
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing latest trigger at stop time"))?;
+        assert_eq!(latest.id, id);
+        assert_eq!(latest.active_from, Some(start));
+        assert_eq!(latest.active_until, Some(stop));
 
         let rows: Vec<(i64, bool, bool)> = db
             .for_reading()?
@@ -187,6 +190,83 @@ mod tests {
         assert_eq!(rows, vec![(500, true, false), (501, false, false)]);
         Ok(())
     }
+    #[tokio::test]
+    async fn latest_trigger_is_targeted_all_time_and_as_of_the_requested_time() -> anyhow::Result<()> {
+        let file = TestFile::new()?;
+        let db = SQLiteDatabase::open(&file.0)?;
+        let module = TriggerModule::new(db.clone())?;
+        let client = module.client();
+        let now = DateTime::from_static_iso("2026-03-10T12:00:00Z");
+        let active_from = now + t!(1 minutes);
+        let active_until = now + t!(2 minutes);
+        let old_until = now - t!(4 days);
+
+        let old_target = UserTriggerTarget::DevicePower(OnOffDevice::Dehumidifier);
+        let heater_target = UserTriggerTarget::DevicePower(OnOffDevice::InfraredHeater);
+        let old_trigger = serde_json::to_string(&UserTrigger::DevicePower {
+            device: OnOffDevice::Dehumidifier,
+            on: true,
+        })?;
+        let heater_on = serde_json::to_string(&UserTrigger::DevicePower {
+            device: OnOffDevice::InfraredHeater,
+            on: true,
+        })?;
+        let heater_off = serde_json::to_string(&UserTrigger::DevicePower {
+            device: OnOffDevice::InfraredHeater,
+            on: false,
+        })?;
+        {
+            let connection = db.for_writing()?;
+            for (id, trigger, timestamp, from, until) in [
+                (1, old_trigger.as_str(), now - t!(5 days), None, Some(old_until)),
+                (10, heater_on.as_str(), now, None, None),
+                (11, heater_off.as_str(), now, Some(active_from), Some(active_until)),
+                (12, heater_on.as_str(), now + t!(5 minutes), None, None),
+            ] {
+                connection.execute(
+                    "INSERT INTO user_trigger (id, trigger, timestamp_us, active_from_us, active_until_us)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        id,
+                        trigger,
+                        timestamp.unix_micros(),
+                        from.map(|datetime| datetime.unix_micros()),
+                        until.map(|datetime| datetime.unix_micros())
+                    ],
+                )?;
+            }
+        }
+
+        let at_now = now
+            .eval_timeshifted(async { client.get_latest_trigger(&heater_target) })
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing latest heater trigger"))?;
+        assert_eq!(at_now.id.value(), 11);
+        assert_eq!(at_now.active_from, None);
+        assert_eq!(at_now.active_until, None);
+
+        let old = now
+            .eval_timeshifted(async { client.get_latest_trigger(&old_target) })
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing old trigger"))?;
+        assert_eq!(old.id.value(), 1);
+        assert_eq!(old.active_until, Some(old_until));
+
+        let at_start = active_from
+            .eval_timeshifted(async { client.get_latest_trigger(&heater_target) })
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing trigger at active start"))?;
+        assert_eq!(at_start.active_from, Some(active_from));
+        assert_eq!(at_start.active_until, None);
+
+        let at_end = active_until
+            .eval_timeshifted(async { client.get_latest_trigger(&heater_target) })
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Missing trigger at active end"))?;
+        assert_eq!(at_end.active_until, Some(active_until));
+        Ok(())
+    }
+
     #[tokio::test]
     async fn failed_sqlite_insert_does_not_make_trigger_visible_or_emit_event() -> anyhow::Result<()> {
         let file = TestFile::new()?;
@@ -218,7 +298,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn latest_and_historical_reads_keep_their_distinct_time_windows() -> anyhow::Result<()> {
+    async fn latest_trigger_list_filters_future_and_invalid_rows() -> anyhow::Result<()> {
         let file = TestFile::new()?;
         let db = SQLiteDatabase::open(&file.0)?;
         let module = TriggerModule::new(db.clone())?;
@@ -249,11 +329,6 @@ mod tests {
             assert_eq!(latest.len(), 1);
             assert_eq!(latest[0].id.value(), 4);
             assert_eq!(latest[0].active_until, None);
-            let history =
-                service.get_all_triggers_active_anytime_in_range(DateTimeRange::new(start, now + t!(1 hours)))?;
-            assert_eq!(history.len(), 1);
-            assert_eq!(history[0].id.value(), 1);
-            assert_eq!(history[0].active_until, Some(expired));
             Ok(())
         })
         .await

@@ -25,6 +25,7 @@ derive_more = { version = "2", features = [
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures = "*"
+rayon = "1"
 
 #Time dependencies
 chrono = { version = "0.4", features = ["serde", "std"] }

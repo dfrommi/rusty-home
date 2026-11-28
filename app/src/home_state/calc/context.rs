@@ -1,6 +1,7 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
 use infrastructure::TraceContext;
+use moka::sync::Cache;
 
 use crate::{
     core::{
@@ -21,14 +22,14 @@ pub trait DerivedStateProvider<ID, T> {
 #[derive(Clone)]
 pub struct StateCalculationResult {
     start_time: DateTime,
-    data: HashMap<HomeStateId, DataFrame<HomeStateValue>>,
+    data: Arc<HashMap<HomeStateId, DataFrame<HomeStateValue>>>,
 }
 
 impl Default for StateCalculationResult {
     fn default() -> Self {
         StateCalculationResult {
             start_time: t!(now),
-            data: HashMap::new(),
+            data: Arc::new(HashMap::new()),
         }
     }
 }
@@ -44,7 +45,10 @@ impl std::fmt::Debug for StateCalculationResult {
 
 impl StateCalculationResult {
     pub fn new(start_time: DateTime, data: HashMap<HomeStateId, DataFrame<HomeStateValue>>) -> Self {
-        StateCalculationResult { start_time, data }
+        StateCalculationResult {
+            start_time,
+            data: Arc::new(data),
+        }
     }
 
     pub fn timestamp(&self) -> DateTime {
@@ -64,24 +68,9 @@ pub struct StateCalculationContext {
     start_time: DateTime,
     device_state_client: DeviceStateClient,
     trigger_client: TriggerClient,
-    current: RefCell<HashMap<HomeStateId, DataPoint<HomeStateValue>>>,
-    calculating: RefCell<Vec<HomeStateId>>,
+    current: Cache<HomeStateId, DataPoint<HomeStateValue>>,
     prev: StateCalculationResult,
     trace_contexts: HashMap<String, TraceContext>,
-}
-
-/// Removes the id from the in-progress stack on drop, so an early return
-/// (e.g. `calculate_new_home_state_value` yielding `None`) does not leave a
-/// stale marker behind that would cause a false cycle detection later.
-struct CalculatingGuard<'a> {
-    id: HomeStateId,
-    stack: &'a RefCell<Vec<HomeStateId>>,
-}
-
-impl Drop for CalculatingGuard<'_> {
-    fn drop(&mut self) {
-        self.stack.borrow_mut().retain(|x| x != &self.id);
-    }
 }
 
 impl StateCalculationContext {
@@ -112,8 +101,7 @@ impl StateCalculationContext {
             start_time,
             device_state_client,
             trigger_client,
-            current: RefCell::new(HashMap::new()),
-            calculating: RefCell::new(Vec::new()),
+            current: Cache::new(HomeStateId::variants().len() as u64),
             prev: previous,
             trace_contexts,
         }
@@ -219,46 +207,24 @@ impl StateCalculationContext {
     }
 
     fn get_home_state_value(&self, id: HomeStateId) -> Option<DataPoint<HomeStateValue>> {
-        if let Some(dp) = self.current.borrow().get(&id).cloned() {
-            return Some(dp);
-        }
+        // Moka coalesces concurrent calculations for the same id. This assumes
+        // the provider graph is acyclic; a cycle can block a waiter.
+        self.current.optionally_get_with(id, || {
+            let calculated_value = self.calculate_new_home_state_value(id)?;
+            let previous_dp = self.prev.get_latest(id);
 
-        // Re-entering an id that is still being calculated is a dependency cycle.
-        {
-            let mut calculating = self.calculating.borrow_mut();
-            if calculating.contains(&id) {
-                tracing::error!(
-                    "Dependency cycle detected: {:?} is already being calculated (chain: {:?})",
-                    id,
-                    calculating
-                );
-                return None;
-            }
-            calculating.push(id);
-        }
-
-        let _guard = CalculatingGuard {
-            id,
-            stack: &self.calculating,
-        };
-
-        let calculated_value = self.calculate_new_home_state_value(id)?;
-        let previous_dp = self.prev.get_latest(id);
-
-        //check if previous value is the same, then reuse timestamp
-        let calculated_dp = if let Some(previous_dp) = previous_dp
-            && previous_dp.value == calculated_value
-        {
-            previous_dp.clone()
-        } else {
-            //no or different previous value
-            DataPoint::new(calculated_value, self.start_time)
-        };
-
-        self.current.borrow_mut().insert(id, calculated_dp.clone());
-        Some(calculated_dp)
+            // Reuse the previous timestamp when the value has not changed.
+            Some(
+                if let Some(previous_dp) = previous_dp
+                    && previous_dp.value == calculated_value
+                {
+                    previous_dp
+                } else {
+                    DataPoint::new(calculated_value, self.start_time)
+                },
+            )
+        })
     }
-
     fn calculate_new_home_state_value(&self, id: HomeStateId) -> Option<HomeStateValue> {
         let ext_id: ExternalId = id.into();
 

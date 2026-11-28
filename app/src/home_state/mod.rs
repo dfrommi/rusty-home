@@ -10,7 +10,7 @@ use infrastructure::EventEmitter;
 use infrastructure::{EventBus, EventListener};
 pub use items::*;
 
-use crate::core::time::Duration;
+use crate::core::time::{DateTime, Duration};
 use crate::core::timeseries::DataPoint;
 use crate::device_state::DeviceStateClient;
 use crate::device_state::DeviceStateEvent;
@@ -117,7 +117,10 @@ impl HomeStateModule {
         let duration = self.duration.clone();
         let device_state = self.device_state.clone();
         let trigger_client = self.trigger_client.clone();
-        let new_result = calculate_next_result(duration, old_result, device_state, trigger_client);
+        let new_result = {
+            let _span = tracing::trace_span!("calculate_next_result", parallel = !DateTime::is_shifted()).entered();
+            calculate_next_result(duration, old_result, device_state, trigger_client)
+        };
 
         self.emit_events(&new_result, old_dps);
 
